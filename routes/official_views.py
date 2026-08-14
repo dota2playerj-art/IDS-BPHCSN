@@ -38,7 +38,12 @@ same gap in the same words.
 from models.appointments import get_calendar_month
 from models.broadcasts import audience_options, get_broadcast_history, get_broadcast_stats
 from models.consultations import PEDIATRIC_AGE_YEARS
-from routes.report_views import reports_analytics_context
+from models.immunizations import (
+    GRACE_PERIOD_DAYS,
+    get_dose_coverage,
+    get_immunization_coverage,
+)
+from routes.report_views import UNTRACKED, reports_analytics_context
 from utils.dates import today
 
 # How many rows the announcement feed shows before it stops.
@@ -84,6 +89,20 @@ LOCAL_UNTRACKED = {
         "Per-user notifications are not recorded. There is no notifications "
         "table and nothing writes one, so this panel would have to invent its "
         "own alerts."
+    ),
+    "program_schedule": (
+        "Programme start and end dates are not recorded. There is no programmes "
+        "table at all -- the two memberships below are counted from the patient "
+        "roster and the dose records, not read from a programme that was set up "
+        "somewhere -- so a launch date, a closing date, an Active/Upcoming "
+        "status and a target headcount have nothing to come from."
+    ),
+    "non_epi_vaccines": (
+        "Only the DOH EPI infant schedule is tracked. COVID-19 boosters, "
+        "influenza, HPV and tetanus toxoid are not on it, and the consultation "
+        "form cannot record a dose of any of them -- models/immunizations.py "
+        "accepts only the schedule's own vaccine codes -- so there is no dose "
+        "history behind them and no coverage to report."
     ),
 }
 
@@ -132,4 +151,85 @@ def official_dashboard_context():
         # this also carries are deliberately not rendered for this role.
         "calendar_month": get_calendar_month(),
         "untracked": untracked,
+    }
+
+
+def health_programs_context():
+    """Everything Screen 16 renders.
+
+    Same construction as the dashboard above: no figure is counted here. The
+    programme list is report_views.programs -- the identical pair Screen 10 and
+    the dashboard's membership panel already print -- so the three screens cannot
+    report different memberships for the same programme.
+
+    WHAT THIS SCREEN CANNOT SHOW
+    ----------------------------
+    It was drawn as a roster of eight barangay programmes with categories,
+    target audiences, enrolment counts, statuses and 2026 date ranges. None of
+    that has a table behind it: there is no programmes table, no enrolment table
+    and nothing that dates a programme. Six of the eight -- Prenatal, TB DOTS,
+    Nutrition, Family Planning, Oral Health and Dengue Prevention -- have no
+    source of any kind, which is the same gap report_views.UNTRACKED["programs"]
+    already names for Screen 10 and the dashboard, reused here rather than
+    restated.
+
+    The two that survive are the two the stored data can actually establish, and
+    each carries the basis it was counted on so the reader can see it is a
+    derived membership rather than an enrolment somebody recorded.
+    """
+    reports = reports_analytics_context()
+    patients = reports["patient_report"]
+    programs = reports["programs"]
+
+    # A patient counted under both programmes would be counted twice here, so
+    # this is reported as memberships rather than people -- see the template.
+    membership_total = sum(program["count"] for program in programs)
+
+    return {
+        "clinic_date": today(),
+        "programs": programs,
+        "membership_total": membership_total,
+        "patient_report": patients,
+        "immunization_coverage": reports["immunization_coverage"],
+        "senior_age": patients["senior_age"],
+        "untracked": {**reports["untracked"], **LOCAL_UNTRACKED},
+    }
+
+
+def vaccination_campaigns_context():
+    """Everything Screen 17 renders.
+
+    THE CAMPAIGN CONCEPT HAS NO SOURCE, THE DOSES DO
+    ------------------------------------------------
+    This screen listed nine named vaccination drives, each with a target
+    population, a date range, a dose count and a coverage percentage. Nothing in
+    the schema groups doses into a campaign -- there is no campaign table, no
+    target group and no coverage goal -- so every one of those rows, and the four
+    coverage donuts under them, was invented. That gap is already named by
+    LOCAL_UNTRACKED["campaigns"], written for the dashboard panel that used to
+    show the same three campaigns, and it is reused here unchanged.
+
+    What the health center does record is every dose given to every child, and
+    the DOH EPI schedule says which doses each child should have had by now. So
+    the real unit this screen reports is the scheduled dose, from
+    get_dose_coverage() -- built on the same _roster_statuses() behind the
+    dashboards' follow-up figure, so the coverage table and the "children behind
+    schedule" count cannot disagree.
+
+    The headline cards come from get_immunization_coverage(), which is what
+    Screen 10 and the Barangay Official dashboard already print, for the same
+    reason.
+    """
+    coverage = get_immunization_coverage()
+    doses = get_dose_coverage()
+
+    return {
+        "clinic_date": today(),
+        "immunization_coverage": coverage,
+        "dose_coverage": doses,
+        "pediatric_age_years": PEDIATRIC_AGE_YEARS,
+        "grace_period_days": GRACE_PERIOD_DAYS,
+        # The reason texts only; this screen needs none of Screen 10's figures,
+        # so UNTRACKED is read directly rather than by running the whole report.
+        "untracked": {**UNTRACKED, **LOCAL_UNTRACKED},
     }

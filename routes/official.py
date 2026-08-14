@@ -9,7 +9,11 @@ and its template are gone, so the URL now 404s. See migrate_drop_schedule_logs.p
 from flask import Blueprint, flash, redirect, render_template, request, session, url_for
 
 from routes.broadcast_views import process_send_broadcast, sms_notifications_context
-from routes.official_views import official_dashboard_context
+from routes.official_views import (
+    health_programs_context,
+    official_dashboard_context,
+    vaccination_campaigns_context,
+)
 from routes.report_views import reports_analytics_context
 from utils.security import login_required, role_required
 
@@ -76,14 +80,21 @@ def official_send_sms_broadcast():
 @login_required
 @role_required("Barangay Official")
 def health_programs():
-    return render_template('health_programs.html')
+    """Screen 16. Both screens below used to render with no context at all --
+    every figure on them was written into the template. See
+    routes/official_views.py for where each one now comes from, and for what
+    these two screens cannot show."""
+    return render_template('health_programs.html', **health_programs_context())
 
 
 @official_bp.route('/vaccination-campaigns')
 @login_required
 @role_required("Barangay Official")
 def vaccination_campaigns():
-    return render_template('vaccination_campaigns.html')
+    """Screen 17. Reports scheduled doses, not campaigns; see
+    official_views.vaccination_campaigns_context() for why."""
+    return render_template('vaccination_campaigns.html',
+                           **vaccination_campaigns_context())
 
 
 @official_bp.route('/community-reports')

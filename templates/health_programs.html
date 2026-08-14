@@ -3,7 +3,6 @@
 {% block title %}IDS-BPHCSN | Health Programs{% endblock %}
 
 {% block styles %}
-  .toolbar-search{min-width:280px; max-width:380px;}
   .status-pill{
     display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600;
     padding:6px 14px; border-radius:999px;
@@ -25,74 +24,27 @@
   }
   .panel-title{font-size:16px; font-weight:600; color:var(--text-dark);}
   .panel-sub{font-size:12.5px; color:var(--text-muted); margin-top:2px;}
+  .panel-link{font-size:12.5px; font-weight:600; color:var(--teal-dark); text-decoration:none; display:inline-flex; align-items:center; gap:3px;}
 
+  /* Membership bars. The same block the Barangay Official dashboard's "Health
+     Programme Membership" panel uses, for the same two programmes -- one visual
+     vocabulary for one set of figures. */
+  .progress-item{margin-bottom:18px;}
+  .progress-item:last-child{margin-bottom:0;}
+  .progress-item-head{display:flex; justify-content:space-between; gap:12px; font-size:13.5px; margin-bottom:6px;}
+  .progress-item-name{font-weight:600; color:var(--text-dark);}
+  .progress-item-pct{font-weight:700; color:var(--teal-dark); white-space:nowrap;}
+  .progress-track{height:8px; border-radius:999px; background:#E5E7EB; overflow:hidden;}
+  .progress-fill{height:100%; border-radius:999px; background:var(--teal);}
 
-  .filter-btn{
-    background:#fff; border:1px solid var(--border-color); border-radius:10px; padding:10px 16px;
-    font-size:14px; font-weight:500; color:var(--text-dark); display:flex; align-items:center; gap:6px;
+  /* The "no data source" treatment, carried over from the dashboard so a gap
+     looks the same wherever this project reports one. */
+  .untracked-block{
+    margin-top:12px; padding:14px 16px; border:1px dashed var(--border-color);
+    border-radius:12px; background:#FAFBFC;
   }
-  .filter-btn.open, .filter-btn:hover{border-color:var(--teal); color:var(--teal-dark);}
-
-  .filter-panel{
-    background:var(--bg); border:1px solid var(--border-color); border-radius:12px; padding:20px;
-    margin-bottom:18px; display:none;
-  }
-  .filter-panel.show{display:block;}
-  .filter-panel label{font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:6px; display:block;}
-  .filter-panel .form-control, .filter-panel .form-select{
-    height:48px; border-radius:12px; border:1px solid var(--border-color); font-size:13.5px;
-  }
-  .filter-panel .form-control:focus, .filter-panel .form-select:focus{
-    border-color:var(--teal); box-shadow:0 0 0 3px rgba(22,155,146,0.12);
-  }
-  .filter-actions{display:flex; justify-content:flex-end; gap:10px; margin-top:16px; padding-top:16px; border-top:1px solid var(--border-color);}
-  .btn-reset{background:transparent; border:none; color:var(--text-muted); font-size:14px; font-weight:600; padding:10px 14px;}
-  .btn-reset:hover{color:var(--danger);}
-
-  table.program-table{width:100%; border-collapse:separate; border-spacing:0; font-size:13.5px;}
-  table.program-table thead th{
-    text-align:left; color:var(--text-muted); font-weight:600; font-size:11.5px; letter-spacing:0.03em;
-    text-transform:uppercase; padding:12px 14px; border-bottom:1px solid var(--border-color); white-space:nowrap;
-  }
-  table.program-table tbody td{
-    padding:14px; border-bottom:1px solid var(--border-color); color:var(--text-dark); vertical-align:middle;
-  }
-  table.program-table tbody tr:hover{background:#FAFBFC;}
-  table.program-table tbody tr:last-child td{border-bottom:none;}
-
-  .prog-name{font-weight:600;}
-  .cat-pill{background:var(--teal-light); color:var(--teal-dark); font-size:11.5px; font-weight:600; padding:3px 10px; border-radius:999px; white-space:nowrap; display:inline-block;}
-  .audience-pill{background:#F3F4F6; color:#4B5563; font-size:11.5px; font-weight:600; padding:3px 10px; border-radius:999px; white-space:nowrap; display:inline-block;}
-
-  .badge-status{
-    display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600;
-    padding:4px 11px; border-radius:999px; white-space:nowrap;
-  }
-  .badge-active{background:#DCFCE7; color:#15803D;}
-  .badge-ongoing{background:#DBEAFE; color:#1D4ED8;}
-  .badge-completed{background:#F3F4F6; color:#4B5563;}
-  .badge-upcoming{background:#FEF3C7; color:#B45309;}
-
-  .action-icon{
-    width:32px; height:32px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center;
-    color:var(--text-muted); background:transparent; border:none;
-  }
-  .action-icon:hover{background:var(--bg); color:var(--teal-dark);}
-
-  .table-footer{display:flex; align-items:center; justify-content:space-between; padding-top:18px; margin-top:6px; border-top:1px solid var(--border-color); flex-wrap:wrap; gap:12px;}
-  .pg-info{font-size:13px; color:var(--text-muted);}
-  .pagination .page-link{
-    color:var(--text-dark); border:1px solid var(--border-color); font-size:13px; font-weight:500;
-    padding:7px 13px; border-radius:8px !important; margin-left:4px;
-  }
-  .pagination .page-item.active .page-link{background-color:var(--teal); border-color:var(--teal); color:#fff;}
-  .pagination .page-link:hover{background-color:var(--teal-light); color:var(--teal-dark); border-color:var(--teal-light);}
-  .pagination .page-item.disabled .page-link{color:#C7CBD1; background:#fff;}
-
-  .chart-wrap-md{position:relative; height:220px;}
-  .mini-legend{display:flex; gap:14px; flex-wrap:wrap; margin-top:14px;}
-  .mini-legend-item{display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted);}
-  .mini-legend-dot{width:8px; height:8px; border-radius:50%;}
+  .untracked-head{display:flex; align-items:center; gap:7px; font-size:13px; font-weight:700; color:var(--text-muted);}
+  .untracked-body{font-size:12px; line-height:1.6; color:var(--text-muted); margin-top:7px;}
 {% endblock %}
 
 {% block breadcrumb %}
@@ -114,253 +66,122 @@
         <span class="status-pill pill-secure"><span class="material-symbols-outlined" style="font-size:14px;">wifi</span>Secure Connection</span>
       </div>
     </div>
-    <div style="font-size:14px; color:var(--text-muted); margin-bottom:20px;">{{ clinic_today | full_date }} &middot; Active community health programs for Barangay Poblacion.</div>
+    <div style="font-size:14px; color:var(--text-muted); margin-bottom:20px;">{{ clinic_today | full_date }} &middot; Health programme membership counted from stored records.</div>
 
-    <!-- SUMMARY CARDS -->
+    <!-- SUMMARY CARDS — the first two are counted from the patient roster and
+         the dose records; the last two have no table behind them and say so. -->
+{#- The four cards that stood here were an invented programme count, an invented
+    campaign count carrying a frozen "July 2026", an invented beneficiary total
+    with an invented monthly delta, and an invented count of upcoming launches.
+    None of the four had a source. This note is a Jinja comment rather than an
+    HTML one so the figures it describes are not still sitting in the delivered
+    markup for a reader -- or a scrape -- to find. #}
     <div class="row g-3 mb-4">
       <div class="col-md-3 col-sm-6">
         <div class="stat-card">
           <div class="stat-icon" style="background:var(--teal-light);"><span class="material-symbols-outlined" style="color:var(--teal-dark);">volunteer_activism</span></div>
-          <div class="stat-value">8</div>
-          <div class="stat-label">Active Health Programs</div>
-          <div class="stat-trend" style="color:var(--text-muted);">Running this quarter</div>
-        </div>
-      </div>
-      <div class="col-md-3 col-sm-6">
-        <div class="stat-card">
-          <div class="stat-icon" style="background:#DBEAFE;"><span class="material-symbols-outlined" style="color:var(--info);">campaign</span></div>
-          <div class="stat-value">3</div>
-          <div class="stat-label">Ongoing Campaigns This Month</div>
-          <div class="stat-trend" style="color:var(--text-muted);">July 2026</div>
+          <div class="stat-value">{{ programs | length }}</div>
+          <div class="stat-label">Programmes with Recorded Membership</div>
+          <div class="stat-trend" style="color:var(--text-muted);">{{ programs | map(attribute='name') | join(', ') }}</div>
         </div>
       </div>
       <div class="col-md-3 col-sm-6">
         <div class="stat-card">
           <div class="stat-icon" style="background:#DCFCE7;"><span class="material-symbols-outlined" style="color:var(--success);">groups</span></div>
-          <div class="stat-value">1,376</div>
-          <div class="stat-label">Total Beneficiaries Enrolled</div>
-          <div class="stat-trend" style="color:var(--success);">+63 this month</div>
+          <div class="stat-value">{{ membership_total }}</div>
+          <div class="stat-label">Programme Memberships Recorded</div>
+          <div class="stat-trend" style="color:var(--text-muted);">Across {{ patient_report.total }} registered patients &middot; a patient in both programmes counts twice</div>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#EDE9FE;"><span class="material-symbols-outlined" style="color:var(--purple);">how_to_reg</span></div>
+          <div class="stat-value" style="font-size:16px; color:var(--text-muted);">Not tracked</div>
+          <div class="stat-label">Programme Enrolment</div>
+          <div class="stat-trend" style="color:var(--text-muted);" title="{{ untracked.programs }}">Nothing links a patient to a programme</div>
         </div>
       </div>
       <div class="col-md-3 col-sm-6">
         <div class="stat-card">
           <div class="stat-icon" style="background:#FEF3C7;"><span class="material-symbols-outlined" style="color:var(--warning);">event_upcoming</span></div>
-          <div class="stat-value">2</div>
-          <div class="stat-label">Upcoming Program Launches</div>
-          <div class="stat-trend" style="color:var(--text-muted);">Next 30 days</div>
+          <div class="stat-value" style="font-size:16px; color:var(--text-muted);">Not tracked</div>
+          <div class="stat-label">Programme Schedule</div>
+          <div class="stat-trend" style="color:var(--text-muted);" title="{{ untracked.program_schedule }}">No programme has a start or end date</div>
         </div>
       </div>
     </div>
 
     <div class="row g-3">
 
-      <!-- LEFT: HEALTH PROGRAMS TABLE -->
+      <!-- LEFT: THE MEMBERSHIPS THE DATA CAN ESTABLISH -->
       <div class="col-lg-8">
         <div class="panel-card mb-0">
+          <div class="panel-title">Programmes with Recorded Membership</div>
+          <div class="panel-sub mb-3">Counted from stored records, as a share of the {{ patient_report.total }} registered patients</div>
 
-          <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-3">
-            <div class="d-flex align-items-center gap-2 flex-wrap">
-              <div class="toolbar-search">
-                <span class="material-symbols-outlined" style="font-size:18px;">search</span>
-                <input type="text" id="programSearch" placeholder="Search by program name or category">
-              </div>
-              <button class="filter-btn" id="filterToggleBtn" onclick="toggleFilterPanel()">
-                <span class="material-symbols-outlined" style="font-size:18px;">filter_list</span>Category Filter
-              </button>
-              <button class="filter-btn"><span class="material-symbols-outlined" style="font-size:18px;">sort</span>Sort</button>
+{#- An eight-row table stood here: Prenatal Checkup, TB DOTS, Nutrition Feeding,
+    Senior Citizen Wellness, Family Planning, Child Immunization, Dengue
+    Prevention and Oral Health, each with an invented enrolment count, an
+    Active/Ongoing/Upcoming status and a 2026 date range. There is no programmes
+    table and no enrolment table, so six of the eight had no source at all and
+    none of the eight had a real date. The two below are the same pair Screen 10
+    and the dashboard's membership panel report, from report_views.programs, and
+    each carries the basis it was counted on. #}
+{%- for program in programs %}
+{%- set pct = (program.count * 100 / patient_report.total) | round | int if patient_report.total else 0 %}
+          <div class="progress-item">
+            <div class="progress-item-head">
+              <span class="progress-item-name">{{ program.name }}</span>
+              <span class="progress-item-pct">{{ program.count }} of {{ patient_report.total }} &middot; {{ pct }}%</span>
             </div>
+            <div class="progress-track"><div class="progress-fill" style="width:{{ pct }}%;"></div></div>
+            <div class="panel-sub" style="margin-top:5px;">{{ program.basis }}</div>
           </div>
+{%- endfor %}
 
-          <!-- FILTER PANEL -->
-          <div class="filter-panel" id="filterPanel">
-            <div class="row g-3">
-              <div class="col-md-4 col-sm-6">
-                <label>Category</label>
-                <select class="form-select">
-                  <option selected>All Categories</option>
-                  <option>Prenatal Program</option>
-                  <option>Nutrition Program</option>
-                  <option>TB DOTS</option>
-                  <option>Vaccination Campaign</option>
-                  <option>Family Planning</option>
-                  <option>Senior Citizen Program</option>
-                </select>
-              </div>
-              <div class="col-md-4 col-sm-6">
-                <label>Status</label>
-                <select class="form-select">
-                  <option selected>All Statuses</option>
-                  <option>Active</option>
-                  <option>Ongoing</option>
-                  <option>Upcoming</option>
-                  <option>Completed</option>
-                </select>
-              </div>
-            </div>
-            <div class="filter-actions">
-              <button class="btn-reset">Reset Filters</button>
-              <button class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">filter_alt</span>Apply Filter</button>
-            </div>
+          <div class="untracked-block">
+            <div class="untracked-head"><span class="material-symbols-outlined" style="font-size:18px;">query_stats</span>Every other programme: not tracked</div>
+            <div class="untracked-body">{{ untracked.programs }}</div>
+            <div class="untracked-body">{{ untracked.program_schedule }}</div>
           </div>
-
-          <div style="overflow-x:auto;">
-            <table class="program-table" id="programTable">
-              <thead>
-                <tr>
-                  <th>Program Name</th>
-                  <th>Category</th>
-                  <th>Target Beneficiaries</th>
-                  <th>Enrolled</th>
-                  <th>Status</th>
-                  <th>Start Date</th>
-                  <th>End Date</th>
-                  <th style="text-align:right;">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td class="prog-name">Prenatal Checkup Program</td>
-                  <td><span class="cat-pill">Prenatal Program</span></td>
-                  <td><span class="audience-pill">Pregnant Women</span></td>
-                  <td>58</td>
-                  <td><span class="badge-status badge-active">Active</span></td>
-                  <td>January 05, 2026</td>
-                  <td>December 20, 2026</td>
-                  <td><div class="d-flex justify-content-end"><button class="action-icon" title="View Details"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button></div></td>
-                </tr>
-                <tr>
-                  <td class="prog-name">TB DOTS Program</td>
-                  <td><span class="cat-pill">TB DOTS</span></td>
-                  <td><span class="audience-pill">Residents</span></td>
-                  <td>37</td>
-                  <td><span class="badge-status badge-ongoing">Ongoing</span></td>
-                  <td>February 12, 2026</td>
-                  <td>February 12, 2027</td>
-                  <td><div class="d-flex justify-content-end"><button class="action-icon" title="View Details"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button></div></td>
-                </tr>
-                <tr>
-                  <td class="prog-name">Nutrition Feeding Program</td>
-                  <td><span class="cat-pill">Nutrition Program</span></td>
-                  <td><span class="audience-pill">Children 0-5</span></td>
-                  <td>214</td>
-                  <td><span class="badge-status badge-active">Active</span></td>
-                  <td>June 01, 2026</td>
-                  <td>July 31, 2026</td>
-                  <td><div class="d-flex justify-content-end"><button class="action-icon" title="View Details"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button></div></td>
-                </tr>
-                <tr>
-                  <td class="prog-name">Senior Citizen Wellness Program</td>
-                  <td><span class="cat-pill">Senior Citizen Program</span></td>
-                  <td><span class="audience-pill">Senior Citizens</span></td>
-                  <td>341</td>
-                  <td><span class="badge-status badge-active">Active</span></td>
-                  <td>January 10, 2026</td>
-                  <td>December 15, 2026</td>
-                  <td><div class="d-flex justify-content-end"><button class="action-icon" title="View Details"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button></div></td>
-                </tr>
-                <tr>
-                  <td class="prog-name">Family Planning Program</td>
-                  <td><span class="cat-pill">Family Planning</span></td>
-                  <td><span class="audience-pill">Residents</span></td>
-                  <td>186</td>
-                  <td><span class="badge-status badge-ongoing">Ongoing</span></td>
-                  <td>March 03, 2026</td>
-                  <td>December 03, 2026</td>
-                  <td><div class="d-flex justify-content-end"><button class="action-icon" title="View Details"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button></div></td>
-                </tr>
-                <tr>
-                  <td class="prog-name">Child Immunization Program</td>
-                  <td><span class="cat-pill">Vaccination Campaign</span></td>
-                  <td><span class="audience-pill">Children 0-5</span></td>
-                  <td>312</td>
-                  <td><span class="badge-status badge-active">Active</span></td>
-                  <td>January 15, 2026</td>
-                  <td>December 30, 2026</td>
-                  <td><div class="d-flex justify-content-end"><button class="action-icon" title="View Details"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button></div></td>
-                </tr>
-                <tr>
-                  <td class="prog-name">Dengue Prevention Campaign</td>
-                  <td><span class="cat-pill">Vaccination Campaign</span></td>
-                  <td><span class="audience-pill">Residents</span></td>
-                  <td>1,842</td>
-                  <td><span class="badge-status badge-ongoing">Ongoing</span></td>
-                  <td>July 04, 2026</td>
-                  <td>July 31, 2026</td>
-                  <td><div class="d-flex justify-content-end"><button class="action-icon" title="View Details"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button></div></td>
-                </tr>
-                <tr>
-                  <td class="prog-name">Oral Health Program</td>
-                  <td><span class="cat-pill">Nutrition Program</span></td>
-                  <td><span class="audience-pill">Children 0-5</span></td>
-                  <td>0</td>
-                  <td><span class="badge-status badge-upcoming">Upcoming</span></td>
-                  <td>July 28, 2026</td>
-                  <td>December 18, 2026</td>
-                  <td><div class="d-flex justify-content-end"><button class="action-icon" title="View Details"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button></div></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <!-- PAGINATION -->
-          <div class="table-footer">
-            <div class="pg-info">Showing 1&ndash;8 of 8 health programs</div>
-            <nav aria-label="Health programs pagination">
-              <ul class="pagination mb-0">
-                <li class="page-item disabled"><a class="page-link" href="#"><span class="material-symbols-outlined" style="font-size:16px;">chevron_left</span></a></li>
-                <li class="page-item active"><a class="page-link" href="#">1</a></li>
-                <li class="page-item"><a class="page-link" href="#"><span class="material-symbols-outlined" style="font-size:16px;">chevron_right</span></a></li>
-              </ul>
-            </nav>
-          </div>
-
         </div>
       </div>
 
-      <!-- RIGHT: PROGRAM CATEGORY BREAKDOWN -->
+      <!-- RIGHT: WHERE THESE TWO FIGURES COME FROM -->
       <div class="col-lg-4">
-        <div class="panel-card mb-0">
-          <div class="panel-title" style="font-size:15px;">Program Category Breakdown</div>
-          <div class="panel-sub mb-2">Beneficiaries enrolled by program category</div>
-          <div class="chart-wrap-md"><canvas id="chartProgramCategory"></canvas></div>
-          <div class="mini-legend">
-            <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--teal);"></span>Prenatal (58)</div>
-            <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--info);"></span>Vaccination (2,154)</div>
-            <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--warning);"></span>Senior Citizen (341)</div>
-            <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--purple);"></span>Family Planning (186)</div>
-            <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--success);"></span>Nutrition (214)</div>
-            <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--danger);"></span>TB DOTS (37)</div>
+        <div class="panel-card">
+          <div class="panel-title" style="font-size:15px;">Immunization Programme</div>
+          <div class="panel-sub mb-2">Membership is derived, not enrolled</div>
+{#- A "Program Category Breakdown" doughnut stood here, plotting six invented
+    category totals (Prenatal 58, Vaccination 2,154, Senior Citizen 341, Family
+    Planning 186, Nutrition 214, TB DOTS 37) that summed to a barangay-wide
+    figure this system has no denominator for. It is not replaced by a chart of
+    the two real memberships: those are two overlapping cohorts of one roster,
+    not slices of one whole, and a doughnut would assert a relationship between
+    them that does not exist. #}
+          <div class="panel-sub" style="line-height:1.6;">
+            {{ immunization_coverage.enrolled }} patient{{ '' if immunization_coverage.enrolled == 1 else 's' }}
+            {{ 'has' if immunization_coverage.enrolled == 1 else 'have' }} at least one dose on record, from
+            {{ immunization_coverage.doses_given }} dose{{ '' if immunization_coverage.doses_given == 1 else 's' }} given.
+            Of the {{ immunization_coverage.eligible_children }} registered child{{ '' if immunization_coverage.eligible_children == 1 else 'ren' }}
+            the DOH schedule still applies to,
+            {{ immunization_coverage.up_to_date_children }} {{ 'is' if immunization_coverage.up_to_date_children == 1 else 'are' }} up to date.
           </div>
+          <a href="{{ url_for('vaccination_campaigns') }}" class="panel-link" style="margin-top:12px;">Dose-by-dose coverage<span class="material-symbols-outlined" style="font-size:15px;">chevron_right</span></a>
+        </div>
+
+        <div class="panel-card mb-0">
+          <div class="panel-title" style="font-size:15px;">Senior Citizen Programme</div>
+          <div class="panel-sub mb-2">Membership is derived, not enrolled</div>
+          <div class="panel-sub" style="line-height:1.6;">
+            {{ patient_report.senior_count }} of the {{ patient_report.total }} registered patients
+            {{ 'is' if patient_report.senior_count == 1 else 'are' }} aged {{ senior_age }} or above,
+            counted from their birthdates. Nothing records a senior signing up for a programme,
+            so this is who qualifies, not who enrolled.
+          </div>
+          <a href="{{ url_for(reports_analytics_endpoint) }}" class="panel-link" style="margin-top:12px;">Reports &amp; Analytics<span class="material-symbols-outlined" style="font-size:15px;">chevron_right</span></a>
         </div>
       </div>
 
     </div>
 {% endblock %}
-
-{% block scripts %}
-<script src="{{ url_for('static', filename='js/chart.umd.min.js') }}"></script>
-<script>
-  function toggleFilterPanel(){
-    var panel = document.getElementById('filterPanel');
-    var btn = document.getElementById('filterToggleBtn');
-    panel.classList.toggle('show');
-    btn.classList.toggle('open');
-  }
-
-  Chart.defaults.font.family = "'Inter', Arial, sans-serif";
-  Chart.defaults.color = '#6B7280';
-  Chart.defaults.font.size = 11;
-
-  new Chart(document.getElementById('chartProgramCategory'), {
-    type: 'doughnut',
-    data: {
-      labels: ['Prenatal Program','Vaccination Campaign','Senior Citizen Program','Family Planning','Nutrition Program','TB DOTS'],
-      datasets: [{
-        data: [58, 2154, 341, 186, 214, 37],
-        backgroundColor: ['#169B92', '#3B82F6', '#F59E0B', '#6D28D9', '#22C55E', '#EF4444'],
-        borderWidth: 0
-      }]
-    },
-    options: { responsive:true, maintainAspectRatio:false, cutout:'68%', plugins:{legend:{display:false}} }
-  });
-</script>{% endblock %}

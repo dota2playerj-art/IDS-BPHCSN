@@ -3,7 +3,6 @@
 {% block title %}IDS-BPHCSN | Vaccination Campaigns{% endblock %}
 
 {% block styles %}
-  .toolbar-search{min-width:260px; max-width:360px;}
   .status-pill{
     display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600;
     padding:6px 14px; border-radius:999px;
@@ -26,76 +25,56 @@
   .panel-title{font-size:16px; font-weight:600; color:var(--text-dark);}
   .panel-sub{font-size:12.5px; color:var(--text-muted); margin-top:2px;}
 
-
-  .filter-btn{
-    background:#fff; border:1px solid var(--border-color); border-radius:10px; padding:10px 16px;
-    font-size:14px; font-weight:500; color:var(--text-dark); display:flex; align-items:center; gap:6px;
-  }
-  .filter-btn.open, .filter-btn:hover{border-color:var(--teal); color:var(--teal-dark);}
-
-  .filter-panel{
-    background:var(--bg); border:1px solid var(--border-color); border-radius:12px; padding:20px;
-    margin-bottom:18px; display:none;
-  }
-  .filter-panel.show{display:block;}
-  .filter-panel label{font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:6px; display:block;}
-  .filter-panel .form-control, .filter-panel .form-select{
-    height:48px; border-radius:12px; border:1px solid var(--border-color); font-size:13.5px;
-  }
-  .filter-panel .form-control:focus, .filter-panel .form-select:focus{
-    border-color:var(--teal); box-shadow:0 0 0 3px rgba(22,155,146,0.12);
-  }
-  .filter-actions{display:flex; justify-content:flex-end; gap:10px; margin-top:16px; padding-top:16px; border-top:1px solid var(--border-color);}
-  .btn-reset{background:transparent; border:none; color:var(--text-muted); font-size:14px; font-weight:600; padding:10px 14px;}
-  .btn-reset:hover{color:var(--danger);}
-
   table.vax-table{width:100%; border-collapse:separate; border-spacing:0; font-size:13px;}
   table.vax-table thead th{
     text-align:left; color:var(--text-muted); font-weight:600; font-size:11.5px; letter-spacing:0.03em;
     text-transform:uppercase; padding:12px 14px; border-bottom:1px solid var(--border-color); white-space:nowrap;
   }
   table.vax-table tbody td{
-    padding:14px; border-bottom:1px solid var(--border-color); color:var(--text-dark); vertical-align:middle;
+    padding:12px 14px; border-bottom:1px solid var(--border-color); color:var(--text-dark); vertical-align:middle;
   }
   table.vax-table tbody tr:hover{background:#FAFBFC;}
   table.vax-table tbody tr:last-child td{border-bottom:none;}
+  table.vax-table td.num{text-align:center; white-space:nowrap;}
+  table.vax-table th.num{text-align:center;}
 
-  .camp-name{font-weight:600;}
+  .dose-name{font-weight:600;}
   .cat-pill{background:var(--teal-light); color:var(--teal-dark); font-size:11.5px; font-weight:600; padding:3px 10px; border-radius:999px; white-space:nowrap; display:inline-block;}
-  .audience-pill{background:#F3F4F6; color:#4B5563; font-size:11.5px; font-weight:600; padding:3px 10px; border-radius:999px; white-space:nowrap; display:inline-block;}
+  .timing-pill{background:#F3F4F6; color:#4B5563; font-size:11.5px; font-weight:600; padding:3px 10px; border-radius:999px; white-space:nowrap; display:inline-block;}
   .coverage-pct{font-weight:700;}
+  .count-zero{color:#C7CBD1;}
 
-  .badge-status{
-    display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600;
-    padding:4px 11px; border-radius:999px; white-space:nowrap;
-  }
-  .badge-ongoing{background:#DBEAFE; color:#1D4ED8;}
-  .badge-upcoming{background:#FEF3C7; color:#B45309;}
-  .badge-completed{background:#F3F4F6; color:#4B5563;}
-
-  .action-icon{
-    width:32px; height:32px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center;
-    color:var(--text-muted); background:transparent; border:none;
-  }
-  .action-icon:hover{background:var(--bg); color:var(--teal-dark);}
-
-  .table-footer{display:flex; align-items:center; justify-content:space-between; padding-top:18px; margin-top:6px; border-top:1px solid var(--border-color); flex-wrap:wrap; gap:12px;}
-  .pg-info{font-size:13px; color:var(--text-muted);}
-  .pagination .page-link{
-    color:var(--text-dark); border:1px solid var(--border-color); font-size:13px; font-weight:500;
-    padding:7px 13px; border-radius:8px !important; margin-left:4px;
-  }
-  .pagination .page-item.active .page-link{background-color:var(--teal); border-color:var(--teal); color:#fff;}
-  .pagination .page-link:hover{background-color:var(--teal-light); color:var(--teal-dark); border-color:var(--teal-light);}
-  .pagination .page-item.disabled .page-link{color:#C7CBD1; background:#fff;}
-
-  /* COVERAGE DONUT CARDS - exact pattern from approved Barangay Official Dashboard */
-  .overview-card{background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:18px 20px; height:100%;}
+  /* COVERAGE DONUT CARDS
+     Copied from the Barangay Official dashboard *after* its overlap fix, not
+     from the version this screen was originally drawn against. The -70px pulls
+     the percentage back up into the hole of the donut above it, which is half of
+     .chart-wrap-sm's 150px; it only makes sense directly after a .chart-wrap-sm.
+     With no chart above it there is nothing to pull into and the text lands on
+     the card's own heading, which is exactly the bug the dashboard hit when its
+     two unsourced donuts were removed. A card with no chart therefore uses
+     .overview-untracked below instead of these two classes. */
+  .overview-card{background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:18px 20px 26px; height:100%; overflow:hidden;}
   .overview-title{font-size:13.5px; font-weight:600; color:var(--text-dark);}
   .overview-sub{font-size:11.5px; color:var(--text-muted); margin-top:1px; margin-bottom:8px;}
-  .chart-wrap-sm{position:relative; height:120px;}
-  .overview-figure{font-size:20px; font-weight:700; color:var(--text-dark); text-align:center; margin-top:-78px; position:relative; z-index:1; pointer-events:none;}
+  .chart-wrap-sm{position:relative; height:150px; display:flex; align-items:center; justify-content:center;}
+  .chart-wrap-sm canvas{position:absolute; inset:0; width:100% !important; height:100% !important;}
+  .overview-figure{font-size:20px; font-weight:700; color:var(--text-dark); text-align:center; margin-top:-70px; position:relative; z-index:1; pointer-events:none;}
   .overview-figure-sub{font-size:10.5px; color:var(--text-muted); text-align:center; margin-top:2px; position:relative; z-index:1; pointer-events:none;}
+
+  .overview-untracked{
+    margin-top:10px; padding:14px 13px 15px; border:1px dashed var(--border-color);
+    border-radius:12px; background:#FAFBFC;
+  }
+  .overview-untracked .material-symbols-outlined{font-size:24px; color:var(--text-muted); display:block; text-align:center;}
+  .overview-untracked-label{font-size:15px; font-weight:700; color:var(--text-muted); text-align:center; margin-top:5px;}
+  .overview-untracked-body{font-size:10.5px; line-height:1.55; color:var(--text-muted); margin-top:9px;}
+
+  .untracked-block{
+    margin-top:12px; padding:14px 16px; border:1px dashed var(--border-color);
+    border-radius:12px; background:#FAFBFC;
+  }
+  .untracked-head{display:flex; align-items:center; gap:7px; font-size:13px; font-weight:700; color:var(--text-muted);}
+  .untracked-body{font-size:12px; line-height:1.6; color:var(--text-muted); margin-top:7px;}
 {% endblock %}
 
 {% block breadcrumb %}
@@ -117,265 +96,177 @@
         <span class="status-pill pill-secure"><span class="material-symbols-outlined" style="font-size:14px;">wifi</span>Secure Connection</span>
       </div>
     </div>
-    <div style="font-size:14px; color:var(--text-muted); margin-bottom:20px;">{{ clinic_today | full_date }} &middot; Vaccination campaign monitoring for Barangay Poblacion.</div>
+    <div style="font-size:14px; color:var(--text-muted); margin-bottom:20px;">{{ clinic_today | full_date }} &middot; DOH EPI schedule coverage for registered children under {{ pediatric_age_years }}.</div>
 
-    <!-- SUMMARY CARDS -->
+    <!-- SUMMARY CARDS — all four read from get_immunization_coverage(), the same
+         call behind Screen 10 and the Barangay Official dashboard. -->
+{#- The cards that stood here counted ongoing and upcoming campaigns, a yearly
+    dose total with a monthly delta, and an overall coverage rate. The first two
+    counted a thing this system does not store; the last two were invented
+    outright. Kept as a Jinja comment so those figures are not still in the
+    delivered markup -- see health_programs.html for the same treatment. #}
     <div class="row g-3 mb-4">
       <div class="col-md-3 col-sm-6">
         <div class="stat-card">
-          <div class="stat-icon" style="background:#DBEAFE;"><span class="material-symbols-outlined" style="color:var(--info);">vaccines</span></div>
-          <div class="stat-value">3</div>
-          <div class="stat-label">Ongoing Campaigns</div>
-          <div class="stat-trend" style="color:var(--text-muted);">Active this week</div>
-        </div>
-      </div>
-      <div class="col-md-3 col-sm-6">
-        <div class="stat-card">
-          <div class="stat-icon" style="background:#FEF3C7;"><span class="material-symbols-outlined" style="color:var(--warning);">event_upcoming</span></div>
-          <div class="stat-value">2</div>
-          <div class="stat-label">Upcoming Campaigns</div>
-          <div class="stat-trend" style="color:var(--text-muted);">Next 30 days</div>
-        </div>
-      </div>
-      <div class="col-md-3 col-sm-6">
-        <div class="stat-card">
           <div class="stat-icon" style="background:var(--teal-light);"><span class="material-symbols-outlined" style="color:var(--teal-dark);">vaccines</span></div>
-          <div class="stat-value">4,186</div>
-          <div class="stat-label">Total Doses Administered This Year</div>
-          <div class="stat-trend" style="color:var(--success);">+312 this month</div>
+          <div class="stat-value">{{ immunization_coverage.doses_given }}</div>
+          <div class="stat-label">Immunization Doses Recorded</div>
+          <div class="stat-trend" style="color:var(--text-muted);">
+            {{ immunization_coverage.enrolled }} patient{{ '' if immunization_coverage.enrolled == 1 else 's' }} with at least one dose
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#DBEAFE;"><span class="material-symbols-outlined" style="color:var(--info);">child_care</span></div>
+          <div class="stat-value">{{ immunization_coverage.eligible_children }}</div>
+          <div class="stat-label">Children on the DOH Schedule</div>
+          <div class="stat-trend" style="color:var(--text-muted);">Active registered patients under {{ pediatric_age_years }}</div>
         </div>
       </div>
       <div class="col-md-3 col-sm-6">
         <div class="stat-card">
           <div class="stat-icon" style="background:#DCFCE7;"><span class="material-symbols-outlined" style="color:var(--success);">verified</span></div>
-          <div class="stat-value">83%</div>
-          <div class="stat-label">Overall Coverage Rate</div>
-          <div class="stat-trend" style="color:var(--text-muted);">All active campaigns</div>
+{%- if immunization_coverage.up_to_date_pct is not none %}
+          <div class="stat-value">{{ immunization_coverage.up_to_date_pct }}%</div>
+          <div class="stat-label">Children Up to Date</div>
+          <div class="stat-trend" style="color:var(--text-muted);">{{ immunization_coverage.up_to_date_children }} of {{ immunization_coverage.eligible_children }} children</div>
+{%- else %}
+          <div class="stat-value" style="font-size:16px; color:var(--text-muted);">No children</div>
+          <div class="stat-label">Children Up to Date</div>
+          <div class="stat-trend" style="color:var(--text-muted);">No registered patient is young enough for the schedule</div>
+{%- endif %}
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#FEE2E2;"><span class="material-symbols-outlined" style="color:var(--danger);">notification_important</span></div>
+          <div class="stat-value">{{ immunization_coverage.needing_attention }}</div>
+          <div class="stat-label">Children Behind Schedule</div>
+          <div class="stat-trend" style="color:var(--text-muted);">
+            {{ immunization_coverage.overdue_children }} overdue past the {{ grace_period_days }}-day grace period
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- VACCINATION CAMPAIGNS TABLE -->
+    <!-- WHAT A "CAMPAIGN" WOULD NEED -->
     <div class="panel-card">
-
-      <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-3">
-        <div class="d-flex align-items-center gap-2 flex-wrap">
-          <div class="toolbar-search">
-            <span class="material-symbols-outlined" style="font-size:18px;">search</span>
-            <input type="text" id="campaignSearch" placeholder="Search by campaign name or vaccine type">
-          </div>
-          <button class="filter-btn" id="filterToggleBtn" onclick="toggleFilterPanel()">
-            <span class="material-symbols-outlined" style="font-size:18px;">filter_list</span>Filter
-          </button>
-          <button class="filter-btn"><span class="material-symbols-outlined" style="font-size:18px;">sort</span>Sort</button>
+      <div class="panel-title">Named Campaigns</div>
+      <div class="panel-sub">Not tracked</div>
+{#- Nine invented campaigns stood below this heading -- BCG Immunization Drive,
+    Anti-Measles Vaccination Drive, Pentavalent Vaccination Program, COVID-19
+    Booster Campaign, Anti-Polio Immunization Round, Hepatitis B Newborn Dosing,
+    Tetanus Toxoid Prenatal Protection Drive, Senior Citizen Influenza
+    Vaccination and HPV Vaccination Program -- each with a target population, a
+    dose count, a coverage percentage and a 2026 date range. Nothing groups doses
+    into a campaign, so all of it was invented. The same gap is already stated on
+    the dashboard panel that showed three of these; the wording is reused rather
+    than restated. #}
+      <div class="untracked-block">
+        <div class="untracked-head"><span class="material-symbols-outlined" style="font-size:18px;">query_stats</span>Campaigns are not recorded</div>
+        <div class="untracked-body">{{ untracked.campaigns }}</div>
+        <div class="untracked-body">
+          What this screen reports instead is the unit that <em>is</em> recorded: the scheduled dose.
+          Every figure below traces to a row in the immunization table and to the DOH EPI schedule
+          the consultation form records against.
         </div>
       </div>
+    </div>
 
-      <!-- FILTER PANEL -->
-      <div class="filter-panel" id="filterPanel">
-        <div class="row g-3">
-          <div class="col-md-4 col-sm-6">
-            <label>Vaccine Type</label>
-            <select class="form-select">
-              <option selected>All Vaccine Types</option>
-              <option>BCG</option>
-              <option>Hepatitis B</option>
-              <option>Pentavalent</option>
-              <option>MMR</option>
-              <option>Polio</option>
-              <option>COVID-19 Vaccine</option>
-              <option>Influenza Vaccine</option>
-              <option>Pneumococcal Vaccine</option>
-              <option>Tetanus Toxoid</option>
-              <option>HPV Vaccine</option>
-            </select>
-          </div>
-          <div class="col-md-4 col-sm-6">
-            <label>Status</label>
-            <select class="form-select">
-              <option selected>All Statuses</option>
-              <option>Ongoing</option>
-              <option>Upcoming</option>
-              <option>Completed</option>
-            </select>
-          </div>
-        </div>
-        <div class="filter-actions">
-          <button class="btn-reset">Reset Filters</button>
-          <button class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">filter_alt</span>Apply Filter</button>
-        </div>
+    <!-- EPI SCHEDULE COVERAGE -->
+    <div class="panel-card">
+      <div class="panel-title">DOH EPI Schedule Coverage</div>
+      <div class="panel-sub mb-3">
+        Each scheduled dose across the {{ dose_coverage.eligible_children }} registered
+        child{{ '' if dose_coverage.eligible_children == 1 else 'ren' }} the infant schedule still applies to.
+        A dose counts as overdue once it is more than {{ grace_period_days }} days past due.
       </div>
 
       <div style="overflow-x:auto;">
-        <table class="vax-table" id="campaignTable">
+        <table class="vax-table">
           <thead>
             <tr>
-              <th>Campaign Name</th>
-              <th>Vaccine Type</th>
-              <th>Target Beneficiaries</th>
-              <th>Target Population</th>
-              <th>Doses Administered</th>
-              <th>Coverage</th>
-              <th>Status</th>
-              <th>Schedule</th>
-              <th style="text-align:right;">Actions</th>
+              <th>Scheduled Dose</th>
+              <th>Protects Against</th>
+              <th>Due At</th>
+              <th class="num">Given</th>
+              <th class="num">Overdue</th>
+              <th class="num">Due Now</th>
+              <th class="num">Not Yet Due</th>
+              <th class="num">Coverage</th>
             </tr>
           </thead>
           <tbody>
+{%- for dose in dose_coverage.doses %}
             <tr>
-              <td class="camp-name">BCG Immunization Drive</td>
-              <td><span class="cat-pill">BCG</span></td>
-              <td><span class="audience-pill">Infants 0-12 months</span></td>
-              <td>412</td>
-              <td>389</td>
-              <td class="coverage-pct" style="color:var(--success);">94%</td>
-              <td><span class="badge-status badge-ongoing">Ongoing</span></td>
-              <td>January 05, 2026 &ndash; December 20, 2026</td>
-              <td><div class="d-flex justify-content-end"><button class="action-icon" title="View Details"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button></div></td>
+              <td class="dose-name">{{ dose.label }}</td>
+              <td style="color:var(--text-muted);">{{ dose.protects }}</td>
+              <td><span class="timing-pill">{{ dose.timing }}</span></td>
+              <td class="num{% if not dose.given %} count-zero{% endif %}">{{ dose.given }}</td>
+              <td class="num{% if not dose.overdue %} count-zero{% endif %}"{% if dose.overdue %} style="color:var(--danger); font-weight:600;"{% endif %}>{{ dose.overdue }}</td>
+              <td class="num{% if not dose.due_now %} count-zero{% endif %}"{% if dose.due_now %} style="color:var(--warning); font-weight:600;"{% endif %}>{{ dose.due_now }}</td>
+              <td class="num{% if not dose.upcoming %} count-zero{% endif %}">{{ dose.upcoming }}</td>
+{%- if dose.coverage_pct is not none %}
+              <td class="num coverage-pct" style="color:{% if dose.coverage_pct >= 80 %}var(--success){% elif dose.coverage_pct > 0 %}var(--warning){% else %}var(--text-muted){% endif %};">{{ dose.coverage_pct }}%</td>
+{%- else %}
+              <td class="num" style="color:var(--text-muted);">&mdash;</td>
+{%- endif %}
             </tr>
-            <tr>
-              <td class="camp-name">Anti-Measles Vaccination Drive</td>
-              <td><span class="cat-pill">MMR</span></td>
-              <td><span class="audience-pill">Children 0-5</span></td>
-              <td>343</td>
-              <td>312</td>
-              <td class="coverage-pct" style="color:var(--success);">91%</td>
-              <td><span class="badge-status badge-ongoing">Ongoing</span></td>
-              <td>July 06, 2026 &ndash; July 10, 2026</td>
-              <td><div class="d-flex justify-content-end"><button class="action-icon" title="View Details"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button></div></td>
-            </tr>
-            <tr>
-              <td class="camp-name">Pentavalent Vaccination Program</td>
-              <td><span class="cat-pill">Pentavalent</span></td>
-              <td><span class="audience-pill">Infants 6-14 weeks</span></td>
-              <td>398</td>
-              <td>326</td>
-              <td class="coverage-pct" style="color:var(--warning);">82%</td>
-              <td><span class="badge-status badge-ongoing">Ongoing</span></td>
-              <td>February 01, 2026 &ndash; December 15, 2026</td>
-              <td><div class="d-flex justify-content-end"><button class="action-icon" title="View Details"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button></div></td>
-            </tr>
-            <tr>
-              <td class="camp-name">COVID-19 Booster Campaign</td>
-              <td><span class="cat-pill">COVID-19 Vaccine</span></td>
-              <td><span class="audience-pill">Senior Citizens</span></td>
-              <td>341</td>
-              <td>0</td>
-              <td class="coverage-pct" style="color:var(--text-muted);">0%</td>
-              <td><span class="badge-status badge-upcoming">Upcoming</span></td>
-              <td>July 15, 2026 &ndash; August 15, 2026</td>
-              <td><div class="d-flex justify-content-end"><button class="action-icon" title="View Details"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button></div></td>
-            </tr>
-            <tr>
-              <td class="camp-name">Anti-Polio Immunization Round</td>
-              <td><span class="cat-pill">Polio</span></td>
-              <td><span class="audience-pill">Children 0-5</span></td>
-              <td>343</td>
-              <td>301</td>
-              <td class="coverage-pct" style="color:var(--warning);">88%</td>
-              <td><span class="badge-status badge-completed">Completed</span></td>
-              <td>March 03, 2026 &ndash; March 17, 2026</td>
-              <td><div class="d-flex justify-content-end"><button class="action-icon" title="View Details"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button></div></td>
-            </tr>
-            <tr>
-              <td class="camp-name">Hepatitis B Newborn Dosing Program</td>
-              <td><span class="cat-pill">Hepatitis B</span></td>
-              <td><span class="audience-pill">Newborns</span></td>
-              <td>128</td>
-              <td>121</td>
-              <td class="coverage-pct" style="color:var(--success);">95%</td>
-              <td><span class="badge-status badge-ongoing">Ongoing</span></td>
-              <td>January 01, 2026 &ndash; December 31, 2026</td>
-              <td><div class="d-flex justify-content-end"><button class="action-icon" title="View Details"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button></div></td>
-            </tr>
-            <tr>
-              <td class="camp-name">Tetanus Toxoid Prenatal Protection Drive</td>
-              <td><span class="cat-pill">Tetanus Toxoid</span></td>
-              <td><span class="audience-pill">Pregnant Women</span></td>
-              <td>58</td>
-              <td>46</td>
-              <td class="coverage-pct" style="color:var(--warning);">79%</td>
-              <td><span class="badge-status badge-ongoing">Ongoing</span></td>
-              <td>January 10, 2026 &ndash; December 10, 2026</td>
-              <td><div class="d-flex justify-content-end"><button class="action-icon" title="View Details"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button></div></td>
-            </tr>
-            <tr>
-              <td class="camp-name">Senior Citizen Influenza Vaccination</td>
-              <td><span class="cat-pill">Influenza Vaccine</span></td>
-              <td><span class="audience-pill">Senior Citizens</span></td>
-              <td>341</td>
-              <td>0</td>
-              <td class="coverage-pct" style="color:var(--text-muted);">0%</td>
-              <td><span class="badge-status badge-upcoming">Upcoming</span></td>
-              <td>July 15, 2026 &ndash; July 15, 2026</td>
-              <td><div class="d-flex justify-content-end"><button class="action-icon" title="View Details"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button></div></td>
-            </tr>
-            <tr>
-              <td class="camp-name">HPV Vaccination Program for Adolescents</td>
-              <td><span class="cat-pill">HPV Vaccine</span></td>
-              <td><span class="audience-pill">Children 9-15 years</span></td>
-              <td>176</td>
-              <td>142</td>
-              <td class="coverage-pct" style="color:var(--warning);">81%</td>
-              <td><span class="badge-status badge-completed">Completed</span></td>
-              <td>April 14, 2026 &ndash; May 09, 2026</td>
-              <td><div class="d-flex justify-content-end"><button class="action-icon" title="View Details"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button></div></td>
-            </tr>
+{%- endfor %}
           </tbody>
         </table>
       </div>
 
-      <!-- PAGINATION -->
-      <div class="table-footer">
-        <div class="pg-info">Showing 1&ndash;8 of 8 vaccination campaigns</div>
-        <nav aria-label="Vaccination campaigns pagination">
-          <ul class="pagination mb-0">
-            <li class="page-item disabled"><a class="page-link" href="#"><span class="material-symbols-outlined" style="font-size:16px;">chevron_left</span></a></li>
-            <li class="page-item active"><a class="page-link" href="#">1</a></li>
-            <li class="page-item"><a class="page-link" href="#"><span class="material-symbols-outlined" style="font-size:16px;">chevron_right</span></a></li>
-          </ul>
-        </nav>
+      <div class="panel-sub" style="margin-top:16px;">
+{%- if dose_coverage.eligible_children %}
+        {{ dose_coverage.total_given }} of {{ dose_coverage.total_scheduled }} scheduled doses given across
+        {{ dose_coverage.doses | length }} scheduled doses &times; {{ dose_coverage.eligible_children }}
+        child{{ '' if dose_coverage.eligible_children == 1 else 'ren' }} &middot;
+        {{ dose_coverage.total_overdue }} overdue, {{ dose_coverage.total_due_now }} due now.
+{%- else %}
+        No registered patient is young enough for the DOH infant schedule, so there is nothing to
+        count against it. The dose rows above show the schedule itself.
+{%- endif %}
       </div>
-
     </div>
 
-    <!-- COVERAGE BY VACCINE TYPE -->
-    <div class="panel-title mb-2">Coverage by Vaccine Type</div>
+    <!-- COVERAGE BY VACCINE -->
+    <div class="panel-title mb-2">Coverage by Vaccine</div>
     <div class="row g-3">
+{#- Four donuts stood here (BCG 94%, Pentavalent 82%, COVID-19 Booster 0%, MMR
+    91%) against invented denominators. The eight below are the vaccines the EPI
+    schedule actually contains, each counted over every one of its scheduled
+    doses for every eligible child. #}
+{%- for vaccine in dose_coverage.by_vaccine %}
       <div class="col-md-3 col-sm-6">
         <div class="overview-card">
-          <div class="overview-title">BCG Coverage</div>
-          <div class="overview-sub">Infants 0&ndash;12 months</div>
-          <div class="chart-wrap-sm"><canvas id="chartBcg"></canvas></div>
-          <div class="overview-figure">94%</div>
-          <div class="overview-figure-sub">389 / 412 infants</div>
+          <div class="overview-title">{{ vaccine.vaccine }}</div>
+          <div class="overview-sub">{{ vaccine.dose_count }} scheduled dose{{ '' if vaccine.dose_count == 1 else 's' }} &middot; {{ vaccine.protects }}</div>
+          <div class="chart-wrap-sm"><canvas id="chartVax{{ loop.index }}"></canvas></div>
+{%- if vaccine.coverage_pct is not none %}
+          <div class="overview-figure">{{ vaccine.coverage_pct }}%</div>
+          <div class="overview-figure-sub">{{ vaccine.given }} / {{ vaccine.scheduled }} doses given</div>
+{%- else %}
+          <div class="overview-figure" style="font-size:17px; color:var(--text-muted);">No children</div>
+          <div class="overview-figure-sub">Nobody is eligible for this dose.</div>
+{%- endif %}
         </div>
       </div>
+{%- endfor %}
+
+      <!-- The vaccines this screen used to chart that are not on the EPI
+           schedule at all. No chart, so no .overview-figure: this card uses the
+           in-flow .overview-untracked block instead. -->
       <div class="col-md-3 col-sm-6">
         <div class="overview-card">
-          <div class="overview-title">Pentavalent Coverage</div>
-          <div class="overview-sub">Infants 6&ndash;14 weeks</div>
-          <div class="chart-wrap-sm"><canvas id="chartPenta"></canvas></div>
-          <div class="overview-figure">82%</div>
-          <div class="overview-figure-sub">326 / 398 infants</div>
-        </div>
-      </div>
-      <div class="col-md-3 col-sm-6">
-        <div class="overview-card">
-          <div class="overview-title">COVID-19 Booster Coverage</div>
-          <div class="overview-sub">Senior citizens, campaign upcoming</div>
-          <div class="chart-wrap-sm"><canvas id="chartCovid"></canvas></div>
-          <div class="overview-figure">0%</div>
-          <div class="overview-figure-sub">0 / 341 seniors</div>
-        </div>
-      </div>
-      <div class="col-md-3 col-sm-6">
-        <div class="overview-card">
-          <div class="overview-title">Anti-Measles (MMR) Coverage</div>
-          <div class="overview-sub">Children 0&ndash;5</div>
-          <div class="chart-wrap-sm"><canvas id="chartMmr"></canvas></div>
-          <div class="overview-figure">91%</div>
-          <div class="overview-figure-sub">312 / 343 children</div>
+          <div class="overview-title">COVID-19, Influenza, HPV, Tetanus Toxoid</div>
+          <div class="overview-sub">Not on the DOH EPI infant schedule</div>
+          <div class="overview-untracked">
+            <span class="material-symbols-outlined">query_stats</span>
+            <div class="overview-untracked-label">Not tracked</div>
+            <div class="overview-untracked-body">{{ untracked.non_epi_vaccines }}</div>
+          </div>
         </div>
       </div>
     </div>
@@ -384,18 +275,11 @@
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/chart.umd.min.js') }}"></script>
 <script>
-  function toggleFilterPanel(){
-    var panel = document.getElementById('filterPanel');
-    var btn = document.getElementById('filterToggleBtn');
-    panel.classList.toggle('show');
-    btn.classList.toggle('open');
-  }
-
   Chart.defaults.font.family = "'Inter', Arial, sans-serif";
   Chart.defaults.color = '#6B7280';
   Chart.defaults.font.size = 11;
 
-  const teal = '#169B92', info = '#3B82F6', warning = '#F59E0B', success = '#22C55E';
+  const teal = '#169B92', warning = '#F59E0B', success = '#22C55E', muted = '#D1D5DB';
 
   function miniDonut(id, value, color){
     new Chart(document.getElementById(id), {
@@ -404,8 +288,14 @@
       options: { responsive:true, maintainAspectRatio:false, cutout:'75%', plugins:{legend:{display:false}, tooltip:{enabled:false}} }
     });
   }
-  miniDonut('chartBcg', 94, success);
-  miniDonut('chartPenta', 82, warning);
-  miniDonut('chartCovid', 0, '#D1D5DB');
-  miniDonut('chartMmr', 91, teal);
+
+  // Emitted from the same context the percentage under each donut is printed
+  // from, so a chart cannot disagree with the number beneath it. A vaccine with
+  // no eligible cohort has no percentage and gets no chart drawn.
+  var vaccineCoverage = {{ dose_coverage.by_vaccine | map(attribute='coverage_pct') | list | tojson }};
+  vaccineCoverage.forEach(function(pct, index){
+    if (pct === null) { return; }
+    var color = pct >= 80 ? success : (pct > 0 ? warning : muted);
+    miniDonut('chartVax' + (index + 1), pct, color);
+  });
 </script>{% endblock %}

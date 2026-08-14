@@ -8,7 +8,7 @@ own redirect target.
 """
 from models.appointments import get_appointments_for_patient, get_next_appointment_for_patient
 from models.consultations import get_consultations_for_patient
-from models.immunizations import get_immunization_status
+from models.immunizations import dose_label, get_immunization_status
 from models.patients import (
     ALLERGY_OPTIONS,
     BLOOD_TYPES,
@@ -235,7 +235,35 @@ def patient_profile_context(patient_id):
         "next_appointment": get_next_appointment_for_patient(patient_id),
         "immunization": immunization,
         "show_immunizations": show_immunizations,
+        "doses_by_consultation": _doses_by_consultation(immunization["records"]),
     }
+
+
+def _doses_by_consultation(records):
+    """{consultation_id: [dose, ...]} for the View panel on each history row.
+
+    Built from the dose list get_immunization_status() has already read for the
+    Immunization tab rather than by asking the database again -- the records
+    carry their consultation_id, so the grouping is free. A per-row call to
+    get_immunizations_for_consultation() would have issued one query per
+    consultation to recover rows this context is already holding.
+
+    Doses recorded outside a consultation (consultation_id NULL -- a dose
+    entered against a patient directly) are skipped: they belong to no visit, so
+    no visit's panel should claim them. They remain visible on the Immunization
+    tab, which is the record of what the child has had.
+    """
+    grouped = {}
+    for record in records:
+        consultation_id = record.get("consultation_id")
+        if not consultation_id:
+            continue
+        dose = dict(record)
+        # The one place a dose is turned into words, so this panel names it
+        # exactly as the Immunization tab and the consultation form do.
+        dose["label"] = dose_label(record["vaccine_code"], record["dose_number"])
+        grouped.setdefault(consultation_id, []).append(dose)
+    return grouped
 
 
 def patient_to_form(patient):

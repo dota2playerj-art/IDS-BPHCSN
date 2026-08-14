@@ -364,16 +364,20 @@ def _summarise(counts, applicable):
     return " · ".join(parts)
 
 
-def get_immunization_alert(limit=None, on_date=None):
-    """Children due or overdue for a dose. Same role as get_low_stock_alert().
+def _roster_statuses(on_date=None):
+    """Every active patient's standing against the schedule. (roster, reference).
 
-    The dashboards' figure and list, and the set the queue reads to decide which
-    rows carry a badge. Everything derives from get_immunization_status(), so the
-    dashboard card, the queue badge and the child's own profile cannot disagree.
+    The shared root of get_immunization_alert() and get_dose_coverage(). Both
+    need the same thing -- one get_immunization_status() per active patient, on
+    one date -- and computing it twice is how the follow-up list and the coverage
+    table would eventually come to disagree about the same child. It is the same
+    reason get_immunization_status() itself is the only place a dose's status is
+    decided; this just extends that rule one level up.
 
-    `limit` caps only the returned list, never the counts -- a panel with room
-    for five rows still reports the true total above them, exactly as the
-    low-stock panel does.
+    Only living, active records: chasing a deceased or archived child for a
+    missed dose is exactly the kind of thing a follow-up list must not do, and a
+    coverage denominator that counted them would be reporting on children the
+    health center is no longer responsible for.
 
     Every dose for every patient is read in one query and grouped in Python,
     rather than one query per child: the roster is small, but a per-child query
@@ -400,20 +404,35 @@ def get_immunization_alert(limit=None, on_date=None):
     for row in rows:
         by_patient.setdefault(row["patient_id"], []).append(dict(row))
 
+    roster = [
+        (patient, get_immunization_status(
+            patient, on_date=reference, records=by_patient.get(patient["id"], [])))
+        for patient in get_all_patients()
+        if patient.get("status") == "Active"
+    ]
+    return roster, reference
+
+
+def get_immunization_alert(limit=None, on_date=None):
+    """Children due or overdue for a dose. Same role as get_low_stock_alert().
+
+    The dashboards' figure and list, and the set the queue reads to decide which
+    rows carry a badge. Everything derives from get_immunization_status(), so the
+    dashboard card, the queue badge and the child's own profile cannot disagree.
+
+    `limit` caps only the returned list, never the counts -- a panel with room
+    for five rows still reports the true total above them, exactly as the
+    low-stock panel does.
+    """
+    roster, reference = _roster_statuses(on_date)
+
     children = []
     # How many children the DOH schedule applies to at all -- the denominator a
     # coverage figure needs. Counted in this loop rather than by a second query,
     # because "applicable" is get_immunization_status()'s own judgement and a
     # separate SELECT on birth_date would be a second, quietly different rule.
     eligible = 0
-    for patient in get_all_patients():
-        # Only living, active records: chasing a deceased or archived child for a
-        # missed dose is exactly the kind of thing a follow-up list must not do.
-        if patient.get("status") != "Active":
-            continue
-        status = get_immunization_status(
-            patient, on_date=reference, records=by_patient.get(patient["id"], [])
-        )
+    for patient, status in roster:
         if status["applicable"]:
             eligible += 1
         if not status["needs_attention"]:
@@ -488,6 +507,92 @@ def get_immunization_coverage(on_date=None):
             round(alert["up_to_date_child_count"] * 100 / alert["eligible_child_count"])
             if alert["eligible_child_count"] else None
         ),
+    }
+
+
+def get_dose_coverage(on_date=None):
+    """Coverage of each scheduled dose across the children the schedule applies to.
+
+    What Screen 17 (Vaccination Campaigns) can honestly report. That screen was
+    drawn as a list of named vaccination drives -- "Anti-Measles Vaccination
+    Drive, 6-10 July, 343 target, 91% coverage" -- and nothing in the schema
+    stores a campaign, its target group, its date range or its goal. See
+    official_views.LOCAL_UNTRACKED["campaigns"].
+
+    What *is* stored is every dose given to every child, and the DOH schedule
+    says which doses each child should have had by now. So the real unit here is
+    the scheduled dose, not the campaign: for each of the EPI schedule's entries,
+    how many of the eligible children have had it, and how many are overdue, due
+    now or not yet due. That is a coverage report a barangay can act on, and
+    every figure in it traces to a row in `immunizations`.
+
+    The denominator is the eligible cohort -- active patients get_immunization_status()
+    judges the infant schedule still applies to -- which is the same denominator
+    get_immunization_alert() reports as eligible_child_count, because both come
+    from _roster_statuses(). A dose's coverage here can therefore be read
+    directly against the up-to-date percentage the dashboards print.
+
+    Returns `doses` (one row per EPI_SCHEDULE entry, in schedule order) and
+    `by_vaccine` (those rows rolled up per vaccine, for the coverage cards).
+    """
+    roster, reference = _roster_statuses(on_date)
+    eligible = [status for _, status in roster if status["applicable"]]
+    cohort = len(eligible)
+
+    doses = []
+    for index, entry in enumerate(EPI_SCHEDULE):
+        code, vaccine, protects, dose_number, total, value, unit, note = entry
+        # Positional lookup is safe: get_immunization_status() builds its
+        # "schedule" list by iterating EPI_SCHEDULE in this same order, one entry
+        # per row, so index i here is index i there for every child.
+        counts = {status_name: 0 for status_name in STATUS_ORDER}
+        for status in eligible:
+            counts[status["schedule"][index]["status"]] += 1
+        doses.append({
+            "code": code,
+            "vaccine": vaccine,
+            "protects": protects,
+            "dose_number": dose_number,
+            "total_doses": total,
+            "label": dose_label(code, dose_number),
+            "timing": note,
+            "given": counts[COMPLETED],
+            "overdue": counts[OVERDUE],
+            "due_now": counts[DUE_NOW],
+            "upcoming": counts[UPCOMING],
+            "eligible": cohort,
+            # None rather than 0 when there is nobody to count, so a screen can
+            # tell "no eligible children" apart from "nobody has had it".
+            "coverage_pct": round(counts[COMPLETED] * 100 / cohort) if cohort else None,
+        })
+
+    by_vaccine = []
+    for code in VACCINE_ORDER:
+        entries = [dose for dose in doses if dose["code"] == code]
+        given = sum(dose["given"] for dose in entries)
+        # Every dose of this vaccine that every eligible child should have had.
+        scheduled = len(entries) * cohort
+        by_vaccine.append({
+            "code": code,
+            "vaccine": VACCINE_NAMES[code],
+            "protects": VACCINE_PROTECTS[code],
+            "dose_count": len(entries),
+            "given": given,
+            "scheduled": scheduled,
+            "coverage_pct": round(given * 100 / scheduled) if scheduled else None,
+            "overdue": sum(dose["overdue"] for dose in entries),
+            "due_now": sum(dose["due_now"] for dose in entries),
+        })
+
+    return {
+        "reference_date": reference,
+        "eligible_children": cohort,
+        "doses": doses,
+        "by_vaccine": by_vaccine,
+        "total_given": sum(dose["given"] for dose in doses),
+        "total_scheduled": TOTAL_SCHEDULED_DOSES * cohort,
+        "total_overdue": sum(dose["overdue"] for dose in doses),
+        "total_due_now": sum(dose["due_now"] for dose in doses),
     }
 
 

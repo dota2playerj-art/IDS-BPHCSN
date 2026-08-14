@@ -53,7 +53,6 @@ from models.immunizations import (
     get_immunizations_for_consultation,
     parse_dose_keys,
     record_immunizations,
-    remove_immunizations,
 )
 from models.patients import get_patient_by_id
 from utils.dates import display_date, today
@@ -100,13 +99,22 @@ def _immunization_context(patient, consultation, visit_date, ticked=None):
     where they are in it. What differs per dose is whether it can still be
     ticked:
 
-        given at THIS visit    ticked, and untickable only by untickng it here
-        given at another visit locked, with the date it was actually given
+        already on file        locked, with the date it was actually given
         not yet given          free to tick, badged Due / Overdue / Upcoming
 
-    A dose recorded elsewhere is locked rather than hidden so the form cannot be
-    used to silently re-date a vaccination that already happened -- which is
-    exactly what an unlocked, pre-ticked checkbox would invite.
+    ANY recorded dose is locked -- including one this very consultation recorded.
+    It used to be that a dose given at this visit stayed an ordinary ticked
+    checkbox, so unticking it deleted the immunisation record. That made the
+    absence of a checkbox mean "destroy this dose", and an HTML checkbox is
+    absent from a submission for many reasons that have nothing to do with
+    intent: a partial or programmatic POST, a serialiser that drops unchecked
+    inputs, a form rebuilt by script. A clinical record that a child was
+    vaccinated is not something a missing form field should be able to erase.
+
+    Locking it reuses exactly the treatment a dose from another visit already
+    had, for the same stated reason -- the form cannot be used to rewrite a
+    vaccination that has already happened. The consequence is that this form is
+    add-only for immunisations: see _apply_immunization_edit().
 
     `ticked` carries the operator's selection back through a validation bounce,
     so a rejected save does not throw away which boxes they had checked.
@@ -121,9 +129,10 @@ def _immunization_context(patient, consultation, visit_date, ticked=None):
 
     for item in status["schedule"]:
         pair = (item["code"], item["dose_number"])
+        # Kept so the template can say *which* visit recorded it, which is still
+        # a different sentence even though both states are now locked.
         item["given_here"] = pair in this_visit
-        # Locked when it is on file from some other visit.
-        item["locked"] = item["given"] and pair not in this_visit
+        item["locked"] = item["given"]
         if ticked is None:
             item["checked"] = item["given_here"]
         else:
@@ -329,19 +338,42 @@ def process_record_consultation(appointment_id, form_data, user_id):
 
 def _apply_immunization_edit(patient, consultation_id, consultation, ticked,
                              user_id, age_context):
-    """Bring this visit's recorded doses in line with the ticked boxes.
+    """Record any newly ticked doses for this visit. Add-only.
 
-    Returns (added, removed) as lists of (code, dose_number).
+    Returns (added, removed) as lists of (code, dose_number). `removed` is always
+    empty and is kept in the signature because the audit line, the flash message
+    and the caller all read it; the day a deliberate correction path exists it is
+    what that path will report through.
 
-    Only doses this consultation recorded are candidates for removal, and only
-    doses not already on file anywhere are candidates for addition -- a box that
-    is ticked because another visit gave that dose is left entirely alone, so
-    saving an edit cannot re-date somebody else's vaccination.
+    WHY THIS NO LONGER REMOVES ANYTHING
+    -----------------------------------
+    It used to delete every dose this consultation had recorded whose checkbox
+    did not come back ticked. That made an absent form field mean "erase this
+    child's vaccination record", which is the one thing this module's own header
+    says must not happen -- "a vaccination that happened, happened". The absence
+    of a checkbox is not evidence of intent: a partial POST, a script-rebuilt
+    form or a serialiser that drops unchecked inputs all produce it, and each
+    silently destroyed a dose whose only remaining trace was an audit line.
+
+    Removal is not merely gated here, it is absent. A confirm-and-delete control
+    on this form would still leave deletion reachable from a routine correction
+    screen -- the same screen a health worker opens to fix a typo in a treatment
+    plan -- and this project already puts its genuinely destructive action
+    (changing a patient's status) behind a dedicated modal and its own endpoint
+    rather than inside a general edit form. Un-recording a dose given in error is
+    rarer and more consequential than an archive, so it belongs on a deliberate
+    correction path of its own, not as a side effect of saving this page.
+
+    models.immunizations.remove_immunizations() is deliberately left in place,
+    unused, for that path to call: it already scopes its DELETE to the
+    consultation that recorded the dose, which is the hard part.
+
+    Adding is unchanged. Only doses not already on file anywhere are candidates,
+    so saving an edit still cannot re-date somebody else's vaccination.
     """
     if not age_context["is_pediatric"]:
         return [], []
 
-    selected = set(parse_dose_keys(ticked))
     current = {
         (dose["vaccine_code"], dose["dose_number"])
         for dose in get_immunizations_for_consultation(consultation_id)
@@ -354,12 +386,7 @@ def _apply_immunization_edit(patient, consultation_id, consultation, ticked,
         date_administered=consultation["consultation_date"],
         consultation_id=consultation_id,
     )
-    removed = remove_immunizations(
-        patient_id=patient["id"],
-        dose_keys=[pair for pair in sorted(current) if pair not in selected],
-        consultation_id=consultation_id,
-    )
-    return added, removed
+    return added, []
 
 
 def _describe_dose_changes(added, removed):
@@ -420,14 +447,11 @@ def process_edit_consultation(consultation_id, form_data, user_id, ip_address=No
 
     update_consultation(consultation_id, values, age_context)
 
-    # Immunisations are corrected the same way the clinical fields are, and
-    # audited the same way -- a dose ticked by mistake is a clerical error like
-    # any other, and leaving it uncorrectable would mean the only way to fix it
-    # was to edit the database by hand.
-    #
-    # Scoped to this visit: only doses recorded *here* can be removed here.
-    # remove_immunizations() enforces that in its WHERE clause rather than
-    # relying on this list being right.
+    # Immunisations are added the same way the clinical fields are corrected, and
+    # audited the same way. They are not removed here: a dose already on file is
+    # rendered as a locked fact rather than a checkbox, so no submission -- however
+    # it was produced -- can delete one. See _apply_immunization_edit() for why
+    # removal belongs on its own deliberate path instead.
     added, removed = _apply_immunization_edit(
         patient, consultation_id, before, ticked, user_id, age_context
     )

@@ -168,9 +168,27 @@
       </div>
     </div>
 
-    <!-- Allergies and standing conditions are the two things a clinician must
-         see before writing a treatment plan, so they are surfaced here rather
-         than left one click away on the profile. -->
+    <!-- Allergies and previously noted conditions are the two things a clinician
+         must see before writing a treatment plan, so they are surfaced here
+         rather than left one click away on the profile. -->
+{#- The second list used to be headed with a word asserting that these conditions
+    are ongoing, which the data cannot support. The list is the patient's
+    `medical_conditions` field -- entered on the registration form, as checkbox
+    chips plus free text, and never revisited unless somebody edits the patient.
+    Nothing in it is dated, nothing marks a condition resolved, and nothing checks
+    it against what consultations later found. In the seeded roster it holds a
+    genuine chronic condition ("Asthma"), an informal note ("High blood") and a
+    reason for attending ("For vaccination") -- asserting all three are current
+    claims an ongoing diagnosis for two of them that no one ever made.
+
+    It is not relabelled "most recent diagnosis" either: it is not a diagnosis and
+    it does not come from a consultation, so that heading would trade one wrong
+    claim for another. It is named for what it is, dated by the only date the
+    record carries, and pointed at the consultation history for anything current.
+
+    Kept as a Jinja comment so the old misleading heading is not still sitting in
+    the delivered markup -- the same treatment the two Barangay Official screens
+    use for the figures they removed. #}
 {%- if patient.allergies_list or patient.medical_conditions_list %}
     <div class="alert-ids {% if patient.allergies_list %}alert-warning-ids{% else %}alert-info-ids{% endif %}">
       <span class="material-symbols-outlined">{% if patient.allergies_list %}warning{% else %}medical_information{% endif %}</span>
@@ -180,8 +198,13 @@
         {{ patient.allergies_list | join(', ') }}.
 {%- endif %}
 {%- if patient.medical_conditions_list %}
-        {% if patient.allergies_list %}<br>{% endif %}<strong style="margin-top:4px;">Standing conditions</strong>
+        {% if patient.allergies_list %}<br>{% endif %}<strong style="margin-top:4px;">Conditions noted on the patient record</strong>
         {{ patient.medical_conditions_list | join(', ') }}.
+        <span style="display:block; margin-top:3px; font-size:12px; opacity:0.85;">
+          Entered on the patient's record{% if patient.updated_at %}, last updated {{ patient.updated_at | display_date }}{% endif %}.
+          Not a confirmed current diagnosis and not checked against this patient's consultation
+          history — an entry stays here until someone edits the record, whether or not it still applies.
+        </span>
 {%- endif %}
       </div>
     </div>
@@ -365,10 +388,14 @@
               <tr{% if item.needs_attention and not item.given %} class="dose-attention"{% endif %}>
                 <td>
 {%- if item.locked %}
-                  <!-- Already on file from another visit. Shown as a fact, not a
-                       checkbox: an unlocked tick here could only ever re-date a
-                       vaccination that has already happened. -->
-                  <span class="material-symbols-outlined" style="font-size:19px; color:var(--success);" title="Already recorded on {{ item.date_administered | display_date }}">task_alt</span>
+                  <!-- Already on file. Shown as a fact, not a checkbox: an
+                       unlocked tick here could only ever re-date a vaccination
+                       that has already happened, and an unlocked *untick* used
+                       to delete one outright — an absent checkbox is not
+                       evidence that a dose was never given. This now covers
+                       doses recorded at this very visit, which is what makes the
+                       form add-only. -->
+                  <span class="material-symbols-outlined" style="font-size:19px; color:var(--success);" title="Recorded on {{ item.date_administered | display_date }} — a dose on file cannot be removed from this form">task_alt</span>
 {%- else %}
                   <input type="checkbox" class="form-check-input" name="{{ immunization_field }}"
                          value="{{ item.key }}" id="dose{{ loop.index }}"{% if item.checked %} checked{% endif %}
@@ -380,7 +407,7 @@
                 <td class="reason-text">{{ item.timing }}{% if item.due_date %} &middot; {{ item.due_date | display_date }}{% endif %}</td>
                 <td><span class="badge-status {{ item.badge_class }}">{{ item.status }}</span></td>
                 <td class="reason-text">
-{%- if item.given_here %}Being recorded at this visit
+{%- if item.given_here %}Recorded at this visit{% if item.date_administered %} &middot; {{ item.date_administered | display_date }}{% endif %}
 {%- elif item.given %}{{ item.date_administered | display_date }}{% if item.administered_by_name %} &middot; {{ item.administered_by_name }}{% endif %}
 {%- else %}&mdash;{% endif %}
                 </td>
@@ -392,10 +419,12 @@
 
         <div class="cohort-note">
           Doses are recorded against this consultation and dated {{ visit_date | display_date }}.
-          A dose already on file from another visit cannot be changed here &mdash; open that
-          consultation instead.
+          A dose already on file cannot be changed here &mdash; whichever visit recorded it.
 {%- if consultation %}
-          Ticking or unticking a box is an edit like any other and is written to the audit log.
+          This form can add a dose that was missed, and every addition is written to the audit
+          log. It cannot remove one: a dose on file is a record that the child was vaccinated,
+          and un-recording it needs a deliberate correction rather than an unticked box on a
+          form opened to fix something else.
 {%- endif %}
         </div>
       </div>
