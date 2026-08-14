@@ -1,0 +1,532 @@
+{% extends "base.html" %}
+{% set active_nav = "patient_records" %}
+{% block title %}IDS-BPHCSN | Patient Records{% endblock %}
+
+{% block styles %}
+  .toolbar-search{min-width:320px; max-width:420px;}
+  .stat-card{
+    background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:20px 22px; height:100%;
+  }
+  .stat-icon{width:44px;height:44px;border-radius:12px; display:flex; align-items:center; justify-content:center; margin-bottom:12px;}
+  .stat-value{font-size:24px; font-weight:700; color:var(--text-dark);}
+  .stat-label{font-size:13px; color:var(--text-muted); margin-top:2px;}
+  .stat-trend{font-size:12px; font-weight:600; margin-top:6px;}
+
+  .panel-card{
+    background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:24px;
+  }
+
+
+  .filter-btn{
+    background:#fff; border:1px solid var(--border-color); border-radius:10px; padding:10px 16px;
+    font-size:14px; font-weight:500; color:var(--text-dark); display:flex; align-items:center; gap:6px;
+  }
+  .filter-btn.open, .filter-btn:hover{border-color:var(--teal); color:var(--teal-dark);}
+
+  /* ADVANCED FILTER PANEL */
+  .filter-panel{
+    background:var(--bg); border:1px solid var(--border-color); border-radius:12px; padding:20px;
+    margin-bottom:18px; display:none;
+  }
+  .filter-panel.show{display:block;}
+  .filter-panel label{font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:6px; display:block;}
+  .filter-panel .form-control, .filter-panel .form-select{
+    height:48px; border-radius:12px; border:1px solid var(--border-color); font-size:13.5px;
+  }
+  .filter-panel .form-control:focus, .filter-panel .form-select:focus{
+    border-color:var(--teal); box-shadow:0 0 0 3px rgba(22,155,146,0.12);
+  }
+  .filter-actions{display:flex; justify-content:flex-end; gap:10px; margin-top:16px; padding-top:16px; border-top:1px solid var(--border-color);}
+  .btn-reset{background:transparent; border:none; color:var(--text-muted); font-size:14px; font-weight:600; padding:10px 14px;}
+  .btn-reset:hover{color:var(--danger);}
+
+  /* BULK ACTION BAR */
+  .bulk-bar{
+    display:none; align-items:center; justify-content:space-between; background:var(--teal-light);
+    border:1px solid #BEE8DF; border-radius:12px; padding:12px 18px; margin-bottom:16px;
+  }
+  .bulk-bar.show{display:flex;}
+  .bulk-bar .count{font-size:13.5px; font-weight:600; color:var(--teal-dark);}
+  .bulk-actions{display:flex; gap:8px;}
+  .bulk-actions button{
+    background:#fff; border:1px solid var(--border-color); border-radius:8px; padding:7px 13px;
+    font-size:13px; font-weight:500; color:var(--text-dark); display:flex; align-items:center; gap:5px;
+  }
+  .bulk-actions button:hover{border-color:var(--teal); color:var(--teal-dark);}
+  .bulk-actions .clear-btn{border:none; background:none; color:var(--text-muted); text-decoration:underline; font-size:13px;}
+
+  table.patient-table{width:100%; border-collapse:separate; border-spacing:0; font-size:13.5px;}
+  table.patient-table thead th{
+    text-align:left; color:var(--text-muted); font-weight:600; font-size:11.5px; letter-spacing:0.03em;
+    text-transform:uppercase; padding:12px 14px; border-bottom:1px solid var(--border-color); white-space:nowrap;
+  }
+  table.patient-table tbody td{
+    padding:14px; border-bottom:1px solid var(--border-color); color:var(--text-dark); vertical-align:middle;
+  }
+  table.patient-table tbody tr:hover{background:#FAFBFC;}
+  table.patient-table tbody tr:last-child td{border-bottom:none;}
+  .pat-name{font-weight:600;}
+  .pat-name a{color:inherit; text-decoration:none;}
+  .pat-name a:hover{color:var(--teal-dark); text-decoration:underline;}
+  .pat-id{color:var(--text-muted); font-size:12.5px;}
+  .form-check-input{width:17px; height:17px; cursor:pointer;}
+  .form-check-input:checked{background-color:var(--teal); border-color:var(--teal);}
+
+  .badge-status{
+    display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600;
+    padding:4px 11px; border-radius:999px; white-space:nowrap;
+  }
+  .badge-active{background:#DCFCE7; color:#15803D;}
+  .badge-followup{background:#FEF3C7; color:#B45309;}
+  .badge-prenatal{background:#DBEAFE; color:#1D4ED8;}
+  .badge-immunization{background:#DBEAFE; color:#1D4ED8;}
+  .badge-critical{background:#FEE2E2; color:#B91C1C;}
+  .badge-referred{background:#EDE9FE; color:var(--purple);}
+  .badge-archived{background:#F3F4F6; color:#4B5563;}
+  .badge-inactive{background:#F3F4F6; color:#4B5563;}
+
+  .action-icon{
+    width:32px; height:32px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center;
+    color:var(--text-muted); background:transparent; border:none;
+  }
+  .action-icon:hover{background:var(--bg); color:var(--teal-dark);}
+  /* Same one-liner Screen 06 carries: these two classes are used on <a> as well
+     as <button>, and neither sets text-decoration. */
+  a.action-icon, a.btn-primary-teal{text-decoration:none;}
+
+  /* PAGINATION (Bootstrap-based) */
+  .table-footer{display:flex; align-items:center; justify-content:space-between; padding-top:18px; margin-top:6px; border-top:1px solid var(--border-color); flex-wrap:wrap; gap:12px;}
+  .pg-info{font-size:13px; color:var(--text-muted);}
+  .pagination .page-link{
+    color:var(--text-dark); border:1px solid var(--border-color); font-size:13px; font-weight:500;
+    padding:7px 13px; border-radius:8px !important; margin-left:4px;
+  }
+  .pagination .page-item:first-child .page-link,
+  .pagination .page-item:last-child .page-link{margin-left:4px;}
+  .pagination .page-item.active .page-link{background-color:var(--teal); border-color:var(--teal); color:#fff;}
+  .pagination .page-link:hover{background-color:var(--teal-light); color:var(--teal-dark); border-color:var(--teal-light);}
+  .pagination .page-item.disabled .page-link{color:#C7CBD1; background:#fff;}
+
+  /* EMPTY STATE */
+  .empty-state{display:none; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:64px 24px;}
+  .empty-state.show{display:flex;}
+  .empty-state .icon-circle{
+    width:72px; height:72px; border-radius:50%; background:var(--teal-light); display:flex; align-items:center;
+    justify-content:center; margin-bottom:18px;
+  }
+  .empty-state h5{font-size:17px; font-weight:600; color:var(--text-dark); margin-bottom:6px;}
+  .empty-state p{font-size:14px; color:var(--text-muted); max-width:380px; margin-bottom:20px;}
+{% endblock %}
+
+{% block breadcrumb %}
+
+    <div class="breadcrumb-nav">
+      <a href="{{ url_for(dashboard_endpoint) }}">Dashboard</a>
+      <span class="sep material-symbols-outlined">chevron_right</span>
+      <span class="current">Patient Records</span>
+    </div>{% endblock %}
+
+{% block content %}
+    <div class="eyebrow">Barangay Poblacion Health Center</div>
+    <div class="page-title">Patient Records</div>
+
+    <!-- STAT CARDS -->
+    <div class="row g-3 mt-1 mb-4">
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:var(--teal-light);"><span class="material-symbols-outlined" style="color:var(--teal-dark);">groups</span></div>
+          <div class="stat-value">{{ "{:,}".format(stats.total_patients) }}</div>
+          <div class="stat-label">Total Registered Patients</div>
+          <div class="stat-trend" style="color:var(--success);">+{{ stats.new_this_month }} this month</div>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#DBEAFE;"><span class="material-symbols-outlined" style="color:var(--info);">person_add</span></div>
+          <div class="stat-value">{{ stats.new_last_30_days }}</div>
+          <div class="stat-label">New Registrations (30 days)</div>
+          {%- if stats.new_30_day_change_pct is not none %}
+          <div class="stat-trend" style="color:{{ 'var(--success)' if stats.new_30_day_change_pct >= 0 else 'var(--danger)' }};">{{ '+' if stats.new_30_day_change_pct >= 0 }}{{ stats.new_30_day_change_pct }}% vs previous 30 days</div>
+          {%- else %}
+          <div class="stat-trend" style="color:var(--text-muted);">No prior-period baseline</div>
+          {%- endif %}
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#FEF3C7;"><span class="material-symbols-outlined" style="color:var(--warning);">elderly</span></div>
+          <div class="stat-value">{{ stats.senior_count }}</div>
+          <div class="stat-label">Senior Citizen Patients</div>
+          <div class="stat-trend" style="color:var(--text-muted);">{{ stats.senior_share_pct }}% of total records</div>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#EDE9FE;"><span class="material-symbols-outlined" style="color:var(--purple);">pregnant_woman</span></div>
+          <div class="stat-value">{{ stats.prenatal_count }}</div>
+          <div class="stat-label">Prenatal Patients</div>
+          <div class="stat-trend" style="color:var(--text-muted);">Not yet tracked</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TABLE PANEL -->
+    <div class="panel-card">
+
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-3">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <div class="toolbar-search">
+            <span class="material-symbols-outlined" style="font-size:18px;">search</span>
+            <input type="text" id="patientSearch" placeholder="Search by patient name, patient ID, or contact number">
+          </div>
+          <button class="filter-btn" id="filterToggleBtn" onclick="toggleFilterPanel()">
+            <span class="material-symbols-outlined" style="font-size:18px;">filter_list</span>Advanced Filter
+          </button>
+          <button class="filter-btn"><span class="material-symbols-outlined" style="font-size:18px;">sort</span>Sort</button>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <button class="btn-outline-teal"><span class="material-symbols-outlined" style="font-size:18px;">file_download</span>Export</button>
+          <a href="{{ url_for(register_patient_endpoint) }}" class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">person_add</span>Add Patient</a>
+        </div>
+      </div>
+
+      <!-- ADVANCED FILTER PANEL -->
+      <div class="filter-panel" id="filterPanel">
+        <div class="row g-3">
+          <div class="col-md-3 col-sm-6">
+            <label>Age Range</label>
+            <div class="d-flex gap-2">
+              <input type="number" class="form-control" placeholder="Min">
+              <input type="number" class="form-control" placeholder="Max">
+            </div>
+          </div>
+          <div class="col-md-3 col-sm-6">
+            <label>Gender</label>
+            <select class="form-select">
+              <option selected>All Genders</option>
+              <option>Male</option>
+              <option>Female</option>
+            </select>
+          </div>
+          <div class="col-md-3 col-sm-6">
+            <label>Barangay / Purok</label>
+            <select class="form-select">
+              <option selected>All Puroks</option>
+              <option>Purok 1</option>
+              <option>Purok 2</option>
+              <option>Purok 3</option>
+              <option>Purok 4</option>
+              <option>Purok 5</option>
+              <option>Purok 6</option>
+              <option>Purok 7</option>
+            </select>
+          </div>
+          <div class="col-md-3 col-sm-6">
+            <label>Status</label>
+            <select class="form-select">
+              <option selected>All Statuses</option>
+              <option>Active</option>
+              <option>Follow-up</option>
+              <option>Prenatal</option>
+              <option>Immunization</option>
+              <option>Critical / Referred</option>
+              <option>Archived</option>
+            </select>
+          </div>
+          <div class="col-md-3 col-sm-6">
+            <label>Registration Date</label>
+            <input type="date" class="form-control">
+          </div>
+          <div class="col-md-3 col-sm-6">
+            <label>Last Visit</label>
+            <input type="date" class="form-control">
+          </div>
+        </div>
+        <div class="filter-actions">
+          <button class="btn-reset">Reset Filters</button>
+          <button class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">filter_alt</span>Apply Filter</button>
+        </div>
+      </div>
+
+      <!-- One form covers the bulk bar and the whole table. The row checkboxes are
+           its patient_ids, and the row-level archive icon fills in
+           single_patient_id instead; the modal's two submit buttons reach it from
+           outside via form="archiveForm". Bulk and single therefore post the same
+           form to the same endpoint. There is no Delete button by design: patient
+           records are soft-retired through Archive and never removed. -->
+      <form id="archiveForm" method="post" action="{{ url_for(archive_patients_endpoint) }}">
+      <input type="hidden" name="single_patient_id" id="singlePatientId" value="">
+
+      <!-- BULK ACTION BAR -->
+      <div class="bulk-bar" id="bulkBar">
+        <div class="count"><span id="selCount">0</span> patient record(s) selected</div>
+        <div class="bulk-actions">
+          <button type="button"><span class="material-symbols-outlined" style="font-size:16px;">file_download</span>Export</button>
+          <button type="button"><span class="material-symbols-outlined" style="font-size:16px;">print</span>Print</button>
+          <button type="button" data-bs-toggle="modal" data-bs-target="#archivePatientModal"><span class="material-symbols-outlined" style="font-size:16px;">archive</span>Change Status</button>
+          <button type="button" class="clear-btn" onclick="clearSelection()">Clear</button>
+        </div>
+      </div>
+
+{%- if patients %}
+      <div style="overflow-x:auto;">
+        <table class="patient-table" id="patientTable">
+          <thead>
+            <tr>
+              <th style="width:36px;"><input type="checkbox" class="form-check-input" id="selectAll" onclick="toggleAll(this)"></th>
+              <th>Patient ID</th>
+              <th>Full Name</th>
+              <th>Age</th>
+              <th>Gender</th>
+              <th>Address</th>
+              <th>Contact Number</th>
+              <th>Last Visit</th>
+              <th>Status</th>
+              <th style="text-align:right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+{%- for patient in patients %}
+            <tr>
+              <td><input type="checkbox" class="form-check-input row-check" name="patient_ids" value="{{ patient.id }}" data-status="{{ patient.status }}" onclick="updateSelection()" aria-label="Select {{ patient.full_name }}"></td>
+              <td class="pat-id">{{ patient.patient_id }}</td>
+              <td class="pat-name"><a href="{{ url_for(patient_profile_endpoint, patient_id=patient.id) }}">{{ patient.full_name }}</a></td>
+              <td>{{ patient.age if patient.age is not none else '—' }}</td>
+              <td>{{ patient.sex or '—' }}</td>
+              <td>{{ patient.display_address or '—' }}</td>
+              <td>{{ patient.contact_number or '—' }}</td>
+              <td>{{ patient.last_visit | display_date('No visits yet') }}</td>
+              <td><span class="badge-status {{ patient.status_badge_class }}">{{ patient.status }}</span></td>
+              <td>
+                <div class="d-flex justify-content-end gap-1">
+                  <button type="button" class="action-icon"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button>
+                  <a href="{{ url_for(register_patient_endpoint, patient_id=patient.id) }}" class="action-icon" title="Edit {{ patient.full_name }}"><span class="material-symbols-outlined" style="font-size:18px;">edit</span></a>
+                  <button type="button" class="action-icon"><span class="material-symbols-outlined" style="font-size:18px;">print</span></button>
+                  <button type="button" class="action-icon" title="Change status of {{ patient.full_name }} (currently {{ patient.status }})"
+                          data-bs-toggle="modal" data-bs-target="#archivePatientModal"
+                          data-patient-id="{{ patient.id }}" data-patient-name="{{ patient.full_name }}"
+                          data-patient-status="{{ patient.status }}"><span class="material-symbols-outlined" style="font-size:18px;">archive</span></button>
+                </div>
+              </td>
+            </tr>
+{%- endfor %}
+          </tbody>
+        </table>
+      </div>
+
+{%- endif %}
+      </form>
+
+      <!-- EMPTY STATE (shown when a search/filter yields no matches) -->
+      <div class="empty-state{% if not patients %} show{% endif %}" id="emptyState">
+        <div class="icon-circle">
+          <span class="material-symbols-outlined" style="font-size:34px; color:var(--teal-dark);">person_search</span>
+        </div>
+        <h5>No patient records found</h5>
+        <p>We couldn't find any patients matching your search or filter criteria. Try adjusting your filters or search terms.</p>
+        <div class="d-flex gap-2">
+          <button class="btn-outline-teal" onclick="resetDemo()"><span class="material-symbols-outlined" style="font-size:18px;">restart_alt</span>Clear Filters</button>
+          <a href="{{ url_for(register_patient_endpoint) }}" class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">person_add</span>Add Patient</a>
+        </div>
+      </div>
+
+      <!-- PAGINATION — the page buttons below are still decoration; only the
+           count line is live. Real paging is separate follow-up work. -->
+{%- if patients %}
+      <div class="table-footer" id="tableFooter">
+        <div class="pg-info">Showing 1&ndash;{{ patients|length }} of {{ "{:,}".format(stats.total_patients) }} patients</div>
+        <nav aria-label="Patient records pagination">
+          <ul class="pagination mb-0">
+            <li class="page-item disabled"><a class="page-link" href="#"><span class="material-symbols-outlined" style="font-size:16px;">chevron_left</span></a></li>
+            <li class="page-item active"><a class="page-link" href="#">1</a></li>
+            <li class="page-item"><a class="page-link" href="#">2</a></li>
+            <li class="page-item"><a class="page-link" href="#">3</a></li>
+            <li class="page-item disabled"><a class="page-link" href="#">&hellip;</a></li>
+            <li class="page-item"><a class="page-link" href="#">346</a></li>
+            <li class="page-item"><a class="page-link" href="#"><span class="material-symbols-outlined" style="font-size:16px;">chevron_right</span></a></li>
+          </ul>
+        </nav>
+      </div>
+{%- endif %}
+
+
+    </div>
+
+{%- if patients %}
+    <!-- STATUS CHANGE CONFIRMATION — same modal shape as base.html's logout confirm:
+         centred dialog, 16px radius, header / body / footer. The statuses are the
+         submit buttons themselves, so the choice and the confirmation are one step
+         rather than two. It sits outside #archiveForm and reaches it through the
+         buttons' form attribute, which keeps the dialog clear of the table's
+         horizontal scroll container.
+
+         All three buttons are in the markup and the dialog hides the one matching
+         the current status as it opens, so a record is never offered the status it
+         already holds. Rendering all three and hiding one beats building the row
+         at open time: the form wiring stays declarative and there is no branch in
+         which a button ends up without its form or name attribute. -->
+    <div class="modal fade" id="archivePatientModal" tabindex="-1" aria-labelledby="archivePatientModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.12);">
+          <div class="modal-header">
+            <h5 class="modal-title" id="archivePatientModalLabel">Change Patient Status</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p style="margin-bottom:10px;">This changes the record's status only. Nothing is deleted &mdash; medical records are retained, and the patient stays listed here under the new status.</p>
+            <p id="archivePrompt" style="margin-bottom:0;">Mark <strong id="archiveTarget">this record</strong><span id="archiveCurrent"></span> as:</p>
+            <!-- Shown only when a bulk selection spans more than one status; the
+                 action buttons are hidden alongside it. -->
+            <p id="archiveMixed" style="margin-bottom:0; display:none; color:var(--danger);">
+              The selected records are not all on the same status. Select patients that currently share one status, then set them together.
+            </p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" form="archiveForm" name="status" value="Deceased" class="btn-outline-teal status-option" data-status="Deceased">
+              <span class="material-symbols-outlined" style="font-size:18px;">person_off</span>Mark Deceased
+            </button>
+            <button type="submit" form="archiveForm" name="status" value="Inactive" class="btn-primary-teal status-option" data-status="Inactive">
+              <span class="material-symbols-outlined" style="font-size:18px;">archive</span>Mark Inactive
+            </button>
+            <button type="submit" form="archiveForm" name="status" value="Active" class="btn-primary-teal status-option" data-status="Active">
+              <span class="material-symbols-outlined" style="font-size:18px;">how_to_reg</span>Mark Active
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+{%- endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function toggleFilterPanel(){
+    var panel = document.getElementById('filterPanel');
+    var btn = document.getElementById('filterToggleBtn');
+    panel.classList.toggle('show');
+    btn.classList.toggle('open');
+  }
+  function updateSelection(){
+    var checks = document.querySelectorAll('.row-check');
+    var checked = document.querySelectorAll('.row-check:checked');
+    var bulkBar = document.getElementById('bulkBar');
+    document.getElementById('selCount').textContent = checked.length;
+    bulkBar.classList.toggle('show', checked.length > 0);
+    document.getElementById('selectAll').checked = (checked.length === checks.length);
+  }
+  function toggleAll(source){
+    var checks = document.querySelectorAll('.row-check');
+    checks.forEach(function(c){ c.checked = source.checked; });
+    updateSelection();
+  }
+  function clearSelection(){
+    document.querySelectorAll('.row-check').forEach(function(c){ c.checked = false; });
+    document.getElementById('selectAll').checked = false;
+    updateSelection();
+  }
+  // Both status entry points open the same dialog, so the dialog has to say
+  // which records it is about. A row icon carries the patient on data-* and sets
+  // single_patient_id, which the server prefers; the bulk bar carries neither and
+  // falls back to the checked patient_ids. Clearing the hidden field on the bulk
+  // path matters -- otherwise a row change followed by a bulk one would still be
+  // holding the earlier single id.
+  //
+  // The dialog is also status-aware: it hides the option matching the status the
+  // record already holds, so Inactive and Deceased are no longer dead ends. The
+  // rule lives in models/patients.py allowed_status_transitions() and is mirrored
+  // here only because the choice has to be made in the browser; the server
+  // re-derives it from the database before writing anything.
+  //
+  // Bulk is restricted to a selection already on one status. Offering the union
+  // of several patients' transitions would let one click apply to only part of
+  // the selection and silently skip the rest -- see MIXED_STATUS_MESSAGE in
+  // routes/patient_views.py.
+  var archiveModal = document.getElementById('archivePatientModal');
+  if(archiveModal){
+    archiveModal.addEventListener('show.bs.modal', function(event){
+      var trigger = event.relatedTarget;
+      var single = document.getElementById('singlePatientId');
+      var target = document.getElementById('archiveTarget');
+      var current = document.getElementById('archiveCurrent');
+      var prompt = document.getElementById('archivePrompt');
+      var mixed = document.getElementById('archiveMixed');
+      var options = Array.prototype.slice.call(
+        archiveModal.querySelectorAll('.status-option')
+      );
+
+      var currentStatus = null;
+      if(trigger && trigger.dataset.patientId){
+        single.value = trigger.dataset.patientId;
+        target.textContent = trigger.dataset.patientName;
+        currentStatus = trigger.dataset.patientStatus || null;
+      } else {
+        single.value = '';
+        var checked = Array.prototype.slice.call(
+          document.querySelectorAll('.row-check:checked')
+        );
+        target.textContent = checked.length + ' selected patient record' +
+          (checked.length === 1 ? '' : 's');
+        var statuses = [];
+        checked.forEach(function(box){
+          if(statuses.indexOf(box.dataset.status) === -1){ statuses.push(box.dataset.status); }
+        });
+        if(statuses.length === 1){
+          currentStatus = statuses[0];
+        } else {
+          currentStatus = null;
+          mixed.textContent = statuses.length === 0
+            ? 'Select at least one patient record first.'
+            : 'The selected records are not all on the same status. Select patients that currently share one status, then set them together.';
+        }
+      }
+
+      // No single current status means nothing can be offered safely.
+      if(!currentStatus){
+        options.forEach(function(button){ button.style.display = 'none'; });
+        prompt.style.display = 'none';
+        mixed.style.display = '';
+        return;
+      }
+
+      prompt.style.display = '';
+      mixed.style.display = 'none';
+      current.textContent = ' (currently ' + currentStatus + ')';
+
+      var visible = [];
+      options.forEach(function(button){
+        var offered = button.dataset.status !== currentStatus;
+        button.style.display = offered ? '' : 'none';
+        if(offered){ visible.push(button); }
+      });
+
+      // One primary action per dialog: the last button still showing, which the
+      // right-aligned footer puts nearest the operator's eye. Whichever statuses
+      // are on offer, the destructive one is never the highlighted default.
+      visible.forEach(function(button, index){
+        var primary = (index === visible.length - 1);
+        button.classList.toggle('btn-primary-teal', primary);
+        button.classList.toggle('btn-outline-teal', !primary);
+      });
+    });
+  }
+
+  // The table and footer are absent entirely when there are no patients, so
+  // these guard before touching them.
+  function showEmptyDemo(){
+    var table = document.getElementById('patientTable');
+    var footer = document.getElementById('tableFooter');
+    if(table){ table.closest('div[style]').style.display = 'none'; }
+    if(footer){ footer.style.display = 'none'; }
+    document.getElementById('bulkBar').classList.remove('show');
+    document.getElementById('emptyState').classList.add('show');
+  }
+  function resetDemo(){
+    var table = document.getElementById('patientTable');
+    var footer = document.getElementById('tableFooter');
+    if(!table){ return; }
+    table.closest('div[style]').style.display = '';
+    if(footer){ footer.style.display = ''; }
+    document.getElementById('emptyState').classList.remove('show');
+  }
+</script>{% endblock %}

@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>{% block title %}IDS-BPHCSN{% endblock %}</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- Bootstrap 5.3.3 and the webfonts are served from static/ rather than a CDN, so the
+     layout, typography and icons still render when the machine has no internet. This is
+     presentation only -- the app itself is unchanged and still needs its local server. -->
+<link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/fonts.css') }}" rel="stylesheet">
+<style>
+  :root{
+    --teal:#169B92;
+    --teal-dark:#0F6E56;
+    --teal-light:#E1F5EE;
+    --bg:#F5F7FA;
+    --white:#FFFFFF;
+    --success:#22C55E;
+    --warning:#F59E0B;
+    --danger:#EF4444;
+    --info:#3B82F6;
+    --purple:#6D28D9;
+    --text-dark:#1F2937;
+    --text-muted:#6B7280;
+    --border-color:#E5E7EB;
+  }
+  *{font-family:'Inter',Arial,sans-serif;}
+  .material-symbols-outlined{
+    font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 20;
+    font-size:20px; vertical-align:middle; line-height:1;
+  }
+  body{background:var(--bg); color:var(--text-dark); margin:0;}
+
+  /* SIDEBAR - frozen, identical to every approved screen */
+  .sidebar{
+    width:280px; background:var(--teal); color:#fff; position:fixed; top:0; left:0; bottom:0;
+    display:flex; flex-direction:column; z-index:100;
+  }
+  .sidebar-brand{ padding:20px 20px 16px; display:flex; align-items:center; gap:12px; border-bottom:1px solid rgba(255,255,255,0.15);}
+  .sidebar-brand .logo-circle{width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,0.15);display:flex;align-items:center;justify-content:center;}
+  .sidebar-brand .brand-text .name{font-weight:700; font-size:16px; line-height:1.2;}
+  .sidebar-brand .brand-text .sub{font-size:12px; color:rgba(255,255,255,0.75);}
+  .sidebar-user{ margin:16px 16px 8px; background:rgba(255,255,255,0.12); border-radius:12px; padding:12px; display:flex; align-items:center; gap:10px;}
+  .sidebar-user .avatar{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.9);color:var(--teal-dark);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;}
+  .sidebar-user .who .nm{font-size:13px;font-weight:600;}
+  .sidebar-user .who .rl{font-size:11px;color:rgba(255,255,255,0.75);}
+  .sidebar-section-label{font-size:11px; letter-spacing:0.06em; color:rgba(255,255,255,0.6); padding:16px 20px 6px; font-weight:600;}
+  .sidebar-nav{ list-style:none; margin:0; padding:0 12px;}
+  .sidebar-nav li{margin-bottom:2px;}
+  .sidebar-nav a{
+    display:flex; align-items:center; gap:12px; padding:11px 12px; border-radius:12px;
+    color:rgba(255,255,255,0.9); text-decoration:none; font-size:14px; font-weight:500;
+    transition:background .15s;
+  }
+  .sidebar-nav a:hover{background:rgba(255,255,255,0.10); color:#fff;}
+  .sidebar-nav a.active{background:#fff; color:var(--teal-dark); font-weight:600;}
+  .sidebar-nav .badge-count{margin-left:auto; background:rgba(255,255,255,0.25); color:#fff; font-size:11px; font-weight:600; padding:1px 8px; border-radius:999px;}
+  .sidebar-nav a.active .badge-count{background:var(--teal-light); color:var(--teal-dark);}
+  .sidebar-footer{margin-top:auto; padding:16px 20px; font-size:12px; color:rgba(255,255,255,0.7); border-top:1px solid rgba(255,255,255,0.15);}
+  .sidebar-footer .status-dot{width:8px;height:8px;border-radius:50%;background:#4ADE80; display:inline-block; margin-right:6px;}
+
+  /* HEADER - frozen, identical to every approved screen */
+  .main-wrap{margin-left:280px;}
+  .topheader{
+    height:80px; background:#fff; border-bottom:1px solid var(--border-color);
+    display:flex; align-items:center; justify-content:space-between; padding:0 32px;
+    position:sticky; top:0; z-index:50;
+  }
+  .search-box{
+    background:var(--bg); border:1px solid var(--border-color); border-radius:12px;
+    padding:9px 14px; display:flex; align-items:center; gap:8px; width:340px; color:var(--text-muted); font-size:14px;
+  }
+  .header-right{display:flex; align-items:center; gap:14px;}
+  .sync-pill{
+    display:flex; align-items:center; gap:6px; background:var(--bg); border:1px solid var(--border-color);
+    border-radius:999px; padding:6px 12px; font-size:13px; color:var(--text-muted);
+  }
+  .bell-btn{ position:relative; width:40px; height:40px; border-radius:12px; background:var(--bg); display:flex; align-items:center; justify-content:center; color:var(--text-muted);}
+  .bell-btn .dot{position:absolute; top:8px; right:9px; width:7px; height:7px; background:var(--danger); border-radius:50%;}
+  .profile-chip{display:flex; align-items:center; gap:10px; cursor:pointer;}
+  .profile-chip .avatar{width:38px;height:38px;border-radius:50%;background:var(--teal-light);color:var(--teal-dark);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;}
+  .profile-chip .nm{font-size:13px;font-weight:600; color:var(--text-dark); line-height:1.1;}
+  .profile-chip .rl{font-size:12px;color:var(--teal); font-weight:500;}
+
+  /* CONTENT */
+  .content{padding:24px 32px 48px;}
+
+  .breadcrumb-nav{font-size:13px; color:var(--text-muted); margin-bottom:8px; display:flex; align-items:center; gap:6px;}
+  .breadcrumb-nav a{color:var(--text-muted); text-decoration:none;}
+  .breadcrumb-nav a:hover{color:var(--teal-dark);}
+  .breadcrumb-nav .sep{font-size:16px; color:#C7CBD1;}
+  .breadcrumb-nav .current{color:var(--teal-dark); font-weight:600;}
+
+  /* FLASH MESSAGES - same visual language as the .alert-ids blocks on the forms */
+  .flash-stack{margin-bottom:16px;}
+  .flash-ids{
+    border-radius:12px; border:1px solid #FDE68A; background:#FFFBEB; color:#92400E;
+    padding:14px 16px; font-size:13.5px; display:flex; gap:12px; align-items:flex-start;
+    margin-bottom:10px;
+  }
+  .flash-ids .material-symbols-outlined{font-size:20px; margin-top:1px;}
+
+  .eyebrow{font-size:12px; font-weight:700; letter-spacing:0.08em; color:var(--teal-dark); text-transform:uppercase;}
+  .page-title{font-size:32px; font-weight:700; color:var(--text-dark); margin-top:2px;}
+
+  /* BUTTONS - 12px radius per 02 Border Radius / 09 6 ("No exceptions")
+     padding + font-size are majority values; the spec states neither. */
+  .btn-primary-teal{
+    background:var(--teal); border:none; color:#fff; border-radius:12px; padding:10px 16px;
+    font-size:14px; font-weight:600; display:flex; align-items:center; gap:6px; white-space:nowrap;
+  }
+  .btn-primary-teal:hover{background:var(--teal-dark); color:#fff;}
+  .btn-outline-teal{
+    background:#fff; border:1px solid var(--teal); color:var(--teal); border-radius:12px; padding:10px 16px;
+    font-size:14px; font-weight:600; display:flex; align-items:center; gap:6px; white-space:nowrap;
+  }
+  .btn-outline-teal:hover{background:var(--teal-light); color:var(--teal-dark);}
+
+  /* TOOLBAR SEARCH - an input wrapper, so 12px per Inputs radius. min/max-width stay per-page. */
+  .toolbar-search{
+    background:var(--bg); border:1px solid var(--border-color); border-radius:12px; padding:10px 14px;
+    display:flex; align-items:center; gap:8px; color:var(--text-muted); font-size:13.5px; flex:1;
+  }
+  .toolbar-search input{border:none; background:transparent; outline:none; width:100%; font-size:13.5px; color:var(--text-dark);}
+  .toolbar-search input::placeholder{color:var(--text-muted); font-size:13px;}
+{% block styles %}{% endblock %}</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-brand">
+    <div class="logo-circle"><span class="material-symbols-outlined">health_metrics</span></div>
+    <div class="brand-text">
+      <div class="name">IDS-BPHCSN</div>
+      <div class="sub">Brgy. Poblacion HC</div>
+    </div>
+  </div>
+
+  <div class="sidebar-user">
+    <div class="avatar">{{ sidebar_user_initials }}</div>
+    <div class="who">
+      <div class="nm">{{ sidebar_user_name }}</div>
+      <div class="rl">{{ sidebar_role_label }}</div>
+    </div>
+  </div>
+
+  <div class="sidebar-section-label">Main Menu</div>
+  <ul class="sidebar-nav">
+    <li><a href="{{ url_for(dashboard_endpoint) }}"{% if active_nav == 'dashboard' %} class="active"{% endif %}><span class="material-symbols-outlined">grid_view</span>Dashboard</a></li>
+{%- if current_role == 'barangay official' %}
+    <!-- Community Announcements was retired. It never had a feature behind it --
+         a static template, no model, no create/edit/delete route -- and SMS
+         Notifications below already covers "tell the community something",
+         with a real record of what was sent. See migrate_drop_schedule_logs.py.
+         No badge on that item. It used to read "12", which was markup: nothing in this
+         system queues or holds SMS, so there is no pending count to show. -->
+    <li><a href="{{ url_for(sms_notifications_endpoint) }}"{% if active_nav == 'sms_notifications' %} class="active"{% endif %}><span class="material-symbols-outlined">sms</span>SMS Notifications</a></li>
+    <li><a href="{{ url_for('health_programs') }}"{% if active_nav == 'health_programs' %} class="active"{% endif %}><span class="material-symbols-outlined">volunteer_activism</span>Health Programs</a></li>
+    <li><a href="{{ url_for('vaccination_campaigns') }}"{% if active_nav == 'vaccination_campaigns' %} class="active"{% endif %}><span class="material-symbols-outlined">vaccines</span>Vaccination Campaigns</a></li>
+    <li><a href="{{ url_for('community_reports') }}"{% if active_nav == 'community_reports' %} class="active"{% endif %}><span class="material-symbols-outlined">summarize</span>Community Reports</a></li>
+    <li><a href="{{ url_for(reports_analytics_endpoint) }}"{% if active_nav == 'reports_analytics' %} class="active"{% endif %}><span class="material-symbols-outlined">monitoring</span>Reports &amp; Analytics</a></li>
+    <!-- Same reason as the SMS item above: the badge read "5", which was
+         markup. There is no notifications table and nothing writes one, so
+         there is no unread count to show. -->
+    <li><a href="{{ url_for('notifications') }}"{% if active_nav == 'notifications' %} class="active"{% endif %}><span class="material-symbols-outlined">notifications</span>Notifications</a></li>
+{%- else %}
+    <li><a href="{{ url_for(patient_records_endpoint) }}"{% if active_nav == 'patient_records' %} class="active"{% endif %}><span class="material-symbols-outlined">groups</span>Patient Records</a></li>
+    <li><a href="{{ url_for(register_patient_endpoint) }}"{% if active_nav == 'register_patient' %} class="active"{% endif %}><span class="material-symbols-outlined">person_add</span>Register Patient</a></li>
+    <!-- The badge is the low-stock alert count from inject_role_context(), and is
+         omitted entirely when nothing is below its reorder level -- a "0" badge
+         would read as an alert that is not there. -->
+    <li><a href="{{ url_for(medicine_inventory_endpoint) }}"{% if active_nav == 'medicine_inventory' %} class="active"{% endif %}><span class="material-symbols-outlined">inventory_2</span>Medicine Inventory{% if low_stock_count %}<span class="badge-count" title="{{ low_stock_count }} item{{ 's' if low_stock_count != 1 }} at or below the reorder level">{{ low_stock_count }}</span>{% endif %}</a></li>
+    <li><a href="{{ url_for(appointment_scheduling_endpoint) }}"{% if active_nav == 'appointment_scheduling' %} class="active"{% endif %}><span class="material-symbols-outlined">calendar_month</span>Appointment Scheduling</a></li>
+    <!-- See the note on the Barangay Official's copy of this item above. -->
+    <li><a href="{{ url_for(sms_notifications_endpoint) }}"{% if active_nav == 'sms_notifications' %} class="active"{% endif %}><span class="material-symbols-outlined">campaign</span>SMS Notifications</a></li>
+{%- if current_role == 'admin' %}
+    <!-- Community Announcements was retired here too; see the note on the
+         Barangay Official's menu above. -->
+    <li><a href="{{ url_for(reports_analytics_endpoint) }}"{% if active_nav == 'reports_analytics' %} class="active"{% endif %}><span class="material-symbols-outlined">monitoring</span>Reports &amp; Analytics</a></li>
+{%- endif %}
+{%- endif %}
+  </ul>
+{% if current_role == 'admin' %}
+  <div class="sidebar-section-label">Administration</div>
+  <ul class="sidebar-nav">
+    <li><a href="{{ url_for('user_management') }}"{% if active_nav == 'user_management' %} class="active"{% endif %}><span class="material-symbols-outlined">manage_accounts</span>User Management</a></li>
+    <li><a href="{{ url_for('audit_logs') }}"{% if active_nav == 'audit_logs' %} class="active"{% endif %}><span class="material-symbols-outlined">fact_check</span>Audit Logs</a></li>
+    <li><a href="{{ url_for('settings') }}"{% if active_nav == 'settings' %} class="active"{% endif %}><span class="material-symbols-outlined">settings</span>Settings</a></li>
+  </ul>
+{% endif %}
+  <div class="sidebar-footer">
+    <div><span class="status-dot"></span>System Online</div>
+    <div style="margin-top:4px;">Version 1.0.0 &middot; DOH-Licensed</div>
+    <div>&copy; 2026 Brgy. Poblacion HC</div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div class="main-wrap">
+
+  <!-- HEADER -->
+  <div class="topheader">
+    <div class="search-box">
+      <span class="material-symbols-outlined" style="font-size:18px;">search</span>
+      Search patient name or ID...
+    </div>
+    <div class="header-right">
+      <div class="sync-pill"><span class="material-symbols-outlined" style="font-size:16px;">sync</span>Synced just now</div>
+      <div class="bell-btn"><span class="material-symbols-outlined">notifications</span><span class="dot" id="headerBellDot"></span></div>
+      <div class="dropdown">
+      <div class="profile-chip" role="button" id="profileDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+
+        <div class="avatar">{{ sidebar_user_initials }}</div>
+        <div>
+          <div class="nm">{{ sidebar_user_name }}</div>
+          <div class="rl">{{ sidebar_role_label }}</div>
+        </div>
+        <span class="material-symbols-outlined" style="font-size:18px; color:var(--text-muted);">expand_more</span>
+      
+      </div>
+      <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="profileDropdown">
+        <li>
+          <button type="button" class="dropdown-item d-flex align-items-center gap-2 text-danger" data-bs-toggle="modal" data-bs-target="#logoutConfirmModal">
+            <span class="material-symbols-outlined">logout</span>Logout
+          </button>
+        </li>
+      </ul>
+    </div>
+    </div>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content">
+{%- with messages = get_flashed_messages() %}
+{%- if messages %}
+    <div class="flash-stack">
+{%- for message in messages %}
+      <div class="flash-ids"><span class="material-symbols-outlined">info</span><div>{{ message }}</div></div>
+{%- endfor %}
+    </div>
+{%- endif %}
+{%- endwith %}
+{%- block breadcrumb %}{% endblock %}
+{% block content %}{% endblock %}
+  </div>
+</div>
+{% block scripts %}{% endblock %}
+
+  <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+  <div class="modal fade" id="logoutConfirmModal" tabindex="-1" aria-labelledby="logoutConfirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content" style="border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.12);">
+        <div class="modal-header">
+          <h5 class="modal-title" id="logoutConfirmModalLabel">Confirm Logout</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          Are you sure you want to log out of IDS-BPHCSN?
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <a href="{{ url_for('logout') }}" class="btn btn-danger">Logout</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

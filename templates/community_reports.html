@@ -1,0 +1,341 @@
+{% extends "base.html" %}
+{% set active_nav = "community_reports" %}
+{% block title %}IDS-BPHCSN | Community Reports{% endblock %}
+
+{% block styles %}
+  .toolbar-search{min-width:280px; max-width:360px;}
+  .page-desc{font-size:14px; color:var(--text-muted); margin-top:8px;}
+
+  .status-pill{
+    display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600;
+    padding:6px 14px; border-radius:999px;
+  }
+  .pill-operational{background:var(--teal-light); color:var(--teal-dark);}
+  .pill-secure{background:#DBEAFE; color:#1D4ED8;}
+  .pill-dot{width:7px;height:7px;border-radius:50%; background:currentColor;}
+
+  .panel-card{
+    background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:24px; margin-bottom:24px;
+  }
+  .panel-title{font-size:16px; font-weight:600; color:var(--text-dark);}
+  .panel-sub{font-size:12.5px; color:var(--text-muted); margin-top:2px;}
+  .panel-link{font-size:12.5px; font-weight:600; color:var(--teal-dark); text-decoration:none; display:flex; align-items:center; gap:3px;}
+
+  label.field-label{font-size:12px; font-weight:500; color:var(--text-dark); margin-bottom:8px; display:block;}
+  .form-select, .form-control{
+    height:48px; border-radius:12px; border:1px solid var(--border-color); font-size:14px; color:var(--text-dark);
+  }
+  .form-control:focus, .form-select:focus{border-color:var(--teal); box-shadow:0 0 0 3px rgba(22,155,146,0.12);}
+
+  .btn-primary-teal:disabled{opacity:0.4;}
+  .btn-outline-teal:disabled{opacity:0.4;}
+
+  .stat-card{
+    background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:20px 22px; height:100%;
+  }
+  .stat-icon{width:44px;height:44px;border-radius:12px; display:flex; align-items:center; justify-content:center; margin-bottom:12px;}
+  .stat-value{font-size:24px; font-weight:700; color:var(--text-dark);}
+  .stat-label{font-size:13px; color:var(--text-muted); margin-top:2px;}
+  .stat-trend{font-size:12px; font-weight:600; margin-top:6px;}
+
+  .chart-wrap{position:relative; height:240px;}
+
+  .mini-legend{display:flex; gap:16px; flex-wrap:wrap; margin-top:16px;}
+  .mini-legend-item{display:flex; align-items:center; gap:8px; font-size:12px; color:var(--text-muted);}
+  .mini-legend-dot{width:8px; height:8px; border-radius:50%;}
+
+
+  .filter-btn{
+    background:#fff; border:1px solid var(--border-color); border-radius:10px; height:44px; padding:0 16px;
+    font-size:14px; font-weight:500; color:var(--text-dark); display:flex; align-items:center; gap:8px;
+  }
+  .filter-btn:hover{border-color:var(--teal); color:var(--teal);}
+
+  table.report-table{width:100%; border-collapse:separate; border-spacing:0; font-size:14px;}
+  table.report-table thead th{
+    text-align:left; color:var(--text-muted); font-weight:600; font-size:12px; letter-spacing:0.03em;
+    text-transform:uppercase; padding:16px; border-bottom:1px solid var(--border-color); white-space:nowrap;
+  }
+  table.report-table tbody td{
+    padding:16px; border-bottom:1px solid var(--border-color); color:var(--text-dark); vertical-align:middle;
+  }
+  table.report-table tbody tr:hover{background:var(--bg);}
+  table.report-table tbody tr:last-child td{border-bottom:none;}
+  .report-name{font-weight:600;}
+
+  .badge-status{
+    display:inline-flex; align-items:center; gap:8px; font-size:12px; font-weight:600;
+    padding:8px 16px; border-radius:999px; white-space:nowrap;
+  }
+  .badge-ready{background:#DCFCE7; color:#15803D;}
+  .badge-processing{background:#DBEAFE; color:#1D4ED8;}
+
+  .action-icon{
+    width:32px; height:32px; border-radius:10px; display:inline-flex; align-items:center; justify-content:center;
+    color:var(--text-muted); background:transparent; border:none;
+  }
+  .action-icon:hover{background:var(--bg); color:var(--teal);}
+
+  .table-footer{display:flex; align-items:center; justify-content:space-between; padding-top:16px; margin-top:8px; border-top:1px solid var(--border-color); flex-wrap:wrap; gap:16px;}
+  .pg-info{font-size:14px; color:var(--text-muted);}
+  .pagination .page-link{
+    color:var(--text-dark); border:1px solid var(--border-color); font-size:14px; font-weight:500;
+    padding:8px 16px; border-radius:8px !important; margin-left:8px;
+  }
+  .pagination .page-item.active .page-link{background-color:var(--teal); border-color:var(--teal); color:#fff;}
+  .pagination .page-link:hover{background-color:rgba(22,155,146,0.12); color:var(--teal); border-color:rgba(22,155,146,0.12);}
+  .pagination .page-item.disabled .page-link{color:var(--border-color); background:#fff;}
+{% endblock %}
+
+{# content: no breadcrumb, per instruction (audit 4.1b - deliberate, do not re-add) #}
+{% block content %}
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+      <div>
+        <div class="eyebrow">Barangay Poblacion Health Center</div>
+        <div class="page-title">Community Reports</div>
+        <div class="page-desc">{{ clinic_today | full_date }} &middot; Community-wide health statistics and reports for Barangay Poblacion.</div>
+      </div>
+      <div class="d-flex gap-2">
+        <span class="status-pill pill-operational"><span class="pill-dot"></span>All Systems Operational</span>
+        <span class="status-pill pill-secure"><span class="material-symbols-outlined" style="font-size:14px;">wifi</span>Secure Connection</span>
+      </div>
+    </div>
+
+    <div style="height:24px;"></div>
+
+    <!-- REPORT GENERATION TOOLBAR -->
+    <div class="panel-card">
+      <div class="panel-title mb-0">Generate a Community Report</div>
+      <div class="panel-sub mb-0">Select a report type and date range to view aggregate, community-wide statistics.</div>
+      <div style="height:24px;"></div>
+
+      <div class="row g-3 align-items-end">
+        <div class="col-lg-4 col-md-6">
+          <label class="field-label">Report Type</label>
+          <select class="form-select" id="reportType">
+            <option selected>Monthly Consultation Summary</option>
+            <option>Patient Registration Trend</option>
+            <option>Community Vaccination Summary</option>
+            <option>Top Community Health Concerns</option>
+            <option>Community Notification Report</option>
+          </select>
+        </div>
+        <div class="col-lg-2 col-md-3 col-sm-6">
+          <label class="field-label">From</label>
+          <input type="date" class="form-control" value="2026-01-01">
+        </div>
+        <div class="col-lg-2 col-md-3 col-sm-6">
+          <label class="field-label">To</label>
+          <input type="date" class="form-control" value="{{ clinic_today.isoformat() }}">
+        </div>
+        <div class="col-lg-4">
+          <div class="d-flex gap-2 flex-wrap">
+            <button class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">insights</span>Generate</button>
+            <button class="btn-outline-teal" disabled><span class="material-symbols-outlined" style="font-size:18px;">print</span>Print</button>
+            <button class="btn-outline-teal" disabled><span class="material-symbols-outlined" style="font-size:18px;">picture_as_pdf</span>Export PDF</button>
+            <button class="btn-outline-teal" disabled><span class="material-symbols-outlined" style="font-size:18px;">description</span>Export Excel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SUMMARY CARDS -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:rgba(22,155,146,0.12);"><span class="material-symbols-outlined" style="color:var(--teal);">clinical_notes</span></div>
+          <div class="stat-value">318</div>
+          <div class="stat-label">Total Consultations This Month</div>
+          <div class="stat-trend" style="color:var(--success);">+22 vs last month</div>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:rgba(59,130,246,0.15);"><span class="material-symbols-outlined" style="color:var(--info);">person_add</span></div>
+          <div class="stat-value">63</div>
+          <div class="stat-label">New Patient Registrations This Month</div>
+          <div class="stat-trend" style="color:var(--success);">+12% vs last month</div>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:rgba(34,197,94,0.15);"><span class="material-symbols-outlined" style="color:var(--success);">verified</span></div>
+          <div class="stat-value">83%</div>
+          <div class="stat-label">Vaccination Coverage Rate</div>
+          <div class="stat-trend" style="color:var(--text-muted);">All active campaigns</div>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:rgba(245,158,11,0.15);"><span class="material-symbols-outlined" style="color:var(--warning);">summarize</span></div>
+          <div class="stat-value">12</div>
+          <div class="stat-label">Community Reports Generated Year-to-Date</div>
+          <div class="stat-trend" style="color:var(--text-muted);">2026</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHART SECTION -->
+    <div class="row g-3">
+      <div class="col-lg-6">
+        <div class="panel-card h-100 mb-0">
+          <div class="panel-title mb-0">Monthly Consultations Trend</div>
+          <div class="panel-sub mb-0">Aggregate consultation count, last 6 months</div>
+          <div style="height:24px;"></div>
+          <div class="chart-wrap"><canvas id="chartConsultTrend"></canvas></div>
+        </div>
+      </div>
+      <div class="col-lg-6">
+        <div class="panel-card h-100 mb-0">
+          <div class="panel-title mb-0">Top Community Health Concerns</div>
+          <div class="panel-sub mb-0">Aggregate condition frequency, no patient-level data</div>
+          <div style="height:24px;"></div>
+          <div class="chart-wrap"><canvas id="chartHealthConcerns"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="height:24px;"></div>
+
+    <!-- RECENT COMMUNITY REPORTS TABLE -->
+    <div class="panel-card mb-0">
+
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-3">
+        <div>
+          <div class="panel-title mb-0">Recent Community Reports</div>
+          <div class="panel-sub mb-0">Previously generated reports</div>
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <div class="toolbar-search">
+            <span class="material-symbols-outlined" style="font-size:18px;">search</span>
+            <input type="text" placeholder="Search by report name">
+          </div>
+          <button class="filter-btn"><span class="material-symbols-outlined" style="font-size:18px;">filter_list</span>Report Type</button>
+          <button class="filter-btn"><span class="material-symbols-outlined" style="font-size:18px;">sort</span>Sort</button>
+        </div>
+      </div>
+
+      <div style="overflow-x:auto;">
+        <table class="report-table">
+          <thead>
+            <tr>
+              <th>Report Name / Type</th>
+              <th>Date Range Covered</th>
+              <th>Generated By</th>
+              <th>Date Generated</th>
+              <th>Status</th>
+              <th style="text-align:right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="report-name">June 2026 Monthly Consultation Summary</td>
+              <td>June 01&ndash;30, 2026</td>
+              <td>Dr. Joshua Reyes</td>
+              <td>July 02, 2026</td>
+              <td><span class="badge-status badge-ready">Ready</span></td>
+              <td><div class="d-flex justify-content-end gap-1"><button class="action-icon" title="View"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button><button class="action-icon" title="Download"><span class="material-symbols-outlined" style="font-size:18px;">download</span></button></div></td>
+            </tr>
+            <tr>
+              <td class="report-name">Q2 2026 Patient Registration Trend</td>
+              <td>April 01&ndash;June 30, 2026</td>
+              <td>Hon. Roberto Villanueva</td>
+              <td>July 01, 2026</td>
+              <td><span class="badge-status badge-ready">Ready</span></td>
+              <td><div class="d-flex justify-content-end gap-1"><button class="action-icon" title="View"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button><button class="action-icon" title="Download"><span class="material-symbols-outlined" style="font-size:18px;">download</span></button></div></td>
+            </tr>
+            <tr>
+              <td class="report-name">Community Vaccination Summary &ndash; June 2026</td>
+              <td>June 01&ndash;30, 2026</td>
+              <td>Dr. Joshua Reyes</td>
+              <td>June 29, 2026</td>
+              <td><span class="badge-status badge-ready">Ready</span></td>
+              <td><div class="d-flex justify-content-end gap-1"><button class="action-icon" title="View"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button><button class="action-icon" title="Download"><span class="material-symbols-outlined" style="font-size:18px;">download</span></button></div></td>
+            </tr>
+            <tr>
+              <td class="report-name">Top Community Health Concerns &ndash; H1 2026</td>
+              <td>January 01&ndash;June 30, 2026</td>
+              <td>Hon. Roberto Villanueva</td>
+              <td>July 03, 2026</td>
+              <td><span class="badge-status badge-processing">Processing</span></td>
+              <td><div class="d-flex justify-content-end gap-1"><button class="action-icon" title="View"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button><button class="action-icon" title="Download" disabled><span class="material-symbols-outlined" style="font-size:18px;">download</span></button></div></td>
+            </tr>
+            <tr>
+              <td class="report-name">Community Notification Report &ndash; June 2026</td>
+              <td>June 01&ndash;30, 2026</td>
+              <td>Hon. Roberto Villanueva</td>
+              <td>July 01, 2026</td>
+              <td><span class="badge-status badge-ready">Ready</span></td>
+              <td><div class="d-flex justify-content-end gap-1"><button class="action-icon" title="View"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button><button class="action-icon" title="Download"><span class="material-symbols-outlined" style="font-size:18px;">download</span></button></div></td>
+            </tr>
+            <tr>
+              <td class="report-name">May 2026 Monthly Consultation Summary</td>
+              <td>May 01&ndash;31, 2026</td>
+              <td>Dr. Joshua Reyes</td>
+              <td>June 02, 2026</td>
+              <td><span class="badge-status badge-ready">Ready</span></td>
+              <td><div class="d-flex justify-content-end gap-1"><button class="action-icon" title="View"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button><button class="action-icon" title="Download"><span class="material-symbols-outlined" style="font-size:18px;">download</span></button></div></td>
+            </tr>
+            <tr>
+              <td class="report-name">Q1 2026 Patient Registration Trend</td>
+              <td>January 01&ndash;March 31, 2026</td>
+              <td>Hon. Roberto Villanueva</td>
+              <td>April 04, 2026</td>
+              <td><span class="badge-status badge-ready">Ready</span></td>
+              <td><div class="d-flex justify-content-end gap-1"><button class="action-icon" title="View"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button><button class="action-icon" title="Download"><span class="material-symbols-outlined" style="font-size:18px;">download</span></button></div></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="table-footer">
+        <div class="pg-info">Showing 1&ndash;7 of 12 reports</div>
+        <nav aria-label="Community reports pagination">
+          <ul class="pagination mb-0">
+            <li class="page-item disabled"><a class="page-link" href="#"><span class="material-symbols-outlined" style="font-size:16px;">chevron_left</span></a></li>
+            <li class="page-item active"><a class="page-link" href="#">1</a></li>
+            <li class="page-item"><a class="page-link" href="#">2</a></li>
+            <li class="page-item"><a class="page-link" href="#"><span class="material-symbols-outlined" style="font-size:16px;">chevron_right</span></a></li>
+          </ul>
+        </nav>
+      </div>
+
+    </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/chart.umd.min.js') }}"></script>
+<script>
+  Chart.defaults.font.family = "'Inter', Arial, sans-serif";
+  Chart.defaults.color = '#6B7280';
+  Chart.defaults.font.size = 12;
+
+  const teal = '#169B92', info = '#3B82F6', warning = '#F59E0B', danger = '#EF4444', success = '#22C55E';
+
+  new Chart(document.getElementById('chartConsultTrend'), {
+    type: 'line',
+    data: {
+      labels: ['Feb','Mar','Apr','May','Jun','Jul'],
+      datasets: [{
+        label: 'Consultations',
+        data: [275, 288, 296, 309, 301, 318],
+        borderColor: teal, backgroundColor: 'rgba(22,155,146,0.12)',
+        fill: true, tension: 0.4, pointRadius: 3, pointBackgroundColor: teal
+      }]
+    },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true, grid:{color:'#F5F7FA'}}, x:{grid:{display:false}}} }
+  });
+
+  new Chart(document.getElementById('chartHealthConcerns'), {
+    type: 'bar',
+    data: {
+      labels: ['Hypertension','Diabetes','Influenza','Dengue Fever','Asthma','Upper Respiratory Infection','Common Cold'],
+      datasets: [{
+        data: [186, 124, 98, 76, 61, 143, 209],
+        backgroundColor: teal,
+        borderRadius: 8
+      }]
+    },
+    options: { indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true, grid:{color:'#F5F7FA'}}, y:{grid:{display:false}}} }
+  });
+</script>{% endblock %}

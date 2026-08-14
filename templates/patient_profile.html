@@ -1,0 +1,613 @@
+{% extends "base.html" %}
+{% set active_nav = "patient_records" %}
+{% block title %}IDS-BPHCSN | Patient Profile{% endblock %}
+
+{% block styles %}
+
+  .panel-card{
+    background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:24px; margin-bottom:24px;
+  }
+
+  /* PROFILE HEADER */
+  .profile-header{display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:20px;}
+  .profile-id-block{display:flex; gap:18px;}
+  .profile-avatar{
+    width:76px; height:76px; border-radius:50%; background:var(--teal-light); color:var(--teal-dark);
+    display:flex; align-items:center; justify-content:center; font-weight:700; font-size:24px; flex-shrink:0;
+  }
+  .profile-name{font-size:22px; font-weight:700; color:var(--text-dark); display:flex; align-items:center; gap:10px;}
+  .profile-id{font-size:13px; color:var(--text-muted); margin-top:2px;}
+  .profile-meta-grid{display:grid; grid-template-columns:repeat(4,auto); gap:22px 32px; margin-top:16px;}
+  .meta-item .meta-label{font-size:11.5px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.04em; font-weight:600;}
+  .meta-item .meta-value{font-size:14px; color:var(--text-dark); font-weight:600; margin-top:2px;}
+  .profile-actions{display:flex; gap:10px; flex-wrap:wrap;}
+
+  .btn-ghost-ids{
+    background:transparent; border:1px solid var(--border-color); color:var(--text-dark); border-radius:10px; padding:10px 16px;
+    font-size:14px; font-weight:500; display:flex; align-items:center; gap:6px; white-space:nowrap;
+  }
+  .btn-ghost-ids:hover{border-color:#C7CBD1; background:var(--bg);}
+
+  .badge-status{
+    display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600;
+    padding:4px 11px; border-radius:999px; white-space:nowrap;
+  }
+  .badge-active{background:#DCFCE7; color:#15803D;}
+  .badge-followup{background:#FEF3C7; color:#B45309;}
+  .badge-prenatal{background:#DBEAFE; color:#1D4ED8;}
+  .badge-immunization{background:#DBEAFE; color:#1D4ED8;}
+  .badge-critical{background:#FEE2E2; color:#B91C1C;}
+  .badge-referred{background:#EDE9FE; color:var(--purple);}
+  .badge-archived{background:#F3F4F6; color:#4B5563;}
+  .badge-inactive{background:#F3F4F6; color:#4B5563;}
+  .badge-completed{background:#DCFCE7; color:#15803D;}
+  .badge-scheduled{background:#DBEAFE; color:#1D4ED8;}
+  .badge-cancelled{background:#FEE2E2; color:#B91C1C;}
+  /* Appointment History renders whatever models/appointments.py maps a status
+     to, so the queue statuses need their styles here too or a checked-in visit
+     would show as an unstyled pill. Same colours as Screen 08. */
+  .badge-waiting{background:#FEF3C7; color:#B45309;}
+  .badge-inconsult{background:var(--teal-light); color:var(--teal-dark);}
+  .badge-noshow{background:#F3F4F6; color:#4B5563;}
+
+  /* SUMMARY CARDS */
+  .stat-card{
+    background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:20px 22px; height:100%;
+  }
+  .stat-icon{width:44px;height:44px;border-radius:12px; display:flex; align-items:center; justify-content:center; margin-bottom:12px;}
+  .stat-value{font-size:20px; font-weight:700; color:var(--text-dark);}
+  .stat-label{font-size:13px; color:var(--text-muted); margin-top:2px;}
+  .stat-trend{font-size:12px; font-weight:600; margin-top:6px;}
+
+  /* TABS */
+  .nav-tabs{border-bottom:1px solid var(--border-color); gap:4px;}
+  .nav-tabs .nav-link{
+    border:none; border-radius:10px 10px 0 0; color:var(--text-muted); font-size:14px; font-weight:500;
+    padding:12px 18px; display:flex; align-items:center; gap:7px;
+  }
+  .nav-tabs .nav-link:hover{color:var(--teal-dark); background:var(--teal-light);}
+  .nav-tabs .nav-link.active{
+    color:var(--teal-dark); background:var(--teal-light); font-weight:600;
+    border-bottom:3px solid var(--teal);
+  }
+  .tab-content{padding-top:22px;}
+
+  .info-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:20px 28px;}
+  .info-item .info-label{font-size:12px; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:0.03em;}
+  .info-item .info-value{font-size:14.5px; color:var(--text-dark); margin-top:3px;}
+
+  table.history-table{width:100%; border-collapse:separate; border-spacing:0; font-size:13.5px;}
+  table.history-table thead th{
+    text-align:left; color:var(--text-muted); font-weight:600; font-size:11.5px; letter-spacing:0.03em;
+    text-transform:uppercase; padding:12px 14px; border-bottom:1px solid var(--border-color); white-space:nowrap;
+  }
+  table.history-table tbody td{
+    padding:14px; border-bottom:1px solid var(--border-color); color:var(--text-dark); vertical-align:middle;
+  }
+  table.history-table tbody tr:hover{background:#FAFBFC;}
+  table.history-table tbody tr:last-child td{border-bottom:none;}
+  .action-icon{
+    width:32px; height:32px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center;
+    color:var(--text-muted); background:transparent; border:none;
+  }
+  .action-icon:hover{background:var(--bg); color:var(--teal-dark);}
+
+  /* TIMELINE */
+  .timeline{position:relative; padding-left:28px;}
+  .timeline::before{content:''; position:absolute; left:8px; top:6px; bottom:6px; width:2px; background:var(--border-color);}
+  .timeline-item{position:relative; padding-bottom:24px;}
+  .timeline-item:last-child{padding-bottom:0;}
+  .timeline-dot{
+    position:absolute; left:-28px; top:2px; width:18px; height:18px; border-radius:50%;
+    background:var(--teal-light); border:2px solid var(--teal); display:flex; align-items:center; justify-content:center;
+  }
+  .timeline-date{font-size:12px; color:var(--text-muted); font-weight:600;}
+  .timeline-title{font-size:14.5px; font-weight:600; color:var(--text-dark); margin-top:2px;}
+  .timeline-desc{font-size:13.5px; color:var(--text-muted); margin-top:2px;}
+  .timeline-meta{font-size:12.5px; color:var(--text-muted); margin-top:4px;}
+
+  /* EMPTY STATE */
+  .empty-state{display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:56px 24px;}
+  .empty-state .icon-circle{
+    width:64px; height:64px; border-radius:50%; background:var(--teal-light); display:flex; align-items:center;
+    justify-content:center; margin-bottom:16px;
+  }
+  .empty-state h5{font-size:16px; font-weight:600; color:var(--text-dark); margin-bottom:6px;}
+  .empty-state p{font-size:13.5px; color:var(--text-muted); max-width:360px; margin-bottom:18px;}
+{% endblock %}
+
+{% block breadcrumb %}
+
+    <div class="breadcrumb-nav">
+      <a href="{{ url_for(dashboard_endpoint) }}">Dashboard</a>
+      <span class="sep material-symbols-outlined">chevron_right</span>
+      <a href="{{ url_for(patient_records_endpoint) }}">Patient Records</a>
+      <span class="sep material-symbols-outlined">chevron_right</span>
+      <span class="current">Patient Profile</span>
+    </div>{% endblock %}
+
+{% block content %}
+    <!-- PROFILE HEADER -->
+    <div class="panel-card">
+      <div class="profile-header">
+        <div class="profile-id-block">
+          <div class="profile-avatar">{{ patient.initials }}</div>
+          <div>
+            <div class="profile-name">{{ patient.full_name }} <span class="badge-status {{ patient.status_badge_class }}">{{ patient.status }}</span></div>
+            <div class="profile-id">Patient ID: {{ patient.patient_id }} &middot; Registered {{ patient.created_at | long_date }}</div>
+
+            <div class="profile-meta-grid">
+              <div class="meta-item">
+                <div class="meta-label">Age / Sex</div>
+                <div class="meta-value">{{ patient.age if patient.age is not none else '—' }} / {{ patient.sex or '—' }}</div>
+              </div>
+              <div class="meta-item">
+                <div class="meta-label">Blood Type</div>
+                <div class="meta-value">{{ patient.blood_type or 'Not recorded' }}</div>
+              </div>
+              <div class="meta-item">
+                <div class="meta-label">PhilHealth No.</div>
+                <div class="meta-value">Not recorded</div>
+              </div>
+              <div class="meta-item">
+                <div class="meta-label">Contact Number</div>
+                <div class="meta-value">{{ patient.contact_number or 'Not recorded' }}</div>
+              </div>
+              <div class="meta-item" style="grid-column:span 2;">
+                <div class="meta-label">Address</div>
+                <div class="meta-value">{{ patient.display_address or 'Not recorded' }}</div>
+              </div>
+              <div class="meta-item">
+                <div class="meta-label">Civil Status</div>
+                <div class="meta-value">{{ patient.civil_status or 'Not recorded' }}</div>
+              </div>
+              <div class="meta-item">
+                <div class="meta-label">Status</div>
+                <div class="meta-value"><span class="badge-status {{ patient.status_badge_class }}">{{ patient.status }}</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="profile-actions">
+          <button class="btn-ghost-ids"><span class="material-symbols-outlined" style="font-size:18px;">print</span>Print Record</button>
+          <button class="btn-outline-teal"><span class="material-symbols-outlined" style="font-size:18px;">calendar_month</span>Schedule Appointment</button>
+          <a href="{{ url_for(register_patient_endpoint, patient_id=patient.id) }}" class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">edit</span>Edit Profile</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- SUMMARY CARDS -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:var(--teal-light);"><span class="material-symbols-outlined" style="color:var(--teal-dark);">event_available</span></div>
+          <div class="stat-value">{{ patient.last_visit | display_date('No visits yet') }}</div>
+          <div class="stat-label">Last Visit</div>
+          <div class="stat-trend" style="color:var(--text-muted);">{{ consultations[0].chief_complaint if consultations else 'No consultations recorded' }}</div>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#DBEAFE;"><span class="material-symbols-outlined" style="color:var(--info);">stethoscope</span></div>
+          <div class="stat-value">Not assigned</div>
+          <div class="stat-label">Assigned Health Worker</div>
+          <div class="stat-trend" style="color:var(--text-muted);">Not yet tracked</div>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#FEF3C7;"><span class="material-symbols-outlined" style="color:var(--warning);">pill</span></div>
+          <div class="stat-value">Not tracked</div>
+          <div class="stat-label">Active Prescriptions</div>
+          <div class="stat-trend" style="color:var(--text-muted);">Medicine dispensing not yet recorded</div>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#EDE9FE;"><span class="material-symbols-outlined" style="color:var(--purple);">calendar_month</span></div>
+          <div class="stat-value">{{ next_appointment.appointment_date | display_date if next_appointment else 'None scheduled' }}</div>
+          <div class="stat-label">Upcoming Appointment</div>
+          <div class="stat-trend" style="color:var(--text-muted);">{{ (next_appointment.appointment_type or 'Appointment') if next_appointment else 'No upcoming appointment' }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TABS PANEL -->
+    <div class="panel-card">
+      <ul class="nav nav-tabs" id="profileTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-personal" type="button">
+            <span class="material-symbols-outlined" style="font-size:17px;">badge</span>Personal Information
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-medical" type="button">
+            <span class="material-symbols-outlined" style="font-size:17px;">medical_information</span>Medical History
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-consult" type="button">
+            <span class="material-symbols-outlined" style="font-size:17px;">stethoscope</span>Consultation History
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-medicine" type="button">
+            <span class="material-symbols-outlined" style="font-size:17px;">pill</span>Medicine History
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-vaccine" type="button">
+            <span class="material-symbols-outlined" style="font-size:17px;">vaccines</span>Immunization Record
+{#- The count rides on the tab itself so an outstanding dose is visible without
+    the tab having to be opened first -- the point of tracking defaulters is that
+    nobody has to go looking. #}
+{%- if immunization and immunization.needs_attention %}
+            <span class="badge-status {{ 'badge-cancelled' if immunization.overdue_count else 'badge-waiting' }}" style="margin-left:6px; font-size:11px; padding:2px 8px;">{{ immunization.attention_count }}</span>
+{%- endif %}
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-appt" type="button">
+            <span class="material-symbols-outlined" style="font-size:17px;">calendar_month</span>Appointment History
+          </button>
+        </li>
+      </ul>
+
+      <div class="tab-content">
+
+        <!-- PERSONAL INFORMATION -->
+        <div class="tab-pane fade show active" id="tab-personal">
+          <div class="info-grid">
+            <div class="info-item"><div class="info-label">Full Name</div><div class="info-value">{{ patient.full_name }}</div></div>
+            <div class="info-item"><div class="info-label">Birthdate</div><div class="info-value">{{ patient.birth_date | long_date('Not recorded') }}</div></div>
+            <div class="info-item"><div class="info-label">Age / Sex</div><div class="info-value">{{ patient.age if patient.age is not none else '—' }} / {{ patient.sex or '—' }}</div></div>
+            <div class="info-item"><div class="info-label">Civil Status</div><div class="info-value">{{ patient.civil_status or 'Not recorded' }}</div></div>
+            <div class="info-item"><div class="info-label">Blood Type</div><div class="info-value">{{ patient.blood_type or 'Not recorded' }}</div></div>
+            <div class="info-item"><div class="info-label">PhilHealth No.</div><div class="info-value">Not recorded</div></div>
+            <div class="info-item"><div class="info-label">Contact Number</div><div class="info-value">{{ patient.contact_number or 'Not recorded' }}</div></div>
+            <div class="info-item"><div class="info-label">Address</div><div class="info-value">{{ patient.display_address or 'Not recorded' }}</div></div>
+            <div class="info-item"><div class="info-label">Emergency Contact</div><div class="info-value">{{ patient.emergency_contact_name or 'Not recorded' }}{% if patient.emergency_contact_relationship %} ({{ patient.emergency_contact_relationship }}){% endif %}</div></div>
+            <div class="info-item"><div class="info-label">Emergency Contact No.</div><div class="info-value">{{ patient.emergency_contact_number or 'Not recorded' }}</div></div>
+            <div class="info-item"><div class="info-label">Assigned Health Worker</div><div class="info-value">Not assigned</div></div>
+            <div class="info-item"><div class="info-label">Date Registered</div><div class="info-value">{{ patient.created_at | long_date }}</div></div>
+          </div>
+        </div>
+
+        <!-- MEDICAL HISTORY -->
+        <div class="tab-pane fade" id="tab-medical">
+          <div class="info-grid mb-4">
+            <div class="info-item"><div class="info-label">Blood Type</div><div class="info-value">{{ patient.blood_type or 'Not recorded' }}</div></div>
+            <div class="info-item"><div class="info-label">Known Conditions</div><div class="info-value">{{ patient.medical_conditions_list | join(', ') if patient.medical_conditions_list else 'None recorded' }}</div></div>
+            <div class="info-item"><div class="info-label">Known Allergies</div><div class="info-value">{{ patient.allergies_list | join(', ') if patient.allergies_list else 'None recorded' }}</div></div>
+          </div>
+{%- if consultations %}
+          <!-- Until a dedicated medical-history table exists, the diagnoses recorded
+               against each consultation are this patient's medical history. -->
+          <div class="timeline">
+{%- for consultation in consultations %}
+            <div class="timeline-item">
+              <div class="timeline-dot"><span class="material-symbols-outlined" style="font-size:11px; color:var(--teal-dark);">favorite</span></div>
+              <div class="timeline-date">{{ consultation.consultation_date | display_date }}</div>
+              <div class="timeline-title">{{ consultation.diagnosis or consultation.chief_complaint or 'Consultation' }}</div>
+              <div class="timeline-desc">{{ consultation.treatment_plan or 'No treatment plan recorded.' }}</div>
+              <div class="timeline-meta">Attending: {{ consultation.recorded_by }}</div>
+            </div>
+{%- endfor %}
+          </div>
+{%- else %}
+          <div class="empty-state">
+            <div class="icon-circle">
+              <span class="material-symbols-outlined" style="font-size:30px; color:var(--teal-dark);">medical_information</span>
+            </div>
+            <h5>No medical history yet</h5>
+            <p>Nothing has been recorded for this patient. Diagnoses entered during consultations will appear here.</p>
+          </div>
+{%- endif %}
+        </div>
+
+        <!-- CONSULTATION HISTORY -->
+        <div class="tab-pane fade" id="tab-consult">
+{%- if consultations %}
+          <div style="overflow-x:auto;">
+            <table class="history-table">
+              <thead>
+                <tr>
+                  <th style="width:34px;"></th>
+                  <th>Date</th>
+                  <th>Chief Complaint</th>
+                  <th>Diagnosis</th>
+                  <th>Attending</th>
+                  <th>Status</th>
+                  <th style="text-align:right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+{#- Each consultation is a summary row plus a details row holding everything the
+    Record Consultation form captured. The details row is collapsed by default so
+    the table still reads as a history at a glance, and every value in it comes
+    from the model's `<field>_display` twin -- which prints "Not recorded" rather
+    than a blank, so the five seeded rows that predate the vitals columns say so
+    plainly instead of showing an empty cell a reader could mistake for a zero. #}
+{%- for consultation in consultations %}
+                <tr>
+                  <td>
+                    <button type="button" class="action-icon" data-bs-toggle="collapse"
+                            data-bs-target="#consultDetail{{ consultation.id }}"
+                            aria-expanded="false" aria-controls="consultDetail{{ consultation.id }}"
+                            title="Show full record">
+                      <span class="material-symbols-outlined" style="font-size:18px;">expand_more</span>
+                    </button>
+                  </td>
+                  <td>{{ consultation.consultation_date | display_date }}{% if consultation.was_edited %}<div style="font-size:11.5px; color:var(--text-muted);">edited</div>{% endif %}</td>
+                  <td>{{ consultation.chief_complaint or '—' }}</td>
+                  <td>{{ consultation.diagnosis or '—' }}</td>
+                  <td>{{ consultation.recorded_by }}</td>
+                  <td><span class="badge-status badge-completed">Completed</span></td>
+                  <td>
+                    <div class="d-flex justify-content-end gap-1">
+                      <a href="{{ url_for(edit_consultation_endpoint, consultation_id=consultation.id) }}"
+                         class="action-icon" title="Edit this consultation — the change is recorded in the audit log">
+                        <span class="material-symbols-outlined" style="font-size:18px;">edit</span>
+                      </a>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td colspan="7" style="padding:0; border-bottom:1px solid var(--border-color);">
+                    <div class="collapse" id="consultDetail{{ consultation.id }}">
+                      <div style="padding:16px 14px 20px; background:#FAFBFC;">
+                        <div class="info-grid" style="margin-bottom:16px;">
+                          <div class="info-item"><div class="info-label">Temperature</div><div class="info-value">{{ consultation.temperature_display }}</div></div>
+                          <div class="info-item"><div class="info-label">Blood Pressure</div><div class="info-value">{{ consultation.blood_pressure_display }}</div></div>
+                          <div class="info-item"><div class="info-label">Pulse Rate</div><div class="info-value">{{ consultation.pulse_rate_display }}</div></div>
+                          <div class="info-item"><div class="info-label">Respiratory Rate</div><div class="info-value">{{ consultation.respiratory_rate_display }}</div></div>
+                          <div class="info-item"><div class="info-label">Weight</div><div class="info-value">{{ consultation.weight_display }}</div></div>
+{#- Growth measurements are shown only where they were actually taken. Printing
+    "Not recorded" for an adult's head circumference would imply it was meant to
+    be there, which is the opposite of what the age rule says. #}
+{%- if consultation.height is not none %}
+                          <div class="info-item"><div class="info-label">Height</div><div class="info-value">{{ consultation.height_display }}</div></div>
+{%- endif %}
+{%- if consultation.head_circumference is not none %}
+                          <div class="info-item"><div class="info-label">Head Circumference</div><div class="info-value">{{ consultation.head_circumference_display }}</div></div>
+{%- endif %}
+                          <div class="info-item"><div class="info-label">Follow-up Date</div><div class="info-value">{{ consultation.follow_up_date_display }}</div></div>
+                        </div>
+                        <div class="info-grid">
+                          <div class="info-item" style="grid-column:1/-1;"><div class="info-label">Chief Complaint</div><div class="info-value">{{ consultation.chief_complaint_display }}</div></div>
+                          <div class="info-item" style="grid-column:1/-1;"><div class="info-label">Diagnosis</div><div class="info-value">{{ consultation.diagnosis_display }}</div></div>
+                          <div class="info-item" style="grid-column:1/-1;"><div class="info-label">Treatment Plan / Medicines Given</div><div class="info-value">{{ consultation.treatment_plan_display }}</div></div>
+                          <div class="info-item" style="grid-column:1/-1;"><div class="info-label">Additional Notes</div><div class="info-value">{{ consultation.remarks_display }}</div></div>
+                        </div>
+                        <div style="font-size:12px; color:var(--text-muted); margin-top:14px; padding-top:12px; border-top:1px dashed var(--border-color);">
+                          Recorded by {{ consultation.recorded_by_name }} on {{ consultation.created_at | display_date }}.
+{%- if consultation.was_edited %} Last edited {{ consultation.updated_at | display_date }} — see the audit log for what changed.{% endif %}
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+{%- endfor %}
+              </tbody>
+            </table>
+          </div>
+{%- else %}
+          <div class="empty-state">
+            <div class="icon-circle">
+              <span class="material-symbols-outlined" style="font-size:30px; color:var(--teal-dark);">stethoscope</span>
+            </div>
+            <h5>No consultations yet</h5>
+            <p>This patient has no recorded consultations. Visits logged at the health center will appear here.</p>
+          </div>
+{%- endif %}
+        </div>
+
+        <!-- MEDICINE HISTORY -->
+        <!-- No dispensing table exists yet, so there is nothing to read. The
+             inventory_logs / dispensing table arrives with Objective 2. -->
+        <div class="tab-pane fade" id="tab-medicine">
+          <div class="empty-state">
+            <div class="icon-circle">
+              <span class="material-symbols-outlined" style="font-size:30px; color:var(--teal-dark);">pill</span>
+            </div>
+            <h5>No medicine records yet</h5>
+            <p>Medicine dispensing is not recorded yet. Once it is, everything issued to this patient will appear here.</p>
+          </div>
+        </div>
+
+        <!-- IMMUNIZATION RECORD — the child's standing against the DOH Expanded
+             Program on Immunization schedule.
+
+             Every status and every count on this tab comes from
+             models/immunizations.py get_immunization_status(). The template
+             works nothing out for itself, so this tab, the queue badge, the
+             check-in message and the dashboard card are all reading one
+             calculation and cannot disagree about a real child.
+
+             Shown for the under-5 cohort the schedule applies to, and for any
+             older patient who has doses on file — ageing out of the programme
+             does not delete a medical record. -->
+        <div class="tab-pane fade" id="tab-vaccine">
+{%- if show_immunizations %}
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+            <div>
+              <div style="font-size:15px; font-weight:600; color:var(--text-dark);">DOH Expanded Program on Immunization</div>
+              <div style="font-size:12.5px; color:var(--text-muted); margin-top:2px;">{{ immunization.summary }}</div>
+            </div>
+{%- if immunization.applicable %}
+            <div class="d-flex gap-2 flex-wrap">
+              <span class="badge-status badge-completed">{{ immunization.completed_count }} completed</span>
+{%- if immunization.overdue_count %}
+              <span class="badge-status badge-cancelled">{{ immunization.overdue_count }} overdue</span>
+{%- endif %}
+{%- if immunization.due_count %}
+              <span class="badge-status badge-waiting">{{ immunization.due_count }} due now</span>
+{%- endif %}
+              <span class="badge-status badge-scheduled">{{ immunization.upcoming_count }} upcoming</span>
+            </div>
+{%- endif %}
+          </div>
+
+{%- if immunization.attention_items %}
+          <!-- Same amber/red split the Medicine Stock Alerts panel uses: red once
+               it is past the grace period, amber while it is merely due. -->
+          <div style="border-radius:12px; border:1px solid {{ '#FECACA' if immunization.overdue_count else '#FDE68A' }}; background:{{ '#FEF2F2' if immunization.overdue_count else '#FFFBEB' }}; color:{{ '#B91C1C' if immunization.overdue_count else '#92400E' }}; padding:14px 16px; font-size:13.5px; display:flex; gap:12px; align-items:flex-start; margin-bottom:18px;">
+            <span class="material-symbols-outlined" style="font-size:20px; margin-top:1px;">{{ 'warning' if immunization.overdue_count else 'event_available' }}</span>
+            <div>
+              <strong style="display:block; margin-bottom:2px;">{{ immunization.attention_count }} dose{{ '' if immunization.attention_count == 1 else 's' }} outstanding</strong>
+              {% for item in immunization.attention_items %}{{ item.label }} ({{ item.status | lower }}{% if item.due_date %}, due {{ item.due_date | display_date }}{% endif %}){{ "; " if not loop.last else "" }}{% endfor %}.
+              Record these during the child's next consultation.
+            </div>
+          </div>
+{%- elif immunization.applicable %}
+          <div style="border-radius:12px; border:1px solid #BBF7D0; background:#F0FDF4; color:#166534; padding:14px 16px; font-size:13.5px; display:flex; gap:12px; align-items:flex-start; margin-bottom:18px;">
+            <span class="material-symbols-outlined" style="font-size:20px; margin-top:1px;">check_circle</span>
+            <div>
+              <strong style="display:block; margin-bottom:2px;">Nothing outstanding today</strong>
+{%- if immunization.next_due %}
+              Next scheduled: {{ immunization.next_due.label }}{% if immunization.next_due.due_date %} on {{ immunization.next_due.due_date | display_date }}{% endif %}.
+{%- else %}
+              Every dose in the schedule has been recorded.
+{%- endif %}
+            </div>
+          </div>
+{%- endif %}
+
+          <div style="overflow-x:auto;">
+            <table class="history-table">
+              <thead>
+                <tr>
+                  <th>Vaccine / Dose</th>
+                  <th>Protects Against</th>
+                  <th>Recommended Age</th>
+                  <th>Due</th>
+                  <th>Date Given</th>
+                  <th>Administered By</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+{%- for item in immunization.schedule %}
+                <tr>
+                  <td style="font-weight:600;">{{ item.label }}</td>
+                  <td style="color:var(--text-muted); font-size:12.5px;">{{ item.protects }}</td>
+                  <td style="color:var(--text-muted); font-size:12.5px;">{{ item.timing }}</td>
+                  <td>{{ item.due_date | display_date if item.due_date else '—' }}</td>
+                  <td>{{ item.date_administered | display_date if item.date_administered else '—' }}</td>
+                  <td>{{ item.administered_by_name or '—' }}</td>
+                  <td><span class="badge-status {{ item.badge_class }}">{{ item.status }}</span></td>
+                </tr>
+{%- endfor %}
+              </tbody>
+            </table>
+          </div>
+
+{%- if immunization.extra_records %}
+          <!-- Doses on file that the current schedule does not list — a vaccine
+               given before a schedule revision, say. Reported rather than
+               dropped: a vaccination that happened, happened. -->
+          <div style="margin-top:20px;">
+            <div style="font-size:13.5px; font-weight:600; color:var(--text-dark); margin-bottom:8px;">Other recorded doses</div>
+            <div style="overflow-x:auto;">
+              <table class="history-table">
+                <thead><tr><th>Vaccine / Dose</th><th>Date Given</th><th>Administered By</th></tr></thead>
+                <tbody>
+{%- for record in immunization.extra_records %}
+                  <tr>
+                    <td style="font-weight:600;">{{ record.label }}</td>
+                    <td>{{ record.date_administered | display_date }}</td>
+                    <td>{{ record.administered_by_name }}</td>
+                  </tr>
+{%- endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+{%- endif %}
+
+          <div style="font-size:12px; color:var(--text-muted); margin-top:16px; padding-top:12px; border-top:1px dashed var(--border-color);">
+            Doses are recorded during a consultation. A dose is <strong style="display:inline;">Due Now</strong> from its
+            recommended age and becomes <strong style="display:inline;">Overdue</strong> {{ immunization.grace_period_days }} days later —
+            about one missed monthly immunisation session.
+{%- if not immunization.applicable %}
+            {{ patient.first_name }} is past the under-{{ immunization.pediatric_age_years }} cohort the infant schedule covers,
+            so nothing here is flagged due or overdue; the history is shown as recorded.
+{%- endif %}
+          </div>
+{%- else %}
+          <div class="empty-state">
+            <div class="icon-circle">
+              <span class="material-symbols-outlined" style="font-size:30px; color:var(--teal-dark);">vaccines</span>
+            </div>
+            <h5>No immunization record</h5>
+            <p>The DOH Expanded Program on Immunization schedule covers children under {{ immunization.pediatric_age_years }}, and this patient has no doses on file. Immunizations recorded during a consultation appear here.</p>
+          </div>
+{%- endif %}
+        </div>
+
+        <!-- APPOINTMENT HISTORY -->
+        <div class="tab-pane fade" id="tab-appt">
+{%- if appointments %}
+          <div style="overflow-x:auto;">
+            <table class="history-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Time</th>
+                  <th>Purpose</th>
+                  <th>Assigned To</th>
+                  <th>Status</th>
+                  <th style="text-align:right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+{%- for appointment in appointments %}
+                <tr>
+                  <td>{{ appointment.appointment_date | display_date }}</td>
+                  <td>{{ appointment.appointment_time or '—' }}</td>
+                  <td>{{ appointment.appointment_type or '—' }}</td>
+                  <td>{{ appointment.assigned_staff or 'Unassigned' }}</td>
+                  <td><span class="badge-status {{ appointment.status_badge_class }}">{{ appointment.status }}</span></td>
+                  <td>
+                    <div class="d-flex justify-content-end gap-1 align-items-center">
+{#- A booking nobody has arrived for can still be moved or called off from here,
+    because this is often where the question gets asked -- the patient rings up
+    about their own appointment while somebody has their profile open.
+
+    Both are links into the dialogs Appointment Scheduling already owns, not
+    copies of them. The reschedule dialog needs the whole clinic's slot load to
+    mark which times are taken, and the cancel dialog decides between Cancelled
+    and No-show from the appointment's own date; reproducing either here would
+    be a second implementation of a rule that has to stay identical. ?reschedule=
+    and ?cancel= open the existing ones on this appointment, and `back` brings
+    the operator straight back to this profile once it is done. #}
+{%- if appointment.is_open_booking %}
+                      <a href="{{ url_for(appointment_scheduling_endpoint, reschedule=appointment.id, back='profile:' ~ patient.id) }}"
+                         class="action-icon" title="Reschedule this appointment"><span class="material-symbols-outlined" style="font-size:18px;">edit_calendar</span></a>
+                      <a href="{{ url_for(appointment_scheduling_endpoint, cancel=appointment.id, back='profile:' ~ patient.id) }}"
+                         class="action-icon" style="color:var(--danger);"
+                         title="Cancel this appointment — the record is kept, its status becomes Cancelled"><span class="material-symbols-outlined" style="font-size:18px;">event_busy</span></a>
+{%- endif %}
+                      <button type="button" class="action-icon"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button>
+                    </div>
+                  </td>
+                </tr>
+{%- endfor %}
+              </tbody>
+            </table>
+          </div>
+{%- else %}
+          <div class="empty-state">
+            <div class="icon-circle">
+              <span class="material-symbols-outlined" style="font-size:30px; color:var(--teal-dark);">calendar_month</span>
+            </div>
+            <h5>No appointments yet</h5>
+            <p>This patient has no scheduled or past appointments. Bookings made on the Appointment Scheduling screen will appear here.</p>
+          </div>
+{%- endif %}
+        </div>
+
+      </div>
+    </div>
+{% endblock %}

@@ -1,0 +1,694 @@
+﻿{% extends "base.html" %}
+{% set active_nav = "reports_analytics" %}
+{% block title %}IDS-BPHCSN | Reports &amp; Analytics{% endblock %}
+
+{% block styles %}
+  .page-desc{font-size:14px; color:var(--text-muted); margin-top:4px; max-width:640px;}
+
+  .panel-card{
+    background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:24px; margin-bottom:24px;
+  }
+  .panel-title{font-size:16px; font-weight:600; color:var(--text-dark);}
+  .panel-sub{font-size:12.5px; color:var(--text-muted); margin-top:2px;}
+
+  .stat-card{
+    background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:20px 22px; height:100%;
+  }
+  .stat-icon{width:44px;height:44px;border-radius:12px; display:flex; align-items:center; justify-content:center; margin-bottom:12px;}
+  .stat-value{font-size:24px; font-weight:700; color:var(--text-dark);}
+  .stat-label{font-size:13px; color:var(--text-muted); margin-top:2px;}
+  .stat-trend{font-size:12px; font-weight:600; margin-top:6px;}
+
+  .form-control, .form-select{
+    height:48px; border-radius:12px; border:1px solid var(--border-color); font-size:13.5px; color:var(--text-dark);
+  }
+  .form-control:focus, .form-select:focus{border-color:var(--teal); box-shadow:0 0 0 3px rgba(22,155,146,0.12);}
+  .toolbar-label{font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:6px; display:block;}
+
+  .btn-ghost-ids{
+    background:transparent; border:1px solid var(--border-color); color:var(--text-dark); border-radius:10px; padding:10px 14px;
+    font-size:13.5px; font-weight:500; display:flex; align-items:center; gap:6px; white-space:nowrap;
+  }
+  .btn-ghost-ids:hover{border-color:#C7CBD1; background:var(--bg);}
+
+  .chart-wrap{position:relative; height:260px;}
+  .chart-wrap.short{height:200px;}
+
+  .mini-legend{display:flex; gap:16px; flex-wrap:wrap; margin-top:14px;}
+  .mini-legend-item{display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--text-muted);}
+  .mini-legend-dot{width:9px; height:9px; border-radius:50%;}
+
+  .low-stock-item{display:flex; align-items:center; justify-content:space-between; padding:11px 0; border-bottom:1px solid var(--border-color);}
+  .low-stock-item:last-child{border-bottom:none;}
+  .ls-name{font-size:13.5px; font-weight:600; color:var(--text-dark);}
+  .ls-meta{font-size:12px; color:var(--text-muted);}
+  .ls-pct{font-size:12px; font-weight:700;}
+
+  .program-stat-row{display:flex; align-items:center; gap:16px; margin-bottom:16px;}
+  .program-stat-icon{width:52px;height:52px;border-radius:14px; display:flex; align-items:center; justify-content:center; flex-shrink:0;}
+  .program-stat-val{font-size:22px; font-weight:700; color:var(--text-dark);}
+  .program-stat-label{font-size:12.5px; color:var(--text-muted);}
+
+  table.report-table{width:100%; border-collapse:separate; border-spacing:0; font-size:13.5px;}
+  table.report-table thead th{
+    text-align:left; color:var(--text-muted); font-weight:600; font-size:11.5px; letter-spacing:0.03em;
+    text-transform:uppercase; padding:12px 14px; border-bottom:1px solid var(--border-color); white-space:nowrap;
+  }
+  table.report-table tbody td{
+    padding:14px; border-bottom:1px solid var(--border-color); color:var(--text-dark); vertical-align:middle;
+  }
+  table.report-table tbody tr:hover{background:#FAFBFC;}
+  table.report-table tbody tr:last-child td{border-bottom:none;}
+  .rep-name{font-weight:600;}
+  .rep-icon{width:34px;height:34px;border-radius:9px; background:var(--teal-light); display:flex; align-items:center; justify-content:center; color:var(--teal-dark); margin-right:10px;}
+  .format-pill{font-size:11.5px; font-weight:700; padding:3px 9px; border-radius:6px;}
+  .format-pdf{background:#FEE2E2; color:#B91C1C;}
+  .format-xlsx{background:#DCFCE7; color:#15803D;}
+
+  .action-icon{
+    width:32px; height:32px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center;
+    color:var(--text-muted); background:transparent; border:none;
+  }
+  .action-icon:hover{background:var(--bg); color:var(--teal-dark);}
+
+  /* NOT YET TRACKED â€” the visual form of this screen's one rule: a figure with
+     no data source says so, in the place the figure would have been. Grey and
+     un-chart-like on purpose, so it cannot be mistaken at a glance for a panel
+     that is merely reporting zero. */
+  .untracked{
+    background:var(--bg); border:1px dashed var(--border-color); border-radius:12px;
+    padding:18px 20px; display:flex; gap:14px; align-items:flex-start;
+  }
+  .untracked .material-symbols-outlined{font-size:22px; color:#9CA3AF; margin-top:1px;}
+  .untracked-title{font-size:13.5px; font-weight:700; color:var(--text-dark); margin-bottom:4px;}
+  .untracked-body{font-size:12.5px; color:var(--text-muted); line-height:1.55;}
+  .untracked-tag{
+    display:inline-block; font-size:10.5px; font-weight:700; letter-spacing:0.04em;
+    text-transform:uppercase; color:#6B7280; background:#F3F4F6; border-radius:6px;
+    padding:2px 8px; margin-left:8px; vertical-align:middle;
+  }
+
+  /* A figure with a real source, and the one-line statement of what that source
+     is. Printed under every derived programme count so no number on this screen
+     is asserted without saying what it was counted from. */
+  .basis-note{font-size:11.5px; color:var(--text-muted); margin-top:3px;}
+
+  .rank-row{display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--border-color);}
+  .rank-row:last-child{border-bottom:none;}
+  .rank-pos{
+    width:24px; height:24px; border-radius:50%; background:var(--teal-light); color:var(--teal-dark);
+    font-size:11.5px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .rank-label{font-size:13.5px; color:var(--text-dark); flex:1;}
+  .rank-count{font-size:13px; font-weight:700; color:var(--text-dark);}
+  .empty-note{font-size:13px; color:var(--text-muted); padding:16px 0;}
+{% endblock %}
+
+{% block breadcrumb %}
+
+    <div class="breadcrumb-nav">
+      <a href="{{ url_for(dashboard_endpoint) }}">Dashboard</a>
+      <span class="sep material-symbols-outlined">chevron_right</span>
+      <span class="current">Reports &amp; Analytics</span>
+    </div>{% endblock %}
+
+{% block content %}
+    <div class="eyebrow">Barangay Poblacion Health Center</div>
+    <div class="page-title">Reports &amp; Analytics</div>
+    <div class="page-desc">Consolidated statistics on patient growth, appointments, medicine stock, SMS reach, and health programs for DOH reporting and internal planning.</div>
+
+    <!-- TOOLBAR â€” still decorative. The two selects and the three export buttons
+         are not wired to anything; every figure below is computed over a fixed
+         window (the last {{ trend_months }} clinic months for the trends,
+         year-to-date for the appointment totals, whole-roster for the patient
+         breakdowns) and the note beside them says so, rather than letting a
+         control imply a filter the screen does not apply. -->
+    <div class="panel-card">
+      <div class="row g-3 align-items-end">
+        <div class="col-md-3">
+          <label class="toolbar-label">Date Range</label>
+          <select class="form-select" disabled title="Report filtering is not wired up yet â€” every figure below covers the fixed window described beside it.">
+            <option selected>Last {{ trend_months }} Months</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="toolbar-label">Report Type</label>
+          <select class="form-select" disabled title="Report filtering is not wired up yet.">
+            <option selected>All Reports</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <div class="d-flex justify-content-md-end gap-2 flex-wrap">
+            <button class="btn-ghost-ids"><span class="material-symbols-outlined" style="font-size:18px;">print</span>Print Report</button>
+            <button class="btn-outline-teal"><span class="material-symbols-outlined" style="font-size:18px;">description</span>Export to Excel</button>
+            <button class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">picture_as_pdf</span>Export to PDF</button>
+          </div>
+        </div>
+        <div class="col-12">
+          <div class="panel-sub">
+            Figures as of {{ report_date | long_date }}. Trends cover the last {{ trend_months }} clinic
+            months; appointment totals are year-to-date {{ appointment_report.year }}; patient breakdowns
+            cover the whole registered roster. Filtering and export are not wired up yet.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPI CARDS -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:var(--teal-light);"><span class="material-symbols-outlined" style="color:var(--teal-dark);">groups</span></div>
+          <!-- Straight from get_patient_stats(), the same call behind Screen 03's
+               own stat cards, so the two screens cannot report different totals. -->
+          <div class="stat-value">{{ "{:,}".format(patient_report.stats.total_patients) }}</div>
+          <div class="stat-label">Total Registered Patients</div>
+          <div class="stat-trend" style="color:{{ 'var(--success)' if patient_report.stats.new_this_month else 'var(--text-muted)' }};">
+            {%- if patient_report.stats.new_this_month %}+{{ patient_report.stats.new_this_month }} this month
+            {%- else %}None registered yet this month{% endif -%}
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#DBEAFE;"><span class="material-symbols-outlined" style="color:var(--info);">calendar_month</span></div>
+          <div class="stat-value">{{ "{:,}".format(appointment_report.ytd_total) }}</div>
+          <div class="stat-label">Appointments (YTD {{ appointment_report.year }})</div>
+          <!-- Attendance is of resolved appointments only -- see
+               get_appointment_report() for why the not-yet-happened ones are
+               excluded rather than counted as failures. -->
+          <div class="stat-trend" style="color:var(--text-muted);">
+            {%- if appointment_report.attendance_pct is not none %}{{ appointment_report.attendance_pct }}% attended &middot; {{ appointment_report.ytd_walk_ins }} walk-in{{ '' if appointment_report.ytd_walk_ins == 1 else 's' }}
+            {%- else %}None resolved yet{% endif -%}
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#FEF3C7;"><span class="material-symbols-outlined" style="color:var(--warning);">inventory_2</span></div>
+          <div class="stat-value">{{ "{:,}".format(inventory_report.total_items) }}</div>
+          <!-- Counts the whole inventory, not medicines alone: the low-stock figure
+               beside it does too (a supply can be below its reorder level), and the
+               two would contradict each other if they measured different sets. -->
+          <div class="stat-label">Inventory Items Tracked</div>
+          {%- if inventory_report.low_stock_count %}
+          <div class="stat-trend" style="color:var(--danger);">{{ inventory_report.low_stock_count }} low stock</div>
+          {%- else %}
+          <div class="stat-trend" style="color:var(--success);">All above reorder level</div>
+          {%- endif %}
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <!-- This slot held an SMS sent-and-delivered figure that nothing in
+               the schema can produce -- see the SMS Delivery panel below, which
+               now states that plainly. The prime real estate goes to a figure
+               that is real instead, and SMS keeps its own panel to report its
+               own absence in. -->
+          <div class="stat-icon" style="background:#EDE9FE;"><span class="material-symbols-outlined" style="color:var(--purple);">clinical_notes</span></div>
+          <div class="stat-value">{{ "{:,}".format(consultation_report_stats.total) }}</div>
+          <div class="stat-label">Consultations Recorded</div>
+          <div class="stat-trend" style="color:var(--text-muted);">
+            {{ consultation_report_stats.recorded_this_month }} this month &middot;
+            {{ consultation_report_stats.patients_seen }} patient{{ '' if consultation_report_stats.patients_seen == 1 else 's' }} seen
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ROW: PATIENT REGISTRATION TRENDS + APPOINTMENT STATISTICS -->
+    <div class="row g-3">
+      <div class="col-lg-6">
+        <div class="panel-card">
+          <div class="panel-title">Patient Registration Trends</div>
+{%- set reg_trend = patient_report.registration_trend %}
+          <div class="panel-sub">
+            New patient registrations, {{ reg_trend[0].label }}&ndash;{{ reg_trend[-1].label }} {{ report_date.year }}
+            &middot; {{ reg_trend | sum(attribute='count') }} in this window
+          </div>
+          <div class="chart-wrap"><canvas id="chartRegTrend"></canvas></div>
+        </div>
+      </div>
+      <div class="col-lg-6">
+        <div class="panel-card">
+          <div class="panel-title">Appointment Statistics</div>
+          <!-- The three bars partition every status the appointments CHECK
+               admits, so a month's stack is that month's whole appointment
+               count. See _OUTCOME_BY_STATUS in models/appointments.py. -->
+          <div class="panel-sub">
+            Monthly appointment outcomes &middot; {{ appointment_report.ytd_total }} year-to-date
+            ({{ appointment_report.ytd_booked }} booked, {{ appointment_report.ytd_walk_ins }} walk-in)
+          </div>
+          <div class="chart-wrap"><canvas id="chartAppt"></canvas></div>
+          <div class="mini-legend">
+            <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--success);"></span>Attended ({{ appointment_report.ytd_attended }}) &mdash; arrived, seen or completed</div>
+            <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--info);"></span>Still expected ({{ appointment_report.ytd_expected }})</div>
+            <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--danger);"></span>Cancelled or no-show ({{ appointment_report.ytd_missed }})</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ROW: MEDICINE INVENTORY STATUS + LOW STOCK MEDICINES -->
+    <div class="row g-3">
+      <div class="col-lg-6">
+        <div class="panel-card">
+          <div class="panel-title">Medicine Inventory Status</div>
+{%- set dist = inventory_report.status_distribution %}
+          <div class="panel-sub">{{ dist.total }} item{{ "s" if dist.total != 1 }} by stock condition &middot; each counted once, under its most urgent condition</div>
+          <div class="chart-wrap short"><canvas id="chartInvStatus"></canvas></div>
+          <div class="mini-legend">
+            <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--success);"></span>In Stock ({{ dist.in_stock }})</div>
+            <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--warning);"></span>Low Stock ({{ dist.low_stock }})</div>
+            <div class="mini-legend-item"><span class="mini-legend-dot" style="background:#FFEDD5;"></span>Near Expiry ({{ dist.near_expiry }})</div>
+            <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--danger);"></span>Expired ({{ dist.expired }})</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-6">
+        <div class="panel-card">
+          <div class="panel-title">Low Stock Medicines</div>
+          <div class="panel-sub">Below reorder level, needs restock</div>
+          <div>
+{%- for item in inventory_report.low_stock_items %}
+            <!-- Most critical first, ordered by get_low_stock_alert(): stock as a
+                 fraction of this item's own reorder level. -->
+{%- set critical = item.stock_status in ('Out of Stock', 'Critical', 'Expires Today', 'Expired') %}
+            <div class="low-stock-item">
+              <div><div class="ls-name">{{ item.name }}{% if item.display_dosage %} {{ item.display_dosage }}{% endif %}</div><div class="ls-meta">{{ item.stock_quantity }} / {{ item.low_stock_threshold }} {{ item.unit or 'units' }}</div></div>
+              {%- if item.threshold_pct is not none %}
+              <div class="ls-pct" style="color:{{ 'var(--danger)' if critical else 'var(--warning)' }};">{{ item.threshold_pct }}%</div>
+              {%- endif %}
+            </div>
+{%- endfor %}
+{%- if not inventory_report.low_stock_items %}
+            <div class="panel-sub">Every item is above its reorder level.</div>
+{%- endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ROW: SMS DELIVERY + BARANGAY HEALTH PROGRAM STATISTICS -->
+    <div class="row g-3">
+      <div class="col-lg-6">
+        <div class="panel-card">
+          <div class="panel-title">SMS Delivery Statistics<span class="untracked-tag">Not yet tracked</span></div>
+          <div class="panel-sub">Whether a message reached the handset it was sent to</div>
+          <div class="untracked mt-3">
+            <span class="material-symbols-outlined">query_stats</span>
+            <div>
+              <div class="untracked-title">No delivery confirmation is recorded</div>
+              <div class="untracked-body">{{ untracked.sms }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-6">
+        <div class="panel-card">
+          <div class="panel-title">Barangay Health Program Statistics</div>
+          <div class="panel-sub">Programme membership that stored data can establish</div>
+          <div class="chart-wrap short"><canvas id="chartPrograms"></canvas></div>
+{%- for program in programs %}
+          <div class="basis-note"><strong>{{ program.name }} ({{ program.count }})</strong> &mdash; {{ program.basis }}.</div>
+{%- endfor %}
+          <div class="untracked mt-3">
+            <span class="material-symbols-outlined">query_stats</span>
+            <div>
+              <div class="untracked-title">Enrolment in the other programmes is not recorded</div>
+              <div class="untracked-body">{{ untracked.programs }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ROW: AGE DISTRIBUTION + GENDER DISTRIBUTION -->
+    <div class="row g-3">
+      <div class="col-lg-6">
+        <div class="panel-card">
+          <div class="panel-title">Patient Age Distribution</div>
+{%- set ages = patient_report.age_distribution %}
+          <!-- Ages come from calculate_age() on each stored birthdate -- the same
+               function behind the Age column on Screen 03 and the senior count
+               below -- so no two screens can age the same patient differently. -->
+          <div class="panel-sub">
+            {{ ages.known }} registered patient{{ '' if ages.known == 1 else 's' }} by age group
+            {%- if ages.unknown %} &middot; {{ ages.unknown }} with no usable birthdate, not plotted{% endif %}
+          </div>
+          <div class="chart-wrap"><canvas id="chartAge"></canvas></div>
+        </div>
+      </div>
+      <div class="col-lg-6">
+        <div class="panel-card">
+          <div class="panel-title">Patient Gender Distribution</div>
+{%- set sexes = patient_report.sex_distribution %}
+          <div class="panel-sub">{{ sexes.total }} total registered patient{{ '' if sexes.total == 1 else 's' }}</div>
+          <div class="chart-wrap"><canvas id="chartGender"></canvas></div>
+          <!-- Percentages are of the whole roster, so they and any unrecorded
+               rows add up to the total printed above. -->
+          <div class="mini-legend">
+            <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--teal);"></span>Female ({{ sexes.female }} &middot; {{ sexes.female_pct }}%)</div>
+            <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--info);"></span>Male ({{ sexes.male }} &middot; {{ sexes.male_pct }}%)</div>
+{%- if sexes.unrecorded %}
+            <div class="mini-legend-item"><span class="mini-legend-dot" style="background:#C7CBD1;"></span>Not recorded ({{ sexes.unrecorded }} &middot; {{ sexes.unrecorded_pct }}%)</div>
+{%- endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ROW: PRENATAL + SENIOR CITIZEN PROGRAM STATS -->
+    <div class="row g-3">
+      <div class="col-lg-6">
+        <div class="panel-card">
+          <div class="panel-title">Prenatal Program Statistics<span class="untracked-tag">Not yet tracked</span></div>
+          <div class="panel-sub">Active prenatal cases, check-ups due, expected deliveries</div>
+          <!-- The same conclusion get_patient_stats() already reaches for Screen
+               03's Prenatal card, which reports 0 for this reason rather than a
+               guess. Stated here in full because this screen is the one whose
+               numbers go into a DOH submission. -->
+          <div class="untracked mt-3">
+            <span class="material-symbols-outlined">query_stats</span>
+            <div>
+              <div class="untracked-title">No prenatal enrolment is recorded</div>
+              <div class="untracked-body">{{ untracked.prenatal }}</div>
+            </div>
+          </div>
+{%- set prenatal_visits = appointment_report.services | selectattr('service', 'equalto', 'Prenatal Check-up') | list %}
+          <div class="basis-note mt-3">
+            For reference, {{ prenatal_visits[0].count if prenatal_visits else 0 }} Prenatal Check-up
+            appointment{{ '' if (prenatal_visits and prenatal_visits[0].count == 1) else 's' }} were booked
+            year-to-date {{ appointment_report.year }} &mdash; a count of visits, not of patients enrolled.
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-6">
+        <div class="panel-card">
+          <div class="panel-title">Senior Citizen Statistics</div>
+{%- set seniors = patient_report.senior_conditions %}
+          <div class="panel-sub">Patients aged {{ patient_report.senior_age }} and above</div>
+          <div class="program-stat-row mt-3">
+            <div class="program-stat-icon" style="background:#FEF3C7;"><span class="material-symbols-outlined" style="color:var(--warning);">elderly</span></div>
+            <div>
+              <!-- senior_count comes from get_patient_stats(), the same figure
+                   Screen 03's "Senior Citizen Patients" card prints. -->
+              <div class="program-stat-val">{{ patient_report.senior_count }} total</div>
+              <div class="program-stat-label">
+                {{ patient_report.senior_share_pct }}% of the roster
+{%- for entry in seniors.counts %}{% if entry.count %} &middot; {{ entry.count }} with {{ entry.condition | lower }}{% endif %}{% endfor %}
+              </div>
+            </div>
+          </div>
+          <!-- The chart was a six-month "growth" line with no basis in stored
+               data: nothing records what the roster looked like in April, and a
+               patient's age today is all a birthdate can answer. Replaced with
+               the breakdown that IS derivable -- how the senior cohort divides
+               by band and by recorded chronic condition. -->
+          <div class="chart-wrap short"><canvas id="chartSenior"></canvas></div>
+          <div class="basis-note">
+            Conditions counted from the Register Patient form's own list
+            ({{ seniors.counts | map(attribute='condition') | join(', ') }}). A patient with two is
+            counted under each, so these do not sum to {{ seniors.cohort_size }}.
+{%- if seniors.other_only %} {{ seniors.other_only }} senior{{ '' if seniors.other_only == 1 else 's' }}
+            recorded only free-text conditions and {{ 'is' if seniors.other_only == 1 else 'are' }} not counted here.{% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TOP HEALTH SERVICES â€” the appointment_type of every appointment booked
+         this year, walk-ins included. That is a record of what was actually
+         asked for, which is what this panel claims to show; it is not a record
+         of programme membership, which nothing stores. -->
+    <div class="panel-card">
+      <div class="panel-title">Health Services Availed</div>
+      <div class="panel-sub">
+        Appointments by service, year-to-date {{ appointment_report.year }}
+        &middot; {{ appointment_report.ytd_total }} in total, walk-ins included
+      </div>
+{%- if appointment_report.services %}
+      <div class="chart-wrap"><canvas id="chartTopServices"></canvas></div>
+{%- else %}
+      <div class="empty-note">No appointments have been recorded this year, so there is nothing to rank yet.</div>
+{%- endif %}
+    </div>
+
+    <!-- ROW: CONSULTATION ACTIVITY + MOST COMMON DIAGNOSES -->
+    <div class="row g-3">
+      <div class="col-lg-7">
+        <div class="panel-card">
+          <div class="panel-title">Consultation Activity</div>
+{%- set ctrend = consultation_report_stats.trend %}
+          <div class="panel-sub">
+            Consultations written up, {{ ctrend[0].label }}&ndash;{{ ctrend[-1].label }} {{ report_date.year }}
+            &middot; {{ consultation_report_stats.total }} on record in total
+          </div>
+          <div class="chart-wrap"><canvas id="chartMonthlyActivity"></canvas></div>
+          <!-- This panel was "Consultations vs. medicine units dispensed". The
+               consultation series is real; the dispensing series had no source
+               and has been removed rather than left as a plausible second line. -->
+          <div class="untracked mt-3">
+            <span class="material-symbols-outlined">query_stats</span>
+            <div>
+              <div class="untracked-title">Medicine units dispensed is not shown &mdash; it is not recorded</div>
+              <div class="untracked-body">{{ untracked.dispensing }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-5">
+        <div class="panel-card">
+          <div class="panel-title">Most Common Diagnoses</div>
+          <div class="panel-sub">
+            Across all {{ consultation_report_stats.total }} recorded consultation{{ '' if consultation_report_stats.total == 1 else 's' }}
+          </div>
+          <div class="mt-2">
+{%- for entry in consultation_report_stats.top_diagnoses %}
+            <div class="rank-row">
+              <span class="rank-pos">{{ loop.index }}</span>
+              <span class="rank-label">{{ entry.label }}</span>
+              <span class="rank-count">{{ entry.count }}</span>
+            </div>
+{%- else %}
+            <div class="empty-note">No diagnoses have been recorded yet.</div>
+{%- endfor %}
+          </div>
+{%- if consultation_report_stats.top_diagnoses %}
+          <!-- diagnosis is prose a health worker typed, not a coded vocabulary,
+               so entries are grouped case-insensitively and nothing is mapped
+               onto ICD or any other classification the system does not hold. -->
+          <div class="basis-note mt-2">
+            Grouped by the text entered, ignoring case. Free text is not coded, so two
+            spellings of one condition count separately.
+          </div>
+{%- endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- RECENT GENERATED REPORTS â€” the table below listed five exports, with
+         names, timestamps and staff, that never happened. Nothing writes a row
+         when a report is generated, so there is no history to show. -->
+    <div class="panel-card mb-0">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+        <div>
+          <div class="panel-title">Recent Generated Reports<span class="untracked-tag">Not yet tracked</span></div>
+          <div class="panel-sub">Reports exported by staff in the last 30 days</div>
+        </div>
+      </div>
+      <div class="untracked">
+        <span class="material-symbols-outlined">query_stats</span>
+        <div>
+          <div class="untracked-title">No export history is recorded</div>
+          <div class="untracked-body">{{ untracked.generated_reports }}</div>
+        </div>
+      </div>
+    </div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/chart.umd.min.js') }}"></script>
+<script>
+  Chart.defaults.font.family = "'Inter', Arial, sans-serif";
+  Chart.defaults.color = '#6B7280';
+  Chart.defaults.font.size = 12;
+
+  const teal = '#169B92', tealDark = '#0F6E56', tealLight = '#E1F5EE';
+  const success = '#22C55E', warning = '#F59E0B', danger = '#EF4444', info = '#3B82F6', purple = '#6D28D9';
+
+  // EVERY SERIES BELOW IS SERVER-RENDERED FROM STORED ROWS.
+  // ------------------------------------------------------
+  // Each array is emitted by Jinja through | tojson from the context that
+  // routes/report_views.py builds, so there is no literal data array left in
+  // this file -- the same treatment the Medicine Inventory Status doughnut
+  // already had. A chart and the panel subtitle above it are therefore reading
+  // the same numbers, and neither can be updated without the other.
+  //
+  // Charts whose data had no source at all (SMS delivery, medicine dispensed,
+  // the prenatal trend) are gone rather than rewired; their panels now say so.
+  const reportData = {
+    registrations: {
+      labels: {{ patient_report.registration_trend | map(attribute='label') | list | tojson }},
+      counts: {{ patient_report.registration_trend | map(attribute='count') | list | tojson }}
+    },
+    appointments: {
+      labels: {{ appointment_report.trend | map(attribute='label') | list | tojson }},
+      attended: {{ appointment_report.trend | map(attribute='attended') | list | tojson }},
+      expected: {{ appointment_report.trend | map(attribute='expected') | list | tojson }},
+      missed: {{ appointment_report.trend | map(attribute='missed') | list | tojson }}
+    },
+    consultations: {
+      labels: {{ consultation_report_stats.trend | map(attribute='label') | list | tojson }},
+      counts: {{ consultation_report_stats.trend | map(attribute='count') | list | tojson }}
+    },
+    ages: {
+      labels: {{ patient_report.age_distribution.bands | map(attribute='label') | list | tojson }},
+      counts: {{ patient_report.age_distribution.bands | map(attribute='count') | list | tojson }}
+    },
+    sexes: {
+      labels: {{ ['Female', 'Male', 'Not recorded'] | tojson }},
+      counts: {{ [patient_report.sex_distribution.female, patient_report.sex_distribution.male, patient_report.sex_distribution.unrecorded] | tojson }}
+    },
+    programs: {
+      labels: {{ programs | map(attribute='name') | list | tojson }},
+      counts: {{ programs | map(attribute='count') | list | tojson }}
+    },
+    services: {
+      labels: {{ appointment_report.services | map(attribute='service') | list | tojson }},
+      counts: {{ appointment_report.services | map(attribute='count') | list | tojson }}
+    },
+    seniorConditions: {
+      labels: {{ patient_report.senior_conditions.counts | map(attribute='condition') | list | tojson }},
+      counts: {{ patient_report.senior_conditions.counts | map(attribute='count') | list | tojson }}
+    }
+  };
+
+  // A count chart's axis must not invent fractional people. With a barangay-
+  // sized roster most of these series are small integers, and Chart.js's default
+  // tick generator will happily label 0, 0.5, 1 on a series whose maximum is 1.
+  const countAxis = { beginAtZero:true, ticks:{ precision:0 }, grid:{color:'#F1F3F5'} };
+  const countAxisX = { beginAtZero:true, ticks:{ precision:0 }, grid:{color:'#F1F3F5'} };
+
+  function draw(id, config){
+    const canvas = document.getElementById(id);
+    // Panels whose data is empty render an explanatory note instead of a canvas,
+    // so the element is genuinely absent rather than merely blank.
+    if(canvas){ new Chart(canvas, config); }
+  }
+
+  // Patient Registration Trends (line) — patients.created_at per clinic month.
+  draw('chartRegTrend', {
+    type: 'line',
+    data: {
+      labels: reportData.registrations.labels,
+      datasets: [{
+        label: 'New Registrations',
+        data: reportData.registrations.counts,
+        borderColor: teal, backgroundColor: 'rgba(22,155,146,0.10)',
+        fill: true, tension: 0.4, pointRadius: 3, pointBackgroundColor: teal
+      }]
+    },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:countAxis, x:{grid:{display:false}}} }
+  });
+
+  // Appointment Statistics (stacked bar) — the three outcome buckets partition
+  // every appointment status, so a month's stack is that month's total.
+  draw('chartAppt', {
+    type: 'bar',
+    data: {
+      labels: reportData.appointments.labels,
+      datasets: [
+        { label:'Attended', data:reportData.appointments.attended, backgroundColor: success, borderRadius:4 },
+        { label:'Still expected', data:reportData.appointments.expected, backgroundColor: info, borderRadius:4 },
+        { label:'Cancelled / no-show', data:reportData.appointments.missed, backgroundColor: danger, borderRadius:4 }
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+      scales:{ x:{stacked:true, grid:{display:false}}, y:{stacked:true, ...countAxis} }
+    }
+  });
+
+  // Medicine Inventory Status (doughnut) — real counts from
+  // models/inventory.py get_status_distribution(); the four partition the
+  // inventory, so they sum to the total shown in the panel subtitle.
+  draw('chartInvStatus', {
+    type: 'doughnut',
+    data: {
+      labels: ['In Stock','Low Stock','Near Expiry','Expired'],
+      datasets: [{ data:[{{ inventory_report.status_distribution.in_stock }},{{ inventory_report.status_distribution.low_stock }},{{ inventory_report.status_distribution.near_expiry }},{{ inventory_report.status_distribution.expired }}], backgroundColor:[success, warning, '#FFEDD5', danger], borderWidth:0 }]
+    },
+    options: { responsive:true, maintainAspectRatio:false, cutout:'68%', plugins:{legend:{display:false}} }
+  });
+
+  // Barangay Health Program Statistics (horizontal bar) — only the two
+  // memberships stored data can establish; the rest are named in the panel.
+  draw('chartPrograms', {
+    type: 'bar',
+    data: {
+      labels: reportData.programs.labels,
+      datasets: [{ data: reportData.programs.counts, backgroundColor: teal, borderRadius:4 }]
+    },
+    options: { indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:countAxisX, y:{grid:{display:false}}} }
+  });
+
+  // Age Distribution (bar) — calculate_age() on every stored birthdate.
+  draw('chartAge', {
+    type: 'bar',
+    data: {
+      labels: reportData.ages.labels,
+      datasets: [{ data: reportData.ages.counts, backgroundColor: tealDark, borderRadius:4 }]
+    },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:countAxis, x:{grid:{display:false}}} }
+  });
+
+  // Gender Distribution (doughnut) — the three segments cover the whole roster.
+  draw('chartGender', {
+    type: 'doughnut',
+    data: {
+      labels: reportData.sexes.labels,
+      datasets: [{ data: reportData.sexes.counts, backgroundColor:[teal, info, '#C7CBD1'], borderWidth:0 }]
+    },
+    options: { responsive:true, maintainAspectRatio:false, cutout:'68%', plugins:{legend:{display:false}} }
+  });
+
+  // Senior cohort by recorded chronic condition. Replaces a six-month "growth"
+  // line that had no stored history behind it -- a birthdate answers how old
+  // somebody is today, not how many seniors the roster held in April.
+  draw('chartSenior', {
+    type: 'bar',
+    data: {
+      labels: reportData.seniorConditions.labels,
+      datasets: [{ data: reportData.seniorConditions.counts, backgroundColor: warning, borderRadius:4 }]
+    },
+    options: { indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:countAxisX, y:{grid:{display:false}}} }
+  });
+
+  // Health Services Availed (horizontal bar) — appointment_type counts, YTD.
+  draw('chartTopServices', {
+    type: 'bar',
+    data: {
+      labels: reportData.services.labels,
+      datasets: [{ data: reportData.services.counts, backgroundColor: teal, borderRadius:4 }]
+    },
+    options: { indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:countAxisX, y:{grid:{display:false}}} }
+  });
+
+  // Consultation Activity (line) — was a combo chart whose second series,
+  // medicine units dispensed, had no source. One real series remains.
+  draw('chartMonthlyActivity', {
+    type: 'line',
+    data: {
+      labels: reportData.consultations.labels,
+      datasets: [{
+        label:'Consultations', data: reportData.consultations.counts,
+        borderColor: teal, backgroundColor:'rgba(22,155,146,0.10)',
+        fill:true, tension:0.4, pointRadius:3, pointBackgroundColor: teal
+      }]
+    },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:countAxis, x:{grid:{display:false}}} }
+  });
+</script>{% endblock %}
+

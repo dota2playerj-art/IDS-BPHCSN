@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>IDS-BPHCSN | Secure Login</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- login.html deliberately does not extend base.html, so it carries its own copy of the
+     self-hosted asset links. Keep these in step with base.html. -->
+<link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/fonts.css') }}" rel="stylesheet">
+<style>
+  :root{
+    --teal:#169B92;
+    --teal-dark:#0F6E56;
+    --teal-light:#E1F5EE;
+    --bg:#F5F7FA;
+    --text-dark:#1F2937;
+    --text-muted:#6B7280;
+    --border-color:#E5E7EB;
+    --danger:#EF4444;
+  }
+  *{box-sizing:border-box; font-family:'Inter',Arial,sans-serif;}
+  .material-symbols-outlined{
+    font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 20;
+    font-size:20px; vertical-align:middle; line-height:1;
+  }
+  html,body{margin:0; padding:0; height:100%; background:var(--bg);}
+
+  .login-page{
+    display:flex; min-height:100vh; width:100%;
+  }
+
+  /* ============ LEFT BRAND PANEL ============ */
+  .brand-panel{
+    flex:0 0 44%;
+    max-width:44%;
+    position:relative;
+    background:linear-gradient(160deg, #0E6B55 0%, #169B92 55%, #1CA79C 100%);
+    overflow:hidden;
+    padding:48px 56px;
+    display:flex;
+    flex-direction:column;
+    color:#fff;
+  }
+  .brand-panel::before{
+    content:'';
+    position:absolute;
+    top:4px; left:0; right:0; height:6px;
+    background:linear-gradient(90deg, #0B4A3A, #169B92);
+  }
+  .brand-decor-circle{
+    position:absolute;
+    top:-120px; right:-160px;
+    width:520px; height:520px;
+    border-radius:50%;
+    background:rgba(255,255,255,0.05);
+  }
+  .brand-decor-circle.two{
+    top:120px; right:-260px;
+    width:620px; height:620px;
+    background:rgba(255,255,255,0.04);
+  }
+
+  .brand-header{display:flex; align-items:center; gap:14px; position:relative; z-index:2;}
+  .brand-logo-circle{
+    width:56px; height:56px; border-radius:50%;
+    background:rgba(255,255,255,0.14);
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink:0;
+  }
+  .brand-eyebrow{
+    font-size:11px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase;
+    color:rgba(255,255,255,0.78);
+  }
+  .brand-name{font-size:19px; font-weight:800; letter-spacing:0.01em; margin-top:2px;}
+
+  .brand-headline{
+    font-size:38px; font-weight:800; line-height:1.18; margin-top:48px; position:relative; z-index:2;
+    max-width:520px;
+  }
+  .brand-desc{
+    font-size:15.5px; line-height:1.6; color:rgba(255,255,255,0.85); margin-top:18px;
+    max-width:480px; position:relative; z-index:2;
+  }
+
+  .brand-illustration{
+    flex:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    position:relative;
+    z-index:2;
+    min-height:220px;
+  }
+
+  .brand-footer{position:relative; z-index:2;}
+  .brand-footer-title{
+    font-size:15px; font-weight:700; line-height:1.4; max-width:520px;
+  }
+  .brand-footer-location{
+    display:flex; align-items:center; gap:10px;
+    font-size:13px; color:rgba(255,255,255,0.75); margin-top:14px;
+  }
+  .brand-footer-location .dash{width:20px; height:1px; background:rgba(255,255,255,0.4); display:inline-block;}
+  .brand-divider{border:none; border-top:1px solid rgba(255,255,255,0.18); margin:22px 0 18px;}
+
+  .brand-tags{display:flex; gap:10px; flex-wrap:wrap; margin-top:16px;}
+  .brand-tag{
+    background:rgba(255,255,255,0.14);
+    border-radius:999px;
+    padding:7px 16px;
+    font-size:12.5px;
+    font-weight:600;
+    color:#fff;
+  }
+
+  /* ============ RIGHT LOGIN PANEL ============ */
+  .login-panel{
+    flex:1;
+    background:var(--bg);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:48px 32px;
+  }
+
+  .login-card{
+    width:100%;
+    max-width:472px;
+    background:#fff;
+    border-radius:20px;
+    box-shadow:0 8px 30px rgba(15,110,86,0.10), 0 1px 3px rgba(0,0,0,0.04);
+    padding:40px 44px 32px;
+    position:relative;
+    overflow:hidden;
+  }
+  .login-card::before{
+    content:'';
+    position:absolute; top:0; left:0; right:0; height:6px;
+    background:linear-gradient(90deg, var(--teal-dark), var(--teal));
+  }
+
+  .login-card-header{display:flex; align-items:center; gap:14px; margin-bottom:16px;}
+  .login-icon-circle{
+    width:44px; height:44px; border-radius:50%;
+    background:var(--teal-light);
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink:0;
+  }
+  .login-title{font-size:22px; font-weight:700; color:var(--text-dark);}
+
+  .login-desc{
+    font-size:13.5px; line-height:1.6; color:var(--text-muted); margin-bottom:26px;
+  }
+
+  .login-alert{
+    display:flex; align-items:flex-start; gap:10px;
+    background:#FEF2F2; border:1px solid #FECACA; border-radius:12px;
+    padding:12px 14px; margin-bottom:20px;
+    font-size:13.5px; line-height:1.5; color:#B91C1C;
+  }
+  .login-alert .material-symbols-outlined{font-size:19px; color:var(--danger); flex-shrink:0;}
+
+  .field-group{margin-bottom:20px;}
+  .field-label{
+    font-size:13.5px; font-weight:600; color:var(--text-dark); margin-bottom:8px; display:block;
+  }
+  .field-input-wrap{
+    position:relative;
+    display:flex; align-items:center;
+    background:var(--bg);
+    border:1px solid var(--border-color);
+    border-radius:12px;
+    height:50px;
+    padding:0 14px;
+  }
+  .field-input-wrap:focus-within{
+    border-color:var(--teal);
+    box-shadow:0 0 0 3px rgba(22,155,146,0.12);
+    background:#fff;
+  }
+  .field-input-wrap .material-symbols-outlined{color:#9CA3AF; font-size:19px;}
+  .field-input-wrap input{
+    border:none; background:transparent; outline:none; flex:1;
+    font-size:14px; color:var(--text-dark); padding:0 10px; height:100%;
+  }
+  .field-input-wrap input::placeholder{color:#9CA3AF;}
+  .eye-toggle{background:none; border:none; padding:0; display:flex; align-items:center; cursor:pointer;}
+  .eye-toggle .material-symbols-outlined{color:#9CA3AF;}
+
+  .btn-signin{
+    width:100%;
+    background:linear-gradient(90deg, var(--teal-dark), var(--teal));
+    border:none;
+    color:#fff;
+    font-size:15px;
+    font-weight:700;
+    height:52px;
+    border-radius:12px;
+    margin-top:6px;
+    box-shadow:0 4px 14px rgba(22,155,146,0.28);
+  }
+  .btn-signin:hover{opacity:0.95;}
+
+  .forgot-link{
+    display:block; text-align:center; margin-top:18px;
+    font-size:13.5px; font-weight:700; color:var(--teal-dark); text-decoration:none;
+  }
+  .forgot-helper{
+    display:block; text-align:center; margin-top:6px;
+    font-size:12px; color:var(--text-muted);
+  }
+
+  .security-divider{
+    display:flex; align-items:center; gap:14px; margin:26px 0 20px;
+  }
+  .security-divider::before, .security-divider::after{
+    content:''; flex:1; height:1px; background:var(--border-color);
+  }
+  .security-divider span{
+    font-size:10.5px; font-weight:700; letter-spacing:0.12em; color:#B0B6BE; text-transform:uppercase; white-space:nowrap;
+  }
+
+  .security-grid{
+    display:grid; grid-template-columns:repeat(4,1fr); gap:8px; text-align:center;
+  }
+  .security-item-icon{
+    width:44px; height:44px; border-radius:50%;
+    background:var(--teal-light);
+    display:flex; align-items:center; justify-content:center;
+    margin:0 auto 8px;
+  }
+  .security-item-icon .material-symbols-outlined{color:var(--teal-dark); font-size:19px;}
+  .security-item-label{font-size:11px; font-weight:600; color:var(--text-dark); line-height:1.3;}
+
+  .login-card-footer{
+    text-align:center; margin-top:26px; padding-top:18px; border-top:1px solid var(--border-color);
+    font-size:11.5px; color:var(--text-muted);
+  }
+  .login-card-footer b{color:var(--text-dark); font-weight:700;}
+
+  .page-footer-notice{
+    text-align:center; margin-top:22px; font-size:11.5px; color:#9CA3AF; line-height:1.7;
+    max-width:472px;
+  }
+</style>
+</head>
+<body>
+
+<div class="login-page">
+
+  <!-- ============ LEFT BRAND PANEL ============ -->
+  <div class="brand-panel">
+    <div class="brand-decor-circle"></div>
+    <div class="brand-decor-circle two"></div>
+
+    <div class="brand-header">
+      <div class="brand-logo-circle">
+        <span class="material-symbols-outlined" style="font-size:26px;">health_metrics</span>
+      </div>
+      <div>
+        <div class="brand-eyebrow">Barangay Poblacion Health Center</div>
+        <div class="brand-name">IDS-BPHCSN</div>
+      </div>
+    </div>
+
+    <div class="brand-headline">Empowering Community Healthcare Through Digital Innovation</div>
+    <div class="brand-desc">Securely manage patient records, medicine inventory, appointments, community announcements, SMS notifications, and reports through one integrated platform.</div>
+
+    <div class="brand-illustration">
+      <svg width="360" height="260" viewBox="0 0 360 260" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- clouds -->
+        <ellipse cx="70" cy="40" rx="28" ry="12" fill="rgba(255,255,255,0.18)"/>
+        <ellipse cx="300" cy="60" rx="20" ry="9" fill="rgba(255,255,255,0.15)"/>
+        <circle cx="330" cy="20" r="10" fill="rgba(255,255,255,0.12)"/>
+        <!-- house -->
+        <polygon points="140,60 230,60 185,15" fill="rgba(255,255,255,0.16)"/>
+        <rect x="140" y="60" width="90" height="110" fill="rgba(255,255,255,0.12)"/>
+        <rect x="152" y="80" width="24" height="24" fill="rgba(255,255,255,0.22)"/>
+        <rect x="194" y="80" width="24" height="24" fill="rgba(255,255,255,0.22)"/>
+        <rect x="152" y="118" width="24" height="24" fill="rgba(255,255,255,0.22)"/>
+        <rect x="170" y="140" width="30" height="30" fill="rgba(255,255,255,0.20)"/>
+        <line x1="185" y1="15" x2="185" y2="2" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
+        <polygon points="185,2 200,6 185,10" fill="rgba(255,255,255,0.3)"/>
+        <!-- ground line -->
+        <line x1="30" y1="215" x2="330" y2="215" stroke="rgba(255,255,255,0.18)" stroke-width="1.5"/>
+        <!-- trees -->
+        <circle cx="95" cy="185" r="18" fill="rgba(255,255,255,0.14)"/>
+        <rect x="92" y="200" width="6" height="16" fill="rgba(255,255,255,0.14)"/>
+        <circle cx="270" cy="180" r="16" fill="rgba(255,255,255,0.14)"/>
+        <rect x="267" y="195" width="6" height="18" fill="rgba(255,255,255,0.14)"/>
+        <!-- family figures -->
+        <circle cx="245" cy="175" r="9" fill="rgba(255,255,255,0.32)"/>
+        <rect x="238" y="184" width="14" height="30" rx="6" fill="rgba(255,255,255,0.32)"/>
+        <circle cx="270" cy="185" r="7" fill="rgba(255,255,255,0.28)"/>
+        <rect x="264" y="192" width="12" height="24" rx="5" fill="rgba(255,255,255,0.28)"/>
+        <circle cx="222" cy="192" r="6" fill="rgba(255,255,255,0.28)"/>
+        <rect x="217" y="198" width="10" height="18" rx="4" fill="rgba(255,255,255,0.28)"/>
+        <!-- flag -->
+        <line x1="252" y1="155" x2="252" y2="185" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
+        <polygon points="252,155 268,161 252,167" fill="rgba(255,255,255,0.32)"/>
+      </svg>
+    </div>
+
+    <div class="brand-footer">
+      <hr class="brand-divider">
+      <div class="brand-footer-title">Integrated Digital System for Barangay Poblacion Health Center Services and Community Notifications</div>
+      <div class="brand-footer-location"><span class="dash"></span>Barangay Poblacion Health Center, San Francisco, Philippines</div>
+      <div class="brand-tags">
+        <span class="brand-tag">Patient Records</span>
+        <span class="brand-tag">Inventory</span>
+        <span class="brand-tag">Scheduling</span>
+        <span class="brand-tag">SMS Broadcast</span>
+        <span class="brand-tag">Analytics</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ RIGHT LOGIN PANEL ============ -->
+  <div class="login-panel">
+    <div style="width:100%; max-width:472px;">
+
+      <div class="login-card">
+        <div class="login-card-header">
+          <div class="login-icon-circle">
+            <span class="material-symbols-outlined" style="color:var(--teal-dark);">verified_user</span>
+          </div>
+          <div class="login-title">Secure Login</div>
+        </div>
+
+        <div class="login-desc">Sign in using your authorized account to access the IDS-BPHCSN healthcare management system.</div>
+
+        {% set flashed = get_flashed_messages() %}
+        {% if error %}
+        <div class="login-alert" role="alert">
+          <span class="material-symbols-outlined">error</span>
+          <span>{{ error }}</span>
+        </div>
+        {% elif flashed %}
+        {% for message in flashed %}
+        <div class="login-alert" role="alert">
+          <span class="material-symbols-outlined">error</span>
+          <span>{{ message }}</span>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        <form method="POST" action="/login" novalidate>
+          <div class="field-group">
+            <label class="field-label" for="username">Username</label>
+            <div class="field-input-wrap">
+              <span class="material-symbols-outlined">person</span>
+              <input type="text" id="username" name="username" placeholder="Enter your username" autocomplete="username">
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label class="field-label" for="password">Password</label>
+            <div class="field-input-wrap">
+              <span class="material-symbols-outlined">lock</span>
+              <input type="password" id="password" name="password" placeholder="Enter your password" autocomplete="current-password">
+              <button type="button" class="eye-toggle" aria-label="Show password">
+                <span class="material-symbols-outlined">visibility</span>
+              </button>
+            </div>
+          </div>
+
+          <button type="submit" class="btn-signin">Sign In</button>
+        </form>
+
+        <a href="#" class="forgot-link">Forgot Password?</a>
+        <span class="forgot-helper">Please contact the System Administrator to reset your password.</span>
+
+        <div class="security-divider"><span>Security</span></div>
+
+        <div class="security-grid">
+          <div class="security-item">
+            <div class="security-item-icon"><span class="material-symbols-outlined">wifi</span></div>
+            <div class="security-item-label">Encrypted<br>Connection</div>
+          </div>
+          <div class="security-item">
+            <div class="security-item-icon"><span class="material-symbols-outlined">key</span></div>
+            <div class="security-item-label">Role-Based<br>Access</div>
+          </div>
+          <div class="security-item">
+            <div class="security-item-icon"><span class="material-symbols-outlined">shield</span></div>
+            <div class="security-item-label">Secure<br>Auth</div>
+          </div>
+          <div class="security-item">
+            <div class="security-item-icon"><span class="material-symbols-outlined">account_balance</span></div>
+            <div class="security-item-label">Trusted Gov<br>System</div>
+          </div>
+        </div>
+
+        <div class="login-card-footer">
+          Version 1.0 &middot; &copy; 2026 Barangay Poblacion Health Center<br>
+          Powered by <b>IDS-BPHCSN</b>
+        </div>
+      </div>
+
+      <div class="page-footer-notice">
+        Access is restricted to authorized personnel only.<br>
+        Unauthorized access attempts are monitored and logged.
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

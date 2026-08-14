@@ -1,0 +1,705 @@
+"""Consultation record queries -- what happened during a visit.
+
+A consultation is the clinical write-up of one appointment: what the patient came
+in with, what was measured, what it was judged to be, and what was done about it.
+The queue (models/appointments.py) tracks a patient through the building; this
+tracks what the health worker recorded once they were in the room.
+
+
+THE PAEDIATRIC BOUNDARIES, AND WHY THEY ARE WHERE THEY ARE
+----------------------------------------------------------
+Two extra measurements are collected for young children, each at its own age:
+
+* height, under 5 (PEDIATRIC_AGE_YEARS). This is the Philippine DOH's own
+  cohort: Operation Timbang Plus and the ECCD programme weigh and measure
+  children 0-59 months, and the WHO Child Growth Standards those assessments are
+  scored against cover exactly 0-59 months. A barangay health station's growth
+  monitoring *is* that cohort, so the form asks for height precisely when the
+  national programme expects a health worker to have taken it. "Under 6" or
+  "under 12" would have been arbitrary in a way this is not -- neither
+  corresponds to anything the health center actually reports on.
+
+* head_circumference, under 1 (INFANT_AGE_YEARS). Head growth is diagnostically
+  useful while the fontanelles are open and the brain is growing fastest; after
+  infancy it stops being routine and asking for it would only invite a blank.
+  One year is also the boundary models/patients.py format_age() already turns on
+  -- under it an age is printed in months and days, at or over it in whole years.
+  A form that asks for head circumference for exactly the patients whose age is
+  written "4 months, 6 days" is one rule the staff can see, not two.
+
+Eligibility is judged against the patient's age *on the day of the consultation*,
+not today -- see consultation_age_context(). Editing an infant's record a year
+later must not hide the head circumference that was legitimately measured, nor
+offer to add one to what is now a toddler.
+
+Immunisations live in models/immunizations.py, recorded during a consultation and
+reading the same paediatric cohort and the same visit date this module resolves.
+See the note below PEDIATRIC/INFANT_AGE_YEARS for why they attach there.
+"""
+from datetime import datetime
+
+from database.connection import get_db
+from models.patients import calculate_age, format_age
+from utils.dates import recent_months, today
+
+# Growth monitoring cohort -- DOH Operation Timbang Plus / WHO 0-59 months.
+PEDIATRIC_AGE_YEARS = 5
+# Head circumference is an infant measurement; matches format_age()'s boundary.
+INFANT_AGE_YEARS = 1
+
+# WHERE IMMUNISATIONS ATTACH, AND WHY HERE
+#
+# The DOH EPI schedule is tracked in models/immunizations.py and recorded from
+# the paediatric section of this module's form. Everything an EPI schedule needs
+# is already resolved by the time that section renders: the patient, their age
+# (consultation_age_context), the visit date and the health worker. A dose is
+# administered *during* a consultation, so it belongs as a further section of
+# this same record -- not as a parallel screen that would have to rediscover all
+# four for itself and could then disagree with this one about any of them.
+#
+# get_immunization_status() reads PEDIATRIC_AGE_YEARS from here rather than
+# defining its own boundary, so the growth measurements and the immunisation
+# schedule are offered to exactly the same children.
+
+# Every column the Record Consultation form writes, in one place so the INSERT,
+# the UPDATE and the redisplay cannot fall out of step. patient_id, recorded_by,
+# appointment_id, consultation_date and created_at are absent on purpose: they
+# are set once, when the record is created, and an edit must not move them.
+CLINICAL_TEXT_FIELDS = ("chief_complaint", "diagnosis", "treatment_plan", "remarks")
+VITAL_FIELDS = ("temperature", "blood_pressure", "pulse_rate", "respiratory_rate", "weight")
+GROWTH_FIELDS = ("height", "head_circumference")
+CONSULTATION_FIELDS = (
+    *CLINICAL_TEXT_FIELDS, *VITAL_FIELDS, *GROWTH_FIELDS, "follow_up_date",
+)
+
+# What the operator must fill in. The clinical judgement is the point of the
+# record, so those three are required.
+#
+# The vitals are deliberately NOT required. A barangay health station does not
+# always have a working thermometer, and paediatric BP cuffs are frequently
+# absent; a form that refuses to save without a number teaches staff to type one
+# in. A blank that means "not measured" is worth more than a plausible invention,
+# so each vital is optional but strictly range-checked when it is given.
+REQUIRED_FIELDS = {
+    "chief_complaint": "Chief complaint is required — what the patient came in for.",
+    "diagnosis": "Diagnosis is required.",
+    "treatment_plan": "Treatment plan is required — including any medicines given.",
+}
+
+# (field, label, unit, low, high, whole_number). The ranges are wide on purpose:
+# they exist to catch a slipped decimal point or a transposed digit, not to
+# second-guess a clinician. Anything genuinely outside them is a typo.
+NUMERIC_LIMITS = (
+    ("temperature", "Temperature", "°C", 25.0, 45.0, False),
+    ("pulse_rate", "Pulse rate", "bpm", 20, 250, True),
+    ("respiratory_rate", "Respiratory rate", "breaths/min", 5, 100, True),
+    ("weight", "Weight", "kg", 0.5, 400.0, False),
+    ("height", "Height", "cm", 20.0, 250.0, False),
+    ("head_circumference", "Head circumference", "cm", 20.0, 70.0, False),
+)
+_LIMITS_BY_FIELD = {entry[0]: entry for entry in NUMERIC_LIMITS}
+
+# Blood pressure is read as one value and validated as two halves.
+BP_SYSTOLIC_RANGE = (50, 300)
+BP_DIASTOLIC_RANGE = (20, 200)
+
+# Human labels, in display order. Used by the profile screen, the form, and the
+# audit trail -- so a field is called the same thing wherever it is named.
+FIELD_LABELS = {
+    "chief_complaint": "Chief complaint",
+    "temperature": "Temperature",
+    "blood_pressure": "Blood pressure",
+    "pulse_rate": "Pulse rate",
+    "respiratory_rate": "Respiratory rate",
+    "weight": "Weight",
+    "height": "Height",
+    "head_circumference": "Head circumference",
+    "diagnosis": "Diagnosis",
+    "treatment_plan": "Treatment plan / medicines given",
+    "remarks": "Additional notes",
+    "follow_up_date": "Follow-up date",
+}
+
+MISSING_TEXT = "Not recorded"
+
+
+def as_date(value):
+    """A date, a stored 'YYYY-MM-DD[ HH:MM:SS]' string, or None -> a date.
+
+    Falls back to today for anything absent or unparseable.
+
+    consultation_date comes back from SQLite as text, and every age calculation
+    downstream needs a real date object. Normalising here rather than at each
+    call site means a caller cannot forget: passing the stored string straight
+    through reaches calculate_age() and fails on `reference.year`.
+    """
+    if value is None or value == "":
+        return today()
+    if hasattr(value, "year") and not hasattr(value, "hour"):
+        return value
+    if hasattr(value, "date"):
+        return value.date()
+    try:
+        return datetime.strptime(str(value)[:10], "%Y-%m-%d").date()
+    except ValueError:
+        return today()
+
+
+def consultation_age_context(patient, on_date=None):
+    """What the patient's age means for this consultation's form.
+
+    `on_date` is the consultation's own date -- as a date or as the text SQLite
+    stores -- so an old record is always judged by how old the patient was at the
+    time. Defaults to today for a new one.
+
+    Returns the age as the screens print it, the whole-year number, and the two
+    eligibility flags the form and the validator both read -- one computation,
+    so the fields that are offered are exactly the fields that will be accepted.
+    """
+    reference = as_date(on_date)
+    birth_date = patient.get("birth_date") if patient else None
+    years = calculate_age(birth_date, on_date=reference)
+
+    return {
+        "age_display": format_age(birth_date, on_date=reference),
+        "age_years": years,
+        # An unknown birthdate yields neither: inventing a cohort for a patient
+        # whose age nobody recorded would put a head circumference on a record
+        # that cannot justify one.
+        "is_pediatric": years is not None and 0 <= years < PEDIATRIC_AGE_YEARS,
+        "is_infant": years is not None and 0 <= years < INFANT_AGE_YEARS,
+        "pediatric_age_years": PEDIATRIC_AGE_YEARS,
+        "infant_age_years": INFANT_AGE_YEARS,
+    }
+
+
+def allowed_growth_fields(age_context):
+    """The growth measurements this patient's age admits, as a set.
+
+    The single authority on the question. The form renders these, the validator
+    accepts only these, and store_values() drops everything else -- so a POST
+    that never touched the page cannot put a head circumference on an adult.
+    """
+    allowed = set()
+    if age_context["is_pediatric"]:
+        allowed.add("height")
+    if age_context["is_infant"]:
+        allowed.add("head_circumference")
+    return allowed
+
+
+def _with_unit(field, value):
+    """A measurement rendered with its unit: 37.2 -> '37.2 °C'. None -> None.
+
+    `:g` rather than str() so a REAL round-tripped through SQLite prints as 37.2
+    and 12 rather than 37.2 and 12.0 -- the second reads as a precision the
+    instrument does not have.
+    """
+    if value is None or value == "":
+        return None
+    unit = _LIMITS_BY_FIELD[field][2]
+    text = f"{value:g}" if isinstance(value, float) else str(value)
+    return f"{text} {unit}".strip()
+
+
+def _rendered(field, value, absent):
+    """One stored value as text, or `absent` when there is nothing there.
+
+    The single renderer behind both the profile screen and the audit trail. They
+    differ only in how they word an empty field -- a table cell says "Not
+    recorded", a sentence in a log says "not recorded" -- so that word is the
+    parameter and everything else is shared. Two renderers would eventually
+    disagree about a unit.
+    """
+    if value is None or value == "":
+        return absent
+    if field == "follow_up_date":
+        from utils.dates import display_date
+
+        return display_date(value, fallback=str(value))
+    if field in _LIMITS_BY_FIELD:
+        return _with_unit(field, value)
+    return value
+
+
+def _audit_renderer(field):
+    def render(value):
+        text = _rendered(field, value, "not recorded")
+        # Free text is quoted in an audit line so a changed case or a trailing
+        # space is visible rather than looking like no change at all.
+        if field in CLINICAL_TEXT_FIELDS and value not in (None, ""):
+            return f'"{text}"'
+        return text
+
+    return render
+
+
+# Passed to models.audit.describe_changes() so an audit entry reads in the same
+# units and wording the screens use.
+AUDIT_FORMATTERS = {field: _audit_renderer(field) for field in CONSULTATION_FIELDS}
+
+
+def _to_consultation(row):
+    """Copy a consultations row into a dict and add the derived display fields.
+
+    Every clinical field gains a `<field>_display` twin holding either the value
+    with its unit or "Not recorded". The five seeded rows predate the vitals
+    columns entirely, so the profile screen would otherwise print blanks where a
+    reader cannot tell "measured 0" from "never measured" -- the two readings a
+    medical record must never confuse.
+    """
+    consultation = dict(row)
+    for field in CONSULTATION_FIELDS:
+        consultation[f"{field}_display"] = _rendered(
+            field, consultation.get(field), MISSING_TEXT
+        )
+
+    consultation["has_vitals"] = any(
+        consultation.get(field) not in (None, "") for field in VITAL_FIELDS
+    )
+    consultation["has_growth"] = any(
+        consultation.get(field) not in (None, "") for field in GROWTH_FIELDS
+    )
+    # A record that has been changed since it was written. updated_at is
+    # backfilled from created_at by the migration, so equality means untouched.
+    consultation["was_edited"] = bool(
+        consultation.get("updated_at")
+        and consultation.get("created_at")
+        and consultation["updated_at"] != consultation["created_at"]
+    )
+    return consultation
+
+
+_CONSULTATION_SELECT = """
+    SELECT c.*, u.full_name AS recorded_by_name, u.role AS recorded_by_role,
+           p.patient_id AS patient_reference, p.first_name, p.middle_name,
+           p.last_name, p.birth_date, p.sex
+    FROM consultations c
+    JOIN users u ON u.id = c.recorded_by
+    JOIN patients p ON p.id = c.patient_id
+"""
+
+
+def get_consultation_report(limit=None):
+    """Every consultation with its patient and author, newest first.
+
+    Written for Screen 10, which does not use it: that screen wants counts and
+    rankings, and get_consultation_stats() below answers those in SQL instead of
+    pulling every row into memory for the template to total up.
+
+    Its caller today is the Administrator dashboard's "Recent Patient
+    Consultations" panel, which wants the opposite thing -- the actual latest
+    visits, named. `limit` is for that panel; left off, the function still
+    returns the whole set, which is what a future spreadsheet export wants.
+
+    birth_date and created_at come back so the panel can print an age and a time
+    without a second query per row. Age is derived through calculate_age() by the
+    caller, the same function every other screen ages a patient with.
+
+    Ordered by consultation_date then id so two visits recorded on the same date
+    -- which is normal, the column is a date for anything entered on Screen 21 --
+    come back newest-first rather than in whatever order SQLite happens to scan.
+    """
+    conn = get_db()
+    rows = conn.execute(
+        f"""
+        SELECT c.id, c.consultation_date, c.chief_complaint, c.diagnosis,
+               c.treatment_plan, c.created_at, c.appointment_id,
+               p.id AS patient_row_id, p.patient_id, p.first_name, p.last_name,
+               p.birth_date, u.full_name AS recorded_by
+        FROM consultations c
+        JOIN patients p ON p.id = c.patient_id
+        JOIN users u ON u.id = c.recorded_by
+        ORDER BY c.consultation_date DESC, c.id DESC
+        {"LIMIT ?" if limit else ""}
+        """,
+        (limit,) if limit else (),
+    ).fetchall()
+    conn.close()
+
+    return {
+        "entries": [dict(row) for row in rows],
+        "total_entries": len(rows),
+    }
+
+
+# ---------------------------------------------------------------------------
+# REPORTING
+#
+# WHY consultation_date IS GROUPED WITH substr(), NOT date()
+# ----------------------------------------------------------
+# The column holds two shapes. A consultation written up through Screen 09
+# stores the visit date the form supplied ('2026-08-03'); the column's DEFAULT
+# CURRENT_TIMESTAMP writes a full UTC stamp ('2026-08-03 14:22:01') for anything
+# inserted without one. Taking the leading 7 characters treats both as the
+# clinic-local month they were recorded under, which is what a monthly report is
+# asking for, and avoids re-interpreting a plain date as a UTC instant -- which
+# date() would do, moving an early-morning visit into the previous month.
+# ---------------------------------------------------------------------------
+
+# How many rows the "most common diagnoses" list shows. A barangay health centre
+# report is read at a glance; beyond about five the tail is noise.
+TOP_DIAGNOSIS_LIMIT = 5
+
+
+def _rank_free_text(rows, limit):
+    """Group free-text clinical entries case-insensitively, most common first.
+
+    diagnosis and chief_complaint are prose typed by a health worker, not a
+    controlled vocabulary, so 'Acute bronchitis' and 'acute bronchitis' are one
+    diagnosis and must not be two bars on a chart. The label shown is the first
+    spelling encountered, so the report prints something a person actually wrote
+    rather than a lower-cased normalisation of it.
+
+    Ties are broken alphabetically so the same data always renders in the same
+    order -- a chart that reshuffles between page loads reads as changing data.
+    """
+    grouped = {}
+    for row in rows:
+        text = (row or "").strip()
+        if not text:
+            continue
+        key = " ".join(text.lower().split())
+        entry = grouped.setdefault(key, {"label": text, "count": 0})
+        entry["count"] += 1
+
+    ranked = sorted(grouped.values(), key=lambda item: (-item["count"], item["label"].lower()))
+    return ranked[:limit] if limit else ranked
+
+
+def get_consultation_stats(months=6, limit=TOP_DIAGNOSIS_LIMIT, on_date=None):
+    """The consultation figures Screen 10 reports.
+
+    Returns totals, a month-by-month trend over the same window the other trend
+    charts use, and the most common diagnoses and presenting complaints.
+
+    `recorded_this_month` counts by the month the visit is dated to, which is the
+    same basis the trend's last bar uses -- so the KPI card and the right-hand
+    end of the chart cannot print different numbers for the same period.
+    """
+    reference = on_date or today()
+    windows = recent_months(months, reference)
+    current_month = reference.strftime("%Y-%m")
+
+    conn = get_db()
+    total = conn.execute("SELECT COUNT(*) FROM consultations").fetchone()[0]
+    by_month = {
+        row["month"]: row["count"]
+        for row in conn.execute(
+            """
+            SELECT substr(consultation_date, 1, 7) AS month, COUNT(*) AS count
+            FROM consultations
+            GROUP BY month
+            """
+        ).fetchall()
+    }
+    patients_seen = conn.execute(
+        "SELECT COUNT(DISTINCT patient_id) FROM consultations"
+    ).fetchone()[0]
+    diagnoses = [row[0] for row in conn.execute("SELECT diagnosis FROM consultations")]
+    complaints = [
+        row[0] for row in conn.execute("SELECT chief_complaint FROM consultations")
+    ]
+    conn.close()
+
+    trend = [
+        {
+            "month": start.strftime("%Y-%m"),
+            "label": label,
+            "count": by_month.get(start.strftime("%Y-%m"), 0),
+        }
+        for start, _, label in windows
+    ]
+
+    return {
+        "total": total,
+        "recorded_this_month": by_month.get(current_month, 0),
+        "patients_seen": patients_seen,
+        "months": months,
+        "trend": trend,
+        "top_diagnoses": _rank_free_text(diagnoses, limit),
+        "top_complaints": _rank_free_text(complaints, limit),
+    }
+
+
+def get_consultations_for_patient(patient_id):
+    """Consultation History tab on Screen 04, most recent first.
+
+    Returns the whole row, not the four columns it used to: the tab now shows the
+    vitals and growth measurements alongside the clinical text, and each entry
+    carries its own edit link.
+
+    recorded_by keeps its original meaning -- the health worker's name -- so the
+    template that already prints it is unaffected.
+    """
+    conn = get_db()
+    rows = conn.execute(
+        _CONSULTATION_SELECT
+        + " WHERE c.patient_id = ? ORDER BY c.consultation_date DESC, c.id DESC",
+        (patient_id,),
+    ).fetchall()
+    conn.close()
+
+    consultations = []
+    for row in rows:
+        consultation = _to_consultation(row)
+        # The name under its historical key, so patient_profile.html's existing
+        # "Attending: {{ consultation.recorded_by }}" keeps working unchanged.
+        consultation["recorded_by"] = consultation["recorded_by_name"]
+        consultations.append(consultation)
+    return consultations
+
+
+def get_consultation_by_id(consultation_id):
+    """One consultation with its patient and author, or None."""
+    conn = get_db()
+    row = conn.execute(
+        _CONSULTATION_SELECT + " WHERE c.id = ?", (consultation_id,)
+    ).fetchone()
+    conn.close()
+    if row is None:
+        return None
+    consultation = _to_consultation(row)
+    consultation["recorded_by"] = consultation["recorded_by_name"]
+    consultation["patient_name"] = " ".join(
+        part for part in (row["first_name"], row["middle_name"], row["last_name"]) if part
+    )
+    return consultation
+
+
+def get_consultation_for_appointment(appointment_id):
+    """The consultation already written up for one queue entry, or None.
+
+    What stops the same visit being recorded twice: the form refuses to open a
+    second time for an appointment that already has a record, and offers the
+    existing one to edit instead.
+    """
+    if not appointment_id:
+        return None
+    conn = get_db()
+    row = conn.execute(
+        _CONSULTATION_SELECT + " WHERE c.appointment_id = ? ORDER BY c.id LIMIT 1",
+        (appointment_id,),
+    ).fetchone()
+    conn.close()
+    return _to_consultation(row) if row else None
+
+
+def _clean_number(raw, whole_number):
+    """Parse a submitted measurement. Returns (value, ok). Blank is (None, True)."""
+    text = str(raw or "").strip()
+    if not text:
+        return None, True
+    try:
+        value = float(text)
+    except ValueError:
+        return None, False
+    if whole_number:
+        if value != int(value):
+            return None, False
+        return int(value), True
+    # Two decimals is finer than any instrument in the building reads.
+    return round(value, 2), True
+
+
+def parse_blood_pressure(raw):
+    """'120/80' -> (120, 80), or (None, None) when it is blank or unusable."""
+    text = str(raw or "").strip()
+    if not text:
+        return None, None
+    parts = text.replace("\\", "/").split("/")
+    if len(parts) != 2:
+        return None, None
+    try:
+        systolic, diastolic = (int(part.strip()) for part in parts)
+    except ValueError:
+        return None, None
+    return systolic, diastolic
+
+
+def validate_consultation_form(values, age_context):
+    """Server-side validation. Returns {field: message}; empty means valid.
+
+    Runs independently of the browser: the form carries `novalidate`, and a POST
+    can arrive without ever touching the page.
+
+    Growth fields are checked against `age_context`, so submitting a head
+    circumference for an adult is an error rather than something quietly stored.
+    """
+    errors = {}
+
+    for field, message in REQUIRED_FIELDS.items():
+        if not str(values.get(field) or "").strip():
+            errors[field] = message
+
+    allowed = allowed_growth_fields(age_context)
+    for field, label, unit, low, high, whole in NUMERIC_LIMITS:
+        raw = str(values.get(field) or "").strip()
+        if not raw:
+            continue
+        if field in GROWTH_FIELDS and field not in allowed:
+            errors[field] = (
+                f"{label} is only recorded for "
+                + (
+                    f"infants under {INFANT_AGE_YEARS} year"
+                    if field == "head_circumference"
+                    else f"children under {PEDIATRIC_AGE_YEARS}"
+                )
+                + ". This patient is outside that age."
+            )
+            continue
+        value, ok = _clean_number(raw, whole)
+        if not ok:
+            errors[field] = (
+                f"Enter {label.lower()} as a whole number in {unit}."
+                if whole
+                else f"Enter {label.lower()} as a number in {unit}."
+            )
+        elif value is not None and not (low <= value <= high):
+            errors[field] = (
+                f"{label} must be between {low:g} and {high:g} {unit}. "
+                "Check the reading before saving."
+            )
+
+    raw_bp = str(values.get("blood_pressure") or "").strip()
+    if raw_bp:
+        systolic, diastolic = parse_blood_pressure(raw_bp)
+        if systolic is None:
+            errors["blood_pressure"] = "Enter blood pressure as systolic/diastolic, e.g. 120/80."
+        elif not (BP_SYSTOLIC_RANGE[0] <= systolic <= BP_SYSTOLIC_RANGE[1]):
+            errors["blood_pressure"] = (
+                f"Systolic must be between {BP_SYSTOLIC_RANGE[0]} and {BP_SYSTOLIC_RANGE[1]}."
+            )
+        elif not (BP_DIASTOLIC_RANGE[0] <= diastolic <= BP_DIASTOLIC_RANGE[1]):
+            errors["blood_pressure"] = (
+                f"Diastolic must be between {BP_DIASTOLIC_RANGE[0]} and {BP_DIASTOLIC_RANGE[1]}."
+            )
+        elif systolic <= diastolic:
+            errors["blood_pressure"] = (
+                "Systolic must be higher than diastolic — check the two numbers "
+                "are the right way round."
+            )
+
+    follow_up = str(values.get("follow_up_date") or "").strip()
+    if follow_up:
+        try:
+            parsed = datetime.strptime(follow_up, "%Y-%m-%d").date()
+        except ValueError:
+            errors["follow_up_date"] = "Enter a valid date in YYYY-MM-DD format."
+        else:
+            # A follow-up is an instruction to come back, so it cannot fall
+            # before the visit. Judged against the visit's own date rather than
+            # today, so editing last month's record does not suddenly invalidate
+            # a follow-up that was perfectly future when it was written.
+            if parsed < as_date(values.get("_consultation_date")):
+                errors["follow_up_date"] = (
+                    "The follow-up date cannot be before the consultation date."
+                )
+
+    return errors
+
+
+def store_values(values, age_context):
+    """Normalise submitted form values into the column values to store.
+
+    Shared by create_consultation() and update_consultation() so an insert and an
+    edit can never normalise the same field differently.
+
+    Growth fields outside the patient's cohort are dropped to NULL rather than
+    stored. validate_consultation_form() already rejects them, so this is the
+    second of two independent refusals -- the one that holds even if a future
+    caller forgets to validate.
+    """
+    record = {}
+    for field in CLINICAL_TEXT_FIELDS:
+        record[field] = str(values.get(field) or "").strip() or None
+
+    allowed = allowed_growth_fields(age_context)
+    for field, _label, _unit, _low, _high, whole in NUMERIC_LIMITS:
+        if field in GROWTH_FIELDS and field not in allowed:
+            record[field] = None
+            continue
+        record[field], _ok = _clean_number(values.get(field), whole)
+
+    systolic, diastolic = parse_blood_pressure(values.get("blood_pressure"))
+    # Re-composed from the parsed halves rather than stored as typed, so
+    # "120 / 80" and "120/80" cannot end up as two different-looking readings.
+    record["blood_pressure"] = f"{systolic}/{diastolic}" if systolic is not None else None
+
+    record["follow_up_date"] = str(values.get("follow_up_date") or "").strip() or None
+    return record
+
+
+def create_consultation(patient_id, recorded_by, values, age_context,
+                        appointment_id=None, consultation_date=None):
+    """Insert a consultation and return its new primary key.
+
+    consultation_date is the clinic-local calendar date, matching the format the
+    five seeded rows already use, so the history table sorts and prints one way.
+    created_at keeps the precise instant, from the column's own default.
+
+    Deliberately writes no audit entry. The first save is the record coming into
+    existence, not a change to it -- created_at and recorded_by already say who
+    wrote it and when, and logging it as an edit would bury the entries that
+    matter under one for every consultation ever taken.
+    """
+    record = store_values(values, age_context)
+    day = as_date(consultation_date).isoformat()
+
+    columns = ["patient_id", "recorded_by", "appointment_id", "consultation_date",
+               *CONSULTATION_FIELDS, "updated_at"]
+    placeholders = ", ".join("?" for _ in columns)
+    parameters = [patient_id, recorded_by, appointment_id, day]
+    parameters += [record[field] for field in CONSULTATION_FIELDS]
+    # Equal to created_at on an unedited record, which is what was_edited reads.
+    parameters += [None]
+
+    conn = get_db()
+    cursor = conn.execute(
+        f"INSERT INTO consultations ({', '.join(columns)}) VALUES ({placeholders})",
+        parameters,
+    )
+    conn.execute(
+        "UPDATE consultations SET updated_at = created_at WHERE id = ?",
+        (cursor.lastrowid,),
+    )
+    conn.commit()
+    new_id = cursor.lastrowid
+    conn.close()
+    return new_id
+
+
+def update_consultation(consultation_id, values, age_context):
+    """Overwrite one consultation's clinical fields. Returns rows affected.
+
+    Deliberately leaves patient_id, recorded_by, appointment_id,
+    consultation_date and created_at alone. Which patient a record belongs to and
+    when the visit happened are historical fact; an edit corrects what was
+    written about that visit, it does not move the visit. Letting patient_id
+    change would silently transplant a diagnosis onto another person's chart.
+
+    The audit entry is written by the caller, which is the only place that knows
+    who is acting and from where.
+    """
+    record = store_values(values, age_context)
+    assignments = ", ".join(f"{field} = ?" for field in CONSULTATION_FIELDS)
+    parameters = [record[field] for field in CONSULTATION_FIELDS] + [consultation_id]
+
+    # strftime(...'%f') rather than CURRENT_TIMESTAMP, which is only accurate to
+    # the second. created_at is second-precision and an unedited row copies it
+    # verbatim into updated_at, so a second-precision edit landing inside the
+    # same second as the original save would write back a byte-identical value --
+    # and the record would go on claiming it had never been touched. The
+    # fractional part makes "has this been edited?" exact rather than usually
+    # right. display_date() still reads it: it falls back to the date prefix.
+    conn = get_db()
+    cursor = conn.execute(
+        f"UPDATE consultations SET {assignments}, "
+        "updated_at = strftime('%Y-%m-%d %H:%M:%f', 'now') "
+        "WHERE id = ?",
+        parameters,
+    )
+    conn.commit()
+    affected = cursor.rowcount
+    conn.close()
+    return affected

@@ -1,0 +1,712 @@
+{% extends "base.html" %}
+{% set active_nav = "sms_notifications" %}
+{% block title %}IDS-BPHCSN | SMS Notifications{% endblock %}
+
+{#
+  Screen 09 — community SMS broadcasts.
+
+  Everything on this page is read from stored rows or from the live patient
+  roster; there are no sample broadcasts and no figures the system could not
+  answer for. In particular there is no delivery percentage anywhere: a message
+  is recorded as Sent when the gateway accepts it, and nothing in this
+  application is ever told that one arrived. See the header of
+  models/broadcasts.py.
+
+  Permission rule (confirmed team ruling): Administrator and Barangay Official
+  compose and send; Health Center Staff is view-only. can_broadcast hides the
+  controls, but the enforcement is that the Staff blueprint has no send endpoint
+  at all -- see the header of routes/broadcast_views.py.
+#}
+
+{% block styles %}
+  .toolbar-search{min-width:280px; max-width:360px;}
+  .page-desc{font-size:14px; color:var(--text-muted); margin-top:4px; max-width:640px;}
+
+  .stat-card{
+    background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:20px 22px; height:100%;
+  }
+  .stat-icon{width:44px;height:44px;border-radius:12px; display:flex; align-items:center; justify-content:center; margin-bottom:12px;}
+  .stat-value{font-size:24px; font-weight:700; color:var(--text-dark);}
+  .stat-label{font-size:13px; color:var(--text-muted); margin-top:2px;}
+  .stat-trend{font-size:12px; font-weight:600; margin-top:6px;}
+
+  .panel-card{
+    background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:24px;
+  }
+
+  .gateway-banner{
+    display:flex; align-items:flex-start; gap:12px; border-radius:14px; padding:14px 16px;
+    font-size:13.5px; line-height:1.5; margin-bottom:18px; border:1px solid transparent;
+  }
+  .gateway-banner .material-symbols-outlined{font-size:20px; flex-shrink:0;}
+  .gateway-banner.simulated{background:#FEF3C7; border-color:#FCD34D; color:#78350F;}
+  .gateway-banner.live{background:var(--teal-light); border-color:var(--teal); color:var(--teal-dark);}
+  .gateway-banner .gw-title{font-weight:700; display:block; margin-bottom:2px;}
+
+  .filter-btn{
+    background:#fff; border:1px solid var(--border-color); border-radius:10px; padding:10px 16px;
+    font-size:14px; font-weight:500; color:var(--text-dark); display:flex; align-items:center; gap:6px;
+  }
+  .filter-btn.open, .filter-btn:hover{border-color:var(--teal); color:var(--teal-dark);}
+  .btn-ghost-ids{
+    background:transparent; border:1px solid var(--border-color); color:var(--text-dark); border-radius:10px; padding:10px 14px;
+    font-size:13.5px; font-weight:500; display:flex; align-items:center; gap:6px; white-space:nowrap;
+  }
+  .btn-ghost-ids:hover{border-color:#C7CBD1; background:var(--bg);}
+
+  .filter-panel{
+    background:var(--bg); border:1px solid var(--border-color); border-radius:12px; padding:20px;
+    margin-bottom:18px; display:none;
+  }
+  .filter-panel.show{display:block;}
+  .filter-panel label{font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:6px; display:block;}
+  .filter-panel .form-control, .filter-panel .form-select{
+    height:48px; border-radius:12px; border:1px solid var(--border-color); font-size:13.5px;
+  }
+  .filter-panel .form-control:focus, .filter-panel .form-select:focus{
+    border-color:var(--teal); box-shadow:0 0 0 3px rgba(22,155,146,0.12);
+  }
+  .filter-actions{display:flex; justify-content:flex-end; gap:10px; margin-top:16px; padding-top:16px; border-top:1px solid var(--border-color);}
+  .btn-reset{background:transparent; border:none; color:var(--text-muted); font-size:14px; font-weight:600; padding:10px 14px;}
+  .btn-reset:hover{color:var(--danger);}
+
+  table.sms-table{width:100%; border-collapse:separate; border-spacing:0; font-size:13.5px;}
+  table.sms-table thead th{
+    text-align:left; color:var(--text-muted); font-weight:600; font-size:11.5px; letter-spacing:0.03em;
+    text-transform:uppercase; padding:12px 14px; border-bottom:1px solid var(--border-color); white-space:nowrap;
+  }
+  table.sms-table tbody td{
+    padding:14px; border-bottom:1px solid var(--border-color); color:var(--text-dark); vertical-align:middle;
+  }
+  table.sms-table tbody tr:hover{background:#FAFBFC;}
+  table.sms-table tbody tr.latest{background:var(--teal-light);}
+  table.sms-table tbody tr:last-child td{border-bottom:none;}
+  .recip-name{font-weight:600;}
+  .recip-mobile{color:var(--text-muted); font-size:12.5px;}
+  .msg-preview{color:var(--text-dark); max-width:260px; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .cat-pill{background:var(--teal-light); color:var(--teal-dark); font-size:11.5px; font-weight:600; padding:3px 10px; border-radius:999px; white-space:nowrap;}
+
+  .badge-status{
+    display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600;
+    padding:4px 11px; border-radius:999px; white-space:nowrap;
+  }
+  .badge-sent{background:#DCFCE7; color:#15803D;}
+  .badge-queued{background:#FEF3C7; color:#B45309;}
+  .badge-failed{background:#FEE2E2; color:#B91C1C;}
+  .sim-flag{
+    display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:600;
+    background:#F1F5F9; color:#475569; border:1px dashed #94A3B8; padding:2px 8px; border-radius:999px;
+    margin-top:5px; white-space:nowrap;
+  }
+  .view-only-note{font-size:12px; color:var(--text-muted); white-space:nowrap;}
+
+  .table-footer{display:flex; align-items:center; justify-content:space-between; padding-top:18px; margin-top:6px; border-top:1px solid var(--border-color); flex-wrap:wrap; gap:12px;}
+  .pg-info{font-size:13px; color:var(--text-muted);}
+
+  .empty-state{display:none; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:64px 24px;}
+  .empty-state.show{display:flex;}
+  .empty-state .icon-circle{
+    width:72px; height:72px; border-radius:50%; background:var(--teal-light); display:flex; align-items:center;
+    justify-content:center; margin-bottom:18px;
+  }
+  .empty-state h5{font-size:17px; font-weight:600; color:var(--text-dark); margin-bottom:6px;}
+  .empty-state p{font-size:14px; color:var(--text-muted); max-width:420px; margin-bottom:20px;}
+
+  /* MESSAGE DETAIL SIDE PANEL */
+  .detail-sticky{position:sticky; top:104px;}
+  .detail-header{display:flex; align-items:center; gap:10px; margin-bottom:16px;}
+  .detail-title{font-size:16px; font-weight:600; color:var(--text-dark);}
+  .detail-sub{font-size:12.5px; color:var(--text-muted); margin-top:2px;}
+  .detail-avatar{width:44px;height:44px;border-radius:50%; background:var(--teal-light); color:var(--teal-dark); display:flex; align-items:center; justify-content:center;}
+  .detail-row{display:flex; justify-content:space-between; gap:12px; padding:10px 0; border-bottom:1px solid var(--border-color); font-size:13px;}
+  .detail-row:last-child{border-bottom:none;}
+  .detail-label{color:var(--text-muted);}
+  .detail-value{font-weight:600; color:var(--text-dark); text-align:right;}
+  .message-bubble{
+    background:var(--bg); border:1px solid var(--border-color); border-radius:12px; padding:14px 16px; font-size:13.5px;
+    color:var(--text-dark); margin:16px 0; line-height:1.5; white-space:pre-wrap; word-break:break-word;
+  }
+  .recipient-list{margin-top:6px;}
+  .recipient-row{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 0; border-bottom:1px solid var(--border-color); font-size:12.5px;}
+  .recipient-row:last-child{border-bottom:none;}
+  .recipient-row .who{color:var(--text-dark); font-weight:600;}
+  .recipient-row .num{color:var(--text-muted); font-size:12px;}
+  .section-label{font-size:11.5px; font-weight:600; letter-spacing:0.03em; text-transform:uppercase; color:var(--text-muted); margin-top:18px;}
+  .panel-note{font-size:12.5px; color:var(--text-muted); line-height:1.5; margin-top:10px;}
+
+  /* COMPOSE DIALOG */
+  .field-label{font-size:12.5px; font-weight:600; color:var(--text-dark); margin-bottom:6px; display:block;}
+  .field-label .req{color:var(--danger); margin-left:2px;}
+  .field-error{font-size:12.5px; color:var(--danger); margin-top:4px;}
+  .form-text-hint{font-size:12px; color:var(--text-muted); margin-top:4px;}
+  .modal .form-control.is-invalid, .modal .form-select.is-invalid{border-color:var(--danger);}
+  .audience-pick{display:flex; flex-direction:column; gap:8px;}
+  .audience-option{
+    border:1px solid var(--border-color); border-radius:12px; padding:12px 14px; display:flex; gap:10px;
+    align-items:flex-start; cursor:pointer;
+  }
+  .audience-option:hover{border-color:var(--teal);}
+  .audience-option input{margin-top:3px;}
+  .audience-option.empty{opacity:0.65; cursor:not-allowed; background:var(--bg);}
+  .ao-label{font-size:13.5px; font-weight:600; color:var(--text-dark);}
+  .ao-count{font-size:12px; font-weight:600; color:var(--teal-dark);}
+  .ao-source{font-size:12px; color:var(--text-muted); margin-top:3px; line-height:1.45;}
+  .counter-line{display:flex; justify-content:space-between; gap:12px; font-size:12px; color:var(--text-muted); margin-top:6px; flex-wrap:wrap;}
+  .counter-line.warn{color:#B45309;}
+  .counter-line.over{color:var(--danger); font-weight:600;}
+  .unavailable-note{
+    background:var(--bg); border:1px solid var(--border-color); border-radius:12px; padding:12px 14px;
+    font-size:12.5px; color:var(--text-muted); line-height:1.5; margin-top:14px;
+  }
+  .unavailable-note strong{color:var(--text-dark);}
+  .unavailable-note li{margin-top:6px;}
+{% endblock %}
+
+{% block breadcrumb %}
+
+    <div class="breadcrumb-nav">
+      <a href="{{ url_for(dashboard_endpoint) }}">Dashboard</a>
+      <span class="sep material-symbols-outlined">chevron_right</span>
+      <span class="current">SMS Notifications</span>
+    </div>{% endblock %}
+
+{% block content %}
+    <div class="eyebrow">Barangay Poblacion Health Center</div>
+    <div class="page-title">SMS Notifications</div>
+    <div class="page-desc">Community SMS broadcasts sent through the Semaphore gateway, and the record of every one already sent.</div>
+
+    <!-- GATEWAY STATUS. Read fresh on every render from the environment, so this
+         line changes the moment SEMAPHORE_API_KEY is set and the app restarts. -->
+    <div class="gateway-banner {{ 'live' if gateway_live else 'simulated' }} mt-3">
+      <span class="material-symbols-outlined">{{ 'cell_tower' if gateway_live else 'wifi_off' }}</span>
+      <div>
+        <span class="gw-title">SMS gateway: {{ gateway_label }}</span>
+        {{ gateway_note }}
+      </div>
+    </div>
+
+    <!-- STAT CARDS. Every figure is counted from stored broadcast rows or from
+         the live patient roster; there is no delivery rate, because nothing here
+         is ever told a message arrived. -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:var(--teal-light);"><span class="material-symbols-outlined" style="color:var(--teal-dark);">campaign</span></div>
+          <div class="stat-value">{{ stats.total_broadcasts }}</div>
+          <div class="stat-label">Broadcasts recorded</div>
+          <div class="stat-trend" style="color:var(--text-muted);">{{ stats.this_month }} this month</div>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#DCFCE7;"><span class="material-symbols-outlined" style="color:var(--success);">mark_email_read</span></div>
+          <div class="stat-value">{{ stats.messages_sent }}</div>
+          <div class="stat-label">Messages accepted</div>
+          <div class="stat-trend" style="color:var(--text-muted);">Across every broadcast</div>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#FEE2E2;"><span class="material-symbols-outlined" style="color:var(--danger);">error</span></div>
+          <div class="stat-value">{{ stats.messages_failed }}</div>
+          <div class="stat-label">Messages failed</div>
+          <div class="stat-trend" style="color:{{ 'var(--danger)' if stats.messages_failed else 'var(--text-muted)' }};">
+            {{ 'Needs review' if stats.messages_failed else 'None so far' }}
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#EDE9FE;"><span class="material-symbols-outlined" style="color:var(--purple);">contacts</span></div>
+          <div class="stat-value">{{ stats.reachable_contacts }}</div>
+          <div class="stat-label">Reachable contacts</div>
+          <div class="stat-trend" style="color:var(--text-muted);">Active patients with a valid mobile</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3">
+      <!-- LEFT: BROADCAST HISTORY -->
+      <div class="col-lg-8">
+        <div class="panel-card">
+
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-3">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <div class="toolbar-search">
+                <span class="material-symbols-outlined" style="font-size:18px;">search</span>
+                <input type="text" id="historySearch" placeholder="Search reference, audience or message" autocomplete="off">
+              </div>
+              <button class="filter-btn" id="filterToggleBtn" onclick="toggleFilterPanel()">
+                <span class="material-symbols-outlined" style="font-size:18px;">filter_list</span>Filter
+              </button>
+            </div>
+            <!-- Permission rule: Administrator and Barangay Official compose/send
+                 broadcasts. Health Center Staff is view-only — no compose or send
+                 control is rendered, and that role's blueprint has no send URL. -->
+            {% if can_broadcast %}
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <button class="btn-primary-teal" data-bs-toggle="modal" data-bs-target="#composeBroadcastModal">
+                <span class="material-symbols-outlined" style="font-size:18px;">campaign</span>New Broadcast
+              </button>
+            </div>
+            {% else %}
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <span class="view-only-note">View only &middot; broadcast sending is Administrator / Barangay Official</span>
+            </div>
+            {% endif %}
+          </div>
+
+          <!-- FILTER PANEL. Filters the rows already on this page; every option
+               comes from the same lists the compose dialog and the model use. -->
+          <div class="filter-panel" id="filterPanel">
+            <div class="row g-3">
+              <div class="col-md-4 col-sm-6">
+                <label for="filterAudience">Audience</label>
+                <select class="form-select" id="filterAudience" onchange="applyFilters()">
+                  <option value="">All audiences</option>
+{%- for option in audience_options %}
+                  <option value="{{ option.label }}">{{ option.label }}</option>
+{%- endfor %}
+                </select>
+              </div>
+              <div class="col-md-4 col-sm-6">
+                <label for="filterStatus">Status</label>
+                <select class="form-select" id="filterStatus" onchange="applyFilters()">
+                  <option value="">All statuses</option>
+                  <option value="Sent">Sent</option>
+                  <option value="Partial">Partial</option>
+                  <option value="Failed">Failed</option>
+                </select>
+              </div>
+              <div class="col-md-4 col-sm-6">
+                <label for="filterCategory">Category</label>
+                <select class="form-select" id="filterCategory" onchange="applyFilters()">
+                  <option value="">All categories</option>
+{%- for category in categories %}
+                  <option value="{{ category }}">{{ category }}</option>
+{%- endfor %}
+                </select>
+              </div>
+            </div>
+            <div class="filter-actions">
+              <button class="btn-reset" onclick="resetFilters()">Reset Filters</button>
+            </div>
+          </div>
+
+{% if broadcasts %}
+          <div style="overflow-x:auto;" id="tableWrap">
+            <table class="sms-table" id="smsTable">
+              <thead>
+                <tr>
+                  <th>Reference</th>
+                  <th>Audience</th>
+                  <th>Message Preview</th>
+                  <th>Category</th>
+                  <th>Sent</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+{%- for broadcast in broadcasts %}
+                <tr{% if latest and broadcast.id == latest.id %} class="latest"{% endif %}
+                    data-audience="{{ broadcast.audience_label }}"
+                    data-status="{{ broadcast.status }}"
+                    data-category="{{ broadcast.category or '' }}"
+                    data-search="{{ (broadcast.reference ~ ' ' ~ broadcast.audience_label ~ ' ' ~ broadcast.message ~ ' ' ~ (broadcast.category or '')) | lower }}">
+                  <td>
+                    <div class="recip-mobile">{{ broadcast.reference }}</div>
+{%- if broadcast.is_simulated %}
+                    <span class="sim-flag" title="Recorded in full, but no message was transmitted: no SEMAPHORE_API_KEY was configured when this was sent.">
+                      <span class="material-symbols-outlined" style="font-size:13px;">wifi_off</span>Simulated
+                    </span>
+{%- endif %}
+                  </td>
+                  <td>
+                    <div class="recip-name">{{ broadcast.audience_label }}</div>
+                    <div class="recip-mobile">
+                      {{ broadcast.sent_count }} of {{ broadcast.recipient_count }} sent
+{%- if broadcast.failed_count %} &middot; {{ broadcast.failed_count }} failed{% endif %}
+                    </div>
+                  </td>
+                  <td><span class="msg-preview" title="{{ broadcast.message }}">{{ broadcast.preview }}</span></td>
+                  <td>{% if broadcast.category %}<span class="cat-pill">{{ broadcast.category }}</span>{% else %}<span class="recip-mobile">&mdash;</span>{% endif %}</td>
+                  <td>
+                    <div>{{ broadcast.sent_at_display }}</div>
+                    <div class="recip-mobile">by {{ broadcast.sent_by_name }}</div>
+                  </td>
+                  <td><span class="badge-status {{ broadcast.status_badge_class }}">{{ broadcast.status }}</span></td>
+                </tr>
+{%- endfor %}
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Shown only when a filter or search matches none of the rows above. -->
+          <div class="empty-state" id="filterEmptyState">
+            <div class="icon-circle">
+              <span class="material-symbols-outlined" style="font-size:34px; color:var(--teal-dark);">search_off</span>
+            </div>
+            <h5>No broadcast matches those filters</h5>
+            <p>Nothing in the history matches your search or filter. Clear them to see every broadcast again.</p>
+            <button class="btn-outline-teal" onclick="resetFilters()"><span class="material-symbols-outlined" style="font-size:18px;">restart_alt</span>Clear Filters</button>
+          </div>
+
+          <div class="table-footer">
+            <div class="pg-info" id="historyCount">
+              Showing {{ broadcasts | length }} of {{ stats.total_broadcasts }} broadcast{{ '' if stats.total_broadcasts == 1 else 's' }}
+{%- if stats.simulated_broadcasts %} &middot; {{ stats.simulated_broadcasts }} simulated, {{ stats.live_broadcasts }} live{% endif %}
+            </div>
+          </div>
+{% else %}
+          <!-- No broadcast has been sent yet. Nothing is invented to fill the
+               table; the history starts when the first one is sent. -->
+          <div class="empty-state show">
+            <div class="icon-circle">
+              <span class="material-symbols-outlined" style="font-size:34px; color:var(--teal-dark);">sms</span>
+            </div>
+            <h5>No broadcasts sent yet</h5>
+            <p>
+              Nothing has been broadcast to the community from this system.
+              {% if can_broadcast %}Compose the first one to start the history.{% else %}Broadcasts sent by the Administrator or the Barangay Official will appear here.{% endif %}
+            </p>
+            {% if can_broadcast %}
+            <button class="btn-primary-teal" data-bs-toggle="modal" data-bs-target="#composeBroadcastModal">
+              <span class="material-symbols-outlined" style="font-size:18px;">campaign</span>New Broadcast
+            </button>
+            {% endif %}
+          </div>
+{% endif %}
+
+        </div>
+      </div>
+
+      <!-- RIGHT: THE MOST RECENT BROADCAST -->
+      <div class="col-lg-4">
+        <div class="panel-card detail-sticky">
+{% if latest %}
+          <div class="detail-header">
+            <div class="detail-avatar"><span class="material-symbols-outlined">campaign</span></div>
+            <div>
+              <div class="detail-title">Most recent broadcast</div>
+              <div class="detail-sub">{{ latest.reference }} &middot; {{ latest.sent_at_display }}</div>
+            </div>
+          </div>
+
+          <div class="detail-row"><div class="detail-label">Audience</div><div class="detail-value">{{ latest.audience_label }}</div></div>
+          <div class="detail-row"><div class="detail-label">Category</div><div class="detail-value">{% if latest.category %}<span class="cat-pill">{{ latest.category }}</span>{% else %}&mdash;{% endif %}</div></div>
+          <div class="detail-row"><div class="detail-label">Sent by</div><div class="detail-value">{{ latest.sent_by_name }}<div class="recip-mobile" style="font-weight:400;">{{ latest.sent_by_role }}</div></div></div>
+          <div class="detail-row"><div class="detail-label">Accepted</div><div class="detail-value">{{ latest.sent_count }} of {{ latest.recipient_count }}</div></div>
+{%- if latest.failed_count %}
+          <div class="detail-row"><div class="detail-label">Failed</div><div class="detail-value" style="color:var(--danger);">{{ latest.failed_count }}</div></div>
+{%- endif %}
+          <div class="detail-row"><div class="detail-label">Message size</div><div class="detail-value">{{ latest.segments }} segment{{ '' if latest.segments == 1 else 's' }} &middot; {{ latest.encoding }}</div></div>
+          <div class="detail-row">
+            <div class="detail-label">Channel</div>
+            <div class="detail-value">
+              {% if latest.is_simulated %}Simulated &middot; not transmitted{% else %}SMS &middot; Semaphore gateway{% endif %}
+            </div>
+          </div>
+          <div class="detail-row"><div class="detail-label">Status</div><div class="detail-value"><span class="badge-status {{ latest.status_badge_class }}">{{ latest.status }}</span></div></div>
+
+          <div class="message-bubble">{{ latest.message }}</div>
+
+{% if latest.is_simulated %}
+          <div class="unavailable-note" style="margin-top:0;">
+            <strong>This broadcast was not transmitted.</strong>
+            It was composed, addressed and recorded exactly as a live send would be, but
+            no <code>SEMAPHORE_API_KEY</code> was configured at the time, so nothing was
+            sent to the gateway. Setting that key makes the next broadcast live.
+          </div>
+{% endif %}
+
+{% if latest_recipients %}
+          <div class="section-label">Recipients</div>
+          <div class="recipient-list">
+{%- for recipient in latest_recipients %}
+            <div class="recipient-row">
+              <div>
+                <div class="who">{{ recipient.recipient_name }}</div>
+                <div class="num">{{ recipient.mobile_number }}</div>
+              </div>
+              <span class="badge-status {{ 'badge-sent' if recipient.status == 'Sent' else 'badge-failed' }}">{{ recipient.status }}</span>
+            </div>
+{%- endfor %}
+          </div>
+{%- if latest.recipient_count > latest_recipients | length %}
+          <div class="panel-note">
+            Showing {{ latest_recipients | length }} of {{ latest.recipient_count }} recipients.
+          </div>
+{%- endif %}
+          <div class="panel-note">
+            &ldquo;Sent&rdquo; means the gateway accepted the message. This system receives no
+            delivery reports from Semaphore, so no broadcast is ever marked delivered.
+          </div>
+{% endif %}
+{% else %}
+          <div class="detail-header">
+            <div class="detail-avatar"><span class="material-symbols-outlined">campaign</span></div>
+            <div>
+              <div class="detail-title">No broadcast yet</div>
+              <div class="detail-sub">Nothing has been sent from this system</div>
+            </div>
+          </div>
+          <div class="panel-note">
+            The details of the most recent broadcast &mdash; its message, its audience and
+            every number it was attempted against &mdash; will appear here once one is sent.
+          </div>
+{% endif %}
+        </div>
+      </div>
+
+    </div>
+
+{% if can_broadcast %}
+    <!-- COMPOSE DIALOG. Rendered only for the two roles that hold broadcast
+         authority; the send endpoint it posts to is guarded by role_required as
+         well, so hiding this is presentation and not the permission itself. -->
+    <div class="modal fade" id="composeBroadcastModal" tabindex="-1" aria-labelledby="composeBroadcastLabel" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content" style="border-radius:16px;">
+          <div class="modal-header">
+            <h5 class="modal-title" id="composeBroadcastLabel">New Community Broadcast</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <form id="composeForm" method="post" action="{{ url_for(send_broadcast_endpoint) }}" novalidate>
+
+              <label class="field-label" for="composeMessage">Message<span class="req">*</span></label>
+              <textarea class="form-control{% if errors.message %} is-invalid{% endif %}" id="composeMessage"
+                        name="message" rows="5" maxlength="{{ sms_limits.maximum }}"
+                        placeholder="e.g. Abiso: Libreng bakuna sa health center sa Sabado, 8:00 AM. Salamat po. - Brgy. Poblacion HC">{{ compose.message or '' }}</textarea>
+{%- if errors.message %}
+              <div class="field-error">{{ errors.message }}</div>
+{%- endif %}
+              <!-- Counter only; the server runs the same calculation on submit. -->
+              <div class="counter-line" id="composeCounter">
+                <span id="counterChars">0 characters</span>
+                <span id="counterSegments">0 segments</span>
+              </div>
+              <div class="form-text-hint" id="counterHint">
+                A GSM-7 message fits {{ sms_limits.gsm_single }} characters in one segment
+                ({{ sms_limits.gsm_concatenated }} per part once it is split). One character
+                outside that alphabet &mdash; an emoji, a curly quote, an ellipsis &mdash; puts the
+                whole message into UCS-2, where a segment holds only {{ sms_limits.unicode_single }}.
+                Each segment is one message credit per recipient.
+              </div>
+
+              <div class="row g-3 mt-1">
+                <div class="col-12">
+                  <label class="field-label">Send to<span class="req">*</span></label>
+                  <div class="audience-pick">
+{%- for option in audience_options %}
+                    <label class="audience-option{% if not option.count %} empty{% endif %}">
+                      <input type="radio" name="audience" value="{{ option.key }}"
+                             {% if not option.count %}disabled{% endif %}
+                             {% if compose.audience == option.key %}checked{% endif %}>
+                      <span>
+                        <span class="d-flex align-items-center gap-2 flex-wrap">
+                          <span class="ao-label">{{ option.label }}</span>
+                          <span class="ao-count">{{ option.count }} recipient{{ '' if option.count == 1 else 's' }}</span>
+                        </span>
+                        <span class="ao-source d-block">
+                          {{ option.source }}
+{%- if option.merged %} {{ option.merged }} record{{ '' if option.merged == 1 else 's' }} share a number with another and are messaged once.{% endif %}
+{%- if not option.count %} <strong>Nobody in this group has a usable mobile number on file, so it cannot be sent to.</strong>{% endif %}
+                        </span>
+                      </span>
+                    </label>
+{%- endfor %}
+                  </div>
+{%- if errors.audience %}
+                  <div class="field-error">{{ errors.audience }}</div>
+{%- endif %}
+                </div>
+
+                <div class="col-md-6">
+                  <label class="field-label" for="composeCategory">Category</label>
+                  <select class="form-select{% if errors.category %} is-invalid{% endif %}" id="composeCategory" name="category">
+                    <option value="">No category</option>
+{%- for category in categories %}
+                    <option value="{{ category }}"{% if compose.category == category %} selected{% endif %}>{{ category }}</option>
+{%- endfor %}
+                  </select>
+{%- if errors.category %}
+                  <div class="field-error">{{ errors.category }}</div>
+{%- else %}
+                  <div class="form-text-hint">Optional. Used to group the history and filter it.</div>
+{%- endif %}
+                </div>
+              </div>
+            </form>
+
+{% if audiences_unavailable %}
+            <!-- Stated rather than quietly omitted: these two appear in the screen
+                 specification, and they are absent because the data they would need
+                 does not exist in this system yet. -->
+            <div class="unavailable-note">
+              <strong>Two audiences from the specification cannot be offered yet:</strong>
+              <ul class="mb-0 ps-3">
+{%- for item in audiences_unavailable %}
+                <li><strong>{{ item.label }}</strong> — {{ item.reason }}</li>
+{%- endfor %}
+              </ul>
+            </div>
+{% endif %}
+
+            <div class="unavailable-note {{ '' if gateway_live else 'border-warning' }}">
+              <strong>{{ gateway_label }}.</strong> {{ gateway_note }}
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" form="composeForm" class="btn-primary-teal">
+              <span class="material-symbols-outlined" style="font-size:18px;">send</span>Send Broadcast
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function toggleFilterPanel(){
+    var panel = document.getElementById('filterPanel');
+    var btn = document.getElementById('filterToggleBtn');
+    panel.classList.toggle('show');
+    btn.classList.toggle('open');
+  }
+
+  // Filters the rows already rendered on this page -- the whole history is here,
+  // so nothing is hidden behind a request that never happens.
+  function applyFilters(){
+    var table = document.getElementById('smsTable');
+    if(!table){ return; }
+    var search = (document.getElementById('historySearch').value || '').trim().toLowerCase();
+    var audience = document.getElementById('filterAudience').value;
+    var status = document.getElementById('filterStatus').value;
+    var category = document.getElementById('filterCategory').value;
+
+    var shown = 0;
+    table.querySelectorAll('tbody tr').forEach(function(row){
+      var matches =
+        (!search || (row.dataset.search || '').indexOf(search) !== -1) &&
+        (!audience || row.dataset.audience === audience) &&
+        (!status || row.dataset.status === status) &&
+        (!category || row.dataset.category === category);
+      row.style.display = matches ? '' : 'none';
+      if(matches){ shown++; }
+    });
+
+    var empty = document.getElementById('filterEmptyState');
+    document.getElementById('tableWrap').style.display = shown ? '' : 'none';
+    if(empty){ empty.classList.toggle('show', shown === 0); }
+  }
+
+  function resetFilters(){
+    document.getElementById('historySearch').value = '';
+    document.getElementById('filterAudience').value = '';
+    document.getElementById('filterStatus').value = '';
+    document.getElementById('filterCategory').value = '';
+    applyFilters();
+  }
+
+  var historySearch = document.getElementById('historySearch');
+  if(historySearch){ historySearch.addEventListener('input', applyFilters); }
+
+{% if can_broadcast %}
+  // ---- character / segment counter -------------------------------------
+  //
+  // The same arithmetic utils/sms.py runs, over the same two character sets --
+  // they are handed down in sms_limits rather than retyped here, so the counter
+  // cannot disagree with what the server charges. The server still recomputes it
+  // on submit; this is a convenience, not the check.
+  var SMS_LIMITS = {{ sms_limits | tojson }};
+  var GSM_BASIC = new Set(Array.from(SMS_LIMITS.gsm_basic));
+  var GSM_EXTENDED = new Set(Array.from(SMS_LIMITS.gsm_extended));
+
+  function messageMetrics(text){
+    var unicodeForced = false;
+    var length = 0;
+    Array.from(text).forEach(function(character){
+      if(GSM_EXTENDED.has(character)){ length += 2; }
+      else if(GSM_BASIC.has(character)){ length += 1; }
+      else { unicodeForced = true; length += 1; }
+    });
+    if(unicodeForced){ length = Array.from(text).length; }
+
+    var single = unicodeForced ? SMS_LIMITS.unicode_single : SMS_LIMITS.gsm_single;
+    var concatenated = unicodeForced ? SMS_LIMITS.unicode_concatenated : SMS_LIMITS.gsm_concatenated;
+
+    var segments;
+    if(length === 0){ segments = 0; }
+    else if(length <= single){ segments = 1; }
+    else { segments = Math.ceil(length / concatenated); }
+
+    var capacity = segments <= 1 ? single : concatenated * segments;
+    return {
+      length: length,
+      encoding: unicodeForced ? 'UCS-2' : 'GSM-7',
+      segments: segments,
+      remaining: capacity - length,
+      unicodeForced: unicodeForced,
+      overMaximum: length > SMS_LIMITS.maximum
+    };
+  }
+
+  var composeMessage = document.getElementById('composeMessage');
+  var counterLine = document.getElementById('composeCounter');
+  var counterChars = document.getElementById('counterChars');
+  var counterSegments = document.getElementById('counterSegments');
+  var counterHint = document.getElementById('counterHint');
+
+  function updateCounter(){
+    if(!composeMessage){ return; }
+    var metrics = messageMetrics(composeMessage.value || '');
+    counterChars.textContent =
+      metrics.length + ' / ' + SMS_LIMITS.maximum + ' characters (' + metrics.encoding + ')';
+    counterSegments.textContent = metrics.segments === 0
+      ? '0 segments'
+      : metrics.segments + ' segment' + (metrics.segments === 1 ? '' : 's') +
+        ' per recipient · ' + metrics.remaining + ' left in this segment';
+
+    counterLine.classList.toggle('over', metrics.overMaximum);
+    counterLine.classList.toggle('warn', !metrics.overMaximum && (metrics.segments > 1 || metrics.unicodeForced));
+
+    if(metrics.overMaximum){
+      counterHint.textContent =
+        'This message is longer than the gateway accepts (' + SMS_LIMITS.maximum +
+        ' characters). Shorten it before sending.';
+    } else if(metrics.unicodeForced){
+      counterHint.textContent =
+        'A character outside the GSM-7 alphabet — often a pasted emoji, curly quote or ellipsis — ' +
+        'has put this message into UCS-2, where a segment holds only ' + SMS_LIMITS.unicode_single +
+        ' characters instead of ' + SMS_LIMITS.gsm_single + '. Replacing it costs fewer credits.';
+    } else if(metrics.segments > 1){
+      counterHint.textContent =
+        'This message is sent as ' + metrics.segments + ' segments, which is ' + metrics.segments +
+        ' message credits for every recipient.';
+    } else {
+      counterHint.textContent =
+        'One segment: ' + SMS_LIMITS.gsm_single + ' GSM-7 characters, or ' +
+        SMS_LIMITS.unicode_single + ' if any character falls outside that alphabet. ' +
+        'Each segment is one message credit per recipient.';
+    }
+  }
+
+  if(composeMessage){
+    composeMessage.addEventListener('input', updateCounter);
+    updateCounter();
+  }
+
+  // A submit that did not send comes back with what was typed; reopen the dialog
+  // on exactly those values, with the errors beside the fields they belong to.
+{%- if compose_open %}
+  var composeModal = document.getElementById('composeBroadcastModal');
+  if(composeModal && window.bootstrap){
+    new bootstrap.Modal(composeModal).show();
+  }
+{%- endif %}
+{% endif %}
+</script>{% endblock %}

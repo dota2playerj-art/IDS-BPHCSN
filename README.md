@@ -1,0 +1,91 @@
+# IDS-BPHCSN
+
+Integrated Database System for Barangay Poblacion Health Center Services and
+Notifications. A Flask application covering patient records, medicine inventory,
+appointment scheduling and consultations, immunisation tracking, SMS broadcasts,
+reporting, and role-scoped dashboards for the Administrator, Health Center Staff
+and Barangay Official.
+
+## Running it
+
+```
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+python app.py
+```
+
+The app serves on <http://127.0.0.1:5001>. It runs entirely offline: Bootstrap,
+Chart.js and the Inter/Material fonts are vendored under `static/`, so no CDN is
+reached at any point.
+
+Demo logins are seeded on first run — `admin` / `(retired demo password)`,
+`staff` / `(retired demo password)`, `official` / `(retired demo password)`.
+
+## The database
+
+`app.db` is **not** in version control. It is generated, and everything needed to
+rebuild it is tracked:
+
+```
+python app.py              # creates app.db from schema.sql on first run
+python populate_records.py # fills it with the demo dataset
+```
+
+If the schema changes after a database already exists, the `migrate_*.py`
+scripts in the project root bring it up to date. Each one is idempotent — safe to
+re-run — and each verifies afterwards that no existing row moved.
+
+Because `app.db` is untracked, **a fresh clone starts with no data.** If the
+current demo dataset matters to you, copy `app.db` across by hand or restore it
+from a backup; regenerating produces a comparable dataset, not an identical one.
+
+## Version control
+
+The first commit has not been made yet — `git` is not installed on the machine
+this project currently lives on. Once it is available:
+
+```
+git init
+git add .
+git commit -m "Initial commit"
+```
+
+After that, the everyday loop is:
+
+```
+git status                      # what changed
+git add <files>                 # or: git add .   to stage everything
+git commit -m "Short description of the change"
+```
+
+Commit in small, related batches with a message that says what changed and why,
+rather than one large commit at the end of a session.
+
+`.gitignore` keeps `app.db`, `.venv/`, `__pycache__/`, `.claude/` and editor and
+OS clutter out of the repository. Everything else — application code, templates,
+`schema.sql`, every migration, the vendored `static/` assets and the governance
+documents in `PR0MPT_INSTRUCTION/` — is tracked on purpose.
+
+## Layout
+
+```
+app.py                  application factory and entry point
+config.py               paths and SECRET_KEY
+schema.sql              full schema for a fresh database
+migrate_*.py            idempotent schema migrations, each self-verifying
+populate_records.py     demo dataset
+routes/                 blueprints, one per role surface, plus shared context builders
+models/                 all data access; each figure has exactly one owner here
+utils/                  dates, roles, security, SMS, phone formatting, endpoint shim
+database/               connection handling and first-run bootstrap
+templates/              Jinja templates; base.html holds the shared shell
+static/                 vendored CSS, JS and fonts
+PR0MPT_INSTRUCTION/     project bible, screen specifications, roadmap
+```
+
+A note on how the code is meant to be read: figures are owned in one place and
+never re-derived on a screen, and anything a screen cannot show honestly says so
+rather than displaying an invented number. The `UNTRACKED` dictionaries in
+`routes/report_views.py` and `routes/official_views.py` are where those
+explanations live.

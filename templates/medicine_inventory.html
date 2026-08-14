@@ -1,0 +1,369 @@
+{% extends "base.html" %}
+{% set active_nav = "medicine_inventory" %}
+{% block title %}IDS-BPHCSN | Medicine Inventory{% endblock %}
+
+{% block styles %}
+  .toolbar-search{min-width:320px; max-width:420px;}
+  .page-desc{font-size:14px; color:var(--text-muted); margin-top:4px; max-width:640px;}
+
+  .stat-card{
+    background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:20px 22px; height:100%;
+  }
+  .stat-icon{width:44px;height:44px;border-radius:12px; display:flex; align-items:center; justify-content:center; margin-bottom:12px;}
+  .stat-value{font-size:24px; font-weight:700; color:var(--text-dark);}
+  .stat-label{font-size:13px; color:var(--text-muted); margin-top:2px;}
+  .stat-trend{font-size:12px; font-weight:600; margin-top:6px;}
+
+  .panel-card{
+    background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:24px;
+  }
+
+
+  .filter-btn{
+    background:#fff; border:1px solid var(--border-color); border-radius:10px; padding:10px 16px;
+    font-size:14px; font-weight:500; color:var(--text-dark); display:flex; align-items:center; gap:6px;
+  }
+  .filter-btn.open, .filter-btn:hover{border-color:var(--teal); color:var(--teal-dark);}
+
+  .filter-panel{
+    background:var(--bg); border:1px solid var(--border-color); border-radius:12px; padding:20px;
+    margin-bottom:18px; display:none;
+  }
+  .filter-panel.show{display:block;}
+  .filter-panel label{font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:6px; display:block;}
+  .filter-panel .form-control, .filter-panel .form-select{
+    height:48px; border-radius:12px; border:1px solid var(--border-color); font-size:13.5px;
+  }
+  .filter-panel .form-control:focus, .filter-panel .form-select:focus{
+    border-color:var(--teal); box-shadow:0 0 0 3px rgba(22,155,146,0.12);
+  }
+  .filter-actions{display:flex; justify-content:flex-end; gap:10px; margin-top:16px; padding-top:16px; border-top:1px solid var(--border-color);}
+  .btn-reset{background:transparent; border:none; color:var(--text-muted); font-size:14px; font-weight:600; padding:10px 14px;}
+  .btn-reset:hover{color:var(--danger);}
+
+  table.inv-table{width:100%; border-collapse:separate; border-spacing:0; font-size:13.5px;}
+  table.inv-table thead th{
+    text-align:left; color:var(--text-muted); font-weight:600; font-size:11.5px; letter-spacing:0.03em;
+    text-transform:uppercase; padding:12px 14px; border-bottom:1px solid var(--border-color); white-space:nowrap;
+  }
+  table.inv-table tbody td{
+    padding:14px; border-bottom:1px solid var(--border-color); color:var(--text-dark); vertical-align:middle;
+  }
+  table.inv-table tbody tr:hover{background:#FAFBFC;}
+  table.inv-table tbody tr:last-child td{border-bottom:none;}
+  .med-name{font-weight:600;}
+  .med-generic{color:var(--text-muted); font-size:12.5px;}
+  .cat-pill{background:var(--teal-light); color:var(--teal-dark); font-size:11.5px; font-weight:600; padding:3px 10px; border-radius:999px; white-space:nowrap;}
+
+  .stock-cell{min-width:130px;}
+  .stock-num{font-size:13px; font-weight:600; color:var(--text-dark);}
+  .stock-unit{font-size:12px; color:var(--text-muted);}
+  .stock-bar-track{height:6px; border-radius:999px; background:#E5E7EB; margin-top:6px; overflow:hidden;}
+  .stock-bar-fill{height:100%; border-radius:999px;}
+  .fill-good{background:var(--success);}
+  .fill-warn{background:var(--warning);}
+  .fill-low{background:var(--danger);}
+
+  .badge-status{
+    display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600;
+    padding:4px 11px; border-radius:999px; white-space:nowrap;
+  }
+  .badge-instock{background:#DCFCE7; color:#15803D;}
+  .badge-lowstock{background:#FEF3C7; color:#B45309;}
+  .badge-critical{background:#FEE2E2; color:#B91C1C;}
+  .badge-nearexpiry{background:#FFEDD5; color:#C2410C;}
+  /* Expires Today is the only filled badge on the screen. Every other state is a
+     pale tint, so a solid fill reads as more urgent than Near Expiry's orange
+     without borrowing Critical's red tint or Expired's grey — and it uses
+     var(--danger) rather than a new colour. */
+  .badge-expirestoday{background:var(--danger); color:#fff;}
+  .badge-expired{background:#F3F4F6; color:#4B5563;}
+
+  .action-icon{
+    width:32px; height:32px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center;
+    color:var(--text-muted); background:transparent; border:none;
+  }
+  .action-icon:hover{background:var(--bg); color:var(--teal-dark);}
+  a.action-icon, a.btn-primary-teal{text-decoration:none;}
+
+  .table-footer{display:flex; align-items:center; justify-content:space-between; padding-top:18px; margin-top:6px; border-top:1px solid var(--border-color); flex-wrap:wrap; gap:12px;}
+  .pg-info{font-size:13px; color:var(--text-muted);}
+  .pagination .page-link{
+    color:var(--text-dark); border:1px solid var(--border-color); font-size:13px; font-weight:500;
+    padding:7px 13px; border-radius:8px !important; margin-left:4px;
+  }
+  .pagination .page-item.active .page-link{background-color:var(--teal); border-color:var(--teal); color:#fff;}
+  .pagination .page-link:hover{background-color:var(--teal-light); color:var(--teal-dark); border-color:var(--teal-light);}
+  .pagination .page-item.disabled .page-link{color:#C7CBD1; background:#fff;}
+
+  .empty-state{display:none; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:64px 24px;}
+  .empty-state.show{display:flex;}
+  .empty-state .icon-circle{
+    width:72px; height:72px; border-radius:50%; background:var(--teal-light); display:flex; align-items:center;
+    justify-content:center; margin-bottom:18px;
+  }
+  .empty-state h5{font-size:17px; font-weight:600; color:var(--text-dark); margin-bottom:6px;}
+  .empty-state p{font-size:14px; color:var(--text-muted); max-width:380px; margin-bottom:20px;}
+
+  .skeleton-wrap{display:none;}
+  .skeleton-wrap.show{display:block;}
+  .skeleton-row{display:flex; align-items:center; gap:16px; padding:14px; border-bottom:1px solid var(--border-color);}
+  .skel-block{background:linear-gradient(90deg,#EEF0F3 25%,#F6F7F9 37%,#EEF0F3 63%); background-size:400% 100%; animation:shimmer 1.4s ease infinite; border-radius:6px;}
+  @keyframes shimmer{0%{background-position:100% 50%;}100%{background-position:0 50%;}}
+{% endblock %}
+
+{% block breadcrumb %}
+
+    <div class="breadcrumb-nav">
+      <a href="{{ url_for(dashboard_endpoint) }}">Dashboard</a>
+      <span class="sep material-symbols-outlined">chevron_right</span>
+      <span class="current">Medicine Inventory</span>
+    </div>{% endblock %}
+
+{% block content %}
+    <div class="eyebrow">Barangay Poblacion Health Center</div>
+    <div class="page-title">Medicine Inventory</div>
+    <div class="page-desc">Track stock levels, expiration dates, and reorder needs for all medicines held at the health center.</div>
+
+    <!-- STAT CARDS — every figure is counted from the rows below, not stored, so a
+         stock edit that crosses a reorder level moves these on the next render. -->
+    <div class="row g-3 mt-1 mb-4">
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:var(--teal-light);"><span class="material-symbols-outlined" style="color:var(--teal-dark);">inventory_2</span></div>
+          <div class="stat-value">{{ "{:,}".format(stats.total_items) }}</div>
+          <div class="stat-label">Total Inventory Items</div>
+          <div class="stat-trend" style="color:var(--text-muted);">{{ stats.medicine_count }} medicine{{ "s" if stats.medicine_count != 1 }}, {{ stats.total_items - stats.medicine_count }} supply &amp; equipment</div>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#FEF3C7;"><span class="material-symbols-outlined" style="color:var(--warning);">trending_down</span></div>
+          <div class="stat-value">{{ stats.low_stock_count }}</div>
+          <div class="stat-label">Low Stock Items</div>
+          {%- if stats.out_of_stock_count %}
+          <div class="stat-trend" style="color:var(--danger);">{{ stats.out_of_stock_count }} out of stock</div>
+          {%- elif stats.low_stock_count %}
+          <div class="stat-trend" style="color:var(--danger);">Needs reorder</div>
+          {%- else %}
+          <div class="stat-trend" style="color:var(--success);">All above reorder level</div>
+          {%- endif %}
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#FFEDD5;"><span class="material-symbols-outlined" style="color:#C2410C;">schedule</span></div>
+          <div class="stat-value">{{ stats.near_expiry_count }}</div>
+          <div class="stat-label">Near Expiry ({{ stats.near_expiry_days }} days)</div>
+          {#- Items expiring today are inside the window, so they are part of the
+              count above; the sub-count names them because they are the urgent ones. #}
+          {%- if stats.expires_today_count %}
+          <div class="stat-trend" style="color:var(--danger);">{{ stats.expires_today_count }} expire{{ "s" if stats.expires_today_count == 1 }} today</div>
+          {%- else %}
+          <div class="stat-trend" style="color:var(--text-muted);">{{ "Review before use" if stats.near_expiry_count else "Nothing lapsing soon" }}</div>
+          {%- endif %}
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#F3F4F6;"><span class="material-symbols-outlined" style="color:#4B5563;">block</span></div>
+          <div class="stat-value">{{ stats.expired_count }}</div>
+          <div class="stat-label">Expired Items</div>
+          <div class="stat-trend" style="color:var(--text-muted);">{{ "Pending disposal" if stats.expired_count else "None on the shelf" }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TABLE PANEL -->
+    <div class="panel-card">
+
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-3">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <div class="toolbar-search">
+            <span class="material-symbols-outlined" style="font-size:18px;">search</span>
+            <input type="text" placeholder="Search by medicine name, generic name, or category">
+          </div>
+          <button class="filter-btn" id="filterToggleBtn" onclick="toggleFilterPanel()">
+            <span class="material-symbols-outlined" style="font-size:18px;">filter_list</span>Advanced Filter
+          </button>
+          <button class="filter-btn"><span class="material-symbols-outlined" style="font-size:18px;">sort</span>Sort</button>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <button class="btn-outline-teal"><span class="material-symbols-outlined" style="font-size:18px;">file_download</span>Export</button>
+          <a href="{{ url_for(add_edit_medicine_endpoint) }}" class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">add</span>Add Medicine</a>
+        </div>
+      </div>
+
+      <!-- ADVANCED FILTER PANEL -->
+      <div class="filter-panel" id="filterPanel">
+        <div class="row g-3">
+          <div class="col-md-3 col-sm-6">
+            <label>Category</label>
+            <select class="form-select">
+              <option selected>All Categories</option>
+              <option>Antihypertensive</option>
+              <option>Analgesic / Antipyretic</option>
+              <option>Antibiotic</option>
+              <option>Antidiabetic</option>
+              <option>Vitamins &amp; Supplements</option>
+              <option>Oral Rehydration</option>
+              <option>Antihistamine</option>
+              <option>Bronchodilator</option>
+            </select>
+          </div>
+          <div class="col-md-3 col-sm-6">
+            <label>Stock Status</label>
+            <select class="form-select">
+              <option selected>All Statuses</option>
+              <option>In Stock</option>
+              <option>Low Stock</option>
+              <option>Critical</option>
+              <option>Near Expiry</option>
+              <option>Expires Today</option>
+              <option>Expired</option>
+            </select>
+          </div>
+          <div class="col-md-3 col-sm-6">
+            <label>Expiration From</label>
+            <input type="date" class="form-control">
+          </div>
+          <div class="col-md-3 col-sm-6">
+            <label>Expiration To</label>
+            <input type="date" class="form-control">
+          </div>
+        </div>
+        <div class="filter-actions">
+          <button class="btn-reset">Reset Filters</button>
+          <button class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">filter_alt</span>Apply Filter</button>
+        </div>
+      </div>
+
+      <!-- LOADING STATE (skeleton) -->
+      <div class="skeleton-wrap" id="skeletonWrap">
+        <div class="skeleton-row"><div class="skel-block" style="width:90px;height:14px;"></div><div class="skel-block" style="width:160px;height:14px;"></div><div class="skel-block" style="width:100px;height:14px;"></div><div class="skel-block" style="width:80px;height:14px;"></div><div class="skel-block" style="width:120px;height:14px;"></div><div class="skel-block" style="width:90px;height:14px;"></div></div>
+        <div class="skeleton-row"><div class="skel-block" style="width:90px;height:14px;"></div><div class="skel-block" style="width:160px;height:14px;"></div><div class="skel-block" style="width:100px;height:14px;"></div><div class="skel-block" style="width:80px;height:14px;"></div><div class="skel-block" style="width:120px;height:14px;"></div><div class="skel-block" style="width:90px;height:14px;"></div></div>
+        <div class="skeleton-row"><div class="skel-block" style="width:90px;height:14px;"></div><div class="skel-block" style="width:160px;height:14px;"></div><div class="skel-block" style="width:100px;height:14px;"></div><div class="skel-block" style="width:80px;height:14px;"></div><div class="skel-block" style="width:120px;height:14px;"></div><div class="skel-block" style="width:90px;height:14px;"></div></div>
+        <div class="skeleton-row" style="border-bottom:none;"><div class="skel-block" style="width:90px;height:14px;"></div><div class="skel-block" style="width:160px;height:14px;"></div><div class="skel-block" style="width:100px;height:14px;"></div><div class="skel-block" style="width:80px;height:14px;"></div><div class="skel-block" style="width:120px;height:14px;"></div><div class="skel-block" style="width:90px;height:14px;"></div></div>
+      </div>
+
+{%- if items %}
+      <div style="overflow-x:auto;" id="tableWrap">
+        <table class="inv-table" id="invTable">
+          <thead>
+            <tr>
+              <th>Medicine Name</th>
+              <th>Category</th>
+              <th>Dosage / Form</th>
+              <th>Current Stock</th>
+              <th>Reorder Level</th>
+              <th>Expiration Date</th>
+              <th>Supplier</th>
+              <th>Status</th>
+              <th style="text-align:right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+{%- for item in items %}
+            <tr>
+              <td><div class="med-name">{{ item.name }}</div><div class="med-generic">{{ item.generic_name or item.category }}</div></td>
+              <td><span class="cat-pill">{{ item.drug_class or item.category }}</span></td>
+              <td>{{ item.display_dosage or '—' }}</td>
+              <td class="stock-cell">
+                <div class="stock-num">{{ "{:,}".format(item.stock_quantity) }} <span class="stock-unit">{{ item.unit or '' }}</span></div>
+                <!-- No "full shelf" figure is stored, so the bar reads against this
+                     item's own reorder level: half full at the threshold, full at
+                     twice it. Computed in models/inventory.py. -->
+                <div class="stock-bar-track"><div class="stock-bar-fill {{ item.stock_fill_class }}" style="width:{{ item.stock_percent }}%;"></div></div>
+              </td>
+              <td>{{ "{:,}".format(item.low_stock_threshold) }} {{ item.unit or '' }}</td>
+              <td>{{ item.expiry_date | display_date('No expiry') }}</td>
+              <td>{{ item.supplier or '—' }}</td>
+              <td><span class="badge-status {{ item.status_badge_class }}">{{ item.stock_status }}</span></td>
+              <td>
+                <div class="d-flex justify-content-end gap-1">
+                  <button class="action-icon"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button>
+                  <a href="{{ url_for(add_edit_medicine_endpoint, medicine_id=item.id) }}" class="action-icon" title="Edit {{ item.name }}"><span class="material-symbols-outlined" style="font-size:18px;">edit</span></a>
+                  <button class="action-icon"><span class="material-symbols-outlined" style="font-size:18px;">print</span></button>
+                  <button class="action-icon"><span class="material-symbols-outlined" style="font-size:18px;">archive</span></button>
+                </div>
+              </td>
+            </tr>
+{%- endfor %}
+          </tbody>
+        </table>
+      </div>
+{%- endif %}
+
+      <!-- EMPTY STATE (shown when the inventory holds nothing at all) -->
+      <div class="empty-state{% if not items %} show{% endif %}" id="emptyState">
+        <div class="icon-circle">
+          <span class="material-symbols-outlined" style="font-size:34px; color:var(--teal-dark);">inventory_2</span>
+        </div>
+        <h5>No medicines found</h5>
+        <p>We couldn't find any medicines matching your search or filter criteria. Try adjusting your filters or search terms.</p>
+        <div class="d-flex gap-2">
+          <button class="btn-outline-teal" onclick="resetDemo()"><span class="material-symbols-outlined" style="font-size:18px;">restart_alt</span>Clear Filters</button>
+          <a href="{{ url_for(add_edit_medicine_endpoint) }}" class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">add</span>Add Medicine</a>
+        </div>
+      </div>
+
+      <!-- PAGINATION — the page buttons below are still decoration; only the
+           count line is live. Real paging is separate follow-up work. -->
+{%- if items %}
+      <div class="table-footer" id="tableFooter">
+        <div class="pg-info">Showing 1&ndash;{{ items|length }} of {{ "{:,}".format(stats.total_items) }} inventory items</div>
+        <nav aria-label="Medicine inventory pagination">
+          <ul class="pagination mb-0">
+            <li class="page-item disabled"><a class="page-link" href="#"><span class="material-symbols-outlined" style="font-size:16px;">chevron_left</span></a></li>
+            <li class="page-item active"><a class="page-link" href="#">1</a></li>
+            <li class="page-item"><a class="page-link" href="#">2</a></li>
+            <li class="page-item"><a class="page-link" href="#">3</a></li>
+            <li class="page-item disabled"><a class="page-link" href="#">&hellip;</a></li>
+            <li class="page-item"><a class="page-link" href="#">23</a></li>
+            <li class="page-item"><a class="page-link" href="#"><span class="material-symbols-outlined" style="font-size:16px;">chevron_right</span></a></li>
+          </ul>
+        </nav>
+      </div>
+{%- endif %}
+
+
+    </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function toggleFilterPanel(){
+    var panel = document.getElementById('filterPanel');
+    var btn = document.getElementById('filterToggleBtn');
+    panel.classList.toggle('show');
+    btn.classList.toggle('open');
+  }
+  // The table and footer are only rendered when the inventory has rows, so each
+  // lookup is guarded — with an empty inventory these ids genuinely do not exist.
+  function show(id, display){
+    var el = document.getElementById(id);
+    if(el){ el.style.display = display; }
+  }
+  function toggle(id, on){
+    var el = document.getElementById(id);
+    if(el){ el.classList.toggle('show', on); }
+  }
+  function showEmptyDemo(){
+    show('tableWrap', 'none');
+    toggle('skeletonWrap', false);
+    show('tableFooter', 'none');
+    toggle('emptyState', true);
+  }
+  function showLoadingDemo(){
+    show('tableWrap', 'none');
+    toggle('emptyState', false);
+    show('tableFooter', 'none');
+    toggle('skeletonWrap', true);
+  }
+  function resetDemo(){
+    show('tableWrap', '');
+    show('tableFooter', '');
+    toggle('emptyState', false);
+    toggle('skeletonWrap', false);
+  }
+</script>{% endblock %}

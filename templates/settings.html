@@ -1,0 +1,563 @@
+{% extends "base.html" %}
+{% set active_nav = "settings" %}
+{% block title %}IDS-BPHCSN | Settings{% endblock %}
+
+{% block styles %}
+  .page-desc{font-size:14px; color:var(--text-muted); margin-top:4px; max-width:640px;}
+
+  /* ALERTS */
+  .alert-ids{border-radius:12px; border:1px solid; padding:14px 16px; font-size:13.5px; display:flex; gap:12px; align-items:flex-start; margin-bottom:16px;}
+  .alert-warning-ids{background:#FFFBEB; border-color:#FDE68A; color:#92400E;}
+  .alert-success-ids{background:#F0FDF4; border-color:#BBF7D0; color:#166534;}
+  .alert-ids .material-symbols-outlined{font-size:20px; margin-top:1px;}
+  .alert-ids strong{display:block; font-size:13.5px; margin-bottom:2px;}
+  .alert-ids .alert-close{margin-left:auto; cursor:pointer; opacity:0.6;}
+
+  .panel-card{
+    background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:0; overflow:hidden; margin-bottom:24px;
+  }
+
+  /* VERTICAL SETTINGS NAV */
+  .settings-nav{background:var(--bg); border-right:1px solid var(--border-color); padding:20px 14px; height:100%;}
+  .settings-nav .nav-link{
+    display:flex; align-items:center; gap:11px; padding:11px 14px; border-radius:10px; color:var(--text-dark);
+    font-size:13.5px; font-weight:500; margin-bottom:3px; text-align:left; width:100%; border:none; background:transparent;
+  }
+  .settings-nav .nav-link:hover{background:#fff; color:var(--teal-dark);}
+  .settings-nav .nav-link.active{background:var(--teal); color:#fff; font-weight:600;}
+  .settings-nav .nav-link .material-symbols-outlined{font-size:19px;}
+
+  .settings-body{padding:28px;}
+  .section-title{font-size:17px; font-weight:600; color:var(--text-dark);}
+  .section-sub{font-size:13px; color:var(--text-muted); margin-top:2px; margin-bottom:22px;}
+
+  label.field-label{font-size:13px; font-weight:600; color:var(--text-dark); margin-bottom:6px; display:inline-block;}
+  label.field-label .req{color:var(--danger); margin-left:2px;}
+  .form-control, .form-select{
+    height:48px; border-radius:12px; border:1px solid var(--border-color); font-size:14px; color:var(--text-dark);
+  }
+  .form-control:focus, .form-select:focus{border-color:var(--teal); box-shadow:0 0 0 3px rgba(22,155,146,0.12);}
+  .form-text-hint{font-size:12px; color:var(--text-muted); margin-top:4px;}
+
+  .subsection-divider{border-top:1px solid var(--border-color); margin:26px 0 22px;}
+  .subsection-title{font-size:14px; font-weight:600; color:var(--text-dark); margin-bottom:14px; display:flex; align-items:center; gap:8px;}
+
+  /* TOGGLE SWITCH ROW */
+  .toggle-row{display:flex; align-items:center; justify-content:space-between; padding:14px 0; border-bottom:1px solid var(--border-color);}
+  .toggle-row:last-child{border-bottom:none;}
+  .toggle-row-label{font-size:13.5px; font-weight:600; color:var(--text-dark);}
+  .toggle-row-desc{font-size:12.5px; color:var(--text-muted); margin-top:2px;}
+  .switch{position:relative; display:inline-block; width:44px; height:24px; flex-shrink:0;}
+  .switch input{opacity:0; width:0; height:0;}
+  .slider{position:absolute; cursor:pointer; inset:0; background:#D1D5DB; border-radius:999px; transition:.2s;}
+  .slider::before{position:absolute; content:""; height:18px; width:18px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.2s;}
+  .switch input:checked + .slider{background:var(--teal);}
+  .switch input:checked + .slider::before{transform:translateX(20px);}
+
+  /* API KEY MASKED */
+  .key-input-group{position:relative;}
+  .key-input-group input{padding-right:46px; font-family:monospace; letter-spacing:1px;}
+  .key-toggle-btn{position:absolute; right:10px; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--text-muted); cursor:pointer;}
+
+  .status-pill{display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600; padding:5px 12px; border-radius:999px;}
+  .status-connected{background:#DCFCE7; color:#15803D;}
+  .status-dot-sm{width:7px;height:7px;border-radius:50%; background:#15803D;}
+
+  .backup-row{display:flex; align-items:center; justify-content:space-between; padding:14px 0; border-bottom:1px solid var(--border-color);}
+  .backup-row:last-child{border-bottom:none;}
+  .backup-label{font-size:13px; color:var(--text-muted);}
+  .backup-value{font-size:14px; font-weight:600; color:var(--text-dark);}
+
+  .about-item{display:flex; justify-content:space-between; padding:12px 0; border-bottom:1px solid var(--border-color); font-size:13.5px;}
+  .about-item:last-child{border-bottom:none;}
+  .about-label{color:var(--text-muted);}
+  .about-value{font-weight:600; color:var(--text-dark);}
+
+  .btn-ghost-ids{
+    background:transparent; border:1px solid var(--border-color); color:var(--text-dark); border-radius:10px; padding:11px 18px;
+    font-size:14px; font-weight:500; display:flex; align-items:center; gap:6px;
+  }
+  .btn-ghost-ids:hover{border-color:#C7CBD1; background:var(--bg);}
+  .btn-danger-text{background:transparent; border:none; color:var(--text-muted); font-size:14px; font-weight:500; padding:11px 14px;}
+  .btn-danger-text:hover{color:var(--danger);}
+
+  .form-actions{
+    background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:18px 24px;
+    display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;
+  }
+  .req-legend{font-size:12.5px; color:var(--text-muted);}
+{% endblock %}
+
+{% block breadcrumb %}
+
+    <div class="breadcrumb-nav">
+      <a href="{{ url_for(dashboard_endpoint) }}">Dashboard</a>
+      <span class="sep material-symbols-outlined">chevron_right</span>
+      <span class="current">Settings</span>
+    </div>{% endblock %}
+
+{% block content %}
+    <div class="eyebrow">Barangay Poblacion Health Center</div>
+    <div class="page-title">Settings</div>
+    <div class="page-desc">Configure health center information, SMS gateway, security, notifications, and system preferences.</div>
+
+    <div style="height:16px;"></div>
+
+    <!-- VALIDATION EXAMPLE -->
+    <div class="alert-ids alert-warning-ids">
+      <span class="material-symbols-outlined">warning</span>
+      <div>
+        <strong>SMS Gateway connection failed</strong>
+        Unable to verify the API key with Semaphore Gateway. Please check your credentials and test the connection again.
+      </div>
+      <span class="material-symbols-outlined alert-close">close</span>
+    </div>
+
+    <!-- SUCCESS EXAMPLE -->
+    <div class="alert-ids alert-success-ids">
+      <span class="material-symbols-outlined">check_circle</span>
+      <div>
+        <strong>Settings saved successfully</strong>
+        Your changes to Health Center Information have been applied system-wide.
+      </div>
+      <span class="material-symbols-outlined alert-close">close</span>
+    </div>
+
+    <!-- SETTINGS PANEL -->
+    <div class="panel-card">
+      <div class="row g-0">
+        <div class="col-lg-3">
+          <div class="settings-nav">
+            <div class="nav flex-column" role="tablist">
+              <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#pane-general" type="button"><span class="material-symbols-outlined">tune</span>General Settings</button>
+              <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-hc" type="button"><span class="material-symbols-outlined">local_hospital</span>Health Center Information</button>
+              <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-prefs" type="button"><span class="material-symbols-outlined">person</span>User Preferences</button>
+              <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-sms" type="button"><span class="material-symbols-outlined">sms</span>SMS Gateway Configuration</button>
+              <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-notif" type="button"><span class="material-symbols-outlined">notifications_active</span>Notification Settings</button>
+              <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-security" type="button"><span class="material-symbols-outlined">shield</span>Security Settings</button>
+              <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-pwd" type="button"><span class="material-symbols-outlined">password</span>Password Policy</button>
+              <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-backup" type="button"><span class="material-symbols-outlined">backup</span>Backup &amp; Restore</button>
+              <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-maint" type="button"><span class="material-symbols-outlined">build</span>System Maintenance</button>
+              <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-about" type="button"><span class="material-symbols-outlined">info</span>About System</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-9">
+          <div class="settings-body tab-content">
+
+            <!-- GENERAL SETTINGS -->
+            <div class="tab-pane fade show active" id="pane-general">
+              <div class="section-title">General Settings</div>
+              <div class="section-sub">Basic identity and contact details for the health center</div>
+
+              <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                  <label class="field-label">Health Center Name<span class="req">*</span></label>
+                  <input type="text" class="form-control" value="Barangay Poblacion Health Center">
+                </div>
+                <div class="col-md-6">
+                  <label class="field-label">Contact Number<span class="req">*</span></label>
+                  <input type="text" class="form-control" value="(085) 343-2210">
+                </div>
+              </div>
+
+              <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                  <label class="field-label">Barangay<span class="req">*</span></label>
+                  <input type="text" class="form-control" value="Barangay Poblacion">
+                </div>
+                <div class="col-md-4">
+                  <label class="field-label">Municipality / City<span class="req">*</span></label>
+                  <input type="text" class="form-control" value="San Francisco">
+                </div>
+                <div class="col-md-4">
+                  <label class="field-label">Province<span class="req">*</span></label>
+                  <input type="text" class="form-control" value="Agusan del Sur">
+                </div>
+              </div>
+
+              <div class="row g-3 mb-3">
+                <div class="col-md-8">
+                  <label class="field-label">Complete Address<span class="req">*</span></label>
+                  <input type="text" class="form-control" value="Purok 2, Barangay Poblacion, San Francisco, Agusan del Sur 8501">
+                </div>
+                <div class="col-md-4">
+                  <label class="field-label">Email Address<span class="req">*</span></label>
+                  <input type="email" class="form-control" value="bphcsn.poblacion@doh.gov.ph">
+                </div>
+              </div>
+
+              <div class="row g-3">
+                <div class="col-md-4">
+                  <label class="field-label">Operating Days</label>
+                  <select class="form-select">
+                    <option selected>Monday &ndash; Friday</option>
+                    <option>Monday &ndash; Saturday</option>
+                    <option>Every day</option>
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label class="field-label">Opening Time</label>
+                  <input type="time" class="form-control" value="08:00">
+                </div>
+                <div class="col-md-4">
+                  <label class="field-label">Closing Time</label>
+                  <input type="time" class="form-control" value="17:00">
+                </div>
+              </div>
+            </div>
+
+            <!-- HEALTH CENTER INFORMATION -->
+            <div class="tab-pane fade" id="pane-hc">
+              <div class="section-title">Health Center Information</div>
+              <div class="section-sub">Facility identity, licensing, and leadership details</div>
+
+              <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                  <label class="field-label">Facility Type</label>
+                  <select class="form-select">
+                    <option selected>Barangay Health Station</option>
+                    <option>Rural Health Unit</option>
+                    <option>City Health Office</option>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="field-label">DOH License Number</label>
+                  <input type="text" class="form-control" value="DOH-CARAGA-BHS-2024-0317">
+                </div>
+              </div>
+
+              <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                  <label class="field-label">Head Physician / Administrator</label>
+                  <input type="text" class="form-control" value="{{ sidebar_user_name }}">
+                </div>
+                <div class="col-md-6">
+                  <label class="field-label">Date Established</label>
+                  <input type="date" class="form-control" value="2018-06-12">
+                </div>
+              </div>
+
+              <div class="row g-3">
+                <div class="col-12">
+                  <label class="field-label">Facility Description</label>
+                  <textarea class="form-control" style="min-height:96px;">Serves the residents of Barangay Poblacion and surrounding puroks with primary care, maternal and child health services, immunization, and chronic disease monitoring.</textarea>
+                </div>
+              </div>
+            </div>
+
+            <!-- USER PREFERENCES -->
+            <div class="tab-pane fade" id="pane-prefs">
+              <div class="section-title">User Preferences</div>
+              <div class="section-sub">Personal display and locale preferences for your account</div>
+
+              <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                  <label class="field-label">Language</label>
+                  <select class="form-select">
+                    <option selected>English</option>
+                    <option>Filipino</option>
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label class="field-label">Date Format</label>
+                  <select class="form-select">
+                    <option selected>Month DD, YYYY</option>
+                    <option>DD/MM/YYYY</option>
+                    <option>MM/DD/YYYY</option>
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label class="field-label">Records Per Page</label>
+                  <select class="form-select">
+                    <option>10</option>
+                    <option selected>25</option>
+                    <option>50</option>
+                    <option>100</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="subsection-divider"></div>
+              <div class="subsection-title"><span class="material-symbols-outlined" style="color:var(--teal-dark); font-size:18px;">dashboard_customize</span>Dashboard Preferences</div>
+              <div class="toggle-row">
+                <div><div class="toggle-row-label">Show Low Stock Alerts on Dashboard</div><div class="toggle-row-desc">Display medicine low-stock warnings on the home dashboard</div></div>
+                <label class="switch"><input type="checkbox" checked><span class="slider"></span></label>
+              </div>
+              <div class="toggle-row">
+                <div><div class="toggle-row-label">Show Today's Appointments Widget</div><div class="toggle-row-desc">Pin the day's appointment count to the dashboard</div></div>
+                <label class="switch"><input type="checkbox" checked><span class="slider"></span></label>
+              </div>
+            </div>
+
+            <!-- SMS GATEWAY CONFIGURATION -->
+            <div class="tab-pane fade" id="pane-sms">
+              <div class="section-title">SMS Gateway Configuration</div>
+              <div class="section-sub">Connection settings for outbound SMS notifications</div>
+
+              <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                  <label class="field-label">Gateway Provider<span class="req">*</span></label>
+                  <select class="form-select">
+                    <option selected>Semaphore</option>
+                    <option>Globe Labs</option>
+                    <option>Twilio</option>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="field-label">Sender Name<span class="req">*</span></label>
+                  <input type="text" class="form-control" value="IDS-BPHCSN">
+                  <div class="form-text-hint">Appears as the sender ID on recipients' phones</div>
+                </div>
+              </div>
+
+              <div class="row g-3 mb-3">
+                <div class="col-md-8">
+                  <label class="field-label">API Key<span class="req">*</span></label>
+                  <div class="key-input-group">
+                    <input type="password" class="form-control" value="sk_live_a83f92h1kd93js82">
+                    <button type="button" class="key-toggle-btn"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button>
+                  </div>
+                  <div class="form-text-hint">Key is masked for security. Only the last 4 characters are visible to other administrators.</div>
+                </div>
+                <div class="col-md-4">
+                  <label class="field-label">Connection Status</label>
+                  <div style="padding-top:11px;">
+                    <span class="status-pill status-connected"><span class="status-dot-sm"></span>Connected</span>
+                  </div>
+                </div>
+              </div>
+
+              <button type="button" class="btn-outline-teal"><span class="material-symbols-outlined" style="font-size:18px;">wifi_tethering</span>Test Connection</button>
+
+              <div class="subsection-divider"></div>
+              <div class="subsection-title"><span class="material-symbols-outlined" style="color:var(--teal-dark); font-size:18px;">payments</span>Billing Info</div>
+              <div class="backup-row">
+                <div class="backup-label">Cost per SMS</div>
+                <div class="backup-value">&#8369;0.50</div>
+              </div>
+              <div class="backup-row">
+                <div class="backup-label">Billing Account</div>
+                <div class="backup-value">Barangay LGU Account</div>
+              </div>
+            </div>
+
+            <!-- NOTIFICATION SETTINGS -->
+            <div class="tab-pane fade" id="pane-notif">
+              <div class="section-title">Notification Settings</div>
+              <div class="section-sub">Control which alerts are sent and how</div>
+
+              <div class="subsection-title"><span class="material-symbols-outlined" style="color:var(--teal-dark); font-size:18px;">tune</span>Channels</div>
+              <div class="toggle-row">
+                <div><div class="toggle-row-label">Email Notifications</div><div class="toggle-row-desc">Send system alerts and reports to staff email addresses</div></div>
+                <label class="switch"><input type="checkbox" checked><span class="slider"></span></label>
+              </div>
+              <div class="toggle-row">
+                <div><div class="toggle-row-label">SMS Notifications</div><div class="toggle-row-desc">Send patient reminders and advisories via SMS Gateway</div></div>
+                <label class="switch"><input type="checkbox" checked><span class="slider"></span></label>
+              </div>
+              <div class="toggle-row">
+                <div><div class="toggle-row-label">System Alerts</div><div class="toggle-row-desc">In-app notifications for low stock, failed SMS, and security events</div></div>
+                <label class="switch"><input type="checkbox" checked><span class="slider"></span></label>
+              </div>
+
+              <div class="subsection-divider"></div>
+              <div class="subsection-title"><span class="material-symbols-outlined" style="color:var(--teal-dark); font-size:18px;">alarm</span>Reminder Settings</div>
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="field-label">Appointment Reminder</label>
+                  <select class="form-select">
+                    <option>Same day, 6:00 AM</option>
+                    <option selected>1 day before</option>
+                    <option>2 days before</option>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="field-label">Immunization Reminder</label>
+                  <select class="form-select">
+                    <option>1 day before</option>
+                    <option selected>3 days before</option>
+                    <option>1 week before</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- SECURITY SETTINGS -->
+            <div class="tab-pane fade" id="pane-security">
+              <div class="section-title">Security Settings</div>
+              <div class="section-sub">Session, access, and authentication controls</div>
+
+              <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                  <label class="field-label">Minimum Password Length</label>
+                  <input type="number" class="form-control" value="8">
+                </div>
+                <div class="col-md-4">
+                  <label class="field-label">Session Timeout (minutes)</label>
+                  <input type="number" class="form-control" value="30">
+                </div>
+                <div class="col-md-4">
+                  <label class="field-label">Login Attempt Limit</label>
+                  <input type="number" class="form-control" value="5">
+                  <div class="form-text-hint">Account locks after this many failed attempts</div>
+                </div>
+              </div>
+
+              <div class="subsection-divider"></div>
+              <div class="toggle-row">
+                <div><div class="toggle-row-label">Two-Factor Authentication</div><div class="toggle-row-desc">Require a one-time code sent via SMS when logging in</div></div>
+                <label class="switch"><input type="checkbox"><span class="slider"></span></label>
+              </div>
+              <div class="toggle-row">
+                <div><div class="toggle-row-label">Auto Logout on Inactivity</div><div class="toggle-row-desc">Automatically sign users out after the session timeout period</div></div>
+                <label class="switch"><input type="checkbox" checked><span class="slider"></span></label>
+              </div>
+            </div>
+
+            <!-- PASSWORD POLICY -->
+            <div class="tab-pane fade" id="pane-pwd">
+              <div class="section-title">Password Policy</div>
+              <div class="section-sub">Rules enforced when staff create or change passwords</div>
+
+              <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                  <label class="field-label">Minimum Length</label>
+                  <input type="number" class="form-control" value="8">
+                </div>
+                <div class="col-md-6">
+                  <label class="field-label">Password Expiry (days)</label>
+                  <input type="number" class="form-control" value="90">
+                  <div class="form-text-hint">0 = never expires</div>
+                </div>
+              </div>
+
+              <div class="subsection-divider"></div>
+              <div class="subsection-title"><span class="material-symbols-outlined" style="color:var(--teal-dark); font-size:18px;">rule</span>Complexity Requirements</div>
+              <div class="toggle-row">
+                <div><div class="toggle-row-label">Require Uppercase Letter</div></div>
+                <label class="switch"><input type="checkbox" checked><span class="slider"></span></label>
+              </div>
+              <div class="toggle-row">
+                <div><div class="toggle-row-label">Require Number</div></div>
+                <label class="switch"><input type="checkbox" checked><span class="slider"></span></label>
+              </div>
+              <div class="toggle-row">
+                <div><div class="toggle-row-label">Require Special Character</div></div>
+                <label class="switch"><input type="checkbox"><span class="slider"></span></label>
+              </div>
+              <div class="toggle-row">
+                <div><div class="toggle-row-label">Prevent Password Reuse</div><div class="toggle-row-desc">Disallow reusing the last 3 passwords</div></div>
+                <label class="switch"><input type="checkbox" checked><span class="slider"></span></label>
+              </div>
+            </div>
+
+            <!-- BACKUP & RESTORE -->
+            <div class="tab-pane fade" id="pane-backup">
+              <div class="section-title">Backup &amp; Restore</div>
+              <div class="section-sub">Protect patient and system data with regular backups</div>
+
+              <div class="backup-row">
+                <div class="backup-label">Last Backup Date</div>
+                <!-- Nothing in this system takes a backup, so there is no date
+                     to print. A frozen timestamp sat here and read as a real
+                     one. -->
+                <div class="backup-value" style="color:var(--text-muted);" title="No backup routine exists yet — nothing writes or records one.">Not tracked</div>
+              </div>
+              <div class="backup-row">
+                <div class="backup-label">Backup Size</div>
+                <div class="backup-value">248 MB</div>
+              </div>
+              <div class="backup-row">
+                <div class="backup-label">Backup Schedule</div>
+                <div class="backup-value">Daily, 3:00 AM</div>
+              </div>
+
+              <div class="row g-3 mt-1 mb-3">
+                <div class="col-md-6">
+                  <label class="field-label">Backup Frequency</label>
+                  <select class="form-select">
+                    <option selected>Daily</option>
+                    <option>Weekly</option>
+                    <option>Monthly</option>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="field-label">Retention Period</label>
+                  <select class="form-select">
+                    <option>30 days</option>
+                    <option selected>90 days</option>
+                    <option>1 year</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="d-flex gap-2 flex-wrap">
+                <button class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">backup</span>Backup Now</button>
+                <button class="btn-outline-teal"><span class="material-symbols-outlined" style="font-size:18px;">download</span>Download Backup</button>
+                <button class="btn-ghost-ids"><span class="material-symbols-outlined" style="font-size:18px;">restore</span>Restore Backup</button>
+              </div>
+            </div>
+
+            <!-- SYSTEM MAINTENANCE -->
+            <div class="tab-pane fade" id="pane-maint">
+              <div class="section-title">System Maintenance</div>
+              <div class="section-sub">Tools for keeping the system running smoothly</div>
+
+              <div class="toggle-row">
+                <div><div class="toggle-row-label">Maintenance Mode</div><div class="toggle-row-desc">Temporarily restrict access to Administrators only</div></div>
+                <label class="switch"><input type="checkbox"><span class="slider"></span></label>
+              </div>
+
+              <div class="subsection-divider"></div>
+              <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                  <label class="field-label">System Log Retention</label>
+                  <select class="form-select">
+                    <option>90 days</option>
+                    <option selected>1 year</option>
+                    <option>2 years</option>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="field-label">Cache Status</label>
+                  <div style="padding-top:11px;">
+                    <span class="status-pill status-connected"><span class="status-dot-sm"></span>Healthy &middot; 42 MB</span>
+                  </div>
+                </div>
+              </div>
+
+              <button class="btn-ghost-ids"><span class="material-symbols-outlined" style="font-size:18px;">cleaning_services</span>Clear Cache</button>
+            </div>
+
+            <!-- ABOUT SYSTEM -->
+            <div class="tab-pane fade" id="pane-about">
+              <div class="section-title">About System</div>
+              <div class="section-sub">Version, licensing, and institution information</div>
+
+              <div class="about-item"><div class="about-label">System Name</div><div class="about-value">IDS-BPHCSN</div></div>
+              <div class="about-item"><div class="about-label">System Version</div><div class="about-value">1.0.0</div></div>
+              <div class="about-item"><div class="about-label">Database Version</div><div class="about-value">PostgreSQL 15.4</div></div>
+              <div class="about-item"><div class="about-label">Last Update</div><div class="about-value">Jul 01, 2026</div></div>
+              <div class="about-item"><div class="about-label">License Status</div><div class="about-value">DOH-Licensed</div></div>
+              <div class="about-item"><div class="about-label">Developer</div><div class="about-value">BSIT Capstone Development Team</div></div>
+              <div class="about-item"><div class="about-label">Institution</div><div class="about-value">San Francisco, Agusan del Sur</div></div>
+              <div class="about-item"><div class="about-label">Deployed For</div><div class="about-value">Barangay Poblacion Health Center</div></div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FORM ACTIONS -->
+    <div class="form-actions">
+      <div class="req-legend"><span style="color:var(--danger);">*</span> Indicates a required field</div>
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <button type="button" class="btn-danger-text">Cancel</button>
+        <button type="button" class="btn-ghost-ids"><span class="material-symbols-outlined" style="font-size:18px;">restart_alt</span>Reset to Default</button>
+        <button type="button" class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">save</span>Save Changes</button>
+      </div>
+    </div>
+{% endblock %}

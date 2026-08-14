@@ -1,0 +1,409 @@
+﻿{% extends "base.html" %}
+{% set active_nav = "dashboard" %}
+{% block title %}IDS-BPHCSN | Staff Dashboard{% endblock %}
+
+{% block styles %}
+  .status-pill{
+    display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600;
+    padding:6px 14px; border-radius:999px;
+  }
+  .pill-operational{background:var(--teal-light); color:var(--teal-dark);}
+  .pill-secure{background:#DBEAFE; color:#1D4ED8;}
+  .pill-dot{width:7px;height:7px;border-radius:50%; background:currentColor;}
+
+  .stat-card{
+    background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:20px 22px; height:100%;
+  }
+  .stat-icon{width:44px;height:44px;border-radius:12px; display:flex; align-items:center; justify-content:center; margin-bottom:12px;}
+  .stat-value{font-size:24px; font-weight:700; color:var(--text-dark);}
+  .stat-label{font-size:13px; color:var(--text-muted); margin-top:2px;}
+  .stat-trend{font-size:12px; font-weight:600; margin-top:6px;}
+
+  .panel-card{
+    background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:24px; margin-bottom:24px;
+  }
+  .panel-title{font-size:16px; font-weight:600; color:var(--text-dark);}
+  .panel-sub{font-size:12.5px; color:var(--text-muted); margin-top:2px;}
+  .panel-link{font-size:12.5px; font-weight:600; color:var(--teal-dark); text-decoration:none; display:flex; align-items:center; gap:3px;}
+
+  /* QUICK ACTIONS */
+  .quick-action{
+    background:#fff; border:1px solid var(--border-color); border-radius:14px; padding:18px 16px; text-align:center;
+    height:100%; text-decoration:none; display:flex; flex-direction:column; align-items:center; gap:10px;
+    transition:border-color .15s, background .15s;
+  }
+  .quick-action:hover{border-color:var(--teal); background:var(--teal-light);}
+  .quick-action-icon{width:46px;height:46px;border-radius:12px; background:var(--teal-light); display:flex; align-items:center; justify-content:center;}
+  .quick-action:hover .quick-action-icon{background:#fff;}
+  .quick-action-label{font-size:13px; font-weight:600; color:var(--text-dark);}
+
+  table.dash-table{width:100%; border-collapse:separate; border-spacing:0; font-size:13.5px;}
+  table.dash-table thead th{
+    text-align:left; color:var(--text-muted); font-weight:600; font-size:11.5px; letter-spacing:0.03em;
+    text-transform:uppercase; padding:12px 14px; border-bottom:1px solid var(--border-color); white-space:nowrap;
+  }
+  table.dash-table tbody td{
+    padding:13px 14px; border-bottom:1px solid var(--border-color); color:var(--text-dark); vertical-align:middle;
+  }
+  table.dash-table tbody tr:hover{background:#FAFBFC;}
+  table.dash-table tbody tr:last-child td{border-bottom:none;}
+  .pat-name{font-weight:600;}
+
+  .badge-status{
+    display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600;
+    padding:4px 11px; border-radius:999px; white-space:nowrap;
+  }
+  .badge-scheduled{background:#DBEAFE; color:#1D4ED8;}
+  .badge-completed{background:#DCFCE7; color:#15803D;}
+  .badge-waiting{background:#FEF3C7; color:#B45309;}
+  .badge-cancelled{background:#FEE2E2; color:#B91C1C;}
+
+  /* LIST ROWS */
+  .list-row{display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--border-color);}
+  .list-row:last-child{border-bottom:none;}
+  .list-avatar{width:38px;height:38px;border-radius:50%; background:var(--teal-light); color:var(--teal-dark); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12.5px; flex-shrink:0;}
+  .list-title{font-size:13.5px; font-weight:600; color:var(--text-dark);}
+  .list-sub{font-size:12px; color:var(--text-muted); margin-top:1px;}
+  .list-meta{margin-left:auto; text-align:right; font-size:12px; color:var(--text-muted); flex-shrink:0;}
+
+  .alert-row{display:flex; align-items:center; gap:12px; padding:11px 0; border-bottom:1px solid var(--border-color);}
+  .alert-row:last-child{border-bottom:none;}
+  .alert-icon{width:34px;height:34px;border-radius:9px; display:flex; align-items:center; justify-content:center; flex-shrink:0;}
+  .alert-title{font-size:13px; font-weight:600; color:var(--text-dark);}
+  .alert-sub{font-size:11.5px; color:var(--text-muted);}
+
+  .notif-item{display:flex; gap:11px; padding:11px 0; border-bottom:1px solid var(--border-color);}
+  .notif-item:last-child{border-bottom:none;}
+  .notif-dot{width:8px;height:8px;border-radius:50%; background:var(--teal); margin-top:6px; flex-shrink:0;}
+  .notif-text{font-size:12.5px; color:var(--text-dark);}
+  .notif-time{font-size:11px; color:var(--text-muted); margin-top:2px;}
+
+  /* MINI CALENDAR */
+  .mini-cal-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;}
+  .mini-cal-nav{width:28px;height:28px;border-radius:8px; border:1px solid var(--border-color); background:#fff; display:flex; align-items:center; justify-content:center; color:var(--text-dark);}
+  .mini-cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:4px; text-align:center;}
+  .mini-cal-dow{font-size:10.5px; font-weight:600; color:var(--text-muted); padding-bottom:4px;}
+  .mini-cal-day{font-size:12px; padding:6px 0; border-radius:8px; color:var(--text-dark);}
+  .mini-cal-day.muted{color:#D1D5DB;}
+  .mini-cal-day.today{background:var(--teal); color:#fff; font-weight:700;}
+  .mini-cal-day.has-event{position:relative;}
+  .mini-cal-day.has-event::after{content:''; position:absolute; bottom:1px; left:50%; transform:translateX(-50%); width:4px; height:4px; border-radius:50%; background:var(--info);}
+  .mini-cal-day.today.has-event::after{background:#fff;}
+
+  .quick-stat-row{display:flex; align-items:center; justify-content:space-between; padding:11px 0; border-bottom:1px solid var(--border-color);}
+  .quick-stat-row:last-child{border-bottom:none;}
+  .qs-label{font-size:13px; color:var(--text-muted);}
+  .qs-value{font-size:14px; font-weight:700; color:var(--text-dark);}
+{% endblock %}
+
+{% block content %}
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-1">
+      <div>
+        <div class="eyebrow">Barangay Poblacion Health Center</div>
+        <div class="page-title">Staff Dashboard</div>
+      </div>
+      <div class="d-flex gap-2">
+        <span class="status-pill pill-operational"><span class="pill-dot"></span>All Systems Operational</span>
+        <span class="status-pill pill-secure"><span class="material-symbols-outlined" style="font-size:14px;">wifi</span>Secure Connection</span>
+      </div>
+    </div>
+    <div class="page-desc" style="font-size:14px; color:var(--text-muted); margin-bottom:20px;">{{ clinic_today | full_date }} &middot; Welcome back, {{ sidebar_user_name }}. Here's what's happening today.</div>
+
+    <!-- STAT CARDS — five across on wide screens, wrapping in pairs below.
+         `col-xl` lets the fifth card join the row rather than stranding it on a
+         line of its own. -->
+    <div class="row g-3 mb-4">
+      <div class="col-xl col-md-4 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:var(--teal-light);"><span class="material-symbols-outlined" style="color:var(--teal-dark);">calendar_month</span></div>
+          <div class="stat-value">{{ queue_stats.total_today }}</div>
+          <div class="stat-label">Today's Appointments</div>
+          <div class="stat-trend" style="color:var(--text-muted);">
+            {{ queue_stats.walk_ins }} walk-in{{ '' if queue_stats.walk_ins == 1 else 's' }}
+            {%- if queue_stats.not_arrived %} &middot; {{ queue_stats.not_arrived }} not yet arrived{% endif %}
+          </div>
+        </div>
+      </div>
+      <div class="col-xl col-md-4 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#DCFCE7;"><span class="material-symbols-outlined" style="color:var(--success);">clinical_notes</span></div>
+          <div class="stat-value">{{ queue_stats.completed }}</div>
+          <div class="stat-label">Patients Served Today</div>
+          <div class="stat-trend" style="color:{{ 'var(--warning)' if queue_stats.waiting else 'var(--success)' }};">
+            {%- if queue_stats.waiting %}{{ queue_stats.waiting }} still waiting
+            {%- elif queue_stats.in_consultation %}1 in consultation
+            {%- else %}Nobody waiting{% endif %}
+          </div>
+        </div>
+      </div>
+      <div class="col-xl col-md-4 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#DBEAFE;"><span class="material-symbols-outlined" style="color:var(--info);">person_add</span></div>
+          <div class="stat-value">{{ patient_stats.new_today }}</div>
+          <div class="stat-label">New Patient Registrations</div>
+          <div class="stat-trend" style="color:var(--text-muted);">Today &middot; {{ patient_stats.total_patients }} on file</div>
+        </div>
+      </div>
+      <div class="col-xl col-md-4 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#FEF3C7;"><span class="material-symbols-outlined" style="color:var(--warning);">trending_down</span></div>
+          <div class="stat-value">{{ low_stock.low_stock_count }}</div>
+          <div class="stat-label">Low Stock Medicines</div>
+          {%- if low_stock.out_of_stock_count %}
+          <div class="stat-trend" style="color:var(--danger);">{{ low_stock.out_of_stock_count }} out of stock</div>
+          {%- elif low_stock.low_stock_count %}
+          <div class="stat-trend" style="color:var(--danger);">Needs reorder</div>
+          {%- else %}
+          <div class="stat-trend" style="color:var(--success);">All above reorder level</div>
+          {%- endif %}
+        </div>
+      </div>
+      <!-- Immunisation defaulters. Deliberately a dashboard figure and not only a
+           queue badge: the queue can only ever flag a child who has walked in,
+           and the children the EPI programme exists to catch are precisely the
+           ones who have not. Same shape and same wording rules as the low-stock
+           card beside it, reading from get_immunization_alert(). -->
+      <div class="col-xl col-md-4 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:{{ '#FEE2E2' if immunization_alert.overdue_child_count else '#DBEAFE' }};"><span class="material-symbols-outlined" style="color:{{ 'var(--danger)' if immunization_alert.overdue_child_count else 'var(--info)' }};">vaccines</span></div>
+          <div class="stat-value">{{ immunization_alert.child_count }}</div>
+          <div class="stat-label">Children Due for Immunization</div>
+          {%- if immunization_alert.overdue_child_count %}
+          <div class="stat-trend" style="color:var(--danger);">{{ immunization_alert.overdue_child_count }} overdue &middot; {{ immunization_alert.due_dose_count }} dose{{ '' if immunization_alert.due_dose_count == 1 else 's' }} outstanding</div>
+          {%- elif immunization_alert.child_count %}
+          <div class="stat-trend" style="color:var(--warning);">{{ immunization_alert.due_dose_count }} dose{{ '' if immunization_alert.due_dose_count == 1 else 's' }} due</div>
+          {%- else %}
+          <div class="stat-trend" style="color:var(--success);">Every child up to date</div>
+          {%- endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- QUICK ACTIONS -->
+    <div class="row g-3 mb-4">
+      <div class="col"><a href="{{ url_for(register_patient_endpoint) }}" class="quick-action"><div class="quick-action-icon"><span class="material-symbols-outlined">person_add</span></div>Register Patient</a></div>
+            <div class="col"><a href="{{ url_for(patient_records_endpoint) }}" class="quick-action"><div class="quick-action-icon"><span class="material-symbols-outlined">groups</span></div>View Patient Records</a></div>
+            <div class="col"><a href="{{ url_for(appointment_scheduling_endpoint) }}" class="quick-action"><div class="quick-action-icon"><span class="material-symbols-outlined">calendar_month</span></div>Schedule Appointment</a></div>
+            <div class="col"><a href="{{ url_for(medicine_inventory_endpoint) }}" class="quick-action"><div class="quick-action-icon"><span class="material-symbols-outlined">inventory_2</span></div>Update Medicine Stock</a></div>
+            <div class="col"><a href="{{ url_for(sms_notifications_endpoint) }}" class="quick-action"><div class="quick-action-icon"><span class="material-symbols-outlined">campaign</span></div>View Notifications</a></div>
+    </div>
+
+    <!-- MAIN GRID -->
+    <div class="row g-3">
+
+      <!-- LEFT COLUMN -->
+      <div class="col-lg-8">
+
+        <!-- TODAY'S APPOINTMENT LIST -->
+        <div class="panel-card">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div>
+              <div class="panel-title">Today's Appointment List</div>
+              <div class="panel-sub">{{ clinic_today | full_date }} &middot; {{ queue_stats.total_today }} appointment{{ '' if queue_stats.total_today == 1 else 's' }}</div>
+            </div>
+            <a href="{{ url_for(appointment_scheduling_endpoint) }}" class="panel-link">View All<span class="material-symbols-outlined" style="font-size:15px;">chevron_right</span></a>
+          </div>
+          <div style="overflow-x:auto;">
+            <table class="dash-table">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Patient</th>
+                  <th>Service</th>
+                  <th>Assigned Staff</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+{#- The same rows Appointment Scheduling's queue table shows, in the same order
+    and with the same badge, because both read get_todays_appointments(). The
+    time column prefers the arrival over the booked time for exactly the reason
+    the queue sorts that way: once someone is in the building, when they got
+    here is the fact the desk acts on. #}
+{%- for entry in queue %}
+                <tr>
+                  <td>{{ entry.arrival_time or entry.booked_time or '—' }}</td>
+                  <td class="pat-name"><a href="{{ url_for(patient_profile_endpoint, patient_id=entry.patient_id) }}" style="color:inherit; text-decoration:none;">{{ entry.first_name }} {{ entry.last_name }}</a>{% if entry.walk_in %} <span class="walkin-tag">Walk-in</span>{% endif %}</td>
+                  <td>{{ entry.appointment_type or 'Consultation' }}</td>
+                  <td>{{ entry.assigned_staff or '—' }}</td>
+                  <td><span class="badge-status {{ entry.display_badge_class }}">{{ entry.display_status }}</span></td>
+                </tr>
+{%- endfor %}
+{%- if not queue %}
+                <tr>
+                  <td colspan="5" class="panel-sub" style="padding:14px 8px;">Nobody is booked or checked in for today.</td>
+                </tr>
+{%- endif %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- RECENT PATIENT REGISTRATIONS -->
+        <div class="panel-card">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div>
+              <div class="panel-title">Recent Patient Registrations</div>
+              <div class="panel-sub">{{ patient_stats.new_today }} added today &middot; {{ patient_stats.new_this_month }} this month</div>
+            </div>
+            <a href="{{ url_for(patient_records_endpoint) }}" class="panel-link">View All<span class="material-symbols-outlined" style="font-size:15px;">chevron_right</span></a>
+          </div>
+          <div>
+{#- The newest records on file, newest first. The panel used to promise "added
+    today" and then list three names regardless; it now says how many were
+    actually registered today and shows the latest records with the date they
+    were created, so a quiet day reads as a quiet day. #}
+{%- for patient in recent_registrations %}
+            <div class="list-row">
+              <div class="list-avatar">{{ patient.initials }}</div>
+              <div>
+                <div class="list-title"><a href="{{ url_for(patient_profile_endpoint, patient_id=patient.id) }}" style="color:inherit; text-decoration:none;">{{ patient.full_name }}</a></div>
+                <div class="list-sub">{{ patient.patient_id }}{% if patient.age %} &middot; {{ patient.age }}{% endif %}{% if patient.display_address %} &middot; {{ patient.display_address }}{% endif %}</div>
+              </div>
+              <div class="list-meta">{{ patient.registered_date }}<br>{{ patient.registered_time }}</div>
+            </div>
+{%- endfor %}
+{%- if not recent_registrations %}
+            <div class="panel-sub">No patient records have been created yet.</div>
+{%- endif %}
+          </div>
+        </div>
+
+        <!-- UPCOMING VACCINATION SCHEDULE -->
+        <div class="panel-card mb-0">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div>
+              <div class="panel-title">Upcoming Vaccination Schedule</div>
+              <div class="panel-sub">Booked immunization visits still to come</div>
+            </div>
+            <a href="{{ url_for(appointment_scheduling_endpoint) }}" class="panel-link">View All<span class="material-symbols-outlined" style="font-size:15px;">chevron_right</span></a>
+          </div>
+          <div>
+{#- Real bookings only. The three names that used to sit here were invented, and
+    the panel is deliberately allowed to be empty: a child who is due a dose but
+    has no appointment belongs in Immunization Follow-up, which reports them. #}
+{%- for entry in upcoming_vaccinations %}
+            <div class="list-row">
+              <div class="list-avatar" style="background:#DBEAFE; color:var(--info);"><span class="material-symbols-outlined" style="font-size:17px;">vaccines</span></div>
+              <div>
+                <div class="list-title"><a href="{{ url_for(patient_profile_endpoint, patient_id=entry.patient_id) }}" style="color:inherit; text-decoration:none;">{{ entry.first_name }} {{ entry.last_name }}</a></div>
+                <div class="list-sub">{{ entry.appointment_type }} &middot; {{ entry.appointment_date | display_date }}{% if entry.booked_time %}, {{ entry.booked_time }}{% endif %}</div>
+              </div>
+              <div class="list-meta">{{ entry.when_label }}</div>
+            </div>
+{%- endfor %}
+{%- if not upcoming_vaccinations %}
+            <div class="panel-sub">No immunization appointments are booked. {% if immunization_alert.child_count %}{{ immunization_alert.child_count }} child{{ "ren" if immunization_alert.child_count != 1 }} {{ "are" if immunization_alert.child_count != 1 else "is" }} due a dose — see Immunization Follow-up.{% endif %}</div>
+{%- endif %}
+          </div>
+        </div>
+
+      </div>
+
+      <!-- RIGHT COLUMN -->
+      <div class="col-lg-4">
+
+        <!-- MEDICINE STOCK ALERTS -->
+        <div class="panel-card">
+          <div class="panel-title" style="font-size:15px;">Medicine Stock Alerts</div>
+          <div class="panel-sub mb-2">{{ low_stock.low_stock_count }} item{{ "s" if low_stock.low_stock_count != 1 }} below reorder level</div>
+          <div>
+{%- for item in low_stock.low_stock_items %}
+            <!-- Out of stock, at half their reorder level or less, or out of time
+                 carry the red treatment; the rest are amber. Same split the Medicine
+                 Inventory badges use. -->
+{%- set critical = item.stock_status in ('Out of Stock', 'Critical', 'Expires Today', 'Expired') %}
+            <div class="alert-row">
+              <div class="alert-icon" style="background:{{ '#FEE2E2' if critical else '#FEF3C7' }};"><span class="material-symbols-outlined" style="color:{{ 'var(--danger)' if critical else 'var(--warning)' }}; font-size:18px;">{{ 'warning' if critical else 'error' }}</span></div>
+              <div>
+                <div class="alert-title">{{ item.name }}{% if item.display_dosage %} {{ item.display_dosage }}{% endif %}</div>
+                <div class="alert-sub">{{ item.stock_quantity }} / {{ item.low_stock_threshold }} {{ item.unit or 'units' }}{% if item.threshold_pct is not none %} &middot; {{ item.threshold_pct }}% of reorder level{% endif %}</div>
+              </div>
+            </div>
+{%- endfor %}
+{%- if not low_stock.low_stock_items %}
+            <div class="panel-sub">Every item is above its reorder level.</div>
+{%- endif %}
+          </div>
+        </div>
+
+        <!-- IMMUNIZATION FOLLOW-UP — the working list behind the stat card,
+             built exactly like the stock panel above it: true total in the
+             sub-line, five rows below, red once a child is past the grace
+             period and amber while merely due. Every name and count comes from
+             get_immunization_alert(). -->
+        <div class="panel-card">
+          <div class="d-flex align-items-center justify-content-between gap-2">
+            <div class="panel-title" style="font-size:15px;">Immunization Follow-up</div>
+{%- if immunization_alert.child_count %}
+            <a href="{{ url_for(patient_records_endpoint) }}" class="panel-link">All patients<span class="material-symbols-outlined" style="font-size:15px;">chevron_right</span></a>
+{%- endif %}
+          </div>
+          <div class="panel-sub mb-2">{{ immunization_alert.child_count }} child{{ "ren" if immunization_alert.child_count != 1 else "" }} with a dose outstanding</div>
+          <div>
+{%- for child in immunization_alert.children %}
+{%- set overdue = child.overdue_count > 0 %}
+            <div class="alert-row">
+              <div class="alert-icon" style="background:{{ '#FEE2E2' if overdue else '#FEF3C7' }};"><span class="material-symbols-outlined" style="color:{{ 'var(--danger)' if overdue else 'var(--warning)' }}; font-size:18px;">vaccines</span></div>
+              <div>
+                <div class="alert-title"><a href="{{ url_for(patient_profile_endpoint, patient_id=child.patient.id) }}" style="color:inherit; text-decoration:none;">{{ child.patient.full_name }}</a></div>
+                <div class="alert-sub">{{ child.patient.age or 'age unknown' }} &middot; {{ child.next_label }}{% if child.attention_count > 1 %} and {{ child.attention_count - 1 }} more{% endif %} &middot; {{ child.next_status | lower }}</div>
+              </div>
+            </div>
+{%- endfor %}
+{%- if not immunization_alert.children %}
+            <div class="panel-sub">Every child under {{ pediatric_age_years }} is up to date with the DOH schedule.</div>
+{%- endif %}
+          </div>
+        </div>
+
+        <!-- NOTIFICATIONS PANEL -->
+        <div class="panel-card">
+          <div class="panel-title" style="font-size:15px;">Notifications</div>
+          <div class="panel-sub mb-2">Not yet tracked</div>
+{#- Four invented alerts used to sit here. Rather than fabricate replacements,
+    the panel states why it is empty, the way Screen 10's untracked KPIs do. #}
+          <div class="panel-sub" style="line-height:1.55;">{{ untracked.notifications }}</div>
+        </div>
+
+        <!-- CALENDAR WIDGET -->
+        <div class="panel-card">
+          <div class="mini-cal-head">
+            <div class="panel-title" style="font-size:15px;">{{ calendar_month.label }}</div>
+            <a href="{{ url_for(appointment_scheduling_endpoint) }}" class="panel-link">Open<span class="material-symbols-outlined" style="font-size:15px;">chevron_right</span></a>
+          </div>
+{#- Drawn from get_calendar_month(), the same builder Appointment Scheduling's
+    month grid uses, so the day marked today and the days marked as carrying
+    appointments agree between the two screens. The two arrow buttons were
+    removed rather than wired: this widget has no month of its own to page
+    through -- the screen that does is one click away. #}
+          <div class="mini-cal-grid">
+            <div class="mini-cal-dow">S</div><div class="mini-cal-dow">M</div><div class="mini-cal-dow">T</div><div class="mini-cal-dow">W</div><div class="mini-cal-dow">T</div><div class="mini-cal-dow">F</div><div class="mini-cal-dow">S</div>
+{%- for week in calendar_month.weeks %}
+{%- for cell in week %}
+            <div class="mini-cal-day{% if not cell.in_month %} muted{% endif %}{% if cell.is_today %} today{% endif %}{% if cell.total %} has-event{% endif %}"{% if cell.total %} title="{{ cell.total }} appointment{{ '' if cell.total == 1 else 's' }} on {{ cell.iso }}"{% endif %}>{{ cell.day }}</div>
+{%- endfor %}
+{%- endfor %}
+          </div>
+          <div class="panel-sub" style="margin-top:8px;">{{ calendar_month.month_total }} appointment{{ '' if calendar_month.month_total == 1 else 's' }} this month</div>
+        </div>
+
+        <!-- QUICK STATISTICS -->
+        <div class="panel-card mb-0">
+          <div class="panel-title" style="font-size:15px;">Quick Statistics</div>
+{#- These five read "your activity this week" and were five invented numbers.
+    Per-worker totals cannot be assembled -- see untracked.staff_activity below --
+    so the panel now reports the health center's own figures, each read from the
+    same call the screen that owns it reports from. #}
+          <div class="panel-sub mb-2">Health center totals</div>
+          <div class="quick-stat-row"><div class="qs-label">Consultations completed today</div><div class="qs-value">{{ queue_stats.completed }}</div></div>
+          <div class="quick-stat-row"><div class="qs-label">Consultations this month</div><div class="qs-value">{{ consultation_stats.recorded_this_month }}</div></div>
+          <div class="quick-stat-row"><div class="qs-label">New registrations this month</div><div class="qs-value">{{ patient_stats.new_this_month }}</div></div>
+          <div class="quick-stat-row"><div class="qs-label">Appointments still upcoming</div><div class="qs-value">{{ upcoming_count }}</div></div>
+          <div class="quick-stat-row"><div class="qs-label">SMS messages sent</div><div class="qs-value">{{ broadcast_stats.messages_sent }}</div></div>
+          <div class="panel-sub" style="margin-top:10px; line-height:1.55;">{{ untracked.staff_activity }}</div>
+        </div>
+
+      </div>
+    </div>
+{% endblock %}

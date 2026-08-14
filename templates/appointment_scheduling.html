@@ -1,0 +1,1733 @@
+{% extends "base.html" %}
+{% set active_nav = "appointment_scheduling" %}
+{% block title %}IDS-BPHCSN | Appointment Scheduling{% endblock %}
+
+{% block styles %}
+  .toolbar-search{min-width:320px; max-width:420px;}
+  .page-desc{font-size:14px; color:var(--text-muted); margin-top:4px; max-width:640px;}
+
+  .stat-card{
+    background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:20px 22px; height:100%;
+  }
+  .stat-icon{width:44px;height:44px;border-radius:12px; display:flex; align-items:center; justify-content:center; margin-bottom:12px;}
+  .stat-value{font-size:24px; font-weight:700; color:var(--text-dark);}
+  .stat-label{font-size:13px; color:var(--text-muted); margin-top:2px;}
+  .stat-trend{font-size:12px; font-weight:600; margin-top:6px;}
+
+  .panel-card{
+    background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:24px; margin-bottom:24px;
+  }
+  .panel-title{font-size:18px; font-weight:600; color:var(--text-dark);}
+  .panel-sub{font-size:13px; color:var(--text-muted); margin-top:2px;}
+
+  /* VIEW TOGGLE */
+  .view-toggle{display:flex; background:var(--bg); border:1px solid var(--border-color); border-radius:10px; padding:3px;}
+  .view-toggle button{
+    border:none; background:transparent; padding:8px 16px; font-size:13.5px; font-weight:500; color:var(--text-muted);
+    border-radius:8px;
+  }
+  .view-toggle button.active{background:var(--teal); color:#fff; font-weight:600;}
+
+  .cal-nav-btn{
+    width:36px; height:36px; border-radius:10px; border:1px solid var(--border-color); background:#fff;
+    display:flex; align-items:center; justify-content:center; color:var(--text-dark);
+    text-decoration:none;
+  }
+  .cal-nav-btn:hover{border-color:var(--teal); color:var(--teal-dark);}
+
+  /* CALENDAR GRID */
+  .cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:8px; margin-top:16px;}
+  .cal-dow{font-size:11.5px; font-weight:600; color:var(--text-muted); text-transform:uppercase; text-align:center; padding-bottom:6px;}
+  .cal-cell{
+    border:1px solid var(--border-color); border-radius:10px; min-height:88px; padding:8px; background:#fff;
+    text-align:left; width:100%; display:block;
+  }
+  .cal-cell.muted{background:var(--bg); color:#C7CBD1;}
+  .cal-cell.today{border-color:var(--teal); box-shadow:0 0 0 2px rgba(22,155,146,0.12);}
+  /* A day that can still be acted on: it has bookings nobody has arrived for
+     yet. Clicking it filters the Upcoming Appointments list below. */
+  .cal-cell.has-upcoming{cursor:pointer;}
+  .cal-cell.has-upcoming:hover{border-color:var(--teal);}
+  .cal-cell.cal-selected{border-color:var(--teal); background:var(--teal-light);}
+  .cal-date{font-size:12.5px; font-weight:600; color:var(--text-dark);}
+  .cal-cell.muted .cal-date{color:#C7CBD1;}
+  .cal-dot-row{display:flex; flex-wrap:wrap; gap:4px; margin-top:6px;}
+  .cal-dot{width:7px; height:7px; border-radius:50%;}
+  .dot-scheduled{background:var(--info);}
+  .dot-completed{background:var(--success);}
+  .dot-cancelled{background:var(--danger);}
+  .dot-inqueue{background:var(--teal);}
+  .cal-count{font-size:10.5px; color:var(--text-muted); margin-top:4px;}
+
+  .legend-row{display:flex; gap:18px; margin-top:14px; flex-wrap:wrap;}
+  .legend-item{display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--text-muted);}
+
+  /* REMINDERS SIDE PANEL */
+  .reminder-item{display:flex; gap:12px; padding:12px 0; border-bottom:1px solid var(--border-color);}
+  .reminder-item:last-child{border-bottom:none;}
+  .reminder-icon{width:36px;height:36px;border-radius:10px; background:var(--teal-light); display:flex; align-items:center; justify-content:center; flex-shrink:0;}
+  .reminder-title{font-size:13.5px; font-weight:600; color:var(--text-dark);}
+  .reminder-meta{font-size:12px; color:var(--text-muted); margin-top:2px;}
+  .reminder-empty{font-size:13px; color:var(--text-muted); padding:14px 0;}
+
+  /* Marks a day-header row inside the Upcoming Appointments table. */
+  table.appt-table tbody tr.upcoming-day-row td{
+    background:var(--bg); font-size:11.5px; font-weight:700; letter-spacing:0.03em;
+    text-transform:uppercase; color:var(--text-muted); padding:9px 14px;
+  }
+  .day-chip{
+    display:inline-flex; align-items:center; gap:6px; background:var(--teal-light); color:var(--teal-dark);
+    border-radius:999px; padding:5px 12px; font-size:12.5px; font-weight:600; border:none;
+  }
+
+  /* FORM FIELDS inside the dialogs. The check-in dialog already used these class
+     names; they had no definitions on this screen, so both dialogs were falling
+     back to Bootstrap's defaults. Same values as Register Patient. */
+  label.field-label{font-size:13px; font-weight:600; color:var(--text-dark); margin-bottom:6px; display:inline-block;}
+  label.field-label .req{color:var(--danger); margin-left:2px;}
+  .modal .form-control, .modal .form-select{
+    height:48px; border-radius:12px; border:1px solid var(--border-color); font-size:14px; color:var(--text-dark);
+  }
+  .modal textarea.form-control{height:auto; min-height:72px;}
+  .modal .form-control:focus, .modal .form-select:focus{
+    border-color:var(--teal); box-shadow:0 0 0 3px rgba(22,155,146,0.12);
+  }
+  .modal .form-control.is-invalid, .modal .form-select.is-invalid{border-color:var(--danger);}
+  .form-text-hint{font-size:12px; color:var(--text-muted); margin-top:4px;}
+  .field-error{font-size:12.5px; color:var(--danger); margin-top:4px;}
+
+  .alert-ids{border-radius:12px; border:1px solid; padding:14px 16px; font-size:13.5px; display:flex; gap:12px; align-items:flex-start; margin-bottom:16px;}
+  .alert-warning-ids{background:#FFFBEB; border-color:#FDE68A; color:#92400E;}
+  .alert-danger-ids{background:#FEF2F2; border-color:#FECACA; color:#B91C1C;}
+  .alert-ids .material-symbols-outlined{font-size:20px; margin-top:1px;}
+  .alert-ids strong{display:block; font-size:13.5px; margin-bottom:2px;}
+
+  /* Calling a booking off is destructive in intent even though it deletes
+     nothing, so it is the only red control on this screen -- the same weight
+     Patient Records gives Mark Deceased. */
+  .btn-danger-outline{
+    background:#fff; border:1px solid #FECACA; color:var(--danger); border-radius:10px;
+    padding:6px 12px; font-size:12.5px; font-weight:600; display:inline-flex; align-items:center; gap:6px;
+    white-space:nowrap;
+  }
+  .btn-danger-outline:hover{background:#FEF2F2; border-color:var(--danger); color:#B91C1C;}
+  .reschedule-was{
+    background:var(--bg); border:1px solid var(--border-color); border-radius:12px; padding:12px 14px;
+    font-size:13px; color:var(--text-dark); margin-bottom:16px;
+  }
+  .reschedule-was .rw-label{font-size:11.5px; font-weight:700; letter-spacing:0.03em; text-transform:uppercase; color:var(--text-muted);}
+
+  /* TOOLBAR / FILTER / TABLE - reused from frozen system */
+  .filter-btn{
+    background:#fff; border:1px solid var(--border-color); border-radius:10px; padding:10px 16px;
+    font-size:14px; font-weight:500; color:var(--text-dark); display:flex; align-items:center; gap:6px;
+  }
+  .filter-btn.open, .filter-btn:hover{border-color:var(--teal); color:var(--teal-dark);}
+
+  .filter-panel{
+    background:var(--bg); border:1px solid var(--border-color); border-radius:12px; padding:20px;
+    margin-bottom:18px; display:none;
+  }
+  .filter-panel.show{display:block;}
+  .filter-panel label{font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:6px; display:block;}
+  .filter-panel .form-control, .filter-panel .form-select{
+    height:48px; border-radius:12px; border:1px solid var(--border-color); font-size:13.5px;
+  }
+  .filter-panel .form-control:focus, .filter-panel .form-select:focus{
+    border-color:var(--teal); box-shadow:0 0 0 3px rgba(22,155,146,0.12);
+  }
+  .filter-actions{display:flex; justify-content:flex-end; gap:10px; margin-top:16px; padding-top:16px; border-top:1px solid var(--border-color);}
+  .btn-reset{background:transparent; border:none; color:var(--text-muted); font-size:14px; font-weight:600; padding:10px 14px;}
+  .btn-reset:hover{color:var(--danger);}
+
+  table.appt-table{width:100%; border-collapse:separate; border-spacing:0; font-size:13.5px;}
+  table.appt-table thead th{
+    text-align:left; color:var(--text-muted); font-weight:600; font-size:11.5px; letter-spacing:0.03em;
+    text-transform:uppercase; padding:12px 14px; border-bottom:1px solid var(--border-color); white-space:nowrap;
+  }
+  table.appt-table tbody td{
+    padding:14px; border-bottom:1px solid var(--border-color); color:var(--text-dark); vertical-align:middle;
+  }
+  table.appt-table tbody tr:hover{background:#FAFBFC;}
+  table.appt-table tbody tr:last-child td{border-bottom:none;}
+  .pat-name{font-weight:600;}
+  .appt-id{color:var(--text-muted); font-size:12.5px;}
+
+  .badge-status{
+    display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600;
+    padding:4px 11px; border-radius:999px; white-space:nowrap;
+  }
+  .badge-scheduled{background:#DBEAFE; color:#1D4ED8;}
+  .badge-completed{background:#DCFCE7; color:#15803D;}
+  .badge-cancelled{background:#FEE2E2; color:#B91C1C;}
+  .badge-waiting{background:#FEF3C7; color:#B45309;}
+  .badge-inconsult{background:var(--teal-light); color:var(--teal-dark);}
+  .badge-noshow{background:#F3F4F6; color:#4B5563;}
+  /* Solid teal against In Consultation's light teal: the two are related states
+     -- one is happening, one is about to -- and the weight says which is which
+     without needing the words to be read. */
+  .badge-ready{background:var(--teal); color:#fff;}
+
+  /* The patient currently with the clinician, lifted out of the list so it can
+     be found at a glance from across the room. */
+  table.appt-table tbody tr.row-inconsult{background:rgba(22,155,146,0.06);}
+  table.appt-table tbody tr.row-inconsult:hover{background:rgba(22,155,146,0.10);}
+  /* The patient who may be brought in right now. Marked with a left edge rather
+     than a fill, so it reads as "next" beside the filled in-consultation row
+     instead of competing with it. */
+  table.appt-table tbody tr.row-ready td:first-child{box-shadow:inset 3px 0 0 var(--teal);}
+  table.appt-table tbody tr.row-ready{background:rgba(22,155,146,0.03);}
+  .queue-pos{
+    display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px;
+    border-radius:50%; background:var(--bg); color:var(--text-muted); font-size:11.5px; font-weight:700;
+  }
+  .queue-pos.pos-next{background:var(--teal-light); color:var(--teal-dark);}
+  /* Says who the clinician takes next while the room is still busy -- the queue
+     has to answer that without anyone having to read down the arrival times. */
+  .next-tag{
+    display:inline-block; margin-left:6px; padding:2px 7px; border-radius:6px; background:var(--teal-light);
+    color:var(--teal-dark); font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.03em;
+  }
+  /* A child in today's queue with a dose outstanding. Amber while merely due,
+     red once past the grace period -- the same two-tier reading the Medicine
+     Stock Alerts panel and the immunization tab already use. */
+  .immun-tag{
+    display:inline-flex; align-items:center; gap:3px; margin-left:6px; padding:2px 7px; border-radius:6px;
+    background:#FEF3C7; color:#B45309; font-size:10.5px; font-weight:700; text-transform:uppercase;
+    letter-spacing:0.03em; white-space:nowrap;
+  }
+  .immun-tag.immun-overdue{background:#FEE2E2; color:#B91C1C;}
+  /* Start Consultation while somebody else is in the room. Kept visible rather
+     than removed so the reason it cannot be pressed is on the screen, in its
+     tooltip, next to the patient it refers to. */
+  .btn-start-blocked{
+    background:var(--bg); border:1px solid var(--border-color); color:#9CA3AF; border-radius:10px;
+    padding:6px 12px; font-size:12.5px; font-weight:600; display:inline-flex; align-items:center; gap:6px;
+    cursor:not-allowed;
+  }
+  .walkin-tag{
+    display:inline-block; margin-left:6px; padding:2px 7px; border-radius:6px; background:var(--bg);
+    color:var(--text-muted); font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.03em;
+  }
+  .reason-text{color:var(--text-muted); font-size:12.5px;}
+
+  /* CHECK-IN DIALOG */
+  .patient-pick{max-height:280px; overflow-y:auto; border:1px solid var(--border-color); border-radius:12px;}
+  .patient-option{display:block; border-bottom:1px solid var(--border-color);}
+  .patient-option:last-child{border-bottom:none;}
+  .patient-option input{position:absolute; opacity:0; pointer-events:none;}
+  .patient-option .po-body{display:flex; align-items:center; gap:10px; padding:10px 14px; cursor:pointer;}
+  .patient-option .po-body:hover{background:var(--bg);}
+  .patient-option input:checked + .po-body{background:var(--teal-light);}
+  .patient-option input:focus-visible + .po-body{outline:2px solid var(--teal); outline-offset:-2px;}
+  .po-name{font-size:13.5px; font-weight:600; color:var(--text-dark);}
+  .po-meta{font-size:12px; color:var(--text-muted);}
+  .po-booked{margin-left:auto; font-size:11.5px; font-weight:600; color:var(--teal-dark); white-space:nowrap;}
+  .po-queued{margin-left:auto; font-size:11.5px; font-weight:600; color:#B45309; white-space:nowrap;}
+  .pick-empty{padding:18px 14px; font-size:13px; color:var(--text-muted); display:none;}
+  .pick-empty.show{display:block;}
+
+  /* The two ways a patient can arrive at the desk. Same pill shape the Register
+     Patient form uses for its Gender choice, so the control is already familiar. */
+  .mode-pill-group{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;}
+  .mode-pill{
+    border:1px solid var(--border-color); border-radius:10px; padding:10px 16px; font-size:13.5px; font-weight:500;
+    display:flex; align-items:center; gap:8px; cursor:pointer; color:var(--text-dark); flex:1 1 0; min-width:180px;
+  }
+  .mode-pill input{accent-color:var(--teal); width:16px; height:16px; flex-shrink:0;}
+  .mode-pill.checked{border-color:var(--teal); background:var(--teal-light); color:var(--teal-dark); font-weight:600;}
+  .mode-hint{font-size:12.5px; color:var(--text-muted); margin-bottom:14px;}
+
+  .action-icon{
+    width:32px; height:32px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center;
+    color:var(--text-muted); background:transparent; border:none;
+  }
+  .action-icon:hover{background:var(--bg); color:var(--teal-dark);}
+
+  .table-footer{display:flex; align-items:center; justify-content:space-between; padding-top:18px; margin-top:6px; border-top:1px solid var(--border-color); flex-wrap:wrap; gap:12px;}
+  .pg-info{font-size:13px; color:var(--text-muted);}
+  .pagination .page-link{
+    color:var(--text-dark); border:1px solid var(--border-color); font-size:13px; font-weight:500;
+    padding:7px 13px; border-radius:8px !important; margin-left:4px;
+  }
+  .pagination .page-item.active .page-link{background-color:var(--teal); border-color:var(--teal); color:#fff;}
+  .pagination .page-link:hover{background-color:var(--teal-light); color:var(--teal-dark); border-color:var(--teal-light);}
+  .pagination .page-item.disabled .page-link{color:#C7CBD1; background:#fff;}
+
+  .empty-state{display:none; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:64px 24px;}
+  .empty-state.show{display:flex;}
+  .empty-state .icon-circle{
+    width:72px; height:72px; border-radius:50%; background:var(--teal-light); display:flex; align-items:center;
+    justify-content:center; margin-bottom:18px;
+  }
+  .empty-state h5{font-size:17px; font-weight:600; color:var(--text-dark); margin-bottom:6px;}
+  .empty-state p{font-size:14px; color:var(--text-muted); max-width:380px; margin-bottom:20px;}
+
+  .skeleton-wrap{display:none;}
+  .skeleton-wrap.show{display:block;}
+  .skeleton-row{display:flex; align-items:center; gap:16px; padding:14px; border-bottom:1px solid var(--border-color);}
+  .skel-block{background:linear-gradient(90deg,#EEF0F3 25%,#F6F7F9 37%,#EEF0F3 63%); background-size:400% 100%; animation:shimmer 1.4s ease infinite; border-radius:6px;}
+  @keyframes shimmer{0%{background-position:100% 50%;}100%{background-position:0 50%;}}
+{% endblock %}
+
+{% block breadcrumb %}
+
+    <div class="breadcrumb-nav">
+      <a href="{{ url_for(dashboard_endpoint) }}">Dashboard</a>
+      <span class="sep material-symbols-outlined">chevron_right</span>
+      <span class="current">Appointment Scheduling</span>
+    </div>{% endblock %}
+
+{% block content %}
+    <div class="eyebrow">Barangay Poblacion Health Center</div>
+    <div class="page-title">Appointment Scheduling</div>
+    <div class="page-desc">View, book, and manage patient appointments across all health center services.</div>
+
+    <!-- STAT CARDS — the four figures that describe today's queue. Same card
+         structure as before; the numbers now come from models/appointments.py
+         get_queue_stats() rather than being written into the markup. -->
+    <div class="row g-3 mt-1 mb-4">
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:var(--teal-light);"><span class="material-symbols-outlined" style="color:var(--teal-dark);">today</span></div>
+          <div class="stat-value">{{ queue_stats.total_today }}</div>
+          <div class="stat-label">Today's Appointments</div>
+          <div class="stat-trend" style="color:var(--text-muted);">{{ queue_stats.walk_ins }} walk-in{{ '' if queue_stats.walk_ins == 1 else 's' }}</div>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#FEF3C7;"><span class="material-symbols-outlined" style="color:#B45309;">hourglass_top</span></div>
+          <div class="stat-value">{{ queue_stats.waiting }}</div>
+          <div class="stat-label">In the waiting room</div>
+          <!-- The whole waiting room above; below, how many of them can actually
+               go in, which under one-at-a-time is never more than one. -->
+          <div class="stat-trend" style="color:var(--text-muted);">
+            {%- if queue_stats.ready %}{{ queue_stats.next_up_name }} can be seen now{% else %}{{ queue_stats.not_arrived }} not yet arrived{% endif -%}
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:var(--teal-light);"><span class="material-symbols-outlined" style="color:var(--teal-dark);">stethoscope</span></div>
+          <div class="stat-value">{{ queue_stats.in_consultation }}</div>
+          <div class="stat-label">In Consultation</div>
+          <!-- One clinician, so this card is a 0 or a 1 and the line under it can
+               afford to name the person rather than count them. -->
+          <div class="stat-trend" style="color:var(--text-muted);">
+            {%- if queue_stats.active_name %}{{ queue_stats.active_name }}, being seen now
+            {%- elif queue_stats.next_up_name %}Clinician free · {{ queue_stats.next_up_name }} is next
+            {%- else %}Clinician free{% endif -%}
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#DCFCE7;"><span class="material-symbols-outlined" style="color:var(--success);">check_circle</span></div>
+          <div class="stat-value">{{ queue_stats.completed }}</div>
+          <div class="stat-label">Completed</div>
+          <div class="stat-trend" style="color:var(--text-muted);">Today</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CALENDAR PANEL — real, as of this pass. It was a hand-written July 2026
+         grid with invented counts; every cell below is now one day's actual
+         appointments, read in a single grouped query (get_appointment_day_summary).
+
+         The month is chosen by ?month=YYYY-MM, so the arrows are links rather
+         than script: the whole panel is server-rendered, which means a booking
+         made in another tab is reflected the moment the page is reloaded, and
+         there is no second copy of the counts living in the browser. -->
+    <div class="panel-card">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-2">
+        <div>
+          <div class="panel-title">{{ calendar.label }}</div>
+          <div class="panel-sub">
+            {{ queue_date | long_date }} &middot; Today
+{%- if calendar.month_total %} &middot; {{ calendar.month_total }} appointment{{ '' if calendar.month_total == 1 else 's' }} this month, {{ calendar.month_pending }} still to come{% endif %}
+          </div>
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <a class="cal-nav-btn" href="{{ url_for(appointment_scheduling_endpoint, month=calendar.previous) }}" title="Previous month"><span class="material-symbols-outlined" style="font-size:18px;">chevron_left</span></a>
+          <a class="cal-nav-btn" href="{{ url_for(appointment_scheduling_endpoint, month=calendar.next) }}" title="Next month"><span class="material-symbols-outlined" style="font-size:18px;">chevron_right</span></a>
+{%- if not calendar.is_current_month %}
+          <a class="btn-outline-teal" href="{{ url_for(appointment_scheduling_endpoint) }}" style="text-decoration:none;"><span class="material-symbols-outlined" style="font-size:18px;">today</span>This month</a>
+{%- endif %}
+          <!-- Now live: opens the advance-booking dialog at the foot of this
+               page. Same button, same place; it simply does what it says. -->
+          <button class="btn-primary-teal" data-bs-toggle="modal" data-bs-target="#bookAppointmentModal"><span class="material-symbols-outlined" style="font-size:18px;">add</span>New Appointment</button>
+        </div>
+      </div>
+
+      <div class="row g-3">
+        <div class="col-lg-9">
+          <div class="cal-grid">
+            <div class="cal-dow">Sun</div><div class="cal-dow">Mon</div><div class="cal-dow">Tue</div><div class="cal-dow">Wed</div><div class="cal-dow">Thu</div><div class="cal-dow">Fri</div><div class="cal-dow">Sat</div>
+{#- One cell per day of the grid, including the neighbouring months' edge days:
+    a booking on the 1st of next month is no less real for appearing in the last
+    row of this one. A day carrying bookings nobody has arrived for yet is a
+    button, and filters the Upcoming Appointments list below; every other day is
+    an inert div, so nothing is clickable that has nothing to show. #}
+{%- for week in calendar.weeks %}
+{%- for cell in week %}
+{%- set clickable = cell.pending > 0 and not cell.is_past %}
+{%- set classes = 'cal-cell' ~ ('' if cell.in_month else ' muted') ~ (' today' if cell.is_today else '') ~ (' has-upcoming' if clickable else '') %}
+{#- A pending booking on a day already gone is not "expected" -- it is a booking
+    nobody ever closed, and saying so is what makes it findable. Both readings
+    count the same rows; only the word differs. #}
+{%- set summary %}{{ cell.total }} appointment{{ '' if cell.total == 1 else 's' }}{% if cell.pending %}, {{ cell.pending }} {{ 'never closed — neither arrived, cancelled nor marked a no-show' if cell.is_past else 'still expected' }}{% endif %}{% if cell.in_queue %}, {{ cell.in_queue }} in the queue{% endif %}{% if cell.completed %}, {{ cell.completed }} completed{% endif %}{% if cell.cancelled %}, {{ cell.cancelled }} cancelled or missed{% endif %}{% endset %}
+{%- if clickable %}
+            <button type="button" class="{{ classes }}" data-cal-date="{{ cell.iso }}" title="{{ cell.date | long_date }} — {{ summary }}. Click to list them below.">
+{%- else %}
+            <div class="{{ classes }}"{% if cell.total %} title="{{ cell.date | long_date }} — {{ summary }}"{% endif %}>
+{%- endif %}
+              <div class="cal-date">{{ cell.day }}</div>
+{%- if cell.total %}
+              <div class="cal-dot-row">
+{%- for _ in range([cell.pending, 3] | min) %}<span class="cal-dot dot-scheduled"></span>{% endfor %}
+{%- for _ in range([cell.in_queue, 3] | min) %}<span class="cal-dot dot-inqueue"></span>{% endfor %}
+{%- for _ in range([cell.completed, 3] | min) %}<span class="cal-dot dot-completed"></span>{% endfor %}
+{%- for _ in range([cell.cancelled, 3] | min) %}<span class="cal-dot dot-cancelled"></span>{% endfor %}
+              </div>
+              <div class="cal-count">{% if cell.pending %}{{ cell.pending }} {{ 'unclosed' if cell.is_past else 'scheduled' }}{% else %}{{ cell.total }} total{% endif %}</div>
+{%- endif %}
+{%- if clickable %}
+            </button>
+{%- else %}
+            </div>
+{%- endif %}
+{%- endfor %}
+{%- endfor %}
+          </div>
+
+          <div class="legend-row">
+            <div class="legend-item"><span class="cal-dot dot-scheduled"></span>Scheduled &mdash; not yet arrived</div>
+            <div class="legend-item"><span class="cal-dot dot-inqueue"></span>Arrived / in consultation</div>
+            <div class="legend-item"><span class="cal-dot dot-completed"></span>Completed</div>
+            <div class="legend-item"><span class="cal-dot dot-cancelled"></span>Cancelled or missed</div>
+          </div>
+        </div>
+
+        <div class="col-lg-3">
+          <!-- The next few people expected, whatever month the grid is showing:
+               this answers "who is coming?", which does not change because the
+               operator paged the calendar forward to book something. -->
+          <div class="panel-title" style="font-size:15px;">Upcoming Reminders</div>
+          <div class="panel-sub">Next patients expected after today</div>
+          <div class="mt-2">
+{%- for entry in upcoming[:5] %}
+            <div class="reminder-item">
+              <div class="reminder-icon"><span class="material-symbols-outlined" style="font-size:18px; color:var(--teal-dark);">event</span></div>
+              <div>
+                <div class="reminder-title">{{ entry.first_name }} {{ entry.last_name }}</div>
+                <div class="reminder-meta">{{ entry.appointment_type or 'Consultation' }} &middot; {{ entry.when_label }}, {{ entry.booked_time or '—' }}</div>
+              </div>
+            </div>
+{%- else %}
+            <div class="reminder-empty">
+              Nothing booked beyond today. Use <strong>New Appointment</strong> to schedule a future visit.
+            </div>
+{%- endfor %}
+          </div>
+{%- if upcoming_stats.total > 5 %}
+          <div class="panel-sub mt-2">+ {{ upcoming_stats.total - 5 }} more in the list below.</div>
+{%- endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- LIST PANEL — today's consultation queue -->
+    <div class="panel-card">
+
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-2">
+        <div>
+          <div class="panel-title">Today's Queue</div>
+          <div class="panel-sub">{{ queue_date | display_date }} &middot; in arrival order, patients in consultation first</div>
+        </div>
+      </div>
+
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-3">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <div class="toolbar-search">
+            <span class="material-symbols-outlined" style="font-size:18px;">search</span>
+            <input type="text" id="queueSearch" placeholder="Search by patient name, patient ID, or reason">
+          </div>
+          <button class="filter-btn" id="filterToggleBtn" onclick="toggleFilterPanel()">
+            <span class="material-symbols-outlined" style="font-size:18px;">filter_list</span>Advanced Filter
+          </button>
+          <button class="filter-btn"><span class="material-symbols-outlined" style="font-size:18px;">sort</span>Sort</button>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <button class="btn-outline-teal"><span class="material-symbols-outlined" style="font-size:18px;">file_download</span>Export</button>
+          <!-- The two things a desk does here, and the pair is deliberate: Check
+               In records somebody who is standing there now, New Appointment
+               commits to a day that has not come yet. Booking is offered beside
+               the queue because the moment a visit ends is when the follow-up
+               gets agreed. -->
+          <button class="btn-outline-teal" data-bs-toggle="modal" data-bs-target="#bookAppointmentModal"><span class="material-symbols-outlined" style="font-size:18px;">event_available</span>New Appointment</button>
+          <button class="btn-primary-teal" data-bs-toggle="modal" data-bs-target="#checkInModal"><span class="material-symbols-outlined" style="font-size:18px;">how_to_reg</span>Check In Patient</button>
+        </div>
+      </div>
+
+      <!-- ADVANCED FILTER PANEL — still decorative: Apply Filter is not wired to
+           anything, and the live filtering on this screen is the search box
+           above. What was corrected here is only the content it displays, which
+           was inventing data: a date pinned to 2026-07-07 and four made-up staff
+           names. It now shows the real queue date and the same service and staff
+           vocabularies the booking dialog offers, so nothing on this screen
+           claims a person or a date that does not exist. -->
+      <div class="filter-panel" id="filterPanel">
+        <div class="row g-3">
+          <div class="col-md-3 col-sm-6">
+            <label>Date</label>
+            <input type="date" class="form-control" value="{{ queue_date }}">
+          </div>
+          <div class="col-md-3 col-sm-6">
+            <label>Service</label>
+            <select class="form-select">
+              <option selected>All Services</option>
+{%- for option in appointment_types %}
+              <option>{{ option }}</option>
+{%- endfor %}
+            </select>
+          </div>
+          <div class="col-md-3 col-sm-6">
+            <label>Status</label>
+            <select class="form-select">
+              <option selected>All Statuses</option>
+              <option>Scheduled</option>
+              <option>Waiting</option>
+              <option>Completed</option>
+              <option>Cancelled</option>
+              <option>No Show</option>
+            </select>
+          </div>
+          <div class="col-md-3 col-sm-6">
+            <label>Healthcare Worker</label>
+            <select class="form-select">
+              <option selected>All Staff</option>
+{%- for member in clinical_staff %}
+              <option>{{ member.full_name }}</option>
+{%- endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="filter-actions">
+          <button class="btn-reset">Reset Filters</button>
+          <button class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">filter_alt</span>Apply Filter</button>
+        </div>
+      </div>
+
+      <!-- LOADING STATE -->
+      <div class="skeleton-wrap" id="skeletonWrap">
+        <div class="skeleton-row"><div class="skel-block" style="width:90px;height:14px;"></div><div class="skel-block" style="width:150px;height:14px;"></div><div class="skel-block" style="width:120px;height:14px;"></div><div class="skel-block" style="width:100px;height:14px;"></div><div class="skel-block" style="width:80px;height:14px;"></div><div class="skel-block" style="width:90px;height:14px;"></div></div>
+        <div class="skeleton-row"><div class="skel-block" style="width:90px;height:14px;"></div><div class="skel-block" style="width:150px;height:14px;"></div><div class="skel-block" style="width:120px;height:14px;"></div><div class="skel-block" style="width:100px;height:14px;"></div><div class="skel-block" style="width:80px;height:14px;"></div><div class="skel-block" style="width:90px;height:14px;"></div></div>
+        <div class="skeleton-row" style="border-bottom:none;"><div class="skel-block" style="width:90px;height:14px;"></div><div class="skel-block" style="width:150px;height:14px;"></div><div class="skel-block" style="width:120px;height:14px;"></div><div class="skel-block" style="width:100px;height:14px;"></div><div class="skel-block" style="width:80px;height:14px;"></div><div class="skel-block" style="width:90px;height:14px;"></div></div>
+      </div>
+
+      <div style="overflow-x:auto;{% if not queue %} display:none;{% endif %}" id="tableWrap">
+        <table class="appt-table" id="apptTable">
+          <thead>
+            <tr>
+              <th style="width:44px;">#</th>
+              <th>Appointment ID</th>
+              <th>Patient Name</th>
+              <th>Service / Reason</th>
+              <th>Arrived</th>
+              <th>Booked</th>
+              <th>Status</th>
+              <th style="text-align:right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="queueBody">
+{#- The queue position, who may start, and who is next are all decided in
+    models/appointments.py _apply_queue_flow() and read off the entry here. The
+    template deliberately works none of it out for itself: the button is offered
+    exactly where start_consultation() would accept it, because both are reading
+    the same answer. #}
+{%- for entry in queue %}
+{%- set patient_name = entry.first_name ~ ' ' ~ entry.last_name %}
+            <tr class="queue-row{% if entry.is_in_consultation %} row-inconsult{% elif entry.is_ready %} row-ready{% endif %}"
+                data-search="{{ (entry.first_name ~ ' ' ~ (entry.middle_name or '') ~ ' ' ~ entry.last_name ~ ' ' ~ entry.patient_reference ~ ' ' ~ (entry.notes or '') ~ ' ' ~ (entry.appointment_type or '')) | lower }}">
+              <td>
+{%- if entry.is_in_consultation %}
+                <span class="material-symbols-outlined" style="font-size:18px; color:var(--teal-dark);" title="In consultation now">stethoscope</span>
+{%- elif entry.line_position %}
+                <span class="queue-pos{% if entry.is_next_up %} pos-next{% endif %}"
+                      title="{% if entry.is_next_up %}Next in line{% else %}Number {{ entry.line_position }} in line{% endif %}">{{ entry.line_position }}</span>
+{%- else %}
+                <span style="color:#C7CBD1;">&mdash;</span>
+{%- endif %}
+              </td>
+              <td class="appt-id">{{ entry.reference }}</td>
+              <td>
+                <div class="pat-name"><a href="{{ url_for(patient_profile_endpoint, patient_id=entry.patient_id) }}">{{ entry.first_name }}{% if entry.middle_name %} {{ entry.middle_name }}{% endif %} {{ entry.last_name }}</a>{% if entry.walk_in %}<span class="walkin-tag">Walk-in</span>{% endif %}{% if entry.is_next_up and not entry.is_ready %}<span class="next-tag">Next</span>{% endif %}
+{#- A child in the building who is due or overdue for a dose. Put on the row
+    rather than left to the profile because this is the moment it can be acted
+    on -- once the parent has gone home the information is worth much less. The
+    count and the wording come from get_immunization_alert(), the same call the
+    dashboard card reads. #}
+{%- if entry.immunization_due %}<span class="immun-tag{% if entry.immunization_overdue %} immun-overdue{% endif %}" title="{{ entry.immunization_count }} dose{{ '' if entry.immunization_count == 1 else 's' }} {{ 'overdue' if entry.immunization_overdue else 'due' }} — next: {{ entry.immunization_next }}"><span class="material-symbols-outlined" style="font-size:13px;">vaccines</span>{{ entry.immunization_count }} {{ 'overdue' if entry.immunization_overdue else 'due' }}</span>{% endif %}</div>
+                <div class="po-meta">{{ entry.patient_reference }}</div>
+              </td>
+              <td>
+                <div>{{ entry.appointment_type or 'Consultation' }}</div>
+{%- if entry.notes %}
+                <div class="reason-text">{{ entry.notes }}</div>
+{%- endif %}
+              </td>
+              <td>{{ entry.arrival_time or '—' }}</td>
+              <td>{{ entry.booked_time or '—' }}</td>
+              <td><span class="badge-status {{ entry.display_badge_class }}">{{ entry.display_status }}</span></td>
+              <td>
+                <div class="d-flex justify-content-end gap-1 align-items-center">
+{%- if entry.can_start %}
+                  <!-- This moves the patient into the room, and is offered only
+                       while the room is empty. Recording what happened in the
+                       consultation is a later pass. The one who arrived first
+                       gets the filled button; anyone taken out of turn gets the
+                       outline one, so the queue still says who is due. -->
+                  <button type="submit" form="startConsultationForm" name="appointment_id" value="{{ entry.id }}"
+                          class="{% if entry.is_ready %}btn-primary-teal{% else %}btn-outline-teal{% endif %}" style="padding:6px 12px; font-size:12.5px;"
+                          title="{% if entry.is_ready %}Start consultation for {{ patient_name }} — first in line{% else %}Start consultation for {{ patient_name }} out of turn{% endif %}">
+                    <span class="material-symbols-outlined" style="font-size:16px;">play_arrow</span>Start Consultation
+                  </button>
+{%- elif entry.is_waiting %}
+                  <!-- Someone else is with the clinician. Shown disabled rather
+                       than hidden so the row explains why it cannot start. The
+                       server refuses this too -- see start_consultation(). -->
+                  <button type="button" class="btn-start-blocked" disabled
+                          title="{{ queue_stats.active_name }} is in consultation. Only one patient is seen at a time — complete that consultation first.">
+                    <span class="material-symbols-outlined" style="font-size:16px;">lock_clock</span>Start Consultation
+                  </button>
+{%- elif entry.can_complete %}
+                  <!-- Writing up the visit is the action that belongs here: it
+                       records what happened and completes the queue entry in one
+                       save. Mark Completed stays beside it, de-emphasised, for
+                       the case where the patient left before anything could be
+                       recorded -- closing a visit with nothing written is a real
+                       situation, just not the normal one. -->
+                  <a href="{{ url_for(record_consultation_endpoint, appointment_id=entry.id) }}"
+                     class="btn-primary-teal" style="padding:6px 12px; font-size:12.5px; text-decoration:none;"
+                     title="Write up {{ patient_name }}'s consultation and complete the visit">
+                    <span class="material-symbols-outlined" style="font-size:16px;">edit_note</span>Record Consultation
+                  </a>
+                  <button type="submit" form="completeConsultationForm" name="appointment_id" value="{{ entry.id }}"
+                          class="btn-outline-teal" style="padding:6px 12px; font-size:12.5px;"
+                          title="Close {{ patient_name }}'s visit without recording a consultation{% if queue_stats.next_up_name %} — {{ queue_stats.next_up_name }} is next{% endif %}">
+                    <span class="material-symbols-outlined" style="font-size:16px;">check_circle</span>Mark Completed
+                  </button>
+{%- elif entry.is_open_booking %}
+                  <!-- Booked for today and not here yet. This is where the
+                       phone call lands -- "I can't make it, can you move me to
+                       Thursday?" -- so the queue offers the same two actions the
+                       upcoming list does, on the same dialogs. Once they are
+                       checked in the row is Waiting and neither is offered:
+                       is_open_booking is false, and close_appointment() and
+                       reschedule_appointment() would refuse anyway. -->
+                  <button type="button" class="btn-outline-teal" style="padding:6px 12px; font-size:12.5px;"
+                          data-bs-toggle="modal" data-bs-target="#rescheduleModal"
+                          data-appointment-id="{{ entry.id }}" data-appointment-label="{{ patient_name }} — {{ entry.appointment_type or 'Consultation' }}"
+                          data-appointment-when="{{ entry.appointment_date | display_date }} at {{ entry.booked_time or 'no time set' }}"
+                          title="Move {{ patient_name }}'s appointment to another date or time">
+                    <span class="material-symbols-outlined" style="font-size:16px;">edit_calendar</span>Reschedule
+                  </button>
+                  <button type="button" class="btn-danger-outline"
+                          data-bs-toggle="modal" data-bs-target="#cancelAppointmentModal"
+                          data-appointment-id="{{ entry.id }}" data-appointment-label="{{ patient_name }} — {{ entry.appointment_type or 'Consultation' }}"
+                          data-appointment-when="{{ entry.appointment_date | display_date }} at {{ entry.booked_time or 'no time set' }}"
+                          data-appointment-closures="{{ entry.closures | join(',') }}"
+                          title="Cancel {{ patient_name }}'s appointment, or mark them a no-show">
+                    <span class="material-symbols-outlined" style="font-size:16px;">event_busy</span>Cancel
+                  </button>
+{%- endif %}
+                  <a href="{{ url_for(patient_profile_endpoint, patient_id=entry.patient_id) }}" class="action-icon" title="Open {{ patient_name }}'s profile"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></a>
+                  <button type="button" class="action-icon"><span class="material-symbols-outlined" style="font-size:18px;">print</span></button>
+                </div>
+              </td>
+            </tr>
+{%- endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- The Start Consultation and Mark Completed buttons above sit in the
+           table, which is inside a horizontal scroll container; the forms live
+           out here and the buttons reach them by id, the same arrangement
+           Patient Records uses for its archive dialog. -->
+      <form id="startConsultationForm" method="post" action="{{ url_for(start_consultation_endpoint) }}"></form>
+      <form id="completeConsultationForm" method="post" action="{{ url_for(complete_consultation_endpoint) }}"></form>
+
+      <!-- EMPTY STATE — shown when nobody is booked or checked in for today, and
+           reused by the live search below when it filters everything out. -->
+      <div class="empty-state{% if not queue %} show{% endif %}" id="emptyState">
+        <div class="icon-circle">
+          <span class="material-symbols-outlined" style="font-size:34px; color:var(--teal-dark);">event_busy</span>
+        </div>
+        <h5>{% if queue %}No matching patients{% else %}Nobody in today's queue yet{% endif %}</h5>
+        <p>{% if queue %}No one in today's queue matches your search. Try a different name or patient ID.{% else %}No appointments are booked for today and no one has checked in. Use Check In Patient when the first patient arrives.{% endif %}</p>
+        <div class="d-flex gap-2">
+          <button class="btn-primary-teal" data-bs-toggle="modal" data-bs-target="#checkInModal"><span class="material-symbols-outlined" style="font-size:18px;">how_to_reg</span>Check In Patient</button>
+          <button class="btn-outline-teal" data-bs-toggle="modal" data-bs-target="#bookAppointmentModal"><span class="material-symbols-outlined" style="font-size:18px;">event_available</span>New Appointment</button>
+        </div>
+      </div>
+
+{%- if queue %}
+      <div class="table-footer" id="tableFooter">
+        <!-- in consultation / ready / waiting are disjoint counts of the people
+             actually in the building, so they add up rather than overlapping --
+             see get_queue_stats(). Under one-at-a-time the first two are each 0
+             or 1, and the summary reads as the real state of the room. -->
+        <div class="pg-info">
+          <span id="queueShown">{{ queue|length }}</span> of {{ queue|length }} patient{{ '' if queue|length == 1 else 's' }} for today
+          &middot; {{ queue_stats.in_consultation }} in consultation
+          &middot; {{ queue_stats.ready }} ready to consult
+          &middot; {{ queue_stats.still_waiting }} waiting
+{%- if queue_stats.not_arrived %}
+          &middot; {{ queue_stats.not_arrived }} not yet arrived
+{%- endif %}
+{%- if queue_stats.completed %}
+          &middot; {{ queue_stats.completed }} completed
+{%- endif %}
+        </div>
+      </div>
+{%- endif %}
+
+
+    </div>
+
+    <!-- UPCOMING APPOINTMENTS — future bookings, kept as a separate panel from
+         today's queue above rather than merged into it.
+
+         WHY THEY ARE NOT ONE LIST
+         -------------------------
+         The queue is a working list for the room: it is in arrival order, it
+         says who may be brought in, and every row on it is somebody the desk can
+         act on right now. A booking for next Tuesday satisfies none of that --
+         it has no arrival time, no queue position, and no action available
+         except waiting for the day. Putting the two in one table would mean
+         either sorting future rows in among people who are physically present,
+         or carrying a "not today" flag on every row that most of the table's
+         columns then have to be blank for.
+
+         They meet at exactly one point, and it is already built: on the morning
+         of the appointment, the row moves from this panel into the queue above
+         when the patient is checked in -- see check_in_patient(), which converts
+         the existing Scheduled row rather than creating a second one. -->
+    <div class="panel-card">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-3">
+        <div>
+          <div class="panel-title">Upcoming Appointments</div>
+          <div class="panel-sub">
+            Booked for a future date &middot; not part of today's queue
+{%- if upcoming_stats.total %} &middot; {{ upcoming_stats.next_seven_days }} within the next 7 days{% endif %}
+          </div>
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <div class="toolbar-search">
+            <span class="material-symbols-outlined" style="font-size:18px;">search</span>
+            <input type="text" id="upcomingSearch" placeholder="Search upcoming by patient, ID, service or date" autocomplete="off">
+          </div>
+          <button type="button" class="day-chip d-none" id="upcomingDayChip">
+            <span class="material-symbols-outlined" style="font-size:15px;">event</span>
+            <span id="upcomingDayLabel"></span>
+            <span class="material-symbols-outlined" style="font-size:15px;">close</span>
+          </button>
+          <button class="btn-primary-teal" data-bs-toggle="modal" data-bs-target="#bookAppointmentModal"><span class="material-symbols-outlined" style="font-size:18px;">add</span>New Appointment</button>
+        </div>
+      </div>
+
+{%- if upcoming %}
+      <div style="overflow-x:auto;" id="upcomingWrap">
+        <table class="appt-table" id="upcomingTable">
+          <thead>
+            <tr>
+              <th>Appointment ID</th>
+              <th>Patient Name</th>
+              <th>Service / Reason</th>
+              <th>Date</th>
+              <th>Time</th>
+              <th>Assigned To</th>
+              <th>Status</th>
+              <th style="text-align:right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="upcomingBody">
+{#- Grouped under a date header rather than repeating the date on every row: the
+    question this list answers is "what does Thursday look like?", and a header
+    per day answers it without the eye having to compare a column. #}
+{%- set day_seen = namespace(value=None) %}
+{%- for entry in upcoming %}
+{%- set day = entry.appointment_date[:10] %}
+{%- if day != day_seen.value %}
+{%- set day_seen.value = day %}
+            <tr class="upcoming-day-row" data-upcoming-day="{{ day }}">
+              <td colspan="8">{{ entry.appointment_date | long_date }} &middot; {{ entry.when_label }}{% if entry.days_away is not none %} &middot; in {{ entry.days_away }} day{{ '' if entry.days_away == 1 else 's' }}{% endif %}</td>
+            </tr>
+{%- endif %}
+{%- set patient_name = entry.first_name ~ ' ' ~ entry.last_name %}
+            <tr class="upcoming-row" data-upcoming-day="{{ day }}"
+                data-search="{{ (entry.first_name ~ ' ' ~ (entry.middle_name or '') ~ ' ' ~ entry.last_name ~ ' ' ~ entry.patient_reference ~ ' ' ~ (entry.notes or '') ~ ' ' ~ (entry.appointment_type or '') ~ ' ' ~ day ~ ' ' ~ entry.when_label) | lower }}">
+              <td class="appt-id">{{ entry.reference }}</td>
+              <td>
+                <div class="pat-name"><a href="{{ url_for(patient_profile_endpoint, patient_id=entry.patient_id) }}">{{ patient_name }}</a></div>
+                <div class="po-meta">{{ entry.patient_reference }}</div>
+              </td>
+              <td>
+                <div>{{ entry.appointment_type or 'Consultation' }}</div>
+{%- if entry.notes %}
+                <div class="reason-text">{{ entry.notes }}</div>
+{%- endif %}
+              </td>
+              <td>{{ entry.appointment_date | display_date }}</td>
+              <td>{{ entry.booked_time or '—' }}</td>
+              <td>{{ entry.assigned_staff or '—' }}</td>
+              <td><span class="badge-status {{ entry.status_badge_class }}">{{ entry.status }}</span></td>
+              <td>
+                <div class="d-flex justify-content-end gap-1 align-items-center">
+{#- The two things that can still happen to a plan: move it, or call it off.
+    Offered exactly where the model would accept them -- is_open_booking is the
+    same condition close_appointment() and reschedule_appointment() guard their
+    UPDATEs with, so a button is never present that the server would refuse. The
+    dialogs are shared; these buttons only say which appointment. #}
+{%- if entry.is_open_booking %}
+                  <button type="button" class="btn-outline-teal" style="padding:6px 12px; font-size:12.5px;"
+                          data-bs-toggle="modal" data-bs-target="#rescheduleModal"
+                          data-appointment-id="{{ entry.id }}" data-appointment-label="{{ patient_name }} — {{ entry.appointment_type or 'Consultation' }}"
+                          data-appointment-when="{{ entry.appointment_date | display_date }} at {{ entry.booked_time or 'no time set' }}"
+                          title="Move {{ patient_name }}'s appointment to another date or time">
+                    <span class="material-symbols-outlined" style="font-size:16px;">edit_calendar</span>Reschedule
+                  </button>
+                  <button type="button" class="btn-danger-outline"
+                          data-bs-toggle="modal" data-bs-target="#cancelAppointmentModal"
+                          data-appointment-id="{{ entry.id }}" data-appointment-label="{{ patient_name }} — {{ entry.appointment_type or 'Consultation' }}"
+                          data-appointment-when="{{ entry.appointment_date | display_date }} at {{ entry.booked_time or 'no time set' }}"
+                          data-appointment-closures="{{ entry.closures | join(',') }}"
+                          title="Cancel {{ patient_name }}'s appointment">
+                    <span class="material-symbols-outlined" style="font-size:16px;">event_busy</span>Cancel
+                  </button>
+{%- endif %}
+                  <a href="{{ url_for(patient_profile_endpoint, patient_id=entry.patient_id) }}" class="action-icon" title="Open {{ patient_name }}'s profile"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></a>
+                  <button type="button" class="action-icon"><span class="material-symbols-outlined" style="font-size:18px;">print</span></button>
+                </div>
+              </td>
+            </tr>
+{%- endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="empty-state" id="upcomingEmpty">
+        <div class="icon-circle"><span class="material-symbols-outlined" style="font-size:34px; color:var(--teal-dark);">search_off</span></div>
+        <h5>No matching appointments</h5>
+        <p>No upcoming appointment matches your search. Try a different name, date or service.</p>
+      </div>
+
+      <div class="table-footer">
+        <div class="pg-info">
+          <span id="upcomingShown">{{ upcoming|length }}</span> of {{ upcoming|length }} upcoming appointment{{ '' if upcoming|length == 1 else 's' }}
+          across {{ upcoming_stats.days_with_bookings }} day{{ '' if upcoming_stats.days_with_bookings == 1 else 's' }}
+{%- if upcoming_stats.tomorrow %}
+          &middot; {{ upcoming_stats.tomorrow }} tomorrow
+{%- endif %}
+        </div>
+      </div>
+{%- else %}
+      <div class="empty-state show">
+        <div class="icon-circle">
+          <span class="material-symbols-outlined" style="font-size:34px; color:var(--teal-dark);">event_upcoming</span>
+        </div>
+        <h5>No future appointments booked</h5>
+        <p>Nothing is scheduled beyond today. Book one with New Appointment — it will appear here, and can be checked in from the queue above on the day itself.</p>
+        <div class="d-flex gap-2">
+          <button class="btn-primary-teal" data-bs-toggle="modal" data-bs-target="#bookAppointmentModal"><span class="material-symbols-outlined" style="font-size:18px;">add</span>New Appointment</button>
+        </div>
+      </div>
+{%- endif %}
+    </div>
+
+    <!-- CHECK-IN DIALOG — same modal shape as Patient Records' status dialog:
+         centred, 16px radius, header / body / footer.
+
+         Two ways a patient reaches the desk, and the dialog now covers both:
+
+         EXISTING PATIENT. Chosen from the roster rather than typed, so a
+         check-in cannot invent a patient or re-enter details Patient Records
+         already holds. The list is filtered in the browser; with one barangay's
+         roster that is instant and keeps the dialog usable with no round trip.
+
+         NEW PATIENT (FIRST VISIT). A first-time walk-in has no record to pick,
+         so this hands off to the existing Register Patient screen rather than
+         asking for her details here. There is deliberately no short form: per
+         the team's decision the full personal record is captured once, while she
+         is at the desk, instead of being chased up afterwards -- and the form
+         that does that already exists, with its own validation and its own
+         duplicate check. Reproducing any of it here would mean two forms that
+         have to agree forever. The reason for the visit typed below travels with
+         her, and the moment the registration saves she is both registered and in
+         today's queue.
+
+         Whether a check-in becomes a walk-in or converts an existing booking is
+         not asked on either path -- the server decides it from what today
+         already holds, so the two cannot disagree. -->
+    <div class="modal fade" id="checkInModal" tabindex="-1" aria-labelledby="checkInModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.12);">
+          <div class="modal-header">
+            <h5 class="modal-title" id="checkInModalLabel">Check In Patient</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p style="font-size:13.5px; color:var(--text-muted); margin-bottom:14px;">
+              Records the patient's arrival for {{ queue_date | display_date }}.
+            </p>
+
+            <div class="mode-pill-group" id="checkInModes">
+              <label class="mode-pill checked">
+                <input type="radio" name="check_in_mode" value="existing" checked>Existing patient
+              </label>
+              <label class="mode-pill">
+                <input type="radio" name="check_in_mode" value="new">New patient (first visit)
+              </label>
+            </div>
+
+            <!-- The two panes are sibling forms rather than one form with a
+                 branch: HTML has no nested forms, and keeping them separate
+                 means the hidden pane's required fields never block the visible
+                 pane's submit. The footer buttons reach whichever is showing
+                 through the form= attribute, exactly as the queue's Start
+                 Consultation buttons reach their form above. -->
+            <div id="checkInExistingPane">
+              <form id="checkInExistingForm" method="post" action="{{ url_for(check_in_patient_endpoint) }}">
+                <div class="mode-hint">
+                  If they already have an appointment booked today it is checked in rather than
+                  duplicated; otherwise a walk-in is created.
+                </div>
+
+                <label class="field-label" for="checkInSearch">Patient</label>
+                <div class="toolbar-search mb-2">
+                  <span class="material-symbols-outlined" style="font-size:18px;">search</span>
+                  <input type="text" id="checkInSearch" placeholder="Search by name, patient ID, or contact number" autocomplete="off">
+                </div>
+
+                <div class="patient-pick" id="patientPick">
+{%- for patient in checkin_patients %}
+                  <label class="patient-option" data-search="{{ (patient.full_name ~ ' ' ~ patient.patient_id ~ ' ' ~ (patient.contact_number or '')) | lower }}">
+                    <input type="radio" name="patient_id" value="{{ patient.id }}" required>
+                    <span class="po-body">
+                      <span>
+                        <span class="po-name">{{ patient.full_name }}</span>
+                        <span class="po-meta d-block">{{ patient.patient_id }}{% if patient.age %} &middot; {{ patient.age }}{% endif %}{% if patient.sex %} &middot; {{ patient.sex }}{% endif %}</span>
+                      </span>
+{%- if patient.today_in_queue %}
+                      <span class="po-queued">Already {{ patient.today_status }}</span>
+{%- elif patient.today_status %}
+                      <span class="po-booked">Booked{% if patient.today_booked_time %} {{ patient.today_booked_time }}{% endif %}</span>
+{%- endif %}
+                    </span>
+                  </label>
+{%- endfor %}
+                  <div class="pick-empty" id="pickEmpty">No active patient matches that search.</div>
+                </div>
+
+                <label class="field-label mt-3" for="checkInReason">Reason for visit</label>
+                <input type="text" class="form-control" id="checkInReason" name="reason" maxlength="200"
+                       placeholder="e.g. Fever and cough for three days" required>
+                <div class="form-text-hint">Recorded against the visit. The full consultation record is entered once the patient is seen.</div>
+              </form>
+            </div>
+
+            <div id="checkInNewPane" class="d-none">
+              <!-- GET, because this navigates to the registration form rather
+                   than saving anything. Nothing is created until that form is
+                   submitted and passes its own validation. -->
+              <form id="checkInNewForm" method="get" action="{{ url_for(register_patient_endpoint) }}">
+                <input type="hidden" name="check_in" value="1">
+                <div class="mode-hint">
+                  Opens the Register Patient form. Saving it registers the patient permanently
+                  <em>and</em> places them in today's queue in one step — there is no separate
+                  check-in to remember afterwards.
+                </div>
+
+                <label class="field-label" for="newPatientReason">Reason for visit</label>
+                <input type="text" class="form-control" id="newPatientReason" name="check_in_reason" maxlength="200"
+                       placeholder="e.g. First prenatal check-up" required>
+                <div class="form-text-hint">Carried through the registration form and recorded against today's visit.</div>
+              </form>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" form="checkInExistingForm" class="btn-primary-teal" id="checkInExistingSubmit">
+              <span class="material-symbols-outlined" style="font-size:18px;">how_to_reg</span>Check In
+            </button>
+            <button type="submit" form="checkInNewForm" class="btn-primary-teal d-none" id="checkInNewSubmit">
+              <span class="material-symbols-outlined" style="font-size:18px;">person_add</span>Continue to Registration
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- NEW APPOINTMENT DIALOG — advance booking.
+         Same dialog shape and the same two-ways-in as Check In above, because it
+         is the same decision one step earlier: the patient either has a record or
+         is about to get one.
+
+         ONE FORM, NOT TWO. The check-in dialog needed sibling forms because its
+         two panes submit to different places. Here both panes submit the same
+         appointment to the same endpoint -- the only difference is whether a
+         patient is picked or registered first -- so duplicating the date, time
+         and service fields into a second form would create two sets of inputs
+         that have to be kept saying the same thing. The pane choice travels as
+         booking_mode and the server branches on it.
+
+         novalidate, as on Register Patient: validate_booking_form() is the
+         authority, it runs on every submit, and a POST can arrive here without
+         the page ever having been opened. -->
+    <div class="modal fade" id="bookAppointmentModal" tabindex="-1" aria-labelledby="bookAppointmentLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content" style="border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.12);">
+          <div class="modal-header">
+            <h5 class="modal-title" id="bookAppointmentLabel">New Appointment</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+
+{%- if booking.errors %}
+            <div class="alert-ids alert-danger-ids">
+              <span class="material-symbols-outlined">error</span>
+              <div>
+                <strong>This appointment was not booked</strong>
+                Correct the {{ booking.errors|length }} highlighted field{{ '' if booking.errors|length == 1 else 's' }} below. Everything you already entered has been kept.
+              </div>
+            </div>
+{%- endif %}
+
+{%- set slot_clashes = booking.conflicts.slot %}
+{%- set day_clashes = booking.conflicts.patient_day %}
+{%- if slot_clashes or day_clashes %}
+            <!-- SOFT SCHEDULING CONFLICT — informs, never blocks, exactly as the
+                 duplicate-patient warning on Register Patient does. Submitting
+                 again carries the hidden confirm_conflict field below and books
+                 the appointment as entered. -->
+            <div class="alert-ids alert-warning-ids">
+              <span class="material-symbols-outlined">warning</span>
+              <div>
+                <strong>That day is already spoken for — please check before booking</strong>
+{%- if day_clashes %}
+                This patient already has {{ day_clashes|length }} appointment{{ '' if day_clashes|length == 1 else 's' }} that day:
+                {% for other in day_clashes %}{{ other.booked_time or 'time not set' }} {{ other.appointment_type or 'Consultation' }}{{ '; ' if not loop.last else '' }}{% endfor %}.
+                Only the earliest of a day's bookings is checked in when they arrive, so a second one would be left Scheduled with nobody to close it.
+{%- endif %}
+{%- if slot_clashes %}
+                {{ slot_clashes|length }} other patient{{ '' if slot_clashes|length == 1 else 's' }} already booked for {{ booking.form.appointment_time }}:
+                {% for other in slot_clashes %}{{ other.first_name }} {{ other.last_name }} ({{ other.appointment_type or 'Consultation' }}){{ '; ' if not loop.last else '' }}{% endfor %}.
+                One clinician sees one patient at a time here, so one of them will wait.
+{%- endif %}
+                Nothing has been saved yet. If this is what you intend, press
+                <strong style="display:inline;">Book Appointment</strong> again — or change the time first.
+              </div>
+            </div>
+{%- endif %}
+
+            <p style="font-size:13.5px; color:var(--text-muted); margin-bottom:14px;">
+              Books a visit for a future date. It is saved as <strong style="display:inline;">Scheduled</strong> —
+              the patient joins the queue on the day itself, when they arrive and are checked in.
+              For someone who is here <em>now</em>, use Check In Patient instead.
+            </p>
+
+            <form id="bookingForm" method="post" action="{{ url_for(book_appointment_endpoint) }}" novalidate>
+{%- if booking.acknowledge_conflict %}
+              <input type="hidden" name="confirm_conflict" value="yes">
+{%- endif %}
+
+              <div class="mode-pill-group" id="bookingModes">
+                <label class="mode-pill{% if booking.mode != 'new' %} checked{% endif %}">
+                  <input type="radio" name="booking_mode" value="existing"{% if booking.mode != 'new' %} checked{% endif %}>Existing patient
+                </label>
+                <label class="mode-pill{% if booking.mode == 'new' %} checked{% endif %}">
+                  <input type="radio" name="booking_mode" value="new"{% if booking.mode == 'new' %} checked{% endif %}>New patient (not yet registered)
+                </label>
+              </div>
+
+              <div id="bookingExistingPane">
+                <label class="field-label" for="bookingSearch">Patient<span class="req">*</span></label>
+                <div class="toolbar-search mb-2">
+                  <span class="material-symbols-outlined" style="font-size:18px;">search</span>
+                  <input type="text" id="bookingSearch" placeholder="Search by name, patient ID, or contact number" autocomplete="off">
+                </div>
+
+                <div class="patient-pick" id="bookingPatientPick">
+{%- for patient in checkin_patients %}
+                  <label class="patient-option" data-search="{{ (patient.full_name ~ ' ' ~ patient.patient_id ~ ' ' ~ (patient.contact_number or '')) | lower }}">
+                    <input type="radio" name="patient_id" value="{{ patient.id }}"{% if booking.form.patient_id == patient.id|string %} checked{% endif %}>
+                    <span class="po-body">
+                      <span>
+                        <span class="po-name">{{ patient.full_name }}</span>
+                        <span class="po-meta d-block">{{ patient.patient_id }}{% if patient.age %} &middot; {{ patient.age }}{% endif %}{% if patient.sex %} &middot; {{ patient.sex }}{% endif %}</span>
+                      </span>
+                    </span>
+                  </label>
+{%- endfor %}
+                  <div class="pick-empty" id="bookingPickEmpty">No active patient matches that search.</div>
+                </div>
+{%- if booking.errors.patient_id %}
+                <div class="field-error">{{ booking.errors.patient_id }}</div>
+{%- endif %}
+              </div>
+
+              <div id="bookingNewPane" class="d-none">
+                <div class="mode-hint">
+                  Continues to the Register Patient form with this appointment attached. Nothing is
+                  created until that form is completed and saved — and when it is, the patient is
+                  registered <em>and</em> the appointment below is booked in one step.
+                </div>
+              </div>
+
+              <div class="row g-3 mt-1">
+                <div class="col-md-6">
+                  <label class="field-label" for="bookingDate">Date<span class="req">*</span></label>
+                  <input type="date" class="form-control{% if booking.errors.appointment_date %} is-invalid{% endif %}"
+                         id="bookingDate" name="appointment_date"
+                         min="{{ booking_min_date }}" max="{{ booking_max_date }}"
+                         value="{{ booking.form.appointment_date or '' }}">
+{%- if booking.errors.appointment_date %}
+                  <div class="field-error">{{ booking.errors.appointment_date }}</div>
+{%- else %}
+                  <div class="form-text-hint">Tomorrow onwards. Same-day arrivals go through Check In Patient.</div>
+{%- endif %}
+                </div>
+                <div class="col-md-6">
+                  <label class="field-label" for="bookingTime">Time<span class="req">*</span></label>
+                  <select class="form-select{% if booking.errors.appointment_time %} is-invalid{% endif %}" id="bookingTime" name="appointment_time">
+                    <option value="">Choose a slot…</option>
+{%- for slot in booking_time_slots %}
+                    <option value="{{ slot }}"{% if booking.form.appointment_time == slot %} selected{% endif %}>{{ slot }}</option>
+{%- endfor %}
+                  </select>
+{%- if booking.errors.appointment_time %}
+                  <div class="field-error">{{ booking.errors.appointment_time }}</div>
+{%- else %}
+                  <div class="form-text-hint" id="bookingSlotHint">Slots already holding a patient are marked once you pick a date.</div>
+{%- endif %}
+                </div>
+
+                <div class="col-md-6">
+                  <label class="field-label" for="bookingType">Reason / Service<span class="req">*</span></label>
+                  <select class="form-select{% if booking.errors.appointment_type %} is-invalid{% endif %}" id="bookingType" name="appointment_type">
+                    <option value="">Choose a service…</option>
+{%- for option in appointment_types %}
+                    <option value="{{ option }}"{% if booking.form.appointment_type == option %} selected{% endif %}>{{ option }}</option>
+{%- endfor %}
+                  </select>
+{%- if booking.errors.appointment_type %}
+                  <div class="field-error">{{ booking.errors.appointment_type }}</div>
+{%- endif %}
+                </div>
+                <div class="col-md-6">
+                  <label class="field-label" for="bookingStaff">Assign to</label>
+                  <select class="form-select{% if booking.errors.assigned_staff_id %} is-invalid{% endif %}" id="bookingStaff" name="assigned_staff_id">
+                    <option value="">Anyone on duty</option>
+{%- for member in clinical_staff %}
+                    <option value="{{ member.id }}"{% if booking.form.assigned_staff_id == member.id|string %} selected{% endif %}>{{ member.full_name }}</option>
+{%- endfor %}
+                  </select>
+{%- if booking.errors.assigned_staff_id %}
+                  <div class="field-error">{{ booking.errors.assigned_staff_id }}</div>
+{%- else %}
+                  <div class="form-text-hint">Optional. Leave as is if it does not matter who sees them.</div>
+{%- endif %}
+                </div>
+
+                <div class="col-12">
+                  <label class="field-label" for="bookingNotes">Note</label>
+                  <input type="text" class="form-control{% if booking.errors.notes %} is-invalid{% endif %}" id="bookingNotes"
+                         name="notes" maxlength="{{ booking_notes_max }}"
+                         value="{{ booking.form.notes or '' }}"
+                         placeholder="e.g. Third trimester check, bring the mother's book">
+{%- if booking.errors.notes %}
+                  <div class="field-error">{{ booking.errors.notes }}</div>
+{%- else %}
+                  <div class="form-text-hint">Optional. Kept with the appointment; whatever the desk adds at check-in is appended to it.</div>
+{%- endif %}
+                </div>
+              </div>
+            </form>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" form="bookingForm" class="btn-primary-teal" id="bookingSubmit">
+              <span class="material-symbols-outlined" style="font-size:18px;" id="bookingSubmitIcon">event_available</span>
+              <span id="bookingSubmitLabel">Book Appointment</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CANCEL / NO-SHOW DIALOG — the same dialog shape Patient Records uses for
+         Active / Inactive / Deceased, and for the same reason: the closing
+         statuses ARE the submit buttons, so choosing one and confirming it are a
+         single step rather than two.
+
+         Both buttons are always in the markup and the dialog hides the one the
+         appointment is not eligible for as it opens, exactly as Screen 03 hides
+         the status a record already holds. No-show is the one that gets hidden:
+         it describes a day that has already run its course, so a booking for
+         next Tuesday is not offered it. The rule lives in
+         allowed_appointment_closures() and is mirrored here only because the
+         choice is made in the browser; close_appointment() re-derives it from
+         the database before writing. -->
+    <div class="modal fade" id="cancelAppointmentModal" tabindex="-1" aria-labelledby="cancelAppointmentLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.12);">
+          <div class="modal-header">
+            <h5 class="modal-title" id="cancelAppointmentLabel">Cancel Appointment</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p style="margin-bottom:10px;">
+              This changes the appointment's status only. <strong style="display:inline;">Nothing is deleted</strong> —
+              the booking stays in the patient's appointment history, which is what records that the
+              clinic held a slot and the visit did not happen.
+            </p>
+            <!-- Pre-filled when a ?cancel=<id> link opened this dialog; a button
+                 on this page overwrites both lines from its data-* attributes. -->
+{%- set closing = cancel.appointment %}
+            <div class="reschedule-was">
+              <div class="rw-label">Appointment</div>
+              <div id="cancelTarget">{% if closing %}{{ closing.first_name }} {{ closing.last_name }} — {{ closing.appointment_type or 'Consultation' }}{% else %}—{% endif %}</div>
+              <div class="po-meta" id="cancelWhen">{% if closing %}{{ closing.appointment_date | display_date }} at {{ closing.booked_time or 'no time set' }}{% endif %}</div>
+            </div>
+            <p style="margin-bottom:0; font-size:13px; color:var(--text-muted);">
+              If the patient simply wants a different day, use <strong style="display:inline;">Reschedule</strong>
+              instead — it keeps the same appointment rather than replacing it with a cancelled one.
+            </p>
+          </div>
+          <div class="modal-footer">
+            <!-- Sits outside the form and reaches it by id, the same arrangement
+                 the queue's Start Consultation buttons use, so the dialog stays
+                 clear of the tables' horizontal scroll containers. -->
+            <form id="cancelAppointmentForm" method="post" action="{{ url_for(cancel_appointment_endpoint) }}">
+              <input type="hidden" name="appointment_id" id="cancelAppointmentId" value="{{ closing.id if closing else '' }}">
+              <input type="hidden" name="return_to" value="{{ return_to }}">
+            </form>
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Keep Appointment</button>
+            <button type="submit" form="cancelAppointmentForm" name="status" value="No-show"
+                    class="btn-outline-teal closure-option{% if 'No-show' not in cancel.closures %} d-none{% endif %}" data-closure="No-show">
+              <span class="material-symbols-outlined" style="font-size:18px;">person_off</span>Mark No-show
+            </button>
+            <button type="submit" form="cancelAppointmentForm" name="status" value="Cancelled"
+                    class="btn-danger-outline closure-option{% if 'Cancelled' not in cancel.closures %} d-none{% endif %}" data-closure="Cancelled" style="padding:10px 16px; font-size:14px;">
+              <span class="material-symbols-outlined" style="font-size:18px;">event_busy</span>Cancel Appointment
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RESCHEDULE DIALOG — moves an existing booking.
+         The date input, the slot dropdown and the slot-load marks are the New
+         Appointment dialog's, unchanged, and the server puts the submitted date
+         and time through the same validate_booking_form() and the same
+         find_scheduling_conflicts() that a new booking goes through. The only
+         difference is one argument: this appointment is excluded from the
+         conflict comparison, so moving a visit within its own day does not
+         report the patient as clashing with themselves.
+
+         What is deliberately NOT here is the patient, the service and the note.
+         Rescheduling answers "when", and a dialog that also let the service be
+         swapped would quietly turn one commitment into a different one under the
+         same record. Those are changed by cancelling and booking afresh. -->
+    <div class="modal fade" id="rescheduleModal" tabindex="-1" aria-labelledby="rescheduleLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.12);">
+          <div class="modal-header">
+            <h5 class="modal-title" id="rescheduleLabel">Reschedule Appointment</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+{%- if reschedule.errors %}
+            <div class="alert-ids alert-danger-ids">
+              <span class="material-symbols-outlined">error</span>
+              <div>
+                <strong>This appointment was not moved</strong>
+                Correct the {{ reschedule.errors|length }} highlighted field{{ '' if reschedule.errors|length == 1 else 's' }} below. The appointment is unchanged.
+              </div>
+            </div>
+{%- endif %}
+{%- set r_slot = reschedule.conflicts.slot %}
+{%- set r_day = reschedule.conflicts.patient_day %}
+{%- if r_slot or r_day %}
+            <!-- The booking dialog's soft conflict warning, word for word the
+                 same behaviour: it informs, it never blocks, and pressing the
+                 button again carries confirm_conflict and saves. -->
+            <div class="alert-ids alert-warning-ids">
+              <span class="material-symbols-outlined">warning</span>
+              <div>
+                <strong>That day is already spoken for — please check before moving it</strong>
+{%- if r_day %}
+                This patient already has {{ r_day|length }} other appointment{{ '' if r_day|length == 1 else 's' }} that day:
+                {% for other in r_day %}{{ other.booked_time or 'time not set' }} {{ other.appointment_type or 'Consultation' }}{{ '; ' if not loop.last else '' }}{% endfor %}.
+                Only the earliest of a day's bookings is checked in when they arrive, so a second one would be left Scheduled with nobody to close it.
+{%- endif %}
+{%- if r_slot %}
+                {{ r_slot|length }} other patient{{ '' if r_slot|length == 1 else 's' }} already booked for {{ reschedule.form.appointment_time }}:
+                {% for other in r_slot %}{{ other.first_name }} {{ other.last_name }} ({{ other.appointment_type or 'Consultation' }}){{ '; ' if not loop.last else '' }}{% endfor %}.
+                One clinician sees one patient at a time here, so one of them will wait.
+{%- endif %}
+                Nothing has been moved yet. If this is what you intend, press
+                <strong style="display:inline;">Move Appointment</strong> again — or choose another time first.
+              </div>
+            </div>
+{%- endif %}
+
+            <!-- Pre-filled by the server when it reopened this dialog itself --
+                 after a failed submit, or from ?reschedule=<id>. When a button
+                 on this page opens it instead, the script below overwrites both
+                 lines from the trigger's data-* attributes. -->
+{%- set moving = reschedule.appointment %}
+            <div class="reschedule-was">
+              <div class="rw-label">Moving</div>
+              <div id="rescheduleTarget">{% if moving %}{{ moving.first_name }} {{ moving.last_name }} — {{ moving.appointment_type or 'Consultation' }}{% else %}—{% endif %}</div>
+              <div class="po-meta">Currently <span id="rescheduleWhen">{% if moving %}{{ moving.appointment_date | display_date }} at {{ moving.booked_time or 'no time set' }}{% else %}—{% endif %}</span></div>
+            </div>
+
+            <form id="rescheduleForm" method="post" action="{{ url_for(reschedule_appointment_endpoint) }}" novalidate>
+              <input type="hidden" name="appointment_id" id="rescheduleAppointmentId"
+                     value="{{ reschedule.appointment.id if reschedule.appointment else '' }}">
+              <input type="hidden" name="return_to" value="{{ return_to }}">
+{%- if reschedule.acknowledge_conflict %}
+              <input type="hidden" name="confirm_conflict" value="yes">
+{%- endif %}
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="field-label" for="rescheduleDate">New date<span class="req">*</span></label>
+                  <input type="date" class="form-control{% if reschedule.errors.appointment_date %} is-invalid{% endif %}"
+                         id="rescheduleDate" name="appointment_date"
+                         min="{{ booking_min_date }}" max="{{ booking_max_date }}"
+                         value="{{ reschedule.form.appointment_date or '' }}">
+{%- if reschedule.errors.appointment_date %}
+                  <div class="field-error">{{ reschedule.errors.appointment_date }}</div>
+{%- else %}
+                  <div class="form-text-hint">Tomorrow onwards, same as a new booking.</div>
+{%- endif %}
+                </div>
+                <div class="col-md-6">
+                  <label class="field-label" for="rescheduleTime">New time<span class="req">*</span></label>
+                  <select class="form-select{% if reschedule.errors.appointment_time %} is-invalid{% endif %}" id="rescheduleTime" name="appointment_time">
+                    <option value="">Choose a slot…</option>
+{%- for slot in booking_time_slots %}
+                    <option value="{{ slot }}"{% if reschedule.form.appointment_time == slot %} selected{% endif %}>{{ slot }}</option>
+{%- endfor %}
+                  </select>
+{%- if reschedule.errors.appointment_time %}
+                  <div class="field-error">{{ reschedule.errors.appointment_time }}</div>
+{%- else %}
+                  <div class="form-text-hint" id="rescheduleSlotHint">Slots already holding a patient are marked once you pick a date.</div>
+{%- endif %}
+                </div>
+              </div>
+              <div class="form-text-hint mt-3">
+                The patient, the reason and any notes stay exactly as they are — this is the same
+                appointment at a different time, not a new one, so the record keeps its history.
+              </div>
+            </form>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" form="rescheduleForm" class="btn-primary-teal">
+              <span class="material-symbols-outlined" style="font-size:18px;">edit_calendar</span>Move Appointment
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function toggleFilterPanel(){
+    var panel = document.getElementById('filterPanel');
+    var btn = document.getElementById('filterToggleBtn');
+    panel.classList.toggle('show');
+    btn.classList.toggle('open');
+  }
+  // These three guard before touching the table and footer, which are absent
+  // from the markup entirely when nobody is in today's queue.
+  function showEmptyDemo(){
+    var wrap = document.getElementById('tableWrap');
+    var footer = document.getElementById('tableFooter');
+    if(wrap){ wrap.style.display = 'none'; }
+    if(footer){ footer.style.display = 'none'; }
+    document.getElementById('skeletonWrap').classList.remove('show');
+    document.getElementById('emptyState').classList.add('show');
+  }
+  function showLoadingDemo(){
+    var wrap = document.getElementById('tableWrap');
+    var footer = document.getElementById('tableFooter');
+    if(wrap){ wrap.style.display = 'none'; }
+    if(footer){ footer.style.display = 'none'; }
+    document.getElementById('emptyState').classList.remove('show');
+    document.getElementById('skeletonWrap').classList.add('show');
+  }
+  function resetDemo(){
+    var wrap = document.getElementById('tableWrap');
+    var footer = document.getElementById('tableFooter');
+    if(wrap){ wrap.style.display = ''; }
+    if(footer){ footer.style.display = ''; }
+    document.getElementById('emptyState').classList.remove('show');
+    document.getElementById('skeletonWrap').classList.remove('show');
+  }
+
+  // Live filter over today's queue. Each row carries the text worth matching on
+  // in data-search, already lower-cased by the template, so this stays a
+  // substring test rather than re-deriving the haystack on every keystroke.
+  var queueSearch = document.getElementById('queueSearch');
+  if(queueSearch){
+    queueSearch.addEventListener('input', function(){
+      var term = queueSearch.value.trim().toLowerCase();
+      var rows = document.querySelectorAll('#queueBody .queue-row');
+      var shown = 0;
+      rows.forEach(function(row){
+        var match = !term || row.dataset.search.indexOf(term) !== -1;
+        row.style.display = match ? '' : 'none';
+        if(match){ shown++; }
+      });
+      var counter = document.getElementById('queueShown');
+      if(counter){ counter.textContent = shown; }
+      // The empty state doubles as the no-results message; the heading and body
+      // are written by the template to cover both readings.
+      document.getElementById('emptyState').classList.toggle('show', rows.length > 0 && shown === 0);
+      var wrap = document.getElementById('tableWrap');
+      if(wrap){ wrap.style.display = shown === 0 ? 'none' : ''; }
+    });
+  }
+
+  // Same pattern for the check-in dialog's patient picker.
+  var checkInSearch = document.getElementById('checkInSearch');
+  if(checkInSearch){
+    checkInSearch.addEventListener('input', function(){
+      var term = checkInSearch.value.trim().toLowerCase();
+      var options = document.querySelectorAll('#patientPick .patient-option');
+      var shown = 0;
+      options.forEach(function(option){
+        var match = !term || option.dataset.search.indexOf(term) !== -1;
+        option.style.display = match ? '' : 'none';
+        if(match){ shown++; }
+      });
+      document.getElementById('pickEmpty').classList.toggle('show', shown === 0);
+    });
+  }
+
+  // Existing patient / new patient. Only the chosen pane and its submit button
+  // are shown; the other pane is a separate form, so nothing in it is validated
+  // or submitted while it is hidden.
+  var checkInPanes = {
+    existing: {
+      pane: document.getElementById('checkInExistingPane'),
+      submit: document.getElementById('checkInExistingSubmit')
+    },
+    'new': {
+      pane: document.getElementById('checkInNewPane'),
+      submit: document.getElementById('checkInNewSubmit')
+    }
+  };
+
+  function showCheckInMode(mode){
+    Object.keys(checkInPanes).forEach(function(key){
+      var target = checkInPanes[key];
+      var active = key === mode;
+      if(target.pane){ target.pane.classList.toggle('d-none', !active); }
+      if(target.submit){ target.submit.classList.toggle('d-none', !active); }
+    });
+    document.querySelectorAll('#checkInModes .mode-pill').forEach(function(pill){
+      var input = pill.querySelector('input');
+      pill.classList.toggle('checked', !!input && input.checked);
+    });
+  }
+
+  document.querySelectorAll('#checkInModes input[name="check_in_mode"]').forEach(function(input){
+    input.addEventListener('change', function(){ showCheckInMode(input.value); });
+  });
+
+  // Reopening the dialog after a check-in should not still be holding the last
+  // mode, patient, search term, or reason.
+  var checkInModal = document.getElementById('checkInModal');
+  if(checkInModal){
+    checkInModal.addEventListener('show.bs.modal', function(){
+      checkInModal.querySelectorAll('form').forEach(function(form){ form.reset(); });
+      var defaultMode = checkInModal.querySelector('#checkInModes input[value="existing"]');
+      if(defaultMode){ defaultMode.checked = true; }
+      showCheckInMode('existing');
+      if(checkInSearch){
+        checkInSearch.value = '';
+        checkInSearch.dispatchEvent(new Event('input'));
+      }
+    });
+    checkInModal.addEventListener('shown.bs.modal', function(){
+      if(checkInSearch){ checkInSearch.focus(); }
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // UPCOMING APPOINTMENTS
+  // ---------------------------------------------------------------------
+  // Same substring filter as the queue above, with one extra rule: the date
+  // header rows are hidden when nothing under them survives, so the list never
+  // shows a day heading with no appointments beneath it.
+  var upcomingSearch = document.getElementById('upcomingSearch');
+  var upcomingDayChip = document.getElementById('upcomingDayChip');
+  var upcomingDayLabel = document.getElementById('upcomingDayLabel');
+  var upcomingDay = null;
+
+  function applyUpcomingFilter(){
+    var body = document.getElementById('upcomingBody');
+    if(!body){ return; }
+    var term = upcomingSearch ? upcomingSearch.value.trim().toLowerCase() : '';
+    var rows = body.querySelectorAll('.upcoming-row');
+    var shown = 0;
+    var visibleDays = {};
+
+    rows.forEach(function(row){
+      var matchesTerm = !term || row.dataset.search.indexOf(term) !== -1;
+      var matchesDay = !upcomingDay || row.dataset.upcomingDay === upcomingDay;
+      var match = matchesTerm && matchesDay;
+      row.style.display = match ? '' : 'none';
+      if(match){ shown++; visibleDays[row.dataset.upcomingDay] = true; }
+    });
+
+    body.querySelectorAll('.upcoming-day-row').forEach(function(header){
+      header.style.display = visibleDays[header.dataset.upcomingDay] ? '' : 'none';
+    });
+
+    var counter = document.getElementById('upcomingShown');
+    if(counter){ counter.textContent = shown; }
+    var wrap = document.getElementById('upcomingWrap');
+    if(wrap){ wrap.style.display = shown === 0 ? 'none' : ''; }
+    var empty = document.getElementById('upcomingEmpty');
+    if(empty){ empty.classList.toggle('show', rows.length > 0 && shown === 0); }
+  }
+
+  if(upcomingSearch){ upcomingSearch.addEventListener('input', applyUpcomingFilter); }
+
+  // Clicking a calendar day narrows the list below to that date. The calendar
+  // only makes a cell clickable when it has bookings still expected, so this can
+  // never filter the list down to nothing.
+  document.querySelectorAll('[data-cal-date]').forEach(function(cell){
+    cell.addEventListener('click', function(){
+      var iso = cell.dataset.calDate;
+      upcomingDay = (upcomingDay === iso) ? null : iso;
+      document.querySelectorAll('[data-cal-date]').forEach(function(other){
+        other.classList.toggle('cal-selected', other.dataset.calDate === upcomingDay);
+      });
+      if(upcomingDayChip){
+        upcomingDayChip.classList.toggle('d-none', !upcomingDay);
+        if(upcomingDay && upcomingDayLabel){ upcomingDayLabel.textContent = upcomingDay; }
+      }
+      applyUpcomingFilter();
+      var panel = document.getElementById('upcomingWrap');
+      if(upcomingDay && panel){ panel.scrollIntoView({behavior:'smooth', block:'center'}); }
+    });
+  });
+
+  if(upcomingDayChip){
+    upcomingDayChip.addEventListener('click', function(){
+      upcomingDay = null;
+      upcomingDayChip.classList.add('d-none');
+      document.querySelectorAll('[data-cal-date]').forEach(function(other){
+        other.classList.remove('cal-selected');
+      });
+      applyUpcomingFilter();
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // NEW APPOINTMENT DIALOG
+  // ---------------------------------------------------------------------
+  // How many patients each future slot already holds. Rendered from the same
+  // rows find_scheduling_conflicts() would warn about after a submit, so the
+  // marks here and the warning there cannot disagree -- this just says it first.
+  var slotLoad = {{ booking_slot_load | tojson }};
+
+  var bookingDate = document.getElementById('bookingDate');
+  var bookingTime = document.getElementById('bookingTime');
+  var bookingSlotHint = document.getElementById('bookingSlotHint');
+
+  function markBookedSlots(){
+    if(!bookingTime){ return; }
+    var taken = (bookingDate && slotLoad[bookingDate.value]) || {};
+    var busy = 0;
+    Array.prototype.forEach.call(bookingTime.options, function(option){
+      if(!option.value){ return; }
+      var names = taken[option.value];
+      option.textContent = names ? option.value + ' · ' + names.length + ' booked' : option.value;
+      if(names){ busy++; }
+    });
+    if(bookingSlotHint){
+      if(!bookingDate || !bookingDate.value){
+        bookingSlotHint.textContent = 'Slots already holding a patient are marked once you pick a date.';
+      } else if(busy){
+        bookingSlotHint.textContent = busy + ' slot' + (busy === 1 ? ' is' : 's are') +
+          ' already booked that day — booking one anyway is allowed, they will simply wait.';
+      } else {
+        bookingSlotHint.textContent = 'Nothing booked that day yet.';
+      }
+    }
+  }
+
+  if(bookingDate){ bookingDate.addEventListener('change', markBookedSlots); }
+
+  // Existing patient / new patient. Unlike the check-in dialog these are two
+  // panes of ONE form, so nothing is shown or hidden except the patient picker
+  // and the wording of the submit -- the appointment fields are shared.
+  function showBookingMode(mode){
+    var existingPane = document.getElementById('bookingExistingPane');
+    var newPane = document.getElementById('bookingNewPane');
+    var label = document.getElementById('bookingSubmitLabel');
+    var icon = document.getElementById('bookingSubmitIcon');
+    var isNew = mode === 'new';
+    if(existingPane){ existingPane.classList.toggle('d-none', isNew); }
+    if(newPane){ newPane.classList.toggle('d-none', !isNew); }
+    if(label){ label.textContent = isNew ? 'Continue to Registration' : 'Book Appointment'; }
+    if(icon){ icon.textContent = isNew ? 'person_add' : 'event_available'; }
+    document.querySelectorAll('#bookingModes .mode-pill').forEach(function(pill){
+      var input = pill.querySelector('input');
+      pill.classList.toggle('checked', !!input && input.checked);
+    });
+  }
+
+  document.querySelectorAll('#bookingModes input[name="booking_mode"]').forEach(function(input){
+    input.addEventListener('change', function(){ showBookingMode(input.value); });
+  });
+
+  var bookingSearch = document.getElementById('bookingSearch');
+  if(bookingSearch){
+    bookingSearch.addEventListener('input', function(){
+      var term = bookingSearch.value.trim().toLowerCase();
+      var options = document.querySelectorAll('#bookingPatientPick .patient-option');
+      var shown = 0;
+      options.forEach(function(option){
+        var match = !term || option.dataset.search.indexOf(term) !== -1;
+        option.style.display = match ? '' : 'none';
+        if(match){ shown++; }
+      });
+      document.getElementById('bookingPickEmpty').classList.toggle('show', shown === 0);
+    });
+  }
+
+  var bookAppointmentModal = document.getElementById('bookAppointmentModal');
+  if(bookAppointmentModal){
+    // Deliberately NOT reset on show, unlike the check-in dialog: this one is
+    // reopened by the server carrying values that failed validation or a
+    // conflict awaiting acknowledgement, and clearing them would throw away the
+    // entry the operator is being asked to confirm. It is a fresh, empty form on
+    // every ordinary open because the page it is rendered into is fresh too.
+    bookAppointmentModal.addEventListener('shown.bs.modal', function(){
+      markBookedSlots();
+      if(bookingSearch){ bookingSearch.focus(); }
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // CANCEL / NO-SHOW DIALOG
+  // ---------------------------------------------------------------------
+  // One dialog serves every Cancel button on the page, so it has to be told
+  // which appointment it is about. Each trigger carries that on data-*, the same
+  // arrangement Patient Records' status dialog uses for its row icons -- and,
+  // like that one, it hides the option this record is not eligible for rather
+  // than offering a button the server would refuse.
+  var cancelModal = document.getElementById('cancelAppointmentModal');
+  if(cancelModal){
+    cancelModal.addEventListener('show.bs.modal', function(event){
+      var trigger = event.relatedTarget;
+      if(!trigger){ return; }
+      document.getElementById('cancelAppointmentId').value = trigger.dataset.appointmentId || '';
+      document.getElementById('cancelTarget').textContent = trigger.dataset.appointmentLabel || '';
+      document.getElementById('cancelWhen').textContent = trigger.dataset.appointmentWhen || '';
+      var allowed = (trigger.dataset.appointmentClosures || 'Cancelled').split(',');
+      cancelModal.querySelectorAll('.closure-option').forEach(function(button){
+        button.classList.toggle('d-none', allowed.indexOf(button.dataset.closure) === -1);
+      });
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // RESCHEDULE DIALOG
+  // ---------------------------------------------------------------------
+  var rescheduleModal = document.getElementById('rescheduleModal');
+  var rescheduleDate = document.getElementById('rescheduleDate');
+  var rescheduleTime = document.getElementById('rescheduleTime');
+
+  // The booking dialog's slot marks, on the reschedule dialog's controls. Both
+  // read the same slotLoad, so the two dialogs cannot disagree about which slots
+  // a day already holds.
+  function markRescheduleSlots(){
+    var taken = (rescheduleDate && slotLoad[rescheduleDate.value]) || {};
+    var busy = 0;
+    if(!rescheduleTime){ return; }
+    Array.prototype.forEach.call(rescheduleTime.options, function(option){
+      if(!option.value){ return; }
+      var names = taken[option.value];
+      option.textContent = names ? option.value + ' · ' + names.length + ' booked' : option.value;
+      if(names){ busy++; }
+    });
+    var hint = document.getElementById('rescheduleSlotHint');
+    if(hint){
+      if(!rescheduleDate || !rescheduleDate.value){
+        hint.textContent = 'Slots already holding a patient are marked once you pick a date.';
+      } else if(busy){
+        hint.textContent = busy + ' slot' + (busy === 1 ? ' is' : 's are') +
+          ' already booked that day — moving into one anyway is allowed, they will simply wait.';
+      } else {
+        hint.textContent = 'Nothing booked that day yet.';
+      }
+    }
+  }
+
+  if(rescheduleDate){ rescheduleDate.addEventListener('change', markRescheduleSlots); }
+
+  if(rescheduleModal){
+    rescheduleModal.addEventListener('show.bs.modal', function(event){
+      var trigger = event.relatedTarget;
+      // No trigger means the server reopened it after a submit that did not
+      // save; the values and the heading are already rendered, so leave them.
+      if(!trigger){ markRescheduleSlots(); return; }
+      document.getElementById('rescheduleAppointmentId').value = trigger.dataset.appointmentId || '';
+      document.getElementById('rescheduleTarget').textContent = trigger.dataset.appointmentLabel || '';
+      document.getElementById('rescheduleWhen').textContent = trigger.dataset.appointmentWhen || '';
+      // A fresh move starts from an empty slot rather than pre-filling the date
+      // it already has: the one date this dialog cannot save is the current one.
+      if(rescheduleDate){ rescheduleDate.value = ''; }
+      if(rescheduleTime){ rescheduleTime.value = ''; }
+      markRescheduleSlots();
+    });
+  }
+
+  // A submit that did not save comes back with the dialog's state; reopen it on
+  // exactly what was entered, with the errors or the warning in view. The same
+  // happens for ?reschedule=<id>, which is how Patient Profile links in here.
+{%- if booking.open %}
+  showBookingMode('{{ booking.mode }}');
+  if(bookAppointmentModal && window.bootstrap){
+    new bootstrap.Modal(bookAppointmentModal).show();
+  }
+{%- else %}
+  showBookingMode('existing');
+{%- endif %}
+{%- if reschedule.open and reschedule.appointment %}
+  // The heading and the values are already rendered above; this only opens it.
+  if(rescheduleModal && window.bootstrap){
+    new bootstrap.Modal(rescheduleModal).show();
+  }
+{%- elif cancel.open %}
+  if(cancelModal && window.bootstrap){
+    new bootstrap.Modal(cancelModal).show();
+  }
+{%- endif %}
+  markBookedSlots();
+  markRescheduleSlots();
+  applyUpcomingFilter();
+</script>{% endblock %}

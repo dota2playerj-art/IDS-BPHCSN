@@ -1,0 +1,49 @@
+# --- Python -----------------------------------------------------------------
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# --- The database -----------------------------------------------------------
+# app.db is generated, not authored. schema.sql builds it, the migrate_*.py
+# scripts evolve it and populate_records.py fills it with demo data, so all
+# three of those ARE tracked and the database itself is not. See README.md for
+# how to rebuild it after a fresh clone.
+app.db
+# SQLite's sidecar files. They exist only while a connection is open, and a
+# committed one would be a half-written transaction.
+app.db-journal
+app.db-wal
+app.db-shm
+
+# --- Secrets ----------------------------------------------------------------
+# config.py reads SECRET_KEY from the environment and falls back to a dev value.
+# A real key belongs in a .env that never leaves the machine.
+.env
+*.env
+
+# --- Tooling and scratch work -----------------------------------------------
+.claude/
+# Nothing of the sort is in the project today -- verification scripts have been
+# kept outside it deliberately -- but this is where they would land if anyone
+# ever wrote one in place.
+scratchpad/
+*.log
+*.bak
+*.orig
+*.tmp
+
+# --- Editors and OS ---------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Everything else is tracked on purpose: app.py, config.py, schema.sql, every
+# migrate_*.py, populate_records.py, requirements.txt, and the whole of
+# routes/ models/ utils/ database/ templates/ static/ PR0MPT_INSTRUCTION/.
+# static/ in particular is vendored on purpose -- Bootstrap, Chart.js and the
+# Inter/Material fonts are committed so the app runs with no network at all.

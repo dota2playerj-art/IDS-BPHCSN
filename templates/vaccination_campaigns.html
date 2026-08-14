@@ -1,0 +1,411 @@
+{% extends "base.html" %}
+{% set active_nav = "vaccination_campaigns" %}
+{% block title %}IDS-BPHCSN | Vaccination Campaigns{% endblock %}
+
+{% block styles %}
+  .toolbar-search{min-width:260px; max-width:360px;}
+  .status-pill{
+    display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600;
+    padding:6px 14px; border-radius:999px;
+  }
+  .pill-operational{background:var(--teal-light); color:var(--teal-dark);}
+  .pill-secure{background:#DBEAFE; color:#1D4ED8;}
+  .pill-dot{width:7px;height:7px;border-radius:50%; background:currentColor;}
+
+  .stat-card{
+    background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:20px 22px; height:100%;
+  }
+  .stat-icon{width:44px;height:44px;border-radius:12px; display:flex; align-items:center; justify-content:center; margin-bottom:12px;}
+  .stat-value{font-size:24px; font-weight:700; color:var(--text-dark);}
+  .stat-label{font-size:13px; color:var(--text-muted); margin-top:2px;}
+  .stat-trend{font-size:12px; font-weight:600; margin-top:6px;}
+
+  .panel-card{
+    background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:24px; margin-bottom:24px;
+  }
+  .panel-title{font-size:16px; font-weight:600; color:var(--text-dark);}
+  .panel-sub{font-size:12.5px; color:var(--text-muted); margin-top:2px;}
+
+
+  .filter-btn{
+    background:#fff; border:1px solid var(--border-color); border-radius:10px; padding:10px 16px;
+    font-size:14px; font-weight:500; color:var(--text-dark); display:flex; align-items:center; gap:6px;
+  }
+  .filter-btn.open, .filter-btn:hover{border-color:var(--teal); color:var(--teal-dark);}
+
+  .filter-panel{
+    background:var(--bg); border:1px solid var(--border-color); border-radius:12px; padding:20px;
+    margin-bottom:18px; display:none;
+  }
+  .filter-panel.show{display:block;}
+  .filter-panel label{font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:6px; display:block;}
+  .filter-panel .form-control, .filter-panel .form-select{
+    height:48px; border-radius:12px; border:1px solid var(--border-color); font-size:13.5px;
+  }
+  .filter-panel .form-control:focus, .filter-panel .form-select:focus{
+    border-color:var(--teal); box-shadow:0 0 0 3px rgba(22,155,146,0.12);
+  }
+  .filter-actions{display:flex; justify-content:flex-end; gap:10px; margin-top:16px; padding-top:16px; border-top:1px solid var(--border-color);}
+  .btn-reset{background:transparent; border:none; color:var(--text-muted); font-size:14px; font-weight:600; padding:10px 14px;}
+  .btn-reset:hover{color:var(--danger);}
+
+  table.vax-table{width:100%; border-collapse:separate; border-spacing:0; font-size:13px;}
+  table.vax-table thead th{
+    text-align:left; color:var(--text-muted); font-weight:600; font-size:11.5px; letter-spacing:0.03em;
+    text-transform:uppercase; padding:12px 14px; border-bottom:1px solid var(--border-color); white-space:nowrap;
+  }
+  table.vax-table tbody td{
+    padding:14px; border-bottom:1px solid var(--border-color); color:var(--text-dark); vertical-align:middle;
+  }
+  table.vax-table tbody tr:hover{background:#FAFBFC;}
+  table.vax-table tbody tr:last-child td{border-bottom:none;}
+
+  .camp-name{font-weight:600;}
+  .cat-pill{background:var(--teal-light); color:var(--teal-dark); font-size:11.5px; font-weight:600; padding:3px 10px; border-radius:999px; white-space:nowrap; display:inline-block;}
+  .audience-pill{background:#F3F4F6; color:#4B5563; font-size:11.5px; font-weight:600; padding:3px 10px; border-radius:999px; white-space:nowrap; display:inline-block;}
+  .coverage-pct{font-weight:700;}
+
+  .badge-status{
+    display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600;
+    padding:4px 11px; border-radius:999px; white-space:nowrap;
+  }
+  .badge-ongoing{background:#DBEAFE; color:#1D4ED8;}
+  .badge-upcoming{background:#FEF3C7; color:#B45309;}
+  .badge-completed{background:#F3F4F6; color:#4B5563;}
+
+  .action-icon{
+    width:32px; height:32px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center;
+    color:var(--text-muted); background:transparent; border:none;
+  }
+  .action-icon:hover{background:var(--bg); color:var(--teal-dark);}
+
+  .table-footer{display:flex; align-items:center; justify-content:space-between; padding-top:18px; margin-top:6px; border-top:1px solid var(--border-color); flex-wrap:wrap; gap:12px;}
+  .pg-info{font-size:13px; color:var(--text-muted);}
+  .pagination .page-link{
+    color:var(--text-dark); border:1px solid var(--border-color); font-size:13px; font-weight:500;
+    padding:7px 13px; border-radius:8px !important; margin-left:4px;
+  }
+  .pagination .page-item.active .page-link{background-color:var(--teal); border-color:var(--teal); color:#fff;}
+  .pagination .page-link:hover{background-color:var(--teal-light); color:var(--teal-dark); border-color:var(--teal-light);}
+  .pagination .page-item.disabled .page-link{color:#C7CBD1; background:#fff;}
+
+  /* COVERAGE DONUT CARDS - exact pattern from approved Barangay Official Dashboard */
+  .overview-card{background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:18px 20px; height:100%;}
+  .overview-title{font-size:13.5px; font-weight:600; color:var(--text-dark);}
+  .overview-sub{font-size:11.5px; color:var(--text-muted); margin-top:1px; margin-bottom:8px;}
+  .chart-wrap-sm{position:relative; height:120px;}
+  .overview-figure{font-size:20px; font-weight:700; color:var(--text-dark); text-align:center; margin-top:-78px; position:relative; z-index:1; pointer-events:none;}
+  .overview-figure-sub{font-size:10.5px; color:var(--text-muted); text-align:center; margin-top:2px; position:relative; z-index:1; pointer-events:none;}
+{% endblock %}
+
+{% block breadcrumb %}
+
+    <div class="breadcrumb-nav">
+      <a href="{{ url_for(dashboard_endpoint) }}">Dashboard</a>
+      <span class="sep material-symbols-outlined">chevron_right</span>
+      <span class="current">Vaccination Campaigns</span>
+    </div>{% endblock %}
+
+{% block content %}
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-1">
+      <div>
+        <div class="eyebrow">Barangay Poblacion Health Center</div>
+        <div class="page-title">Vaccination Campaigns</div>
+      </div>
+      <div class="d-flex gap-2">
+        <span class="status-pill pill-operational"><span class="pill-dot"></span>All Systems Operational</span>
+        <span class="status-pill pill-secure"><span class="material-symbols-outlined" style="font-size:14px;">wifi</span>Secure Connection</span>
+      </div>
+    </div>
+    <div style="font-size:14px; color:var(--text-muted); margin-bottom:20px;">{{ clinic_today | full_date }} &middot; Vaccination campaign monitoring for Barangay Poblacion.</div>
+
+    <!-- SUMMARY CARDS -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#DBEAFE;"><span class="material-symbols-outlined" style="color:var(--info);">vaccines</span></div>
+          <div class="stat-value">3</div>
+          <div class="stat-label">Ongoing Campaigns</div>
+          <div class="stat-trend" style="color:var(--text-muted);">Active this week</div>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#FEF3C7;"><span class="material-symbols-outlined" style="color:var(--warning);">event_upcoming</span></div>
+          <div class="stat-value">2</div>
+          <div class="stat-label">Upcoming Campaigns</div>
+          <div class="stat-trend" style="color:var(--text-muted);">Next 30 days</div>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:var(--teal-light);"><span class="material-symbols-outlined" style="color:var(--teal-dark);">vaccines</span></div>
+          <div class="stat-value">4,186</div>
+          <div class="stat-label">Total Doses Administered This Year</div>
+          <div class="stat-trend" style="color:var(--success);">+312 this month</div>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#DCFCE7;"><span class="material-symbols-outlined" style="color:var(--success);">verified</span></div>
+          <div class="stat-value">83%</div>
+          <div class="stat-label">Overall Coverage Rate</div>
+          <div class="stat-trend" style="color:var(--text-muted);">All active campaigns</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VACCINATION CAMPAIGNS TABLE -->
+    <div class="panel-card">
+
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-3">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <div class="toolbar-search">
+            <span class="material-symbols-outlined" style="font-size:18px;">search</span>
+            <input type="text" id="campaignSearch" placeholder="Search by campaign name or vaccine type">
+          </div>
+          <button class="filter-btn" id="filterToggleBtn" onclick="toggleFilterPanel()">
+            <span class="material-symbols-outlined" style="font-size:18px;">filter_list</span>Filter
+          </button>
+          <button class="filter-btn"><span class="material-symbols-outlined" style="font-size:18px;">sort</span>Sort</button>
+        </div>
+      </div>
+
+      <!-- FILTER PANEL -->
+      <div class="filter-panel" id="filterPanel">
+        <div class="row g-3">
+          <div class="col-md-4 col-sm-6">
+            <label>Vaccine Type</label>
+            <select class="form-select">
+              <option selected>All Vaccine Types</option>
+              <option>BCG</option>
+              <option>Hepatitis B</option>
+              <option>Pentavalent</option>
+              <option>MMR</option>
+              <option>Polio</option>
+              <option>COVID-19 Vaccine</option>
+              <option>Influenza Vaccine</option>
+              <option>Pneumococcal Vaccine</option>
+              <option>Tetanus Toxoid</option>
+              <option>HPV Vaccine</option>
+            </select>
+          </div>
+          <div class="col-md-4 col-sm-6">
+            <label>Status</label>
+            <select class="form-select">
+              <option selected>All Statuses</option>
+              <option>Ongoing</option>
+              <option>Upcoming</option>
+              <option>Completed</option>
+            </select>
+          </div>
+        </div>
+        <div class="filter-actions">
+          <button class="btn-reset">Reset Filters</button>
+          <button class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">filter_alt</span>Apply Filter</button>
+        </div>
+      </div>
+
+      <div style="overflow-x:auto;">
+        <table class="vax-table" id="campaignTable">
+          <thead>
+            <tr>
+              <th>Campaign Name</th>
+              <th>Vaccine Type</th>
+              <th>Target Beneficiaries</th>
+              <th>Target Population</th>
+              <th>Doses Administered</th>
+              <th>Coverage</th>
+              <th>Status</th>
+              <th>Schedule</th>
+              <th style="text-align:right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="camp-name">BCG Immunization Drive</td>
+              <td><span class="cat-pill">BCG</span></td>
+              <td><span class="audience-pill">Infants 0-12 months</span></td>
+              <td>412</td>
+              <td>389</td>
+              <td class="coverage-pct" style="color:var(--success);">94%</td>
+              <td><span class="badge-status badge-ongoing">Ongoing</span></td>
+              <td>January 05, 2026 &ndash; December 20, 2026</td>
+              <td><div class="d-flex justify-content-end"><button class="action-icon" title="View Details"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button></div></td>
+            </tr>
+            <tr>
+              <td class="camp-name">Anti-Measles Vaccination Drive</td>
+              <td><span class="cat-pill">MMR</span></td>
+              <td><span class="audience-pill">Children 0-5</span></td>
+              <td>343</td>
+              <td>312</td>
+              <td class="coverage-pct" style="color:var(--success);">91%</td>
+              <td><span class="badge-status badge-ongoing">Ongoing</span></td>
+              <td>July 06, 2026 &ndash; July 10, 2026</td>
+              <td><div class="d-flex justify-content-end"><button class="action-icon" title="View Details"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button></div></td>
+            </tr>
+            <tr>
+              <td class="camp-name">Pentavalent Vaccination Program</td>
+              <td><span class="cat-pill">Pentavalent</span></td>
+              <td><span class="audience-pill">Infants 6-14 weeks</span></td>
+              <td>398</td>
+              <td>326</td>
+              <td class="coverage-pct" style="color:var(--warning);">82%</td>
+              <td><span class="badge-status badge-ongoing">Ongoing</span></td>
+              <td>February 01, 2026 &ndash; December 15, 2026</td>
+              <td><div class="d-flex justify-content-end"><button class="action-icon" title="View Details"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button></div></td>
+            </tr>
+            <tr>
+              <td class="camp-name">COVID-19 Booster Campaign</td>
+              <td><span class="cat-pill">COVID-19 Vaccine</span></td>
+              <td><span class="audience-pill">Senior Citizens</span></td>
+              <td>341</td>
+              <td>0</td>
+              <td class="coverage-pct" style="color:var(--text-muted);">0%</td>
+              <td><span class="badge-status badge-upcoming">Upcoming</span></td>
+              <td>July 15, 2026 &ndash; August 15, 2026</td>
+              <td><div class="d-flex justify-content-end"><button class="action-icon" title="View Details"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button></div></td>
+            </tr>
+            <tr>
+              <td class="camp-name">Anti-Polio Immunization Round</td>
+              <td><span class="cat-pill">Polio</span></td>
+              <td><span class="audience-pill">Children 0-5</span></td>
+              <td>343</td>
+              <td>301</td>
+              <td class="coverage-pct" style="color:var(--warning);">88%</td>
+              <td><span class="badge-status badge-completed">Completed</span></td>
+              <td>March 03, 2026 &ndash; March 17, 2026</td>
+              <td><div class="d-flex justify-content-end"><button class="action-icon" title="View Details"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button></div></td>
+            </tr>
+            <tr>
+              <td class="camp-name">Hepatitis B Newborn Dosing Program</td>
+              <td><span class="cat-pill">Hepatitis B</span></td>
+              <td><span class="audience-pill">Newborns</span></td>
+              <td>128</td>
+              <td>121</td>
+              <td class="coverage-pct" style="color:var(--success);">95%</td>
+              <td><span class="badge-status badge-ongoing">Ongoing</span></td>
+              <td>January 01, 2026 &ndash; December 31, 2026</td>
+              <td><div class="d-flex justify-content-end"><button class="action-icon" title="View Details"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button></div></td>
+            </tr>
+            <tr>
+              <td class="camp-name">Tetanus Toxoid Prenatal Protection Drive</td>
+              <td><span class="cat-pill">Tetanus Toxoid</span></td>
+              <td><span class="audience-pill">Pregnant Women</span></td>
+              <td>58</td>
+              <td>46</td>
+              <td class="coverage-pct" style="color:var(--warning);">79%</td>
+              <td><span class="badge-status badge-ongoing">Ongoing</span></td>
+              <td>January 10, 2026 &ndash; December 10, 2026</td>
+              <td><div class="d-flex justify-content-end"><button class="action-icon" title="View Details"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button></div></td>
+            </tr>
+            <tr>
+              <td class="camp-name">Senior Citizen Influenza Vaccination</td>
+              <td><span class="cat-pill">Influenza Vaccine</span></td>
+              <td><span class="audience-pill">Senior Citizens</span></td>
+              <td>341</td>
+              <td>0</td>
+              <td class="coverage-pct" style="color:var(--text-muted);">0%</td>
+              <td><span class="badge-status badge-upcoming">Upcoming</span></td>
+              <td>July 15, 2026 &ndash; July 15, 2026</td>
+              <td><div class="d-flex justify-content-end"><button class="action-icon" title="View Details"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button></div></td>
+            </tr>
+            <tr>
+              <td class="camp-name">HPV Vaccination Program for Adolescents</td>
+              <td><span class="cat-pill">HPV Vaccine</span></td>
+              <td><span class="audience-pill">Children 9-15 years</span></td>
+              <td>176</td>
+              <td>142</td>
+              <td class="coverage-pct" style="color:var(--warning);">81%</td>
+              <td><span class="badge-status badge-completed">Completed</span></td>
+              <td>April 14, 2026 &ndash; May 09, 2026</td>
+              <td><div class="d-flex justify-content-end"><button class="action-icon" title="View Details"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button></div></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- PAGINATION -->
+      <div class="table-footer">
+        <div class="pg-info">Showing 1&ndash;8 of 8 vaccination campaigns</div>
+        <nav aria-label="Vaccination campaigns pagination">
+          <ul class="pagination mb-0">
+            <li class="page-item disabled"><a class="page-link" href="#"><span class="material-symbols-outlined" style="font-size:16px;">chevron_left</span></a></li>
+            <li class="page-item active"><a class="page-link" href="#">1</a></li>
+            <li class="page-item"><a class="page-link" href="#"><span class="material-symbols-outlined" style="font-size:16px;">chevron_right</span></a></li>
+          </ul>
+        </nav>
+      </div>
+
+    </div>
+
+    <!-- COVERAGE BY VACCINE TYPE -->
+    <div class="panel-title mb-2">Coverage by Vaccine Type</div>
+    <div class="row g-3">
+      <div class="col-md-3 col-sm-6">
+        <div class="overview-card">
+          <div class="overview-title">BCG Coverage</div>
+          <div class="overview-sub">Infants 0&ndash;12 months</div>
+          <div class="chart-wrap-sm"><canvas id="chartBcg"></canvas></div>
+          <div class="overview-figure">94%</div>
+          <div class="overview-figure-sub">389 / 412 infants</div>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="overview-card">
+          <div class="overview-title">Pentavalent Coverage</div>
+          <div class="overview-sub">Infants 6&ndash;14 weeks</div>
+          <div class="chart-wrap-sm"><canvas id="chartPenta"></canvas></div>
+          <div class="overview-figure">82%</div>
+          <div class="overview-figure-sub">326 / 398 infants</div>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="overview-card">
+          <div class="overview-title">COVID-19 Booster Coverage</div>
+          <div class="overview-sub">Senior citizens, campaign upcoming</div>
+          <div class="chart-wrap-sm"><canvas id="chartCovid"></canvas></div>
+          <div class="overview-figure">0%</div>
+          <div class="overview-figure-sub">0 / 341 seniors</div>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="overview-card">
+          <div class="overview-title">Anti-Measles (MMR) Coverage</div>
+          <div class="overview-sub">Children 0&ndash;5</div>
+          <div class="chart-wrap-sm"><canvas id="chartMmr"></canvas></div>
+          <div class="overview-figure">91%</div>
+          <div class="overview-figure-sub">312 / 343 children</div>
+        </div>
+      </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/chart.umd.min.js') }}"></script>
+<script>
+  function toggleFilterPanel(){
+    var panel = document.getElementById('filterPanel');
+    var btn = document.getElementById('filterToggleBtn');
+    panel.classList.toggle('show');
+    btn.classList.toggle('open');
+  }
+
+  Chart.defaults.font.family = "'Inter', Arial, sans-serif";
+  Chart.defaults.color = '#6B7280';
+  Chart.defaults.font.size = 11;
+
+  const teal = '#169B92', info = '#3B82F6', warning = '#F59E0B', success = '#22C55E';
+
+  function miniDonut(id, value, color){
+    new Chart(document.getElementById(id), {
+      type: 'doughnut',
+      data: { datasets: [{ data:[value, 100-value], backgroundColor:[color, '#EEF0F3'], borderWidth:0 }] },
+      options: { responsive:true, maintainAspectRatio:false, cutout:'75%', plugins:{legend:{display:false}, tooltip:{enabled:false}} }
+    });
+  }
+  miniDonut('chartBcg', 94, success);
+  miniDonut('chartPenta', 82, warning);
+  miniDonut('chartCovid', 0, '#D1D5DB');
+  miniDonut('chartMmr', 91, teal);
+</script>{% endblock %}

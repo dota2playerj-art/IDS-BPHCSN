@@ -1,0 +1,511 @@
+{% extends "base.html" %}
+{% set active_nav = "patient_records" if patient else "register_patient" %}
+{% block title %}IDS-BPHCSN | {% if patient %}Edit Patient{% else %}Register Patient{% endif %}{% endblock %}
+
+{% block styles %}
+  .page-desc{font-size:14px; color:var(--text-muted); margin-top:4px; max-width:640px;}
+
+  .panel-card{
+    background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:24px; margin-bottom:24px;
+  }
+  .section-head{display:flex; align-items:center; gap:12px; margin-bottom:20px;}
+  .section-icon{width:40px;height:40px;border-radius:10px; background:var(--teal-light); display:flex; align-items:center; justify-content:center;}
+  .section-icon .material-symbols-outlined{color:var(--teal-dark); font-size:20px;}
+  .section-title{font-size:18px; font-weight:600; color:var(--text-dark);}
+  .section-sub{font-size:13px; color:var(--text-muted);}
+
+  label.field-label{font-size:13px; font-weight:600; color:var(--text-dark); margin-bottom:6px; display:inline-block;}
+  label.field-label .req{color:var(--danger); margin-left:2px;}
+  .form-control, .form-select{
+    height:48px; border-radius:12px; border:1px solid var(--border-color); font-size:14px; color:var(--text-dark);
+  }
+  textarea.form-control{height:auto; min-height:96px; border-radius:12px;}
+  .form-control::placeholder{color:#9CA3AF;}
+  .form-control:focus, .form-select:focus{
+    border-color:var(--teal); box-shadow:0 0 0 3px rgba(22,155,146,0.12);
+  }
+  .form-control.is-invalid, .form-select.is-invalid{border-color:var(--danger);}
+  .form-control.is-valid, .form-select.is-valid{border-color:var(--success);}
+  .invalid-feedback{font-size:12.5px;}
+  .valid-feedback{font-size:12.5px;}
+  .form-text-hint{font-size:12px; color:var(--text-muted); margin-top:4px;}
+
+  .form-check-input{width:18px; height:18px; margin-top:0.2em; cursor:pointer;}
+  .form-check-input:checked{background-color:var(--teal); border-color:var(--teal);}
+  .form-check-label{font-size:13.5px; color:var(--text-dark);}
+  .radio-pill-group{display:flex; gap:10px; flex-wrap:wrap;}
+  .radio-pill{
+    border:1px solid var(--border-color); border-radius:10px; padding:11px 18px; font-size:13.5px; font-weight:500;
+    display:flex; align-items:center; gap:8px; cursor:pointer; color:var(--text-dark);
+  }
+  .radio-pill input{accent-color:var(--teal); width:16px; height:16px;}
+  .radio-pill.checked{border-color:var(--teal); background:var(--teal-light); color:var(--teal-dark); font-weight:600;}
+
+  .check-chip-group{display:flex; gap:10px; flex-wrap:wrap;}
+  .check-chip{
+    border:1px solid var(--border-color); border-radius:999px; padding:8px 16px; font-size:13px; font-weight:500;
+    display:flex; align-items:center; gap:6px; cursor:pointer; color:var(--text-dark); background:#fff;
+  }
+  .check-chip input{width:14px; height:14px; accent-color:var(--teal);}
+  .check-chip.checked{border-color:var(--teal); background:var(--teal-light); color:var(--teal-dark);}
+
+  .id-preview{
+    background:var(--bg); border:1px dashed var(--border-color); border-radius:10px; padding:10px 14px;
+    font-size:13.5px; color:var(--text-muted); display:flex; align-items:center; gap:8px;
+  }
+  .id-preview strong{color:var(--teal-dark); font-weight:700;}
+
+  /* ALERTS */
+  .alert-ids{border-radius:12px; border:1px solid; padding:14px 16px; font-size:13.5px; display:flex; gap:12px; align-items:flex-start; margin-bottom:20px;}
+  .alert-warning-ids{background:#FFFBEB; border-color:#FDE68A; color:#92400E;}
+  .alert-success-ids{background:#F0FDF4; border-color:#BBF7D0; color:#166534;}
+  .alert-danger-ids{background:#FEF2F2; border-color:#FECACA; color:#B91C1C;}
+  .alert-ids .material-symbols-outlined{font-size:20px; margin-top:1px;}
+  .alert-ids strong{display:block; font-size:13.5px; margin-bottom:2px;}
+  .alert-ids .alert-close{margin-left:auto; cursor:pointer; opacity:0.6;}
+
+  /* FOOTER ACTION BAR */
+  .form-actions{
+    background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:18px 24px;
+    display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;
+  }
+  .req-legend{font-size:12.5px; color:var(--text-muted);}
+  .req-legend .req{color:var(--danger);}
+  .btn-ghost-ids{
+    background:transparent; border:1px solid var(--border-color); color:var(--text-dark); border-radius:10px; padding:11px 18px;
+    font-size:14px; font-weight:500; display:flex; align-items:center; gap:6px;
+  }
+  .btn-ghost-ids:hover{border-color:#C7CBD1; background:var(--bg);}
+  .btn-danger-text{background:transparent; border:none; color:var(--text-muted); font-size:14px; font-weight:500; padding:11px 14px;}
+  .btn-danger-text:hover{color:var(--danger);}
+{% endblock %}
+
+{% block breadcrumb %}
+
+    <div class="breadcrumb-nav">
+      <a href="{{ url_for(dashboard_endpoint) }}">Dashboard</a>
+      <span class="sep material-symbols-outlined">chevron_right</span>
+      <a href="{{ url_for(patient_records_endpoint) }}">Patient Records</a>
+      <span class="sep material-symbols-outlined">chevron_right</span>
+      <span class="current">{% if patient %}Edit Patient{% else %}Register Patient{% endif %}</span>
+    </div>{% endblock %}
+
+{% block content %}
+    <div class="eyebrow">Barangay Poblacion Health Center</div>
+    <div class="page-title">{% if patient %}Edit Patient{% else %}Register Patient{% endif %}</div>
+    {%- if patient %}
+    <div class="page-desc">Update {{ patient.full_name }}'s details below. Fields marked with <span style="color:var(--danger);">*</span> are required.</div>
+    {%- elif check_in %}
+    <div class="page-desc">This is the same registration form as always — nothing is shortened or skipped. Saving it also checks the patient in for today. Fields marked with <span style="color:var(--danger);">*</span> are required.</div>
+    {%- elif booking %}
+    <div class="page-desc">This is the same registration form as always — nothing is shortened or skipped. Saving it also books the appointment agreed at the desk. Fields marked with <span style="color:var(--danger);">*</span> are required.</div>
+    {%- else %}
+    <div class="page-desc">Complete the form below to add a new patient to the health center's records. Fields marked with <span style="color:var(--danger);">*</span> are required.</div>
+    {%- endif %}
+
+    <div style="height:20px;"></div>
+
+{%- if check_in %}
+    <!-- Opened from the Check In dialog's "New Patient (first visit)" path. The
+         form itself is untouched; only this notice, the hidden fields inside the
+         form below, and the save button's wording differ, so what gets validated
+         and stored is identical to an ordinary registration. -->
+    <div class="alert-ids alert-success-ids">
+      <span class="material-symbols-outlined">how_to_reg</span>
+      <div>
+        <strong>First-visit check-in — saving this form also places the patient in today's queue</strong>
+        Complete the patient's details in full now, while they are at the desk. When you save,
+        the record is registered permanently <em>and</em> today's visit is created in one step;
+        you will be returned to the queue.
+        {%- if check_in_reason %} Reason for visit recorded so far: <strong style="display:inline;">{{ check_in_reason }}</strong>.{% endif %}
+      </div>
+    </div>
+{%- endif %}
+
+{%- if booking %}
+    <!-- Opened from the New Appointment dialog's "New patient" path. Exactly the
+         same arrangement as the check-in notice above: the form is untouched,
+         and only this notice, the hidden fields inside it, and the save button's
+         wording differ. The appointment details were already validated before
+         this screen opened, so nothing here can be typed into an invalid state. -->
+    <div class="alert-ids alert-success-ids">
+      <span class="material-symbols-outlined">event_available</span>
+      <div>
+        <strong>New appointment — saving this form also books the visit</strong>
+        Register the patient in full now. When you save, the record is created permanently
+        <em>and</em> the appointment below is booked as <strong style="display:inline;">Scheduled</strong>;
+        you will be returned to Appointment Scheduling.
+        Booking: <strong style="display:inline;">{{ booking.appointment_type }}</strong> on
+        <strong style="display:inline;">{{ booking.appointment_date | long_date }}</strong> at
+        <strong style="display:inline;">{{ booking.appointment_time }}</strong>{% if booking.notes %}
+        — {{ booking.notes }}{% endif %}.
+      </div>
+    </div>
+{%- endif %}
+
+{%- if duplicates %}
+    <!-- SOFT DUPLICATE WARNING - informs, never blocks. Submitting again carries
+         the hidden confirm_duplicate field below and saves a separate record. -->
+    <div class="alert-ids alert-warning-ids">
+      <span class="material-symbols-outlined">warning</span>
+      <div>
+        <strong>A similar patient record already exists — please verify before continuing</strong>
+        {% for match in duplicates %}{{ match.first_name }} {{ match.last_name }} (ID: {{ match.patient_id }}), born {{ match.birth_date | long_date }}{{ "; " if not loop.last else "" }}{% endfor %}.
+        Nothing has been saved yet. Check the details below — if this really is a different
+        person, press <strong style="display:inline;">{% if check_in %}Save &amp; Check In{% elif booking %}Save &amp; Book Appointment{% else %}Save Patient Record{% endif %}</strong> again to
+        register them as a separate record.
+      </div>
+    </div>
+{%- endif %}
+{%- if errors %}
+    <div class="alert-ids alert-danger-ids">
+      <span class="material-symbols-outlined">error</span>
+      <div>
+        <strong>{% if patient %}Your changes were not saved{% else %}This record was not saved{% endif %}</strong>
+        Please correct the {{ errors|length }} highlighted field{{ "s" if errors|length != 1 else "" }} below. Everything you already entered has been kept.
+      </div>
+    </div>
+{%- endif %}
+
+    <form method="post" novalidate>
+{%- if acknowledge_duplicate %}
+      <input type="hidden" name="confirm_duplicate" value="yes">
+{%- endif %}
+{%- if check_in %}
+      <!-- Same mechanism as confirm_duplicate above: the intent rides along with
+           the form, so it survives a validation failure or a duplicate warning
+           and is still in effect on whichever submit finally saves. A patient can
+           therefore never end up registered but not queued. -->
+      <input type="hidden" name="{{ check_in_flag_field }}" value="1">
+      <input type="hidden" name="{{ check_in_reason_field }}" value="{{ check_in_reason }}" maxlength="{{ check_in_reason_max }}">
+{%- endif %}
+{%- if booking %}
+      <!-- The booking rides along the same way, and is re-validated on the
+           server when it arrives back -- these are a claim about what was sent,
+           not a fact, however they got here. -->
+      <input type="hidden" name="{{ booking_flag_field }}" value="1">
+{%- for field, value in booking_hidden %}
+      <input type="hidden" name="{{ field }}" value="{{ value }}">
+{%- endfor %}
+{%- endif %}
+
+      <!-- PERSONAL INFORMATION -->
+      <div class="panel-card">
+        <div class="section-head">
+          <div class="section-icon"><span class="material-symbols-outlined">badge</span></div>
+          <div>
+            <div class="section-title">Personal Information</div>
+            <div class="section-sub">Basic identity details of the patient</div>
+          </div>
+        </div>
+
+        <div class="row g-3 mb-3">
+          <div class="col-md-4">
+            <label class="field-label">Patient ID</label>
+            <!-- Never editable: auto-assigned on registration, then permanent. -->
+            <div class="id-preview">
+              <span class="material-symbols-outlined" style="font-size:16px;">tag</span>
+              {% if patient %}Patient ID: <strong>{{ patient.patient_id }}</strong>{% else %}Auto-generated: <strong>{{ next_patient_id }}</strong>{% endif %}
+            </div>
+          </div>
+        </div>
+
+        <div class="row g-3 mb-3">
+          <div class="col-md-4">
+            <label class="field-label">First Name<span class="req">*</span></label>
+            <input type="text" class="form-control{% if errors.first_name %} is-invalid{% endif %}" name="first_name" value="{{ form.first_name or '' }}" placeholder="Enter first name">
+            {%- if errors.first_name %}<div class="invalid-feedback d-block">{{ errors.first_name }}</div>{% endif %}
+          </div>
+          <div class="col-md-4">
+            <label class="field-label">Middle Name</label>
+            <input type="text" class="form-control" name="middle_name" value="{{ form.middle_name or '' }}" placeholder="Enter middle name">
+          </div>
+          <div class="col-md-4">
+            <label class="field-label">Last Name<span class="req">*</span></label>
+            <input type="text" class="form-control{% if errors.last_name %} is-invalid{% endif %}" name="last_name" value="{{ form.last_name or '' }}" placeholder="Enter last name">
+            {%- if errors.last_name %}<div class="invalid-feedback d-block">{{ errors.last_name }}</div>{% endif %}
+          </div>
+        </div>
+
+        <div class="row g-3 mb-3">
+          <div class="col-md-4">
+            <label class="field-label">Birthdate<span class="req">*</span></label>
+            <div class="input-group">
+              <input type="date" class="form-control{% if errors.birth_date %} is-invalid{% endif %}" id="birthDate" name="birth_date" value="{{ form.birth_date or '' }}">
+            </div>
+            {%- if errors.birth_date %}<div class="invalid-feedback d-block">{{ errors.birth_date }}</div>{% endif %}
+          </div>
+          <div class="col-md-2">
+            <label class="field-label">Age</label>
+            <input type="text" class="form-control" id="ageDisplay" disabled>
+            <div class="form-text-hint">Auto-calculated</div>
+          </div>
+          <div class="col-md-3">
+            <label class="field-label">Civil Status<span class="req">*</span></label>
+            <select class="form-select{% if errors.civil_status %} is-invalid{% endif %}" name="civil_status">
+              <option value="">Select…</option>
+              {%- for option in options.civil_statuses %}
+              <option value="{{ option }}"{% if form.civil_status == option %} selected{% endif %}>{{ option }}</option>
+              {%- endfor %}
+            </select>
+            {%- if errors.civil_status %}<div class="invalid-feedback d-block">{{ errors.civil_status }}</div>{% endif %}
+          </div>
+          <div class="col-md-3">
+            <label class="field-label">Contact Number</label>
+            <input type="text" class="form-control{% if errors.contact_number %} is-invalid{% endif %}" name="contact_number" value="{{ form.contact_number or '' }}" placeholder="09XX-XXX-XXXX">
+            {%- if errors.contact_number %}<div class="invalid-feedback d-block">{{ errors.contact_number }}</div>{% endif %}
+          </div>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="field-label">Gender<span class="req">*</span></label>
+            <div class="radio-pill-group">
+              {%- for option in options.sexes %}
+              <label class="radio-pill{% if form.sex == option %} checked{% endif %}"><input type="radio" name="sex" value="{{ option }}"{% if form.sex == option %} checked{% endif %}>{{ option }}</label>
+              {%- endfor %}
+            </div>
+            {%- if errors.sex %}<div class="invalid-feedback d-block">{{ errors.sex }}</div>{% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- ADDRESS INFORMATION -->
+      <div class="panel-card">
+        <div class="section-head">
+          <div class="section-icon"><span class="material-symbols-outlined">location_on</span></div>
+          <div>
+            <div class="section-title">Address Information</div>
+            <div class="section-sub">Current residential address of the patient</div>
+          </div>
+        </div>
+
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <label class="field-label">House No. / Street / Purok<span class="req">*</span></label>
+            <input type="text" class="form-control{% if errors.address %} is-invalid{% endif %}" name="address" value="{{ form.address or '' }}" placeholder="e.g., Purok 6">
+            {%- if errors.address %}<div class="invalid-feedback d-block">{{ errors.address }}</div>{% endif %}
+          </div>
+          <div class="col-md-6">
+            <!-- Fixed for this health center, so it is shown but never submitted. -->
+            <label class="field-label">Barangay<span class="req">*</span></label>
+            <input type="text" class="form-control" value="Barangay Poblacion" disabled>
+          </div>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="field-label">Municipality / City<span class="req">*</span></label>
+            <select class="form-select{% if errors.municipality %} is-invalid{% endif %}" name="municipality">
+              <option value="">Select…</option>
+              {%- for option in options.municipalities %}
+              <option value="{{ option }}"{% if form.municipality == option %} selected{% endif %}>{{ option }}</option>
+              {%- endfor %}
+            </select>
+            {%- if errors.municipality %}<div class="invalid-feedback d-block">{{ errors.municipality }}</div>{% endif %}
+          </div>
+          <div class="col-md-4">
+            <label class="field-label">Province<span class="req">*</span></label>
+            <select class="form-select{% if errors.province %} is-invalid{% endif %}" name="province">
+              <option value="">Select…</option>
+              {%- for option in options.provinces %}
+              <option value="{{ option }}"{% if form.province == option %} selected{% endif %}>{{ option }}</option>
+              {%- endfor %}
+            </select>
+            {%- if errors.province %}<div class="invalid-feedback d-block">{{ errors.province }}</div>{% endif %}
+          </div>
+          <div class="col-md-4">
+            <label class="field-label">Zip Code</label>
+            <input type="text" class="form-control{% if errors.zip_code %} is-invalid{% endif %}" name="zip_code" value="{{ form.zip_code or '' }}" placeholder="e.g., 8501">
+            {%- if errors.zip_code %}<div class="invalid-feedback d-block">{{ errors.zip_code }}</div>{% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- EMERGENCY CONTACT -->
+      <div class="panel-card">
+        <div class="section-head">
+          <div class="section-icon"><span class="material-symbols-outlined">emergency</span></div>
+          <div>
+            <div class="section-title">Emergency Contact Information</div>
+            <div class="section-sub">Person to notify in case of emergency</div>
+          </div>
+        </div>
+
+        <div class="row g-3 mb-3">
+          <div class="col-md-5">
+            <label class="field-label">Full Name<span class="req">*</span></label>
+            <input type="text" class="form-control{% if errors.emergency_contact_name %} is-invalid{% endif %}" name="emergency_contact_name" value="{{ form.emergency_contact_name or '' }}" placeholder="Enter full name">
+            {%- if errors.emergency_contact_name %}<div class="invalid-feedback d-block">{{ errors.emergency_contact_name }}</div>{% endif %}
+          </div>
+          <div class="col-md-3">
+            <label class="field-label">Relationship<span class="req">*</span></label>
+            <select class="form-select{% if errors.emergency_contact_relationship %} is-invalid{% endif %}" name="emergency_contact_relationship">
+              <option value="">Select…</option>
+              {%- for option in options.relationships %}
+              <option value="{{ option }}"{% if form.emergency_contact_relationship == option %} selected{% endif %}>{{ option }}</option>
+              {%- endfor %}
+            </select>
+            {%- if errors.emergency_contact_relationship %}<div class="invalid-feedback d-block">{{ errors.emergency_contact_relationship }}</div>{% endif %}
+          </div>
+          <div class="col-md-4">
+            <label class="field-label">Contact Number<span class="req">*</span></label>
+            <input type="text" class="form-control{% if errors.emergency_contact_number %} is-invalid{% endif %}" name="emergency_contact_number" value="{{ form.emergency_contact_number or '' }}" placeholder="09XX-XXX-XXXX">
+            {%- if errors.emergency_contact_number %}<div class="invalid-feedback d-block">{{ errors.emergency_contact_number }}</div>{% endif %}
+          </div>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="field-label">Address</label>
+            <input type="text" class="form-control" name="emergency_contact_address" value="{{ form.emergency_contact_address or '' }}" placeholder="Emergency contact address">
+          </div>
+        </div>
+      </div>
+
+      <!-- MEDICAL INFORMATION -->
+      <div class="panel-card">
+        <div class="section-head">
+          <div class="section-icon"><span class="material-symbols-outlined">medical_information</span></div>
+          <div>
+            <div class="section-title">Medical Information</div>
+            <div class="section-sub">Health background used by staff during consultations</div>
+          </div>
+        </div>
+
+{%- set picked_conditions = form.medical_conditions_selected or [] %}
+{%- set picked_allergies = form.allergies_selected or [] %}
+        <div class="row g-3 mb-3">
+          <div class="col-md-4">
+            <label class="field-label">Blood Type</label>
+            <select class="form-select{% if errors.blood_type %} is-invalid{% endif %}" name="blood_type">
+              {%- for option in options.blood_types %}
+              <option value="{{ option }}"{% if (form.blood_type or 'Unknown') == option %} selected{% endif %}>{{ option }}</option>
+              {%- endfor %}
+            </select>
+            {%- if errors.blood_type %}<div class="invalid-feedback d-block">{{ errors.blood_type }}</div>{% endif %}
+          </div>
+        </div>
+
+        <!-- "None" is a UI affordance, not a stored value: it means the saved
+             JSON array is empty. -->
+        <div class="mb-3">
+          <label class="field-label">Known Medical Conditions</label>
+          <div class="check-chip-group mb-2">
+            {%- for option in options.conditions %}
+            <label class="check-chip{% if option in picked_conditions %} checked{% endif %}"><input type="checkbox" name="medical_conditions" value="{{ option }}"{% if option in picked_conditions %} checked{% endif %}>{{ option }}</label>
+            {%- endfor %}
+{#- "None" is only implied when neither a chip nor a free-text note is present. #}
+{%- set no_conditions = not picked_conditions and not (form.medical_conditions_note or '') %}
+            <label class="check-chip{% if no_conditions or 'None' in picked_conditions %} checked{% endif %}"><input type="checkbox" name="medical_conditions" value="None"{% if no_conditions or 'None' in picked_conditions %} checked{% endif %}>None</label>
+          </div>
+          <textarea class="form-control" name="medical_conditions_note" placeholder="Add other conditions or notes, if any">{{ form.medical_conditions_note or '' }}</textarea>
+        </div>
+
+        <div>
+          <label class="field-label">Known Allergies</label>
+          <div class="check-chip-group mb-2">
+            {%- for option in options.allergies %}
+            <label class="check-chip{% if option in picked_allergies %} checked{% endif %}"><input type="checkbox" name="allergies" value="{{ option }}"{% if option in picked_allergies %} checked{% endif %}>{{ option }}</label>
+            {%- endfor %}
+{%- set no_allergies = not picked_allergies and not (form.allergies_note or '') %}
+            <label class="check-chip{% if no_allergies or 'None' in picked_allergies %} checked{% endif %}"><input type="checkbox" name="allergies" value="None"{% if no_allergies or 'None' in picked_allergies %} checked{% endif %}>None</label>
+          </div>
+          <textarea class="form-control" name="allergies_note" placeholder="Add other allergies or notes, if any">{{ form.allergies_note or '' }}</textarea>
+        </div>
+      </div>
+
+      <!-- FORM ACTIONS -->
+      <div class="form-actions">
+        <div class="req-legend"><span class="req">*</span> Indicates a required field</div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <button type="button" class="btn-danger-text">Cancel</button>
+          <button type="reset" class="btn-ghost-ids"><span class="material-symbols-outlined" style="font-size:18px;">restart_alt</span>Reset</button>
+          {%- if not patient and not check_in and not booking %}
+          <button type="button" class="btn-outline-teal"><span class="material-symbols-outlined" style="font-size:18px;">person_add</span>Save &amp; Register Another</button>
+          {%- endif %}
+          <button type="submit" class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">{% if check_in %}how_to_reg{% elif booking %}event_available{% else %}save{% endif %}</span>{% if patient %}Save Changes{% elif check_in %}Save &amp; Check In{% elif booking %}Save &amp; Book Appointment{% else %}Save Patient Record{% endif %}</button>
+        </div>
+      </div>
+
+    </form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Keeps the .checked styling in step with the real input state. The server
+  // renders the initial state; this only maintains it as the user clicks.
+  function syncChoice(input){
+    var wrapper = input.closest('.radio-pill, .check-chip');
+    if(!wrapper){ return; }
+    if(input.type === 'radio'){
+      var group = document.querySelectorAll('input[name="' + input.name + '"]');
+      group.forEach(function(other){
+        var box = other.closest('.radio-pill');
+        if(box){ box.classList.toggle('checked', other.checked); }
+      });
+    } else {
+      wrapper.classList.toggle('checked', input.checked);
+    }
+  }
+  document.querySelectorAll('.radio-pill input, .check-chip input').forEach(function(input){
+    input.addEventListener('change', function(){ syncChoice(input); });
+  });
+
+  // Makes the "Auto-calculated" hint on the disabled Age field true.
+  //
+  // This is a preview of a value the server has not computed yet -- nothing is
+  // stored until the form is submitted -- so it cannot call the shared function.
+  // models/patients.py format_age() stays the authority: it is what Screens 03
+  // and 04 render once the record exists, and the rules below are a deliberate
+  // mirror of it. Change that function and this has to move with it, or an
+  // infant would preview as "0" here and as "4 months, 6 days" on the profile
+  // the save redirects to.
+  var birthDate = document.getElementById('birthDate');
+  var ageDisplay = document.getElementById('ageDisplay');
+
+  // Mirrors add_months(): clamped to the target month's last day, so 31 January
+  // plus one month is 28 February rather than rolling into March.
+  function addMonths(value, months){
+    var monthIndex = value.getMonth() + months;
+    var year = value.getFullYear() + Math.floor(monthIndex / 12);
+    var month = ((monthIndex % 12) + 12) % 12;
+    var lastDay = new Date(year, month + 1, 0).getDate();
+    return new Date(year, month, Math.min(value.getDate(), lastDay));
+  }
+
+  function plural(count, noun){
+    return count + ' ' + noun + (count === 1 ? '' : 's');
+  }
+
+  function refreshAge(){
+    if(!birthDate || !ageDisplay){ return; }
+    var value = birthDate.value;
+    if(!value){ ageDisplay.value = ''; return; }
+    var born = new Date(value + 'T00:00:00');
+    if(isNaN(born.getTime())){ ageDisplay.value = ''; return; }
+
+    var now = new Date();
+    var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    var years = today.getFullYear() - born.getFullYear();
+    var beforeBirthday = (today.getMonth() < born.getMonth()) ||
+      (today.getMonth() === born.getMonth() && today.getDate() < born.getDate());
+    if(beforeBirthday){ years -= 1; }
+
+    if(years < 0 || years >= 150){ ageDisplay.value = ''; return; }
+    if(years !== 0){ ageDisplay.value = String(years); return; }
+
+    // Under one year: months with the leftover days, and days alone under a
+    // month, so a newborn never previews as "0".
+    var months = (today.getFullYear() - born.getFullYear()) * 12 +
+      (today.getMonth() - born.getMonth());
+    if(today.getDate() < born.getDate()){ months -= 1; }
+    var days = Math.round((today - addMonths(born, months)) / 86400000);
+
+    if(months === 0){ ageDisplay.value = plural(days, 'day'); return; }
+    ageDisplay.value = plural(months, 'month') + (days ? ', ' + plural(days, 'day') : '');
+  }
+  if(birthDate){ birthDate.addEventListener('change', refreshAge); refreshAge(); }
+</script>
+{% endblock %}

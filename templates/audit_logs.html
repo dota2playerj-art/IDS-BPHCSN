@@ -1,0 +1,432 @@
+{% extends "base.html" %}
+{% set active_nav = "audit_logs" %}
+{% block title %}IDS-BPHCSN | Audit Logs{% endblock %}
+
+{% block styles %}
+  .toolbar-search{min-width:240px; max-width:320px;}
+  .page-desc{font-size:14px; color:var(--text-muted); margin-top:4px; max-width:640px;}
+
+  .stat-card{
+    background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:20px 22px; height:100%;
+  }
+  .stat-icon{width:44px;height:44px;border-radius:12px; display:flex; align-items:center; justify-content:center; margin-bottom:12px;}
+  .stat-value{font-size:24px; font-weight:700; color:var(--text-dark);}
+  .stat-label{font-size:13px; color:var(--text-muted); margin-top:2px;}
+  .stat-trend{font-size:12px; font-weight:600; margin-top:6px;}
+
+  .panel-card{
+    background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:24px;
+  }
+
+
+  .filter-btn{
+    background:#fff; border:1px solid var(--border-color); border-radius:10px; padding:10px 16px;
+    font-size:14px; font-weight:500; color:var(--text-dark); display:flex; align-items:center; gap:6px;
+  }
+  .filter-btn.open, .filter-btn:hover{border-color:var(--teal); color:var(--teal-dark);}
+  .btn-ghost-ids{
+    background:transparent; border:1px solid var(--border-color); color:var(--text-dark); border-radius:10px; padding:10px 14px;
+    font-size:13.5px; font-weight:500; display:flex; align-items:center; gap:6px; white-space:nowrap;
+  }
+  .btn-ghost-ids:hover{border-color:#C7CBD1; background:var(--bg);}
+
+  .filter-panel{
+    background:var(--bg); border:1px solid var(--border-color); border-radius:12px; padding:20px;
+    margin-bottom:18px; display:none;
+  }
+  .filter-panel.show{display:block;}
+  .filter-panel label{font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:6px; display:block;}
+  .filter-panel .form-control, .filter-panel .form-select{
+    height:48px; border-radius:12px; border:1px solid var(--border-color); font-size:13.5px;
+  }
+  .filter-panel .form-control:focus, .filter-panel .form-select:focus{
+    border-color:var(--teal); box-shadow:0 0 0 3px rgba(22,155,146,0.12);
+  }
+  .filter-actions{display:flex; justify-content:flex-end; gap:10px; margin-top:16px; padding-top:16px; border-top:1px solid var(--border-color);}
+  .btn-reset{background:transparent; border:none; color:var(--text-muted); font-size:14px; font-weight:600; padding:10px 14px;}
+  .btn-reset:hover{color:var(--danger);}
+
+  table.audit-table{width:100%; border-collapse:separate; border-spacing:0; font-size:13.5px;}
+  table.audit-table thead th{
+    text-align:left; color:var(--text-muted); font-weight:600; font-size:11.5px; letter-spacing:0.03em;
+    text-transform:uppercase; padding:12px 14px; border-bottom:1px solid var(--border-color); white-space:nowrap;
+  }
+  table.audit-table tbody td{
+    padding:14px; border-bottom:1px solid var(--border-color); color:var(--text-dark); vertical-align:middle;
+  }
+  table.audit-table tbody tr{cursor:pointer;}
+  table.audit-table tbody tr:hover{background:#FAFBFC;}
+  table.audit-table tbody tr.selected{background:var(--teal-light);}
+  table.audit-table tbody tr:last-child td{border-bottom:none;}
+
+  .ts-main{font-weight:600;}
+  .ts-sub{color:var(--text-muted); font-size:12px;}
+  .user-cell{display:flex; align-items:center; gap:9px;}
+  .user-avatar{width:30px;height:30px;border-radius:50%; background:var(--teal-light); color:var(--teal-dark); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:11px; flex-shrink:0;}
+  .user-name{font-weight:600; font-size:13px;}
+  .module-pill{background:var(--teal-light); color:var(--teal-dark); font-size:11.5px; font-weight:600; padding:3px 10px; border-radius:999px; white-space:nowrap;}
+  .ip-mono{font-family:monospace; font-size:12.5px; color:var(--text-muted);}
+
+  .badge-status{
+    display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600;
+    padding:4px 11px; border-radius:999px; white-space:nowrap;
+  }
+  .badge-success{background:#DCFCE7; color:#15803D;}
+  .badge-failed{background:#FEE2E2; color:#B91C1C;}
+  .badge-warning{background:#FEF3C7; color:#B45309;}
+
+  .action-icon{
+    width:32px; height:32px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center;
+    color:var(--text-muted); background:transparent; border:none;
+  }
+  .action-icon:hover{background:var(--bg); color:var(--teal-dark);}
+
+  .table-footer{display:flex; align-items:center; justify-content:space-between; padding-top:18px; margin-top:6px; border-top:1px solid var(--border-color); flex-wrap:wrap; gap:12px;}
+  .pg-info{font-size:13px; color:var(--text-muted);}
+  .pagination .page-link{
+    color:var(--text-dark); border:1px solid var(--border-color); font-size:13px; font-weight:500;
+    padding:7px 13px; border-radius:8px !important; margin-left:4px;
+  }
+  .pagination .page-item.active .page-link{background-color:var(--teal); border-color:var(--teal); color:#fff;}
+  .pagination .page-link:hover{background-color:var(--teal-light); color:var(--teal-dark); border-color:var(--teal-light);}
+  .pagination .page-item.disabled .page-link{color:#C7CBD1; background:#fff;}
+
+  /* DETAIL PANEL */
+  .detail-sticky{position:sticky; top:104px;}
+  .detail-header{display:flex; align-items:center; gap:12px; margin-bottom:4px;}
+  .detail-icon{width:44px;height:44px;border-radius:12px; background:var(--teal-light); display:flex; align-items:center; justify-content:center; flex-shrink:0;}
+  .detail-title{font-size:15.5px; font-weight:700; color:var(--text-dark);}
+  .detail-sub{font-size:12px; color:var(--text-muted); margin-top:2px;}
+  .detail-row{display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--border-color); font-size:13px; gap:10px;}
+  .detail-row:last-child{border-bottom:none;}
+  .detail-label{color:var(--text-muted); flex-shrink:0;}
+  .detail-value{font-weight:600; color:var(--text-dark); text-align:right;}
+
+  .diff-section-title{font-size:12px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.03em; margin:18px 0 10px;}
+  .diff-row{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;}
+  .diff-box{border-radius:10px; padding:10px 12px; font-size:12.5px;}
+  .diff-before{background:#FEF2F2; border:1px solid #FECACA;}
+  .diff-after{background:#F0FDF4; border:1px solid #BBF7D0;}
+  .diff-field{font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.02em; margin-bottom:4px;}
+  .diff-before .diff-field{color:#B91C1C;}
+  .diff-after .diff-field{color:#15803D;}
+  .diff-value{color:var(--text-dark); font-weight:500;}
+  .diff-field-name{font-size:12.5px; font-weight:600; color:var(--text-muted); margin-bottom:6px;}
+{% endblock %}
+
+{% block breadcrumb %}
+
+    <div class="breadcrumb-nav">
+      <a href="{{ url_for(dashboard_endpoint) }}">Dashboard</a>
+      <span class="sep material-symbols-outlined">chevron_right</span>
+      <span class="current">Audit Logs</span>
+    </div>{% endblock %}
+
+{% block content %}
+    <div class="eyebrow">Barangay Poblacion Health Center</div>
+    <div class="page-title">Audit Logs</div>
+    <div class="page-desc">Complete activity trail of all system actions, logins, and record changes for accountability and compliance.</div>
+
+    <!-- STAT CARDS — the two that can be counted are counted, in
+         models/audit.py::get_audit_stats(); the two with no writer behind them
+         say so rather than printing a number nobody could reproduce. -->
+    <div class="row g-3 mt-1 mb-4">
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:var(--teal-light);"><span class="material-symbols-outlined" style="color:var(--teal-dark);">fact_check</span></div>
+          <div class="stat-value">{{ stats.today }}</div>
+          <div class="stat-label">Activities Today</div>
+          <div class="stat-trend" style="color:var(--text-muted);">{{ stats.total }} recorded in total</div>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#FEF3C7;"><span class="material-symbols-outlined" style="color:var(--warning);">edit_note</span></div>
+          <div class="stat-value">{{ stats.record_updates }}</div>
+          <div class="stat-label">Record Updates</div>
+          <div class="stat-trend" style="color:var(--text-muted);">
+            {{ stats.distinct_actors }} account{{ '' if stats.distinct_actors == 1 else 's' }} represented
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card" title="{{ untracked.logins }}">
+          <div class="stat-icon" style="background:#DBEAFE;"><span class="material-symbols-outlined" style="color:var(--info);">login</span></div>
+          <div class="stat-value" style="color:var(--text-muted);">&mdash;</div>
+          <div class="stat-label">Login Events</div>
+          <div class="stat-trend" style="color:var(--text-muted); font-weight:500;">Not tracked &mdash; nothing logs sign-in</div>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card" title="{{ untracked.security }}">
+          <div class="stat-icon" style="background:#FEE2E2;"><span class="material-symbols-outlined" style="color:var(--danger);">gpp_maybe</span></div>
+          <div class="stat-value" style="color:var(--text-muted);">&mdash;</div>
+          <div class="stat-label">Security Events</div>
+          <div class="stat-trend" style="color:var(--text-muted); font-weight:500;">Not tracked &mdash; no lockout exists</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3">
+      <!-- LEFT: LIST PANEL -->
+      <div class="col-lg-8">
+        <div class="panel-card">
+
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-3">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <div class="toolbar-search">
+                <span class="material-symbols-outlined" style="font-size:18px;">search</span>
+                <input type="text" id="auditSearch" placeholder="Search by user, module, or activity"
+                       aria-label="Search the audit trail">
+              </div>
+              <button class="filter-btn" id="filterToggleBtn" onclick="toggleFilterPanel()">
+                <span class="material-symbols-outlined" style="font-size:18px;">filter_list</span>Filter
+              </button>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+              <a class="btn-ghost-ids" href="{{ url_for('admin.audit_logs', module=selected_module) }}">
+                <span class="material-symbols-outlined" style="font-size:18px;">refresh</span>Refresh
+              </a>
+              <button class="btn-outline-teal" disabled title="{{ untracked.export }}">
+                <span class="material-symbols-outlined" style="font-size:18px;">file_download</span>Export
+              </button>
+            </div>
+          </div>
+
+          <!-- FILTER PANEL — module is the only filter the stored query supports
+               (models/audit.py::get_audit_logs), so it is the only one offered.
+               The options are the modules that actually have entries, so the
+               filter can never return an empty screen. -->
+          <div class="filter-panel" id="filterPanel">
+            <form method="get" action="{{ url_for('admin.audit_logs') }}">
+              <div class="row g-3">
+                <div class="col-md-4 col-sm-6">
+                  <label for="moduleFilter">Module</label>
+                  <select class="form-select" id="moduleFilter" name="module">
+                    <option value=""{% if not selected_module %} selected{% endif %}>All Modules</option>
+{%- for option in module_options %}
+                    <option value="{{ option }}"{% if selected_module == option %} selected{% endif %}>{{ option }}</option>
+{%- endfor %}
+                  </select>
+                </div>
+                <div class="col-md-8">
+                  <label>Other filters</label>
+                  <div class="form-text-hint" style="font-size:12.5px; color:var(--text-muted); line-height:1.5;">
+                    {{ untracked.filters }}
+                  </div>
+                </div>
+              </div>
+              <div class="filter-actions">
+                <a class="btn-reset" href="{{ url_for('admin.audit_logs') }}">Reset Filters</a>
+                <button type="submit" class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">filter_alt</span>Apply Filter</button>
+              </div>
+            </form>
+          </div>
+
+          <div style="overflow-x:auto;">
+            <table class="audit-table" id="auditTable">
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>User</th>
+                  <th>Module</th>
+                  <th>Activity</th>
+                  <th>IP Address</th>
+                  <th>Status</th>
+                  <th style="text-align:right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+{%- for entry in entries %}
+                <tr{% if loop.first %} class="selected"{% endif %} data-entry="{{ entry.id }}"
+                    data-search="{{ (entry.user_name ~ ' ' ~ (entry.module or '') ~ ' ' ~ entry.action ~ ' ' ~ (entry.details or '')) | lower }}"
+                    onclick="selectRow(this)">
+                  <td><div class="ts-main">{{ entry.time_text }}</div><div class="ts-sub">{{ entry.date_text }}</div></td>
+                  <td>
+                    <div class="user-cell">
+                      <div class="user-avatar">{{ entry.initials }}</div>
+                      <div>
+                        <div class="user-name">{{ entry.user_name }}</div>
+                        <div class="ts-sub">{{ entry.user_role }}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>{% if entry.module %}<span class="module-pill">{{ entry.module }}</span>{% else %}<span class="ts-sub">&mdash;</span>{% endif %}</td>
+                  <td>{{ entry.action }}</td>
+                  <td class="ip-mono">{{ entry.ip_address or '—' }}</td>
+                  {#- Every stored entry is a completed action: log_action() is
+                      called after the write it describes has succeeded, so there
+                      is no failed or partial row for this column to report. #}
+                  <td><span class="badge-status badge-success">Recorded</span></td>
+                  <td><div class="d-flex justify-content-end"><button class="action-icon" type="button" aria-label="View entry {{ entry.id }}"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button></div></td>
+                </tr>
+{%- else %}
+                <tr id="auditEmpty">
+                  <td colspan="7" style="text-align:center; padding:38px 14px; color:var(--text-muted);">
+                    <div class="material-symbols-outlined" style="font-size:34px; opacity:0.45;">fact_check</div>
+                    <div style="font-weight:600; margin-top:8px; color:var(--text-dark);">No activity recorded yet</div>
+                    <div style="font-size:13px; margin-top:4px;">
+                      Entries appear here as soon as a consultation record is edited or an SMS
+                      broadcast is sent.
+                    </div>
+                  </td>
+                </tr>
+{%- endfor %}
+                <tr id="auditNoMatch" hidden>
+                  <td colspan="7" style="text-align:center; padding:32px 14px; color:var(--text-muted);">
+                    No entry matches that search.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- FOOTER — a real count. There are no paging controls because the
+               query returns the whole trail up to PAGE_SIZE; when it outgrows
+               that, the line below says so rather than inventing page numbers. -->
+          <div class="table-footer">
+            <div class="pg-info" id="auditCount">
+              {%- if matching %}
+              Showing {{ showing }} of {{ matching }}
+              {{- ' activity' if matching == 1 else ' activities' }}
+              {%- if selected_module %} in {{ selected_module }}{% endif %}
+              {%- else %}
+              No activities recorded{% if selected_module %} in {{ selected_module }}{% endif %}
+              {%- endif %}
+            </div>
+{%- if truncated %}
+            <div class="pg-info">
+              Showing the {{ page_size }} most recent. Older entries are stored but not paged
+              through on this screen yet.
+            </div>
+{%- endif %}
+          </div>
+
+        </div>
+      </div>
+
+      <!-- RIGHT: ENTRY DETAILS PANEL — one block per entry, all rendered
+           server-side and all but the selected one hidden. The `details` column
+           is parsed into before/after pairs in routes/audit_views.py; a clause
+           that is not a field change is shown verbatim rather than dropped. -->
+      <div class="col-lg-4">
+        <div class="panel-card detail-sticky">
+{%- if not entries %}
+          <div class="detail-header">
+            <div class="detail-icon"><span class="material-symbols-outlined" style="color:var(--teal-dark); font-size:22px;">fact_check</span></div>
+            <div>
+              <div class="detail-title">No entry selected</div>
+              <div class="detail-sub">There is nothing in the trail yet</div>
+            </div>
+          </div>
+          <div class="mt-3" style="font-size:13px; color:var(--text-muted); line-height:1.6;">
+            Editing a saved consultation or sending an SMS broadcast writes an entry here,
+            naming who acted, what changed, and what the record said before.
+          </div>
+{%- endif %}
+{%- for entry in entries %}
+          <div class="entry-detail" data-detail="{{ entry.id }}"{% if not loop.first %} hidden{% endif %}>
+            <div class="detail-header">
+              <div class="detail-icon">
+                <span class="material-symbols-outlined" style="color:var(--teal-dark); font-size:22px;">{{ 'campaign' if entry.is_sms else 'edit_note' }}</span>
+              </div>
+              <div>
+                <div class="detail-title">{{ entry.action }}</div>
+                <div class="detail-sub">Entry #{{ entry.id }}</div>
+              </div>
+            </div>
+
+            <div class="mt-3">
+              <span class="badge-status badge-success">Recorded</span>
+            </div>
+
+            <div class="mt-3">
+              <div class="detail-row"><div class="detail-label">Timestamp</div><div class="detail-value">{{ entry.full_text }}</div></div>
+              <div class="detail-row"><div class="detail-label">User</div><div class="detail-value">{{ entry.user_name }}</div></div>
+              <div class="detail-row"><div class="detail-label">Role</div><div class="detail-value">{{ entry.user_role }}</div></div>
+              <div class="detail-row"><div class="detail-label">Module</div><div class="detail-value">{{ entry.module or '—' }}</div></div>
+              <div class="detail-row"><div class="detail-label">IP Address</div><div class="detail-value ip-mono">{{ entry.ip_address or '—' }}</div></div>
+            </div>
+
+{%- if entry.summary %}
+            <div class="diff-section-title">What happened</div>
+            <div style="font-size:13px; color:var(--text-dark); line-height:1.6;">{{ entry.summary }}</div>
+{%- endif %}
+
+{%- if entry.changes %}
+            <div class="diff-section-title">Field Changes ({{ entry.changes | length }})</div>
+{%- for change in entry.changes %}
+            <div class="diff-field-name">{{ change.field }}</div>
+            <div class="diff-row">
+              <div class="diff-box diff-before"><div class="diff-field">Before</div><div class="diff-value">{{ change.before }}</div></div>
+              <div class="diff-box diff-after"><div class="diff-field">After</div><div class="diff-value">{{ change.after }}</div></div>
+            </div>
+{%- endfor %}
+{%- endif %}
+
+{%- if entry.notes %}
+            <div class="diff-section-title">Details</div>
+            <ul style="font-size:12.5px; color:var(--text-dark); line-height:1.65; padding-left:18px; margin-bottom:0;">
+{%- for note in entry.notes %}
+              <li style="margin-bottom:5px;">{{ note }}</li>
+{%- endfor %}
+            </ul>
+{%- endif %}
+          </div>
+{%- endfor %}
+        </div>
+      </div>
+
+    </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function toggleFilterPanel(){
+    var panel = document.getElementById('filterPanel');
+    var btn = document.getElementById('filterToggleBtn');
+    panel.classList.toggle('show');
+    btn.classList.toggle('open');
+  }
+
+  // Selecting a row shows that entry's detail block. Every block is already on
+  // the page, rendered by the server from the stored row, so nothing here
+  // builds text -- it only decides which one is visible.
+  function selectRow(row){
+    var id = row.getAttribute('data-entry');
+    if(!id){ return; }
+    document.querySelectorAll('#auditTable tbody tr[data-entry]').forEach(function(r){
+      r.classList.remove('selected');
+    });
+    row.classList.add('selected');
+    document.querySelectorAll('.entry-detail').forEach(function(panel){
+      panel.hidden = panel.getAttribute('data-detail') !== id;
+    });
+  }
+
+  // Search filters the rows already on the page against the same text the
+  // server put in data-search (user, role, module, activity and details).
+  (function(){
+    var box = document.getElementById('auditSearch');
+    if(!box){ return; }
+    var noMatch = document.getElementById('auditNoMatch');
+    var counter = document.getElementById('auditCount');
+    var baseline = counter ? counter.textContent.trim() : '';
+
+    box.addEventListener('input', function(){
+      var term = box.value.trim().toLowerCase();
+      var shown = 0;
+      document.querySelectorAll('#auditTable tbody tr[data-entry]').forEach(function(row){
+        var hit = !term || (row.getAttribute('data-search') || '').indexOf(term) !== -1;
+        row.hidden = !hit;
+        if(hit){ shown++; }
+      });
+      if(noMatch){ noMatch.hidden = !(term && shown === 0); }
+      if(counter){
+        counter.textContent = term
+          ? 'Showing ' + shown + (shown === 1 ? ' matching activity' : ' matching activities')
+          : baseline;
+      }
+    });
+  })();
+</script>{% endblock %}

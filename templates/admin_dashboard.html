@@ -1,0 +1,434 @@
+﻿{% extends "base.html" %}
+{% set active_nav = "dashboard" %}
+{% block title %}IDS-BPHCSN | Administrator Dashboard{% endblock %}
+
+{% block styles %}
+  .btn-primary-teal{justify-content:center; width:100%;}
+  .status-pill{
+    display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600;
+    padding:6px 14px; border-radius:999px;
+  }
+  .pill-operational{background:var(--teal-light); color:var(--teal-dark);}
+  .pill-secure{background:#DBEAFE; color:#1D4ED8;}
+  .pill-dot{width:7px;height:7px;border-radius:50%; background:currentColor;}
+
+  .stat-card{
+    background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:20px 22px; height:100%;
+  }
+  .stat-icon{width:44px;height:44px;border-radius:12px; display:flex; align-items:center; justify-content:center; margin-bottom:12px;}
+  .stat-value{font-size:23px; font-weight:700; color:var(--text-dark);}
+  .stat-label{font-size:12.5px; color:var(--text-muted); margin-top:2px;}
+  .stat-trend{font-size:11.5px; font-weight:600; margin-top:6px;}
+
+  .panel-card{
+    background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:24px; margin-bottom:24px;
+  }
+  .panel-title{font-size:16px; font-weight:600; color:var(--text-dark);}
+  .panel-sub{font-size:12.5px; color:var(--text-muted); margin-top:2px;}
+  .panel-link{font-size:12.5px; font-weight:600; color:var(--teal-dark); text-decoration:none; display:flex; align-items:center; gap:3px;}
+
+  /* FILTER CHIPS */
+  .filter-chip-group{display:flex; gap:6px; flex-wrap:wrap;}
+  .filter-chip{
+    border:1px solid var(--border-color); background:#fff; border-radius:999px; padding:6px 15px;
+    font-size:12.5px; font-weight:600; color:var(--text-muted);
+  }
+  .filter-chip.active{background:var(--teal); border-color:var(--teal); color:#fff;}
+
+  table.dash-table{width:100%; border-collapse:separate; border-spacing:0; font-size:13.5px;}
+  table.dash-table thead th{
+    text-align:left; color:var(--text-muted); font-weight:600; font-size:11.5px; letter-spacing:0.03em;
+    text-transform:uppercase; padding:12px 14px; border-bottom:1px solid var(--border-color); white-space:nowrap;
+  }
+  table.dash-table tbody td{
+    padding:13px 14px; border-bottom:1px solid var(--border-color); color:var(--text-dark); vertical-align:middle;
+  }
+  table.dash-table tbody tr:hover{background:#FAFBFC;}
+  table.dash-table tbody tr:last-child td{border-bottom:none;}
+  .pat-name{font-weight:600;}
+  .pat-id{color:var(--text-muted); font-size:12.5px;}
+
+  .badge-status{
+    display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600;
+    padding:4px 11px; border-radius:999px; white-space:nowrap;
+  }
+  .badge-completed{background:#DCFCE7; color:#15803D;}
+  .badge-followup{background:#FEF3C7; color:#B45309;}
+  .badge-referred{background:#EDE9FE; color:var(--purple);}
+  .badge-appointment-pending{background:rgba(59,130,246,0.12); color:#1D4ED8;}
+
+  .chart-wrap{position:relative; height:170px;}
+
+  .inv-item{padding:11px 0; border-bottom:1px solid var(--border-color);}
+  .inv-item:last-child{border-bottom:none;}
+  .inv-item-head{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:4px;}
+  .inv-name{font-size:13px; font-weight:600; color:var(--text-dark);}
+  .inv-qty{font-size:11.5px; color:var(--text-muted);}
+  .inv-bar-track{height:6px; border-radius:999px; background:#E5E7EB; overflow:hidden; margin-bottom:3px;}
+  .inv-bar-fill{height:100%; border-radius:999px;}
+  .fill-good{background:var(--success);}
+  .fill-low{background:var(--danger);}
+  .fill-warn{background:var(--warning);}
+  .inv-exp{font-size:10.5px; color:var(--text-muted);}
+  .inv-pct{font-size:11px; font-weight:700;}
+
+  label.field-label{font-size:12.5px; font-weight:600; color:var(--text-dark); margin-bottom:6px; display:block;}
+  .form-select, .form-control{
+    border-radius:12px; border:1px solid var(--border-color); font-size:13px; height:48px; color:var(--text-dark);
+  }
+  .form-control:focus, .form-select:focus{border-color:var(--teal); box-shadow:0 0 0 3px rgba(22,155,146,0.12);}
+  textarea.form-control{height:auto; min-height:84px; border-radius:12px; font-size:13px; resize:none;}
+
+  .channel-toggle{display:flex; gap:6px; margin-top:4px;}
+  .channel-btn{
+    flex:1; border:1px solid var(--border-color); background:#fff; border-radius:10px; padding:9px 0;
+    font-size:12.5px; font-weight:600; color:var(--text-dark); text-align:center;
+  }
+  .channel-btn.active{background:var(--teal); border-color:var(--teal); color:#fff;}
+
+  .btn-primary-teal:disabled{opacity:0.5;}
+
+  .sms-cost-note{font-size:11px; color:var(--text-muted); text-align:center; margin-top:8px;}
+
+  .activity-item{display:flex; gap:10px; padding:11px 0; border-bottom:1px solid var(--border-color);}
+  .activity-item:last-child{border-bottom:none;}
+  .activity-icon{width:32px;height:32px;border-radius:9px; display:flex; align-items:center; justify-content:center; flex-shrink:0;}
+  .activity-title{font-size:12.5px; font-weight:600; color:var(--text-dark);}
+  .activity-sub{font-size:11.5px; color:var(--text-muted);}
+  .activity-time{font-size:10.5px; color:#9CA3AF; margin-top:1px;}
+{% endblock %}
+
+{% block content %}
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-1">
+      <div>
+        <div class="eyebrow">Barangay Poblacion Health Center</div>
+        <div class="page-title">Administrator Dashboard</div>
+      </div>
+      <div class="d-flex gap-2">
+        <span class="status-pill pill-operational"><span class="pill-dot"></span>All Systems Operational</span>
+        <span class="status-pill pill-secure"><span class="material-symbols-outlined" style="font-size:14px;">wifi</span>Secure Connection</span>
+      </div>
+    </div>
+    <div style="font-size:14px; color:var(--text-muted); margin-bottom:20px;">{{ clinic_today | full_date }} &middot; Welcome back, {{ sidebar_user_name }}. Here's today's overview.</div>
+
+    <!-- STAT CARDS (6, matching original IA) -->
+    <div class="row g-3 mb-4">
+      <div class="col-lg-2 col-md-4 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:var(--teal-light);"><span class="material-symbols-outlined" style="color:var(--teal-dark); font-size:20px;">groups</span></div>
+          <div class="stat-value">{{ patient_stats.total_patients }}</div>
+          <div class="stat-label">Total Registered Patients</div>
+          <div class="stat-trend" style="color:{{ 'var(--success)' if patient_stats.new_this_month else 'var(--text-muted)' }};">
+            {%- if patient_stats.new_this_month %}+{{ patient_stats.new_this_month }} this month
+            {%- else %}No new records this month{% endif %}
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-2 col-md-4 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#DBEAFE;"><span class="material-symbols-outlined" style="color:var(--info); font-size:20px;">calendar_month</span></div>
+          <div class="stat-value">{{ queue_stats.total_today }}</div>
+          <div class="stat-label">Today's Appointments</div>
+          <div class="stat-trend" style="color:var(--text-muted);">
+            {{ queue_stats.walk_ins }} walk-in{{ '' if queue_stats.walk_ins == 1 else 's' }}
+            {%- if queue_stats.not_arrived %} &middot; {{ queue_stats.not_arrived }} not yet arrived{% endif %}
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-2 col-md-4 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#EDE9FE;"><span class="material-symbols-outlined" style="color:var(--purple); font-size:20px;">inventory_2</span></div>
+          <div class="stat-value">{{ inventory_stats.total_items }}</div>
+          <div class="stat-label">Active Inventory Items</div>
+          <div class="stat-trend" style="color:var(--text-muted);">{{ inventory_stats.medicine_count }} medicine{{ '' if inventory_stats.medicine_count == 1 else 's' }}</div>
+        </div>
+      </div>
+      <div class="col-lg-2 col-md-4 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#FEF3C7;"><span class="material-symbols-outlined" style="color:var(--warning); font-size:20px;">trending_down</span></div>
+          <div class="stat-value">{{ low_stock.low_stock_count }}</div>
+          <div class="stat-label">Low Stock Medicines</div>
+          {%- if low_stock.out_of_stock_count %}
+          <div class="stat-trend" style="color:var(--danger);">{{ low_stock.out_of_stock_count }} out of stock</div>
+          {%- elif low_stock.low_stock_count %}
+          <div class="stat-trend" style="color:var(--danger);">Needs reorder</div>
+          {%- else %}
+          <div class="stat-trend" style="color:var(--success);">All above reorder level</div>
+          {%- endif %}
+        </div>
+      </div>
+      <div class="col-lg-2 col-md-4 col-sm-6">
+        <div class="stat-card">
+          {#- Relabelled from "Pending SMS Alerts". A broadcast is composed and
+              transmitted in one step -- there is no queue and no scheduled send,
+              so nothing in the schema is ever "pending". What can be counted is
+              what actually went out, which is what this now reports. #}
+          <div class="stat-icon" style="background:#DBEAFE;"><span class="material-symbols-outlined" style="color:var(--info); font-size:20px;">campaign</span></div>
+          <div class="stat-value">{{ broadcast_stats.messages_sent }}</div>
+          <div class="stat-label">SMS Messages Sent</div>
+          <div class="stat-trend" style="color:{{ 'var(--danger)' if broadcast_stats.messages_failed else 'var(--text-muted)' }};">
+            {%- if broadcast_stats.messages_failed %}{{ broadcast_stats.messages_failed }} failed send{{ '' if broadcast_stats.messages_failed == 1 else 's' }}
+            {%- else %}{{ broadcast_stats.total_broadcasts }} broadcast{{ '' if broadcast_stats.total_broadcasts == 1 else 's' }} &middot; none failed{% endif %}
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-2 col-md-4 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#DCFCE7;"><span class="material-symbols-outlined" style="color:var(--success); font-size:20px;">clinical_notes</span></div>
+          <div class="stat-value">{{ consultation_stats.recorded_this_month }}</div>
+          <div class="stat-label">Monthly Consultations</div>
+          {#- Against last month, read off the same six-month trend the chart
+              below plots rather than counted a second way. #}
+          {%- set last_month = consultation_trend[-2].count if consultation_trend | length > 1 else 0 %}
+          {%- set change = consultation_stats.recorded_this_month - last_month %}
+          <div class="stat-trend" style="color:{{ 'var(--success)' if change > 0 else ('var(--danger)' if change < 0 else 'var(--text-muted)') }};">
+            {%- if change > 0 %}+{{ change }} vs last month
+            {%- elif change < 0 %}{{ change }} vs last month
+            {%- else %}Same as last month{% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RECENT PATIENT CONSULTATIONS -->
+    <div class="panel-card">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-3">
+        <div>
+          <div class="panel-title">Recent Patient Consultations</div>
+          <div class="panel-sub">
+            {{ clinic_today | display_date }} &middot;
+            {{ consultation_stats.total }} record{{ '' if consultation_stats.total == 1 else 's' }} on file
+            &middot; {{ consultation_stats.recorded_this_month }} this month
+          </div>
+        </div>
+        <a href="{{ url_for(patient_records_endpoint) }}" class="panel-link">Patient Records<span class="material-symbols-outlined" style="font-size:15px;">chevron_right</span></a>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="dash-table">
+          <thead>
+            <tr>
+              <th>Patient</th>
+              <th>ID</th>
+              <th>Age</th>
+              <th>Time</th>
+              <th>Chief Complaint</th>
+              <th>Medicine</th>
+              <th>BHW</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+{%- for entry in recent_consultations %}
+            <tr>
+              <td class="pat-name"><a href="{{ url_for(patient_profile_endpoint, patient_id=entry.patient_row_id) }}" style="color:inherit; text-decoration:none;">{{ entry.full_name }}</a></td>
+              <td class="pat-id">{{ entry.patient_id }}</td>
+              <td>{{ entry.age if entry.age is not none else '—' }}</td>
+              <td>{{ entry.consultation_date | display_date }}</td>
+              <td>{{ entry.chief_complaint or '—' }}</td>
+              {#- Dispensing is not recorded anywhere, so this column has no
+                  source. See untracked.dispensing, printed under the table. #}
+              <td style="color:var(--text-muted);">&mdash;</td>
+              <td>{{ entry.recorded_by }}</td>
+              <td><span class="badge-status badge-completed">Recorded</span></td>
+            </tr>
+{%- else %}
+            <tr>
+              <td colspan="8" style="text-align:center; padding:34px 14px; color:var(--text-muted);">
+                <div style="font-weight:600; color:var(--text-dark);">No consultations recorded yet</div>
+                <div style="font-size:13px; margin-top:4px;">A visit written up on Record Consultation appears here.</div>
+              </td>
+            </tr>
+{%- endfor %}
+          </tbody>
+        </table>
+      </div>
+{%- if recent_consultations %}
+      <div class="panel-sub" style="margin-top:10px; font-size:12.5px;">{{ untracked.dispensing }}</div>
+{%- endif %}
+    </div>
+
+    <!-- SECOND ROW: ANALYTICS + INVENTORY + SMS + ACTIVITY -->
+    <div class="row g-3">
+
+      <!-- MONTHLY ANALYTICS -->
+      <div class="col-lg-6">
+        <div class="panel-card h-100 mb-0">
+          <div class="panel-title mb-1">Monthly Analytics</div>
+          <div class="panel-sub mb-3">Last 6 months</div>
+
+          <div class="mb-3">
+            <div style="font-size:12.5px; font-weight:600; color:var(--text-dark); margin-bottom:6px;">Consultations</div>
+            <div class="chart-wrap"><canvas id="chartConsult"></canvas></div>
+          </div>
+
+          <div class="row g-3">
+            <div class="col-6">
+              <div style="font-size:12.5px; font-weight:600; color:var(--text-dark); margin-bottom:6px;">New Patient Registrations</div>
+              <div class="chart-wrap" style="height:140px;"><canvas id="chartRegs"></canvas></div>
+            </div>
+            <div class="col-6">
+              <div style="font-size:12.5px; font-weight:600; color:var(--text-dark); margin-bottom:6px;">Medicine Units Dispensed</div>
+              {#- No chart: there is no dispensing history to plot. The canvas
+                  that used to sit here was drawing six invented monthly totals. #}
+              <div class="chart-wrap" style="height:140px; display:flex; align-items:center; justify-content:center; background:var(--bg); border-radius:10px; padding:12px;">
+                <div style="font-size:11.5px; color:var(--text-muted); line-height:1.55; text-align:center;">
+                  <span class="material-symbols-outlined" style="font-size:20px; opacity:0.5; display:block; margin-bottom:4px;">query_stats</span>
+                  Not yet tracked &mdash; no dispensing history exists to plot.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MEDICINE INVENTORY -->
+      <div class="col-lg-3 col-md-6">
+        <div class="panel-card h-100 mb-0">
+          <div class="d-flex align-items-center justify-content-between mb-1">
+            <div class="panel-title" style="font-size:15px;">Medicine Inventory</div>
+          </div>
+          <div class="panel-sub mb-2">{{ low_stock.total_items }} item{{ "s" if low_stock.total_items != 1 }} &middot; {{ low_stock.low_stock_count }} low stock</div>
+
+{%- for item in low_stock.low_stock_items %}
+          <!-- Most critical first: stock as a fraction of this item's own reorder
+               level, so 15 of 60 outranks 90 of 90. Ordered in models/inventory.py. -->
+{%- set critical = item.stock_status in ('Out of Stock', 'Critical', 'Expires Today', 'Expired') %}
+          <div class="inv-item">
+            <div class="inv-item-head"><span class="inv-name">{{ item.name }}{% if item.display_dosage %} {{ item.display_dosage }}{% endif %}</span>{% if item.threshold_pct is not none %}<span class="inv-pct" style="color:{{ 'var(--danger)' if critical else 'var(--warning)' }};">{{ item.threshold_pct }}%</span>{% endif %}</div>
+            <div class="inv-qty">{{ item.stock_quantity }} / {{ item.low_stock_threshold }} {{ item.unit or 'units' }}</div>
+            <div class="inv-bar-track"><div class="inv-bar-fill {{ item.stock_fill_class }}" style="width:{{ item.stock_percent }}%;"></div></div>
+            <div class="inv-exp">Exp: {{ item.expiry_date | display_date('No expiry') }}</div>
+          </div>
+{%- endfor %}
+{%- if not low_stock.low_stock_items %}
+          <div class="panel-sub">Every item is above its reorder level.</div>
+{%- endif %}
+
+          <a href="{{ url_for('medicine_inventory') }}" class="panel-link mt-2">Manage Inventory<span class="material-symbols-outlined" style="font-size:15px;">chevron_right</span></a>
+
+          <!-- IMMUNIZATION FOLLOW-UP — the same figure the Staff dashboard
+               carries as a stat card, from the same get_immunization_alert().
+               It lands here rather than as a seventh stat card because the row
+               above is the frozen six-card IA at col-lg-2, which fills twelve
+               columns exactly; a seventh would either break the row or squeeze
+               all seven below a readable width. The Administrator's need here is
+               oversight — who is outstanding — which the list serves directly. -->
+          <div style="margin-top:18px; padding-top:16px; border-top:1px solid var(--border-color);">
+            <div class="panel-title" style="font-size:15px;">Immunization Follow-up</div>
+            <div class="panel-sub mb-2">
+              {{ immunization_alert.child_count }} child{{ "ren" if immunization_alert.child_count != 1 else "" }} due
+{%- if immunization_alert.overdue_child_count %} &middot; <span style="color:var(--danger); font-weight:600;">{{ immunization_alert.overdue_child_count }} overdue</span>{% endif %}
+            </div>
+{%- for child in immunization_alert.children %}
+{%- set overdue = child.overdue_count > 0 %}
+            <div class="inv-item">
+              <div class="inv-item-head"><span class="inv-name">{{ child.patient.full_name }}</span><span class="inv-pct" style="color:{{ 'var(--danger)' if overdue else 'var(--warning)' }};">{{ child.next_status }}</span></div>
+              <div class="inv-qty">{{ child.patient.age or 'age unknown' }} &middot; {{ child.next_label }}{% if child.attention_count > 1 %} +{{ child.attention_count - 1 }} more{% endif %}</div>
+            </div>
+{%- endfor %}
+{%- if not immunization_alert.children %}
+            <div class="panel-sub">Every child under {{ pediatric_age_years }} is up to date with the DOH schedule.</div>
+{%- endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: SMS BROADCAST + SYSTEM ACTIVITY -->
+      <div class="col-lg-3 col-md-6">
+        <div class="panel-card mb-3">
+          <div class="panel-title" style="font-size:15px;">SMS Broadcast</div>
+          <div class="panel-sub mb-2">Semaphore Gateway</div>
+
+          {#- The audiences and their sizes are the real ones, from
+              models/broadcasts.py::audience_options() -- the same list and the
+              same counts the working composer on Screen 09 offers. Composing
+              happens there, not here: this panel has no form behind it, so the
+              control below links across rather than pretending to send. #}
+          <div class="mb-2">
+            <label class="field-label">Audiences</label>
+{%- for option in audience_options %}
+            <div class="d-flex justify-content-between align-items-center" style="font-size:13px; padding:5px 0; border-bottom:1px solid var(--border-color);">
+              <span style="color:var(--text-dark);">{{ option.label }}</span>
+              <span style="font-weight:600; color:{{ 'var(--text-muted)' if not option.count else 'var(--teal-dark)' }};">{{ option.count }}</span>
+            </div>
+{%- endfor %}
+          </div>
+
+          <div class="mb-2" style="font-size:12.5px; color:var(--text-muted); line-height:1.55;">
+            {{ broadcast_stats.total_broadcasts }} broadcast{{ '' if broadcast_stats.total_broadcasts == 1 else 's' }} sent
+            &middot; {{ broadcast_stats.messages_sent }} message{{ '' if broadcast_stats.messages_sent == 1 else 's' }}
+            &middot; {{ broadcast_stats.reachable_contacts }} reachable contact{{ '' if broadcast_stats.reachable_contacts == 1 else 's' }}.
+          </div>
+
+          <a href="{{ url_for(sms_notifications_endpoint) }}" class="btn-primary-teal" style="text-decoration:none; justify-content:center;"><span class="material-symbols-outlined" style="font-size:17px;">send</span>Compose Broadcast</a>
+        </div>
+
+        <div class="panel-card mb-0">
+          {#- The real audit trail, newest first -- the same rows Screen 12 shows,
+              through models/audit.py::get_audit_logs(). #}
+          <div class="panel-title" style="font-size:15px;">System Activity</div>
+          <div class="panel-sub mb-2">
+            {{ audit_stats.today }} event{{ '' if audit_stats.today == 1 else 's' }} today
+            &middot; {{ audit_stats.total }} recorded in total
+          </div>
+
+{%- for event in activity %}
+{%- set is_sms = event.module == 'SMS Notifications' %}
+          <div class="activity-item">
+            <div class="activity-icon" style="background:{{ '#DBEAFE' if is_sms else 'var(--teal-light)' }};"><span class="material-symbols-outlined" style="color:{{ 'var(--info)' if is_sms else 'var(--teal-dark)' }}; font-size:16px;">{{ 'campaign' if is_sms else 'edit' }}</span></div>
+            <div>
+              <div class="activity-title">{{ event.action }}</div>
+              <div class="activity-sub">{{ event.user_name }}{% if event.module %} &middot; {{ event.module }}{% endif %}</div>
+              <div class="activity-time">{{ event.when }}</div>
+            </div>
+          </div>
+{%- else %}
+          <div class="panel-sub">
+            Nothing has been recorded yet. Editing a consultation or sending a broadcast
+            writes an entry here.
+          </div>
+{%- endfor %}
+
+          <a href="{{ url_for('audit_logs') }}" class="panel-link mt-2">View Audit Logs<span class="material-symbols-outlined" style="font-size:15px;">chevron_right</span></a>
+        </div>
+      </div>
+
+    </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/chart.umd.min.js') }}"></script>
+<script>
+  Chart.defaults.font.family = "'Inter', Arial, sans-serif";
+  Chart.defaults.color = '#6B7280';
+  Chart.defaults.font.size = 11;
+
+  const teal = '#169B92';
+
+  // Both series are emitted from the same six-month windows Screen 10 plots,
+  // through | tojson -- there is no literal data array left on this screen.
+  const consultTrend = {{ consultation_trend | tojson }};
+  const regTrend = {{ registration_trend | tojson }};
+
+  new Chart(document.getElementById('chartConsult'), {
+    type: 'line',
+    data: {
+      labels: consultTrend.map(m => m.label),
+      datasets: [{
+        data: consultTrend.map(m => m.count),
+        borderColor: teal, backgroundColor:'rgba(22,155,146,0.10)',
+        fill:true, tension:0.4, pointRadius:3, pointBackgroundColor: teal
+      }]
+    },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true, grid:{color:'#F1F3F5'}}, x:{grid:{display:false}}} }
+  });
+
+  new Chart(document.getElementById('chartRegs'), {
+    type: 'bar',
+    data: {
+      labels: regTrend.map(m => m.label),
+      datasets: [{ data: regTrend.map(m => m.count), backgroundColor: teal, borderRadius:4 }]
+    },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true, grid:{color:'#F1F3F5'}}, x:{grid:{display:false}}} }
+  });
+</script>{% endblock %}

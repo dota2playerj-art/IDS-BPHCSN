@@ -1,0 +1,776 @@
+"""Patient record queries.
+
+Functions here return plain dicts rather than sqlite3.Row objects, because the
+Patient Records and Patient Profile screens need derived values (age, full name,
+composed address) that do not exist as columns. sqlite3.Row is read-only, so the
+row is copied into a dict and the derived keys are added alongside.
+"""
+import calendar
+import json
+from datetime import date, datetime
+
+from database.connection import get_db
+from utils.dates import day_start_utc, days_ago, month_bounds, recent_months, today
+from utils.phone import is_valid_ph_mobile, to_local_ph_mobile
+
+# The vocabularies the Register Patient form offers. The template renders its
+# <select>/radio/chip options from these same tuples, so a constrained field
+# cannot accept a value the form never offered, and the two cannot drift apart.
+CIVIL_STATUSES = ("Single", "Married", "Widowed", "Separated", "Minor")
+SEXES = ("Female", "Male")
+MUNICIPALITIES = ("San Francisco", "Bunawan", "Rosario")
+PROVINCES = ("Agusan del Sur", "Surigao del Sur", "Davao de Oro")
+EMERGENCY_RELATIONSHIPS = ("Mother", "Father", "Spouse", "Sibling", "Guardian", "Other")
+# "Unknown" is the form's placeholder choice and is stored as NULL, not as text.
+BLOOD_TYPES = ("Unknown", "O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-")
+CONDITION_OPTIONS = ("Hypertension", "Diabetes", "Asthma", "Tuberculosis")
+ALLERGY_OPTIONS = ("Penicillin", "Sulfa Drugs", "Seafood")
+
+# Fields marked with * on the form; the confirmed required set.
+REQUIRED_FIELDS = {
+    "first_name": "First name is required.",
+    "last_name": "Last name is required.",
+    "birth_date": "Birthdate is required.",
+    "civil_status": "Civil status is required.",
+    "sex": "Gender is required.",
+    "address": "House No. / Street / Purok is required.",
+    "municipality": "Municipality / City is required.",
+    "province": "Province is required.",
+    "emergency_contact_name": "Emergency contact name is required.",
+    "emergency_contact_relationship": "Emergency contact relationship is required.",
+    "emergency_contact_number": "Emergency contact number is required.",
+}
+
+# Every column the form writes, in one place so the INSERT and the redisplay
+# cannot fall out of step. created_at is absent on purpose -- it comes from the
+# column's DEFAULT CURRENT_TIMESTAMP.
+PATIENT_FIELDS = (
+    "first_name", "middle_name", "last_name", "birth_date", "sex", "civil_status",
+    "blood_type", "address", "municipality", "province", "zip_code",
+    "contact_number", "emergency_contact_name", "emergency_contact_relationship",
+    "emergency_contact_number", "emergency_contact_address",
+    "medical_conditions", "allergies",
+)
+
+# The two list-valued columns arrive as Python lists and are JSON-encoded, so
+# they are handled apart from the plain text ones.
+LIST_FIELDS = ("medical_conditions", "allergies")
+SCALAR_FIELDS = tuple(field for field in PATIENT_FIELDS if field not in LIST_FIELDS)
+
+EARLIEST_BIRTH_YEAR = 1900
+
+# Republic Act 9994 defines a Philippine senior citizen as 60 years and over.
+# The "Senior Citizen Patients" stat card on Screen 03 counts against this.
+SENIOR_AGE = 60
+
+# Lifecycle values permitted by the patients.status CHECK constraint. Records are
+# never hard-deleted; only Health Center Staff and Administrator may change this.
+PATIENT_STATUSES = ("Active", "Inactive", "Deceased")
+
+# status -> the badge class Screen 03/04 already define in their stylesheets.
+STATUS_BADGE_CLASS = {
+    "Active": "badge-active",
+    "Inactive": "badge-inactive",
+    "Deceased": "badge-archived",
+}
+
+
+def allowed_status_transitions(current_status):
+    """The statuses a record currently in current_status may be moved to.
+
+    Every status except the one it already holds, in PATIENT_STATUSES order --
+    which yields exactly the three cases the status dialog offers:
+
+        Active   -> Inactive, Deceased
+        Inactive -> Active,   Deceased
+        Deceased -> Active,   Inactive
+
+    Reactivation is deliberately included. Marking a record Inactive or Deceased
+    used to be a one-way door, so a mis-click on the wrong row left no way back
+    through the UI; correcting an erroneous status is a normal clerical fix, not
+    an exceptional one.
+
+    An unrecognised status (a hand-edited row) yields all three, so the dialog
+    still offers a way out rather than presenting no options at all.
+    """
+    return tuple(status for status in PATIENT_STATUSES if status != current_status)
+
+
+def get_patient_statuses(patient_ids):
+    """{id: status} for the given ids. Ids with no row are simply absent.
+
+    The status dialog decides what to offer from the page, but the page can be
+    stale and a POST can be forged, so the server re-reads the current statuses
+    before deciding whether a requested transition is legal.
+    """
+    ids = [int(patient_id) for patient_id in patient_ids]
+    if not ids:
+        return {}
+
+    placeholders = ", ".join("?" for _ in ids)
+    conn = get_db()
+    rows = conn.execute(
+        f"SELECT id, status FROM patients WHERE id IN ({placeholders})", ids
+    ).fetchall()
+    conn.close()
+    return {row["id"]: row["status"] for row in rows}
+
+
+def _parse_birth_date(birth_date):
+    """A stored birth_date as a date, or None if it is absent or malformed."""
+    if not birth_date:
+        return None
+    try:
+        return datetime.strptime(str(birth_date)[:10], "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+def add_months(value, months):
+    """value shifted forward by whole months, clamped to the month's last day.
+
+    Needed to find an infant's month-anniversary before counting the leftover
+    days: 31 January plus one month is 28 February, not an invalid 31 February.
+
+    Public because models/immunizations.py needs exactly this to turn "due at 9
+    months" into a date. Calendar months are not 4-week blocks, and a second
+    implementation over there would drift from this one on precisely the dates
+    that are hardest to notice -- a baby born on the 31st.
+    """
+    month_index = value.month - 1 + months
+    year = value.year + month_index // 12
+    month = month_index % 12 + 1
+    return date(year, month, min(value.day, calendar.monthrange(year, month)[1]))
+
+
+def calculate_age(birth_date, on_date=None):
+    """Whole years between birth_date and on_date (default today), or None.
+
+    The numeric age, used wherever age drives logic rather than display -- the
+    "Senior Citizen Patients" card counts against SENIOR_AGE through this. For
+    what a screen actually prints, see format_age(): under a year old this
+    returns 0, which is exactly the reading that function exists to replace.
+    """
+    born = _parse_birth_date(birth_date)
+    if born is None:
+        return None
+
+    reference = on_date or today()
+    return (
+        reference.year
+        - born.year
+        - ((reference.month, reference.day) < (born.month, born.day))
+    )
+
+
+def format_age(birth_date, on_date=None):
+    """Age as every screen prints it, or None when birth_date is unusable.
+
+    The one place patient age is turned into text. Screens 03 and 04 render this
+    string directly, so their Age column, header meta grid and Personal
+    Information grid cannot drift apart.
+
+    One year and over returns the same whole-year count those screens have
+    always shown ("63"), so no existing record's display changes. Under one year
+    returns months with the leftover days ("4 months, 6 days"), and under one
+    month returns days alone ("21 days") so a newborn never reads as "0 months".
+
+    The days are carried alongside the months on purpose. The instructor's point
+    was vaccination scheduling, and the Philippine EPI schedule places doses at
+    6, 10 and 14 weeks -- month-only precision cannot tell those apart, and all
+    three would otherwise read as "1 month" or "2 months".
+
+    A birthdate in the future keeps its existing negative-year rendering rather
+    than being reinterpreted as an infant; validate_patient_form() already
+    refuses to store one, so this only concerns hand-edited rows.
+    """
+    years = calculate_age(birth_date, on_date)
+    if years is None:
+        return None
+    if years != 0:
+        return str(years)
+
+    born = _parse_birth_date(birth_date)
+    reference = on_date or today()
+
+    months = (reference.year - born.year) * 12 + (reference.month - born.month)
+    if reference.day < born.day:
+        months -= 1
+    days = (reference - add_months(born, months)).days
+
+    if months == 0:
+        return f"{days} day{'' if days == 1 else 's'}"
+
+    text = f"{months} month{'' if months == 1 else 's'}"
+    if days:
+        text += f", {days} day{'' if days == 1 else 's'}"
+    return text
+
+
+def parse_list_field(raw):
+    """Read a medical_conditions / allergies value into a list of strings.
+
+    Stored as a JSON array. Tolerates a plain string (returned as a single-item
+    list) so a hand-edited row does not break the profile page.
+    """
+    if not raw:
+        return []
+    try:
+        parsed = json.loads(raw)
+    except (TypeError, ValueError):
+        return [part.strip() for part in str(raw).split(",") if part.strip()]
+
+    if isinstance(parsed, list):
+        return [str(item).strip() for item in parsed if str(item).strip()]
+    return [str(parsed).strip()] if str(parsed).strip() else []
+
+
+def _full_name(row):
+    parts = [row["first_name"], row["middle_name"], row["last_name"]]
+    return " ".join(part for part in parts if part)
+
+
+def _initials(row):
+    first = (row["first_name"] or "").strip()
+    last = (row["last_name"] or "").strip()
+    return ((first[:1] or "") + (last[:1] or "")).upper() or "?"
+
+
+def _display_address(row, keys=("address", "municipality", "province", "zip_code")):
+    return ", ".join(str(row[key]).strip() for key in keys if row[key])
+
+
+def _to_patient(row):
+    """Copy a patients row into a dict and add the derived display fields."""
+    patient = dict(row)
+    patient["full_name"] = _full_name(row)
+    patient["initials"] = _initials(row)
+    # "age" is the display string, because that is all the three screens do with
+    # it -- keeping the number here under that name is what let an infant print
+    # as "0". The number is still available as age_years for anything that needs
+    # to compare rather than print.
+    patient["age"] = format_age(row["birth_date"])
+    patient["age_years"] = calculate_age(row["birth_date"])
+    patient["display_address"] = _display_address(row)
+    patient["status_badge_class"] = STATUS_BADGE_CLASS.get(
+        patient.get("status"), "badge-inactive"
+    )
+    patient["medical_conditions_list"] = parse_list_field(patient.get("medical_conditions"))
+    patient["allergies_list"] = parse_list_field(patient.get("allergies"))
+    return patient
+
+
+# Screen 03's table carries a Last Visit column, which is the most recent
+# consultation rather than a stored field -- hence the correlated subquery.
+_LAST_VISIT = (
+    "(SELECT MAX(c.consultation_date) FROM consultations c "
+    "WHERE c.patient_id = p.id) AS last_visit"
+)
+
+
+def get_all_patients():
+    """Every patient, ordered by surname then given name."""
+    conn = get_db()
+    rows = conn.execute(
+        f"""
+        SELECT p.*, {_LAST_VISIT}
+        FROM patients p
+        ORDER BY p.last_name COLLATE NOCASE, p.first_name COLLATE NOCASE
+        """
+    ).fetchall()
+    conn.close()
+    return [_to_patient(row) for row in rows]
+
+
+def get_patient_by_id(patient_id):
+    """One patient by primary key, or None if no such row exists."""
+    conn = get_db()
+    row = conn.execute(
+        f"SELECT p.*, {_LAST_VISIT} FROM patients p WHERE p.id = ?",
+        (patient_id,),
+    ).fetchone()
+    conn.close()
+    return _to_patient(row) if row else None
+
+
+def get_patient_stats():
+    """Counts behind the four stat cards on Screen 03.
+
+    The windows are clinic-local: "this month" means the month it is in San
+    Francisco, Agusan del Sur, not wherever the server happens to be. They are
+    built in Python via utils.dates and converted to UTC instants before being
+    compared, because created_at is written by SQLite's CURRENT_TIMESTAMP and is
+    therefore UTC. Both sides of every comparison are then the same instant
+    expressed the same way -- previously SQLite's own date('now') supplied the
+    boundary, which pinned these counts to UTC midnight rather than Manila's.
+    """
+    conn = get_db()
+
+    total = conn.execute("SELECT COUNT(*) FROM patients").fetchone()[0]
+
+    month_start, next_month_start = month_bounds()
+    new_this_month = conn.execute(
+        "SELECT COUNT(*) FROM patients WHERE created_at >= ? AND created_at < ?",
+        (day_start_utc(month_start), day_start_utc(next_month_start)),
+    ).fetchone()[0]
+
+    # Registered since midnight, clinic time. The Staff dashboard's "New Patient
+    # Registrations / Today" card reads this; same boundary treatment as the
+    # month window above, so the two cannot disagree about which day a record
+    # written late in the evening belongs to.
+    new_today = conn.execute(
+        "SELECT COUNT(*) FROM patients WHERE created_at >= ?",
+        (day_start_utc(today()),),
+    ).fetchone()[0]
+
+    new_last_30 = conn.execute(
+        "SELECT COUNT(*) FROM patients WHERE created_at >= ?",
+        (day_start_utc(days_ago(30)),),
+    ).fetchone()[0]
+
+    previous_30 = conn.execute(
+        "SELECT COUNT(*) FROM patients WHERE created_at >= ? AND created_at < ?",
+        (day_start_utc(days_ago(60)), day_start_utc(days_ago(30))),
+    ).fetchone()[0]
+
+    birth_dates = [row[0] for row in conn.execute("SELECT birth_date FROM patients")]
+    conn.close()
+
+    senior_count = sum(
+        1
+        for birth_date in birth_dates
+        if (calculate_age(birth_date) or 0) >= SENIOR_AGE
+    )
+
+    change_pct = None
+    if previous_30:
+        change_pct = round((new_last_30 - previous_30) / previous_30 * 100)
+
+    return {
+        "total_patients": total,
+        "new_today": new_today,
+        "new_this_month": new_this_month,
+        "new_last_30_days": new_last_30,
+        "previous_30_days": previous_30,
+        "new_30_day_change_pct": change_pct,
+        "senior_count": senior_count,
+        "senior_share_pct": round(senior_count / total * 100) if total else 0,
+        # Screen 03 shows a "Prenatal Patients" card, but nothing in the schema
+        # records a pregnancy. Reported as 0 rather than invented; it needs a
+        # real data source (a prenatal flag or an appointment type) before it
+        # can show anything else.
+        "prenatal_count": 0,
+    }
+
+
+# ---------------------------------------------------------------------------
+# REPORTING
+#
+# Screen 10's patient charts. Everything below reads the roster through
+# get_all_patients() and the derived fields already on it -- age_years from
+# calculate_age(), the parsed condition list -- rather than issuing its own SQL.
+#
+# That is the point: a second query that counted seniors with its own `WHERE
+# birth_date <= ...` would eventually disagree with the "Senior Citizen Patients"
+# card on Screen 03, and the two would both look right in isolation. Reading the
+# same rows the rest of the project reads makes agreement structural.
+# ---------------------------------------------------------------------------
+
+# The bands Screen 10's Age Distribution chart plots. Upper bound None means
+# open-ended, so every patient with a usable birthdate lands in exactly one band
+# and the bars sum to the number of patients whose age is known.
+AGE_BANDS = (
+    ("0-9", 0, 9), ("10-19", 10, 19), ("20-29", 20, 29), ("30-39", 30, 39),
+    ("40-49", 40, 49), ("50-59", 50, 59), ("60-69", 60, 69), ("70+", 70, None),
+)
+
+
+def get_age_distribution(patients=None):
+    """Patients per age band, plus how many have no usable birthdate.
+
+    A patient with an unparseable or missing birth_date is counted in `unknown`
+    rather than dropped into a band -- a chart whose bars silently omit rows
+    misreports the population it claims to describe.
+    """
+    if patients is None:
+        patients = get_all_patients()
+
+    counts = {label: 0 for label, _, _ in AGE_BANDS}
+    unknown = 0
+    for patient in patients:
+        age = patient.get("age_years")
+        if age is None or age < 0:
+            unknown += 1
+            continue
+        for label, low, high in AGE_BANDS:
+            if age >= low and (high is None or age <= high):
+                counts[label] += 1
+                break
+
+    return {
+        "bands": [
+            {"label": label, "count": counts[label]} for label, _, _ in AGE_BANDS
+        ],
+        "unknown": unknown,
+        "known": sum(counts.values()),
+    }
+
+
+def get_sex_distribution(patients=None):
+    """Female / male / unrecorded counts with their shares of the roster.
+
+    Percentages are of the whole roster, not of the two named sexes, so the
+    figures on the chart's legend add up to the total the panel prints above it.
+    """
+    if patients is None:
+        patients = get_all_patients()
+
+    total = len(patients)
+    counts = {"Female": 0, "Male": 0}
+    unrecorded = 0
+    for patient in patients:
+        sex = (patient.get("sex") or "").strip()
+        if sex in counts:
+            counts[sex] += 1
+        else:
+            unrecorded += 1
+
+    def share(value):
+        return round(value / total * 100, 1) if total else 0.0
+
+    return {
+        "total": total,
+        "female": counts["Female"],
+        "male": counts["Male"],
+        "unrecorded": unrecorded,
+        "female_pct": share(counts["Female"]),
+        "male_pct": share(counts["Male"]),
+        "unrecorded_pct": share(unrecorded),
+    }
+
+
+def get_condition_counts(patients=None, conditions=CONDITION_OPTIONS, min_age=None):
+    """How many patients have each recorded chronic condition.
+
+    Counted from the parsed medical_conditions list, so a patient with both
+    Hypertension and Diabetes is counted under each -- these are not segments of
+    a pie and are not expected to sum to the roster.
+
+    Only the form's own CONDITION_OPTIONS vocabulary is counted by default.
+    The field also accepts free text (the "other" note), and that text is
+    deliberately left out: 'High blood' and 'Hypertension' are the same illness
+    written two ways, and a chart that treated them as two conditions would be
+    reporting the data-entry habit rather than the population. The count of
+    patients carrying only free-text conditions is reported separately as
+    `other_only` so the omission is visible instead of silent.
+
+    `min_age` narrows to a cohort -- the Senior Citizen panel passes SENIOR_AGE.
+    """
+    if patients is None:
+        patients = get_all_patients()
+
+    if min_age is not None:
+        patients = [
+            patient for patient in patients
+            if (patient.get("age_years") is not None and patient["age_years"] >= min_age)
+        ]
+
+    counts = {condition: 0 for condition in conditions}
+    other_only = 0
+    for patient in patients:
+        recorded = patient.get("medical_conditions_list") or []
+        matched = False
+        for condition in conditions:
+            if condition in recorded:
+                counts[condition] += 1
+                matched = True
+        if recorded and not matched:
+            other_only += 1
+
+    return {
+        "cohort_size": len(patients),
+        "counts": [
+            {"condition": condition, "count": counts[condition]}
+            for condition in conditions
+        ],
+        "other_only": other_only,
+        "with_any": sum(
+            1 for patient in patients if patient.get("medical_conditions_list")
+        ),
+    }
+
+
+def get_registration_trend(months=6, end=None):
+    """New patient registrations per clinic month, oldest first.
+
+    The window boundaries are built in Python and converted to UTC instants
+    before being compared, for the reason get_patient_stats() spells out:
+    created_at is written by SQLite's CURRENT_TIMESTAMP and is therefore UTC,
+    while "August" means August in San Francisco, Agusan del Sur.
+
+    Months with no registrations are returned as zeros rather than omitted --
+    a trend line that skipped its empty months would compress the gap and read
+    as steady activity through a period when nobody registered at all.
+    """
+    windows = recent_months(months, end)
+    conn = get_db()
+    trend = []
+    for start, next_start, label in windows:
+        count = conn.execute(
+            "SELECT COUNT(*) FROM patients WHERE created_at >= ? AND created_at < ?",
+            (day_start_utc(start), day_start_utc(next_start)),
+        ).fetchone()[0]
+        trend.append({"month": start.strftime("%Y-%m"), "label": label, "count": count})
+    conn.close()
+    return trend
+
+
+def get_patient_report(months=6):
+    """Everything Screen 10 shows about patients, from one read of the roster.
+
+    get_all_patients() is called once and handed to each breakdown, so the age
+    bands, the sex split and the condition counts all describe the same roster --
+    and the headline totals come straight from get_patient_stats(), the function
+    Screen 03's own stat cards use.
+    """
+    patients = get_all_patients()
+    stats = get_patient_stats()
+    return {
+        "stats": stats,
+        "total": len(patients),
+        "age_distribution": get_age_distribution(patients),
+        "sex_distribution": get_sex_distribution(patients),
+        "conditions": get_condition_counts(patients),
+        "senior_conditions": get_condition_counts(patients, min_age=SENIOR_AGE),
+        "senior_count": stats["senior_count"],
+        "senior_share_pct": stats["senior_share_pct"],
+        "registration_trend": get_registration_trend(months),
+        "senior_age": SENIOR_AGE,
+    }
+
+
+def collect_list_field(selected, note):
+    """Turn the checkbox chips plus the free-text note into a JSON-ready list.
+
+    The form's "None" chip is a UI affordance, not a value: choosing it means
+    the list is empty, so it is dropped rather than stored as the string "None".
+    """
+    items = [str(item).strip() for item in selected if str(item).strip() and str(item).strip() != "None"]
+    note = (note or "").strip()
+    if note:
+        items.append(note)
+    return items
+
+
+def validate_patient_form(values):
+    """Server-side validation. Returns {field: message}; empty means valid.
+
+    Runs independently of the browser -- the form carries `novalidate`, and a
+    POST can arrive without ever touching the page.
+    """
+    errors = {}
+
+    for field, message in REQUIRED_FIELDS.items():
+        if not (values.get(field) or "").strip():
+            errors[field] = message
+
+    birth_date = (values.get("birth_date") or "").strip()
+    if birth_date and "birth_date" not in errors:
+        try:
+            parsed = datetime.strptime(birth_date, "%Y-%m-%d").date()
+        except ValueError:
+            errors["birth_date"] = "Enter a valid date in YYYY-MM-DD format."
+        else:
+            if parsed > today():
+                errors["birth_date"] = "Birthdate cannot be in the future."
+            elif parsed.year < EARLIEST_BIRTH_YEAR:
+                errors["birth_date"] = f"Birthdate cannot be earlier than {EARLIEST_BIRTH_YEAR}."
+
+    # Constrained fields: reject anything the form does not itself offer.
+    for field, allowed, label in (
+        ("civil_status", CIVIL_STATUSES, "civil status"),
+        ("sex", SEXES, "gender"),
+        ("municipality", MUNICIPALITIES, "municipality"),
+        ("province", PROVINCES, "province"),
+        ("emergency_contact_relationship", EMERGENCY_RELATIONSHIPS, "relationship"),
+    ):
+        value = (values.get(field) or "").strip()
+        if value and field not in errors and value not in allowed:
+            errors[field] = f"Choose a {label} from the list."
+
+    blood_type = (values.get("blood_type") or "").strip()
+    if blood_type and blood_type not in BLOOD_TYPES:
+        errors["blood_type"] = "Choose a blood type from the list."
+
+    emergency_number = (values.get("emergency_contact_number") or "").strip()
+    if emergency_number and "emergency_contact_number" not in errors:
+        if not is_valid_ph_mobile(emergency_number):
+            errors["emergency_contact_number"] = (
+                "Enter a valid Philippine mobile number, e.g. 0917-123-4567."
+            )
+
+    contact_number = (values.get("contact_number") or "").strip()
+    if contact_number and not is_valid_ph_mobile(contact_number):
+        errors["contact_number"] = (
+            "Enter a valid Philippine mobile number, e.g. 0917-123-4567."
+        )
+
+    zip_code = (values.get("zip_code") or "").strip()
+    if zip_code and not (zip_code.isdigit() and len(zip_code) == 4):
+        errors["zip_code"] = "Zip code must be 4 digits, e.g. 8501."
+
+    return errors
+
+
+def find_possible_duplicates(first_name, last_name, birth_date):
+    """Existing patients sharing a name and birthdate, matched case-insensitively.
+
+    Used for a non-blocking warning: two residents genuinely can share a name and
+    birthday, so this informs the operator rather than refusing the record.
+    """
+    conn = get_db()
+    rows = conn.execute(
+        """
+        SELECT id, patient_id, first_name, last_name, birth_date
+        FROM patients
+        WHERE LOWER(TRIM(first_name)) = LOWER(TRIM(?))
+          AND LOWER(TRIM(last_name))  = LOWER(TRIM(?))
+          AND birth_date = ?
+        ORDER BY patient_id
+        """,
+        (first_name or "", last_name or "", birth_date or ""),
+    ).fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+def _build_record(values):
+    """Normalise submitted form values into the column values to store.
+
+    Shared by create_patient() and update_patient() so an insert and an edit can
+    never normalise the same field differently.
+    """
+    record = {field: (values.get(field) or "").strip() or None for field in SCALAR_FIELDS}
+
+    # "Unknown" blood type is the absence of a value.
+    if record["blood_type"] == "Unknown":
+        record["blood_type"] = None
+
+    # Store phone numbers in the same 09XXXXXXXXX shape as the existing rows.
+    for field in ("contact_number", "emergency_contact_number"):
+        if record[field]:
+            record[field] = to_local_ph_mobile(record[field]) or record[field]
+
+    # These two arrive as Python lists from the form handler.
+    record["medical_conditions"] = json.dumps(values.get("medical_conditions") or [])
+    record["allergies"] = json.dumps(values.get("allergies") or [])
+    return record
+
+
+def update_patient(patient_id, values):
+    """Overwrite one patient's form-collected fields. Returns rows affected.
+
+    Deliberately leaves patient_id, created_at and status alone: the identifier
+    and the registration date are historical fact, and the lifecycle status is
+    changed through the separate deactivate/deceased flow, not by editing.
+    """
+    record = _build_record(values)
+    assignments = ", ".join(f"{field} = ?" for field in PATIENT_FIELDS)
+    parameters = [record[field] for field in PATIENT_FIELDS] + [patient_id]
+
+    conn = get_db()
+    cursor = conn.execute(
+        f"UPDATE patients SET {assignments}, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        parameters,
+    )
+    conn.commit()
+    affected = cursor.rowcount
+    conn.close()
+    return affected
+
+
+def set_patient_status(patient_ids, status):
+    """Move one or more patients to a lifecycle status. Returns rows changed.
+
+    This is the whole of the Archive action on Screen 03. Records are never
+    hard-deleted -- medical records are retained even after a patient dies -- so
+    archiving is this UPDATE and nothing else: no row is removed, patient_id and
+    created_at are untouched, and only updated_at moves alongside the status.
+
+    The row-level icon and the bulk bar both arrive here as a list of ids, so a
+    single archive is just the one-element case of the bulk one; there is no
+    second code path that could drift.
+
+    `AND status != ?` makes the count honest. SQLite's rowcount reports rows
+    matched, not rows changed, so without it re-archiving an already-Inactive
+    patient would claim an update that did not happen -- and would bump
+    updated_at for a write that changed nothing.
+    """
+    if status not in PATIENT_STATUSES:
+        raise ValueError(
+            f"{status!r} is not a patient status; expected one of {PATIENT_STATUSES}."
+        )
+
+    ids = [int(patient_id) for patient_id in patient_ids]
+    if not ids:
+        return 0
+
+    placeholders = ", ".join("?" for _ in ids)
+    conn = get_db()
+    cursor = conn.execute(
+        f"""
+        UPDATE patients
+           SET status = ?, updated_at = CURRENT_TIMESTAMP
+         WHERE id IN ({placeholders}) AND status != ?
+        """,
+        [status] + ids + [status],
+    )
+    conn.commit()
+    affected = cursor.rowcount
+    conn.close()
+    return affected
+
+
+def create_patient(values):
+    """Insert a patient and return its new primary key.
+
+    created_at is left to the column's DEFAULT CURRENT_TIMESTAMP, and status is
+    set explicitly to 'Active' -- new records always start active.
+    """
+    record = _build_record(values)
+
+    columns = ["patient_id"] + list(PATIENT_FIELDS) + ["status"]
+    placeholders = ", ".join("?" for _ in columns)
+    parameters = [generate_next_patient_id()] + [record[f] for f in PATIENT_FIELDS] + ["Active"]
+
+    conn = get_db()
+    cursor = conn.execute(
+        f"INSERT INTO patients ({', '.join(columns)}) VALUES ({placeholders})",
+        parameters,
+    )
+    conn.commit()
+    new_id = cursor.lastrowid
+    conn.close()
+    return new_id
+
+
+def generate_next_patient_id():
+    """Next free identifier in the existing PAT-### series.
+
+    Reads the highest number currently in use rather than counting rows, so a
+    gap left by an earlier record cannot cause a UNIQUE collision. Zero-padded
+    to three digits; a series past PAT-999 simply grows wider.
+    """
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT patient_id FROM patients WHERE patient_id LIKE 'PAT-%'"
+    ).fetchall()
+    conn.close()
+
+    highest = 0
+    for row in rows:
+        suffix = str(row["patient_id"]).split("-", 1)[1]
+        if suffix.isdigit():
+            highest = max(highest, int(suffix))
+
+    return f"PAT-{highest + 1:03d}"

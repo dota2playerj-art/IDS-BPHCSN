@@ -1,0 +1,479 @@
+{% extends "base.html" %}
+{% set active_nav = "dashboard" %}
+{% block title %}IDS-BPHCSN | Barangay Official Dashboard{% endblock %}
+
+{% block styles %}
+  .status-pill{
+    display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600;
+    padding:6px 14px; border-radius:999px;
+  }
+  .pill-operational{background:var(--teal-light); color:var(--teal-dark);}
+  .pill-secure{background:#DBEAFE; color:#1D4ED8;}
+  .pill-dot{width:7px;height:7px;border-radius:50%; background:currentColor;}
+
+  .stat-card{
+    background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:20px 22px; height:100%;
+  }
+  .stat-icon{width:44px;height:44px;border-radius:12px; display:flex; align-items:center; justify-content:center; margin-bottom:12px;}
+  .stat-value{font-size:24px; font-weight:700; color:var(--text-dark);}
+  .stat-label{font-size:13px; color:var(--text-muted); margin-top:2px;}
+  .stat-trend{font-size:12px; font-weight:600; margin-top:6px;}
+
+  .panel-card{
+    background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:24px; margin-bottom:24px;
+  }
+  .panel-title{font-size:16px; font-weight:600; color:var(--text-dark);}
+  .panel-sub{font-size:12.5px; color:var(--text-muted); margin-top:2px;}
+  .panel-link{font-size:12.5px; font-weight:600; color:var(--teal-dark); text-decoration:none; display:flex; align-items:center; gap:3px;}
+
+  /* QUICK ACTIONS */
+  .quick-action{
+    background:#fff; border:1px solid var(--border-color); border-radius:14px; padding:18px 16px; text-align:center;
+    height:100%; text-decoration:none; display:flex; flex-direction:column; align-items:center; gap:10px;
+    transition:border-color .15s, background .15s;
+  }
+  .quick-action:hover{border-color:var(--teal); background:var(--teal-light);}
+  .quick-action-icon{width:46px;height:46px;border-radius:12px; background:var(--teal-light); display:flex; align-items:center; justify-content:center;}
+  .quick-action:hover .quick-action-icon{background:#fff;}
+  .quick-action-label{font-size:13px; font-weight:600; color:var(--text-dark);}
+
+  /* MINI OVERVIEW CARDS */
+  .overview-card{background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:18px 20px 26px; height:100%; overflow:hidden;}
+  .overview-title{font-size:13.5px; font-weight:600; color:var(--text-dark);}
+  .overview-sub{font-size:11.5px; color:var(--text-muted); margin-top:1px; margin-bottom:8px;}
+  .chart-wrap-sm{position:relative; height:150px; display:flex; align-items:center; justify-content:center;}
+  .chart-wrap-sm canvas{position:absolute; inset:0; width:100% !important; height:100% !important;}
+  /* The -70px pulls the percentage back up into the hole of the donut above it,
+     which is half of .chart-wrap-sm's 150px. It only makes sense directly after
+     a .chart-wrap-sm -- with no chart above it there is nothing to pull into and
+     the text lands on the card's own heading. A card with no chart therefore
+     uses .overview-untracked below instead of these two classes. */
+  .overview-figure{font-size:20px; font-weight:700; color:var(--text-dark); text-align:center; margin-top:-70px; position:relative; z-index:1; pointer-events:none;}
+  .overview-figure-sub{font-size:10.5px; color:var(--text-muted); text-align:center; margin-top:2px; position:relative; z-index:1; pointer-events:none;}
+
+  /* The no-chart variant of the two classes above: same card, same rhythm, but
+     everything is in normal flow. The dashed tile stands where the donut stands
+     on its neighbours, so the four cards still read as one row. */
+  .overview-untracked{
+    margin-top:10px; padding:14px 13px 15px; border:1px dashed var(--border-color);
+    border-radius:12px; background:#FAFBFC;
+  }
+  .overview-untracked .material-symbols-outlined{font-size:24px; color:var(--text-muted); display:block; text-align:center;}
+  .overview-untracked-label{font-size:15px; font-weight:700; color:var(--text-muted); text-align:center; margin-top:5px;}
+  .overview-untracked-body{font-size:10.5px; line-height:1.55; color:var(--text-muted); margin-top:9px;}
+
+  table.dash-table{width:100%; border-collapse:separate; border-spacing:0; font-size:13.5px;}
+  table.dash-table thead th{
+    text-align:left; color:var(--text-muted); font-weight:600; font-size:11.5px; letter-spacing:0.03em;
+    text-transform:uppercase; padding:12px 14px; border-bottom:1px solid var(--border-color); white-space:nowrap;
+  }
+  table.dash-table tbody td{
+    padding:13px 14px; border-bottom:1px solid var(--border-color); color:var(--text-dark); vertical-align:middle;
+  }
+  table.dash-table tbody tr:hover{background:#FAFBFC;}
+  table.dash-table tbody tr:last-child td{border-bottom:none;}
+
+  .badge-status{
+    display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600;
+    padding:4px 11px; border-radius:999px; white-space:nowrap;
+  }
+  .badge-scheduled{background:#DBEAFE; color:#1D4ED8;}
+  .badge-completed{background:#DCFCE7; color:#15803D;}
+  .badge-ongoing{background:#FEF3C7; color:#B45309;}
+  .badge-planned{background:#EDE9FE; color:var(--purple);}
+
+  /* LIST ROWS */
+  .list-row{display:flex; align-items:flex-start; gap:12px; padding:12px 0; border-bottom:1px solid var(--border-color);}
+  .list-row:last-child{border-bottom:none;}
+  .list-avatar{width:38px;height:38px;border-radius:10px; background:var(--teal-light); color:var(--teal-dark); display:flex; align-items:center; justify-content:center; flex-shrink:0;}
+  .list-title{font-size:13.5px; font-weight:600; color:var(--text-dark);}
+  .list-sub{font-size:12px; color:var(--text-muted); margin-top:1px;}
+  .list-meta{margin-left:auto; text-align:right; font-size:12px; color:var(--text-muted); flex-shrink:0; white-space:nowrap;}
+
+  .progress-item{margin-bottom:16px;}
+  .progress-item:last-child{margin-bottom:0;}
+  .progress-item-head{display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px;}
+  .progress-item-name{font-weight:600; color:var(--text-dark);}
+  .progress-item-pct{font-weight:700; color:var(--teal-dark);}
+  .progress-track{height:8px; border-radius:999px; background:#E5E7EB; overflow:hidden;}
+  .progress-fill{height:100%; border-radius:999px; background:var(--teal);}
+
+  .notif-item{display:flex; gap:11px; padding:11px 0; border-bottom:1px solid var(--border-color);}
+  .notif-item:last-child{border-bottom:none;}
+  .notif-dot{width:8px;height:8px;border-radius:50%; background:var(--teal); margin-top:6px; flex-shrink:0;}
+  .notif-text{font-size:12.5px; color:var(--text-dark);}
+  .notif-time{font-size:11px; color:var(--text-muted); margin-top:2px;}
+
+  /* MINI CALENDAR */
+  .mini-cal-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;}
+  .mini-cal-nav{width:28px;height:28px;border-radius:8px; border:1px solid var(--border-color); background:#fff; display:flex; align-items:center; justify-content:center; color:var(--text-dark);}
+  .mini-cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:4px; text-align:center;}
+  .mini-cal-dow{font-size:10.5px; font-weight:600; color:var(--text-muted); padding-bottom:4px;}
+  .mini-cal-day{font-size:12px; padding:6px 0; border-radius:8px; color:var(--text-dark);}
+  .mini-cal-day.muted{color:#D1D5DB;}
+  .mini-cal-day.today{background:var(--teal); color:#fff; font-weight:700;}
+  .mini-cal-day.has-event{position:relative;}
+  .mini-cal-day.has-event::after{content:''; position:absolute; bottom:1px; left:50%; transform:translateX(-50%); width:4px; height:4px; border-radius:50%; background:var(--purple);}
+  .mini-cal-day.today.has-event::after{background:#fff;}
+
+  .chart-wrap-md{position:relative; height:200px;}
+
+  .mini-legend{display:flex; gap:14px; flex-wrap:wrap; margin-top:12px;}
+  .mini-legend-item{display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted);}
+  .mini-legend-dot{width:8px; height:8px; border-radius:50%;}
+
+  .format-pill{font-size:11.5px; font-weight:700; padding:3px 9px; border-radius:6px;}
+  .format-pdf{background:#FEE2E2; color:#B91C1C;}
+  .format-xlsx{background:#DCFCE7; color:#15803D;}
+{% endblock %}
+
+{% block content %}
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-1">
+      <div>
+        <div class="eyebrow">Barangay Poblacion Health Center</div>
+        <div class="page-title">Barangay Official Dashboard</div>
+      </div>
+      <div class="d-flex gap-2">
+        <span class="status-pill pill-operational"><span class="pill-dot"></span>All Systems Operational</span>
+        <span class="status-pill pill-secure"><span class="material-symbols-outlined" style="font-size:14px;">wifi</span>Secure Connection</span>
+      </div>
+    </div>
+    <div style="font-size:14px; color:var(--text-muted); margin-bottom:20px;">{{ clinic_today | full_date }} &middot; Community health overview for Barangay Poblacion.</div>
+
+    <!-- STAT CARDS — every value below is read from a call this role already
+         reads elsewhere: get_broadcast_stats() behind Screen 09's cards,
+         get_immunization_coverage() and the programme list behind Screen 10's.
+         The fourth card has no source at all and says so. -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:var(--teal-light);"><span class="material-symbols-outlined" style="color:var(--teal-dark);">campaign</span></div>
+          <div class="stat-value">{{ broadcast_stats.total_broadcasts }}</div>
+          <div class="stat-label">Community Broadcasts Sent</div>
+          <div class="stat-trend" style="color:{{ 'var(--success)' if broadcast_stats.this_month else 'var(--text-muted)' }};">
+            {%- if broadcast_stats.this_month %}+{{ broadcast_stats.this_month }} this month{% else %}None yet this month{% endif %}
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#DCFCE7;"><span class="material-symbols-outlined" style="color:var(--success);">volunteer_activism</span></div>
+          <div class="stat-value">{{ programs | length }}</div>
+          <div class="stat-label">Health Programmes with Recorded Membership</div>
+          <div class="stat-trend" style="color:var(--text-muted);" title="{{ untracked.programs }}">
+            {{ programs | map(attribute='name') | join(', ') }} &middot; others not tracked
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#DBEAFE;"><span class="material-symbols-outlined" style="color:var(--info);">vaccines</span></div>
+          <div class="stat-value">{{ immunization_coverage.doses_given }}</div>
+          <div class="stat-label">Immunization Doses Recorded</div>
+          <div class="stat-trend" style="color:var(--text-muted);" title="{{ untracked.campaigns }}">
+            {{ immunization_coverage.enrolled }} patient{{ '' if immunization_coverage.enrolled == 1 else 's' }} with a dose &middot; campaigns not tracked
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <!-- "12 Community Health Reports, year to date" stood here. Nothing
+             writes a row when a report is printed or exported, so there is no
+             count to give. -->
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#EDE9FE;"><span class="material-symbols-outlined" style="color:var(--purple);">summarize</span></div>
+          <div class="stat-value" style="font-size:16px; color:var(--text-muted);">Not tracked</div>
+          <div class="stat-label">Community Health Reports Generated</div>
+          <div class="stat-trend" style="color:var(--text-muted);" title="{{ untracked.generated_reports }}">Report exports are not recorded</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- QUICK ACTIONS — the four screens this role actually holds. All four
+         links were dead placeholders before and went nowhere. -->
+    <div class="row g-3 mb-4">
+      <!-- This slot was Community Announcements, which has been retired -- it had
+           no feature behind it, and SMS Notifications is where this barangay
+           actually publishes. Reports & Analytics takes the slot instead: it is
+           real, and it is where every figure on this page comes from. -->
+      <div class="col"><a href="{{ url_for(reports_analytics_endpoint) }}" class="quick-action"><div class="quick-action-icon"><span class="material-symbols-outlined" style="color:var(--teal-dark);">monitoring</span></div><div class="quick-action-label">Reports &amp; Analytics</div></a></div>
+      <div class="col"><a href="{{ url_for('community_reports') }}" class="quick-action"><div class="quick-action-icon"><span class="material-symbols-outlined" style="color:var(--teal-dark);">summarize</span></div><div class="quick-action-label">View Community Reports</div></a></div>
+      <div class="col"><a href="{{ url_for('vaccination_campaigns') }}" class="quick-action"><div class="quick-action-icon"><span class="material-symbols-outlined" style="color:var(--teal-dark);">vaccines</span></div><div class="quick-action-label">View Vaccination Campaigns</div></a></div>
+      <div class="col"><a href="{{ url_for(sms_notifications_endpoint) }}" class="quick-action"><div class="quick-action-icon"><span class="material-symbols-outlined" style="color:var(--teal-dark);">history</span></div><div class="quick-action-label">View Notification History</div></a></div>
+    </div>
+
+    <!-- COMMUNITY HEALTH OVERVIEW -->
+    <div class="panel-title mb-2">Community Health Overview</div>
+    <div class="row g-3 mb-4">
+      <!-- Two of these four are real and two cannot be. The two that are read
+           against the patient roster, not against the barangay -- said out loud
+           in each sub-line, because "87% of all eligible residents" was the most
+           misleading number on this screen. -->
+      <div class="col-md-3 col-sm-6">
+        <div class="overview-card">
+          <div class="overview-title">Vaccination Coverage</div>
+          <div class="overview-sub">All eligible residents</div>
+          <div class="overview-untracked">
+            <span class="material-symbols-outlined">query_stats</span>
+            <div class="overview-untracked-label">Not tracked</div>
+            <div class="overview-untracked-body">{{ untracked.population }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="overview-card">
+          <div class="overview-title">Maternal Health</div>
+          <div class="overview-sub">Prenatal patients with 4+ check-ups</div>
+          <div class="overview-untracked">
+            <span class="material-symbols-outlined">query_stats</span>
+            <div class="overview-untracked-label">Not tracked</div>
+            <div class="overview-untracked-body">{{ untracked.prenatal }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="overview-card">
+          <div class="overview-title">Child Immunization</div>
+          <div class="overview-sub">Up to date on the DOH schedule, registered children under {{ pediatric_age_years }}</div>
+          <div class="chart-wrap-sm"><canvas id="chartChildImm"></canvas></div>
+{%- if immunization_coverage.up_to_date_pct is not none %}
+          <div class="overview-figure">{{ immunization_coverage.up_to_date_pct }}%</div>
+          <div class="overview-figure-sub">{{ immunization_coverage.up_to_date_children }} / {{ immunization_coverage.eligible_children }} children</div>
+{%- else %}
+          <div class="overview-figure" style="font-size:17px; color:var(--text-muted);">No children</div>
+          <div class="overview-figure-sub">No registered patient is young enough for the schedule.</div>
+{%- endif %}
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="overview-card">
+          <div class="overview-title">Senior Citizens</div>
+          <div class="overview-sub">Registered patients aged {{ senior_age }} and above</div>
+          <div class="chart-wrap-sm"><canvas id="chartSeniorMon"></canvas></div>
+          <div class="overview-figure">{{ patient_report.senior_share_pct }}%</div>
+          <div class="overview-figure-sub">{{ patient_report.senior_count }} / {{ patient_report.total }} patients</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAIN GRID -->
+    <div class="row g-3">
+
+      <!-- LEFT COLUMN -->
+      <div class="col-lg-8">
+
+        <!-- COMMUNITY ANNOUNCEMENT FEED -->
+        <div class="panel-card">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div>
+              <div class="panel-title">Community Announcement Feed</div>
+              <div class="panel-sub">{{ broadcast_stats.total_broadcasts }} broadcast{{ '' if broadcast_stats.total_broadcasts == 1 else 's' }} published &middot; {{ broadcast_stats.messages_sent }} message{{ '' if broadcast_stats.messages_sent == 1 else 's' }} sent</div>
+            </div>
+            <a href="{{ url_for(sms_notifications_endpoint) }}" class="panel-link">View All<span class="material-symbols-outlined" style="font-size:15px;">chevron_right</span></a>
+          </div>
+{#- Three invented Tagalog announcements sat here, dated July 2026. What this
+    barangay has actually published are its SMS broadcasts, from
+    get_broadcast_history() -- the same rows Screen 09 lists. See
+    LOCAL_UNTRACKED["announcements"] for why there is no separate store. #}
+          <div>
+{%- for item in announcements %}
+            <div class="list-row">
+              <div class="list-avatar"><span class="material-symbols-outlined" style="font-size:18px;">campaign</span></div>
+              <div>
+                <div class="list-title">{{ item.category }} &middot; {{ item.audience_label }}</div>
+                <div class="list-sub">{{ item.preview }}</div>
+                <div class="list-sub" style="margin-top:2px;">{{ item.reference }} &middot; {{ item.sent_count }} sent{% if item.failed_count %} &middot; {{ item.failed_count }} failed{% endif %} &middot; by {{ item.sent_by_name }}</div>
+              </div>
+              <div class="list-meta">{{ item.sent_at_display }}</div>
+            </div>
+{%- endfor %}
+{%- if not announcements %}
+            <div class="panel-sub" style="line-height:1.55;">Nothing has been published yet. {{ untracked.announcements }}</div>
+{%- endif %}
+          </div>
+        </div>
+
+        <!-- UPCOMING HEALTH EVENTS -->
+        <div class="panel-card">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div>
+              <div class="panel-title">Upcoming Health Events</div>
+              <div class="panel-sub">Not tracked</div>
+            </div>
+          </div>
+{#- Three invented events sat here with invented venues and July dates. #}
+          <div class="panel-sub" style="line-height:1.55;">{{ untracked.events }}</div>
+        </div>
+
+        <!-- VACCINATION CAMPAIGN SCHEDULE -->
+        <div class="panel-card">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div>
+              <div class="panel-title">Vaccination Campaign Schedule</div>
+              <div class="panel-sub">Not tracked</div>
+            </div>
+            <a href="{{ url_for('vaccination_campaigns') }}" class="panel-link">Vaccination Campaigns<span class="material-symbols-outlined" style="font-size:15px;">chevron_right</span></a>
+          </div>
+{#- Three invented campaigns sat here, with coverage goals quoted against the
+    invented barangay population. Doses are recorded; campaigns are not. #}
+          <div class="panel-sub" style="line-height:1.55;">{{ untracked.campaigns }}</div>
+          <div class="panel-sub" style="margin-top:10px;">
+            What is recorded: {{ immunization_coverage.doses_given }} dose{{ '' if immunization_coverage.doses_given == 1 else 's' }}
+            across {{ immunization_coverage.enrolled }} patient{{ '' if immunization_coverage.enrolled == 1 else 's' }},
+            with {{ immunization_coverage.needing_attention }} child{{ 'ren' if immunization_coverage.needing_attention != 1 }} currently behind the DOH schedule.
+          </div>
+        </div>
+
+        <!-- HEALTH PROGRAM PROGRESS -->
+        <div class="panel-card">
+          <div class="panel-title mb-1">Health Programme Membership</div>
+          <div class="panel-sub mb-3">Counted from stored records, as a share of the {{ patient_report.total }} registered patients</div>
+
+{#- Five progress bars against invented 2026 targets stood here. There is no
+    enrolment table and no target anywhere, so a percentage "vs. target" cannot
+    be formed at all. The two memberships below are the ones the data can
+    establish -- the same pair Screen 10 lists, from report_views.programs. #}
+{%- for program in programs %}
+{%- set pct = (program.count * 100 / patient_report.total) | round | int if patient_report.total else 0 %}
+          <div class="progress-item">
+            <div class="progress-item-head"><span class="progress-item-name">{{ program.name }}</span><span class="progress-item-pct">{{ program.count }} of {{ patient_report.total }} &middot; {{ pct }}%</span></div>
+            <div class="progress-track"><div class="progress-fill" style="width:{{ pct }}%;"></div></div>
+            <div class="panel-sub" style="margin-top:4px;">{{ program.basis }}</div>
+          </div>
+{%- endfor %}
+          <div class="panel-sub" style="margin-top:12px; line-height:1.55;">{{ untracked.programs }}</div>
+        </div>
+
+        <!-- RECENT REPORTS -->
+        <div class="panel-card mb-0">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div>
+              <div class="panel-title">Recent Reports</div>
+              <div class="panel-sub">Not tracked</div>
+            </div>
+            <a href="{{ url_for(reports_analytics_endpoint) }}" class="panel-link">Reports &amp; Analytics<span class="material-symbols-outlined" style="font-size:15px;">chevron_right</span></a>
+          </div>
+{#- Three invented PDF/XLSX exports with invented generation dates stood here.
+    Export is not implemented and nothing records one, so the list has no
+    source. Reports & Analytics is live and is where the figures are. #}
+          <div class="panel-sub" style="line-height:1.55;">{{ untracked.generated_reports }}</div>
+        </div>
+
+      </div>
+
+      <!-- RIGHT COLUMN -->
+      <div class="col-lg-4">
+
+        <!-- NOTIFICATION DELIVERY SUMMARY -->
+        <div class="panel-card">
+          <div class="panel-title" style="font-size:15px;">Broadcast Send Summary</div>
+          <div class="panel-sub mb-2">All {{ broadcast_stats.total_broadcasts }} community broadcast{{ '' if broadcast_stats.total_broadcasts == 1 else 's' }}</div>
+{#- The legend read "Delivered (3,214) · Sent (48) · Failed (22)". Two of those
+    three were impossible: nothing in this system is ever told that a message
+    arrived. Sent and failed are counted per recipient row by
+    get_broadcast_stats(), so only those two are plotted. #}
+          <div class="chart-wrap-md"><canvas id="chartNotifSummary"></canvas></div>
+          <div class="mini-legend">
+            <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--success);"></span>Sent ({{ broadcast_stats.messages_sent }})</div>
+            <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--danger);"></span>Failed ({{ broadcast_stats.messages_failed }})</div>
+          </div>
+          <div class="panel-sub" style="margin-top:10px; line-height:1.55;">{{ untracked.delivery }}</div>
+        </div>
+
+        <!-- MONTHLY COMMUNITY STATISTICS -->
+        <div class="panel-card">
+          <div class="panel-title" style="font-size:15px;">Monthly Community Statistics</div>
+{#- Plotted "Program Enrollment" rising 812 -> 1,005 over Feb-Jul. Programme
+    enrolment does not exist; new patient registrations do, and they are the
+    same series Reports & Analytics plots for this role. #}
+          <div class="panel-sub mb-2">New patient registrations, last {{ trend_months }} months</div>
+          <div class="chart-wrap-md"><canvas id="chartMonthlyCommunity"></canvas></div>
+        </div>
+
+        <!-- CALENDAR WIDGET -->
+        <div class="panel-card">
+          <div class="mini-cal-head">
+            <div class="panel-title" style="font-size:15px;">{{ calendar_month.label }}</div>
+          </div>
+{#- Dates only. get_calendar_month() also carries a booking count per day, which
+    is deliberately not rendered here: this role has no access to Appointment
+    Scheduling, and a dot on a day is still clinic scheduling information. #}
+          <div class="mini-cal-grid">
+            <div class="mini-cal-dow">S</div><div class="mini-cal-dow">M</div><div class="mini-cal-dow">T</div><div class="mini-cal-dow">W</div><div class="mini-cal-dow">T</div><div class="mini-cal-dow">F</div><div class="mini-cal-dow">S</div>
+{%- for week in calendar_month.weeks %}
+{%- for cell in week %}
+            <div class="mini-cal-day{% if not cell.in_month %} muted{% endif %}{% if cell.is_today %} today{% endif %}">{{ cell.day }}</div>
+{%- endfor %}
+{%- endfor %}
+          </div>
+        </div>
+
+        <!-- NOTIFICATIONS PANEL -->
+        <div class="panel-card mb-0">
+          <div class="panel-title" style="font-size:15px;">Notifications</div>
+          <div class="panel-sub mb-2">Not tracked</div>
+{#- Four invented alerts sat here, three of them quoting figures that do not
+    exist (68% coverage in Purok 3, 3,214 residents reached, 22 failed sends). #}
+          <div class="panel-sub" style="line-height:1.55;">{{ untracked.notifications }}</div>
+          <div class="panel-sub" style="margin-top:10px;">
+            The live figures on this page &mdash; broadcasts sent, immunisation coverage and
+            senior registrations &mdash; are the real ones.
+          </div>
+        </div>
+
+      </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/chart.umd.min.js') }}"></script>
+<script>
+  Chart.defaults.font.family = "'Inter', Arial, sans-serif";
+  Chart.defaults.color = '#6B7280';
+  Chart.defaults.font.size = 11;
+
+  const teal = '#169B92', success = '#22C55E', warning = '#F59E0B', danger = '#EF4444', info = '#3B82F6';
+
+  // Every series below is emitted through | tojson from the same context the
+  // figures beside the charts are printed from, so a chart cannot disagree with
+  // the number under it. Two donuts were removed rather than re-pointed: their
+  // panels now say "Not tracked" and have no value to draw.
+  function miniDonut(id, value, color){
+    new Chart(document.getElementById(id), {
+      type: 'doughnut',
+      data: { datasets: [{ data:[value, 100-value], backgroundColor:[color, '#EEF0F3'], borderWidth:0 }] },
+      options: { responsive:true, maintainAspectRatio:false, cutout:'75%', plugins:{legend:{display:false}, tooltip:{enabled:false}} }
+    });
+  }
+{%- if immunization_coverage.up_to_date_pct is not none %}
+  miniDonut('chartChildImm', {{ immunization_coverage.up_to_date_pct }}, info);
+{%- endif %}
+  miniDonut('chartSeniorMon', {{ patient_report.senior_share_pct or 0 }}, warning);
+
+  // Broadcast Send Summary — sent vs failed recipient rows. No "delivered"
+  // slice: delivery is never reported back to this system.
+  new Chart(document.getElementById('chartNotifSummary'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Sent','Failed'],
+      datasets: [{
+        data: [{{ broadcast_stats.messages_sent }}, {{ broadcast_stats.messages_failed }}],
+        backgroundColor:[success, danger], borderWidth:0
+      }]
+    },
+    options: { responsive:true, maintainAspectRatio:false, cutout:'68%', plugins:{legend:{display:false}} }
+  });
+
+  // Monthly Community Statistics — new patient registrations per month.
+  const regTrend = {{ registration_trend | tojson }};
+  new Chart(document.getElementById('chartMonthlyCommunity'), {
+    type: 'line',
+    data: {
+      labels: regTrend.map(function(m){ return m.label; }),
+      datasets: [{
+        label:'New Registrations', data: regTrend.map(function(m){ return m.count; }),
+        borderColor: teal, backgroundColor:'rgba(22,155,146,0.10)', fill:true, tension:0.4, pointRadius:3, pointBackgroundColor: teal
+      }]
+    },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true, grid:{color:'#F1F3F5'}}, x:{grid:{display:false}}} }
+  });
+</script>{% endblock %}
