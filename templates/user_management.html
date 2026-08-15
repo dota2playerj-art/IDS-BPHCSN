@@ -3,7 +3,6 @@
 {% block title %}IDS-BPHCSN | User Management{% endblock %}
 
 {% block styles %}
-  .toolbar-search{min-width:260px; max-width:340px;}
   .page-desc{font-size:14px; color:var(--text-muted); margin-top:4px; max-width:640px;}
 
   .stat-card{
@@ -18,35 +17,21 @@
     background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:24px;
   }
 
-
-  .filter-btn{
-    background:#fff; border:1px solid var(--border-color); border-radius:10px; padding:10px 16px;
-    font-size:14px; font-weight:500; color:var(--text-dark); display:flex; align-items:center; gap:6px;
-  }
-  .filter-btn.open, .filter-btn:hover{border-color:var(--teal); color:var(--teal-dark);}
   .btn-ghost-ids{
     background:transparent; border:1px solid var(--border-color); color:var(--text-dark); border-radius:10px; padding:10px 14px;
     font-size:13.5px; font-weight:500; display:flex; align-items:center; gap:6px; white-space:nowrap;
   }
   .btn-ghost-ids:hover{border-color:#C7CBD1; background:var(--bg);}
   .btn-danger-text{background:transparent; border:none; color:var(--text-muted); font-size:13.5px; font-weight:500; padding:10px 14px;}
-  .btn-danger-text:hover{color:var(--danger);}
+  .btn-ghost-ids:disabled, .btn-danger-text:disabled, .btn-primary-teal:disabled, .btn-outline-teal:disabled{
+    opacity:0.55; cursor:not-allowed;
+  }
 
-  .filter-panel{
-    background:var(--bg); border:1px solid var(--border-color); border-radius:12px; padding:20px;
-    margin-bottom:18px; display:none;
+  .scope-note{
+    background:var(--bg); border:1px solid var(--border-color); border-radius:12px; padding:14px 16px;
+    font-size:12.5px; color:var(--text-muted); line-height:1.55; margin-bottom:18px;
   }
-  .filter-panel.show{display:block;}
-  .filter-panel label{font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:6px; display:block;}
-  .filter-panel .form-control, .filter-panel .form-select{
-    height:48px; border-radius:12px; border:1px solid var(--border-color); font-size:13.5px;
-  }
-  .filter-panel .form-control:focus, .filter-panel .form-select:focus{
-    border-color:var(--teal); box-shadow:0 0 0 3px rgba(22,155,146,0.12);
-  }
-  .filter-actions{display:flex; justify-content:flex-end; gap:10px; margin-top:16px; padding-top:16px; border-top:1px solid var(--border-color);}
-  .btn-reset{background:transparent; border:none; color:var(--text-muted); font-size:14px; font-weight:600; padding:10px 14px;}
-  .btn-reset:hover{color:var(--danger);}
+  .scope-note strong{color:var(--text-dark); font-weight:600;}
 
   table.user-table{width:100%; border-collapse:separate; border-spacing:0; font-size:13.5px;}
   table.user-table thead th{
@@ -65,13 +50,16 @@
   .user-avatar{width:36px;height:36px;border-radius:50%; background:var(--teal-light); color:var(--teal-dark); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12.5px; flex-shrink:0;}
   .user-name{font-weight:600;}
   .user-id{color:var(--text-muted); font-size:12.5px;}
+  .muted-cell{color:var(--text-muted);}
 
+  {#- Three pills for the three roles the schema's CHECK constraint allows.
+      The mockup also styled Nurse, Midwife, Pharmacist and Barangay Health
+      Worker; those roles cannot be stored, so their classes are gone with the
+      rows that used them. #}
   .role-pill{font-size:11.5px; font-weight:600; padding:4px 11px; border-radius:999px; white-space:nowrap; display:inline-flex; align-items:center; gap:5px;}
   .role-admin{background:#EDE9FE; color:var(--purple);}
-  .role-nurse{background:#DBEAFE; color:#1D4ED8;}
-  .role-midwife{background:#FCE7F3; color:#BE185D;}
-  .role-pharmacist{background:#FEF3C7; color:#B45309;}
-  .role-bhw{background:var(--teal-light); color:var(--teal-dark);}
+  .role-staff{background:#DBEAFE; color:#1D4ED8;}
+  .role-official{background:var(--teal-light); color:var(--teal-dark);}
 
   .badge-status{
     display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600;
@@ -79,8 +67,6 @@
   }
   .badge-active{background:#DCFCE7; color:#15803D;}
   .badge-inactive{background:#F3F4F6; color:#4B5563;}
-  .badge-account-pending{background:rgba(245,158,11,0.16); color:#B45309;}
-  .badge-locked{background:#FEE2E2; color:#B91C1C;}
 
   .action-icon{
     width:32px; height:32px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center;
@@ -90,13 +76,6 @@
 
   .table-footer{display:flex; align-items:center; justify-content:space-between; padding-top:18px; margin-top:6px; border-top:1px solid var(--border-color); flex-wrap:wrap; gap:12px;}
   .pg-info{font-size:13px; color:var(--text-muted);}
-  .pagination .page-link{
-    color:var(--text-dark); border:1px solid var(--border-color); font-size:13px; font-weight:500;
-    padding:7px 13px; border-radius:8px !important; margin-left:4px;
-  }
-  .pagination .page-item.active .page-link{background-color:var(--teal); border-color:var(--teal); color:#fff;}
-  .pagination .page-link:hover{background-color:var(--teal-light); color:var(--teal-dark); border-color:var(--teal-light);}
-  .pagination .page-item.disabled .page-link{color:#C7CBD1; background:#fff;}
 
   /* USER DETAILS PANEL */
   .detail-sticky{position:sticky; top:104px;}
@@ -104,13 +83,15 @@
   .detail-avatar-lg{width:56px;height:56px;border-radius:50%; background:var(--teal-light); color:var(--teal-dark); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:18px;}
   .detail-title{font-size:17px; font-weight:700; color:var(--text-dark);}
   .detail-sub{font-size:12.5px; color:var(--text-muted); margin-top:2px;}
-  .detail-row{display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--border-color); font-size:13px;}
+  .detail-row{display:flex; justify-content:space-between; gap:16px; padding:10px 0; border-bottom:1px solid var(--border-color); font-size:13px;}
   .detail-row:last-child{border-bottom:none;}
-  .detail-label{color:var(--text-muted);}
+  .detail-label{color:var(--text-muted); white-space:nowrap;}
   .detail-value{font-weight:600; color:var(--text-dark); text-align:right;}
+  .detail-value.muted{color:var(--text-muted); font-weight:500;}
   .perm-section-title{font-size:12px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.03em; margin:18px 0 10px;}
   .perm-item{display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-dark); padding:6px 0;}
   .perm-item .material-symbols-outlined{font-size:17px; color:var(--success);}
+  .perm-note{font-size:12px; color:var(--text-muted); line-height:1.5; margin-top:10px;}
 {% endblock %}
 
 {% block breadcrumb %}
@@ -124,40 +105,48 @@
 {% block content %}
     <div class="eyebrow">Barangay Poblacion Health Center</div>
     <div class="page-title">User Management</div>
-    <div class="page-desc">Manage staff accounts, roles, and access permissions for the IDS-BPHCSN system.</div>
+    <div class="page-desc">Every account that can sign in to the IDS-BPHCSN system, with the roles and access each one carries.</div>
 
-    <!-- STAT CARDS -->
+    {#- STAT CARDS — three real counts off the users table, and one card whose
+        figure has no source. The mockup's fourth card was "Pending Invitation:
+        1", which counted something the system has no concept of. #}
     <div class="row g-3 mt-1 mb-4">
       <div class="col-md-3 col-sm-6">
         <div class="stat-card">
           <div class="stat-icon" style="background:var(--teal-light);"><span class="material-symbols-outlined" style="color:var(--teal-dark);">group</span></div>
-          <div class="stat-value">18</div>
-          <div class="stat-label">Total Users</div>
-          <div class="stat-trend" style="color:var(--text-muted);">Across 5 roles</div>
+          <div class="stat-value">{{ total_users }}</div>
+          <div class="stat-label">Total Accounts</div>
+          <div class="stat-trend" style="color:var(--text-muted);">
+            Across {{ roles_represented }} role{{ '' if roles_represented == 1 else 's' }}
+          </div>
         </div>
       </div>
       <div class="col-md-3 col-sm-6">
         <div class="stat-card">
           <div class="stat-icon" style="background:#DCFCE7;"><span class="material-symbols-outlined" style="color:var(--success);">how_to_reg</span></div>
-          <div class="stat-value">15</div>
-          <div class="stat-label">Active Users</div>
-          <div class="stat-trend" style="color:var(--success);">83% of total</div>
+          <div class="stat-value">{{ active_users }}</div>
+          <div class="stat-label">Active Accounts</div>
+          <div class="stat-trend" style="color:var(--success);">
+            {{ active_users }} of {{ total_users }} can sign in
+          </div>
         </div>
       </div>
       <div class="col-md-3 col-sm-6">
         <div class="stat-card">
           <div class="stat-icon" style="background:#F3F4F6;"><span class="material-symbols-outlined" style="color:#4B5563;">person_off</span></div>
-          <div class="stat-value">2</div>
-          <div class="stat-label">Inactive / Disabled</div>
-          <div class="stat-trend" style="color:var(--text-muted);">Access revoked</div>
+          <div class="stat-value">{{ inactive_users }}</div>
+          <div class="stat-label">Deactivated</div>
+          <div class="stat-trend" style="color:var(--text-muted);">
+            {% if inactive_users %}Access revoked{% else %}No account has been disabled{% endif %}
+          </div>
         </div>
       </div>
       <div class="col-md-3 col-sm-6">
-        <div class="stat-card">
-          <div class="stat-icon" style="background:#FEF3C7;"><span class="material-symbols-outlined" style="color:var(--warning);">pending_actions</span></div>
-          <div class="stat-value">1</div>
-          <div class="stat-label">Pending Invitation</div>
-          <div class="stat-trend" style="color:var(--text-muted);">Awaiting activation</div>
+        <div class="stat-card" title="{{ untracked.last_login }}">
+          <div class="stat-icon" style="background:#DBEAFE;"><span class="material-symbols-outlined" style="color:var(--info);">login</span></div>
+          <div class="stat-value" style="color:var(--text-muted);">&mdash;</div>
+          <div class="stat-label">Signed In Recently</div>
+          <div class="stat-trend" style="color:var(--text-muted); font-weight:500;">Not tracked &mdash; nothing logs sign-in</div>
         </div>
       </div>
     </div>
@@ -168,54 +157,30 @@
         <div class="panel-card">
 
           <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-3">
-            <div class="d-flex align-items-center gap-2 flex-wrap">
-              <div class="toolbar-search">
-                <span class="material-symbols-outlined" style="font-size:18px;">search</span>
-                <input type="text" placeholder="Search by name, user ID, or email">
+            <div>
+              <div style="font-size:15px; font-weight:700; color:var(--text-dark);">System Accounts</div>
+              <div class="pg-info" style="margin-top:2px;">
+                {{ total_users }} account{{ '' if total_users == 1 else 's' }} on the system &mdash; this is the complete list
               </div>
-              <button class="filter-btn" id="filterToggleBtn" onclick="toggleFilterPanel()">
-                <span class="material-symbols-outlined" style="font-size:18px;">filter_list</span>Advanced Filter
-              </button>
             </div>
             <div class="d-flex align-items-center gap-2">
-              <button class="btn-outline-teal"><span class="material-symbols-outlined" style="font-size:18px;">file_download</span>Export</button>
-              <button class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">person_add</span>Add User</button>
+              <button class="btn-outline-teal" type="button" disabled title="{{ untracked.export }}">
+                <span class="material-symbols-outlined" style="font-size:18px;">file_download</span>Export
+              </button>
+              <button class="btn-primary-teal" type="button" disabled title="{{ untracked.write }}">
+                <span class="material-symbols-outlined" style="font-size:18px;">person_add</span>Add User
+              </button>
             </div>
           </div>
 
-          <!-- ADVANCED FILTER PANEL -->
-          <div class="filter-panel" id="filterPanel">
-            <div class="row g-3">
-              <div class="col-md-4 col-sm-6">
-                <label>Role</label>
-                <select class="form-select">
-                  <option selected>All Roles</option>
-                  <option>Administrator</option>
-                  <option>Nurse</option>
-                  <option>Midwife</option>
-                  <option>Pharmacist</option>
-                  <option>Barangay Health Worker</option>
-                </select>
-              </div>
-              <div class="col-md-4 col-sm-6">
-                <label>Status</label>
-                <select class="form-select">
-                  <option selected>All Statuses</option>
-                  <option>Active</option>
-                  <option>Inactive</option>
-                  <option>Pending</option>
-                  <option>Locked</option>
-                </select>
-              </div>
-              <div class="col-md-4 col-sm-6">
-                <label>Date Added</label>
-                <input type="date" class="form-control">
-              </div>
-            </div>
-            <div class="filter-actions">
-              <button class="btn-reset">Reset Filters</button>
-              <button class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">filter_alt</span>Apply Filter</button>
-            </div>
+          {#- The mockup carried a search box, an Advanced Filter panel offering
+              five roles, and pagination reading "Showing 1–7 of 18 users".
+              Three accounts fit on one screen, so all three controls filtered
+              or paged a list that is already complete. #}
+          <div class="scope-note">
+            <strong>Accounts are seeded, not created here.</strong>
+            The three accounts below are written once by <code>models/users.py</code>,
+            one for each role the database allows. {{ untracked.write }}
           </div>
 
           <div style="overflow-x:auto;">
@@ -224,7 +189,6 @@
                 <tr>
                   <th>User</th>
                   <th>Role</th>
-                  <th>Assignment</th>
                   <th>Contact</th>
                   <th>Status</th>
                   <th>Last Login</th>
@@ -232,161 +196,53 @@
                 </tr>
               </thead>
               <tbody>
-                <tr class="selected" onclick="selectRow(this)">
+{%- for user in users %}
+                <tr{% if loop.first %} class="selected"{% endif %} data-user="{{ user.id }}" onclick="selectUser(this)">
                   <td>
                     <div class="user-cell">
-                      <div class="user-avatar">JR</div>
-                      <div><div class="user-name">Dr. Joshua Reyes</div><div class="user-id">USR-0001</div></div>
+                      <div class="user-avatar">{{ user.initials }}</div>
+                      <div>
+                        <div class="user-name">{{ user.full_name }}</div>
+                        <div class="user-id">{{ user.username }}</div>
+                      </div>
                     </div>
                   </td>
-                  <td><span class="role-pill role-admin"><span class="material-symbols-outlined" style="font-size:13px;">shield_person</span>Administrator</span></td>
-                  <td>Main Health Center</td>
-                  <td>0917-330-1122</td>
-                  <td><span class="badge-status badge-active">Active</span></td>
-                  <td style="color:var(--text-muted);" title="Sign-ins are not recorded — routes/auth.py writes nothing on a successful login.">Not tracked</td>
+                  <td>
+                    <span class="role-pill {{ user.role_class }}">
+                      <span class="material-symbols-outlined" style="font-size:13px;">{{ user.role_icon }}</span>{{ user.role }}
+                    </span>
+                  </td>
+                  {#- email and phone are real columns, but nothing writes them. #}
+                  <td>
+                    {%- if user.contact %}{{ user.contact }}
+                    {%- else %}<span class="muted-cell" title="{{ untracked.contact }}">Not recorded</span>{% endif %}
+                  </td>
+                  <td>
+                    {%- if user.is_active %}<span class="badge-status badge-active">Active</span>
+                    {%- else %}<span class="badge-status badge-inactive">Deactivated</span>{% endif %}
+                  </td>
+                  <td class="muted-cell" title="{{ untracked.last_login }}">Not tracked</td>
                   <td>
                     <div class="d-flex justify-content-end gap-1">
-                      <button class="action-icon"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button>
-                      <button class="action-icon"><span class="material-symbols-outlined" style="font-size:18px;">edit</span></button>
-                      <button class="action-icon"><span class="material-symbols-outlined" style="font-size:18px;">lock_reset</span></button>
+                      <button class="action-icon" type="button" onclick="selectUser(this.closest('tr')); event.stopPropagation();"
+                              aria-label="View details for {{ user.full_name }}" title="View details">
+                        <span class="material-symbols-outlined" style="font-size:18px;">visibility</span>
+                      </button>
                     </div>
                   </td>
                 </tr>
-                <tr onclick="selectRow(this)">
-                  <td>
-                    <div class="user-cell">
-                      <div class="user-avatar">AC</div>
-                      <div><div class="user-name">Angela Cruz</div><div class="user-id">USR-0002</div></div>
-                    </div>
-                  </td>
-                  <td><span class="role-pill role-bhw"><span class="material-symbols-outlined" style="font-size:13px;">volunteer_activism</span>Barangay Health Worker</span></td>
-                  <td>Purok 1-3 Zone</td>
-                  <td>0917-482-9021</td>
-                  <td><span class="badge-status badge-active">Active</span></td>
-                  <td style="color:var(--text-muted);" title="Sign-ins are not recorded — routes/auth.py writes nothing on a successful login.">Not tracked</td>
-                  <td>
-                    <div class="d-flex justify-content-end gap-1">
-                      <button class="action-icon"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button>
-                      <button class="action-icon"><span class="material-symbols-outlined" style="font-size:18px;">edit</span></button>
-                      <button class="action-icon"><span class="material-symbols-outlined" style="font-size:18px;">lock_reset</span></button>
-                    </div>
-                  </td>
-                </tr>
-                <tr onclick="selectRow(this)">
-                  <td>
-                    <div class="user-cell">
-                      <div class="user-avatar">RM</div>
-                      <div><div class="user-name">Rowena Morales</div><div class="user-id">USR-0003</div></div>
-                    </div>
-                  </td>
-                  <td><span class="role-pill role-bhw"><span class="material-symbols-outlined" style="font-size:13px;">volunteer_activism</span>Barangay Health Worker</span></td>
-                  <td>Purok 4-5 Zone</td>
-                  <td>0928-115-4470</td>
-                  <td><span class="badge-status badge-active">Active</span></td>
-                  <td style="color:var(--text-muted);" title="Sign-ins are not recorded — routes/auth.py writes nothing on a successful login.">Not tracked</td>
-                  <td>
-                    <div class="d-flex justify-content-end gap-1">
-                      <button class="action-icon"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button>
-                      <button class="action-icon"><span class="material-symbols-outlined" style="font-size:18px;">edit</span></button>
-                      <button class="action-icon"><span class="material-symbols-outlined" style="font-size:18px;">lock_reset</span></button>
-                    </div>
-                  </td>
-                </tr>
-                <tr onclick="selectRow(this)">
-                  <td>
-                    <div class="user-cell">
-                      <div class="user-avatar">JS</div>
-                      <div><div class="user-name">Josephine Santos, RN</div><div class="user-id">USR-0004</div></div>
-                    </div>
-                  </td>
-                  <td><span class="role-pill role-nurse"><span class="material-symbols-outlined" style="font-size:13px;">medical_services</span>Nurse</span></td>
-                  <td>Main Health Center</td>
-                  <td>0956-772-3390</td>
-                  <td><span class="badge-status badge-active">Active</span></td>
-                  <td style="color:var(--text-muted);" title="Sign-ins are not recorded — routes/auth.py writes nothing on a successful login.">Not tracked</td>
-                  <td>
-                    <div class="d-flex justify-content-end gap-1">
-                      <button class="action-icon"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button>
-                      <button class="action-icon"><span class="material-symbols-outlined" style="font-size:18px;">edit</span></button>
-                      <button class="action-icon"><span class="material-symbols-outlined" style="font-size:18px;">lock_reset</span></button>
-                    </div>
-                  </td>
-                </tr>
-                <tr onclick="selectRow(this)">
-                  <td>
-                    <div class="user-cell">
-                      <div class="user-avatar">CA</div>
-                      <div><div class="user-name">Corazon Aquino-Diaz</div><div class="user-id">USR-0005</div></div>
-                    </div>
-                  </td>
-                  <td><span class="role-pill role-midwife"><span class="material-symbols-outlined" style="font-size:13px;">pregnant_woman</span>Midwife</span></td>
-                  <td>Prenatal &amp; Maternal Care Unit</td>
-                  <td>0917-556-2290</td>
-                  <td><span class="badge-status badge-active">Active</span></td>
-                  <td style="color:var(--text-muted);" title="Sign-ins are not recorded — routes/auth.py writes nothing on a successful login.">Not tracked</td>
-                  <td>
-                    <div class="d-flex justify-content-end gap-1">
-                      <button class="action-icon"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button>
-                      <button class="action-icon"><span class="material-symbols-outlined" style="font-size:18px;">edit</span></button>
-                      <button class="action-icon"><span class="material-symbols-outlined" style="font-size:18px;">lock_reset</span></button>
-                    </div>
-                  </td>
-                </tr>
-                <tr onclick="selectRow(this)">
-                  <td>
-                    <div class="user-cell">
-                      <div class="user-avatar">FT</div>
-                      <div><div class="user-name">Ferdinand Tolentino, RPh</div><div class="user-id">USR-0006</div></div>
-                    </div>
-                  </td>
-                  <td><span class="role-pill role-pharmacist"><span class="material-symbols-outlined" style="font-size:13px;">medication</span>Pharmacist</span></td>
-                  <td>Medicine Dispensary</td>
-                  <td>0932-664-7710</td>
-                  <td><span class="badge-status badge-account-pending">Pending</span></td>
-                  <td>Never logged in</td>
-                  <td>
-                    <div class="d-flex justify-content-end gap-1">
-                      <button class="action-icon"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button>
-                      <button class="action-icon"><span class="material-symbols-outlined" style="font-size:18px;">edit</span></button>
-                      <button class="action-icon"><span class="material-symbols-outlined" style="font-size:18px;">mail</span></button>
-                    </div>
-                  </td>
-                </tr>
-                <tr onclick="selectRow(this)">
-                  <td>
-                    <div class="user-cell">
-                      <div class="user-avatar">EB</div>
-                      <div><div class="user-name">Eduardo Bautista</div><div class="user-id">USR-0007</div></div>
-                    </div>
-                  </td>
-                  <td><span class="role-pill role-bhw"><span class="material-symbols-outlined" style="font-size:13px;">volunteer_activism</span>Barangay Health Worker</span></td>
-                  <td>Purok 6-7 Zone</td>
-                  <td>0900-000-0007</td>
-                  <td><span class="badge-status badge-inactive">Inactive</span></td>
-                  <td style="color:var(--text-muted);" title="Sign-ins are not recorded — routes/auth.py writes nothing on a successful login.">Not tracked</td>
-                  <td>
-                    <div class="d-flex justify-content-end gap-1">
-                      <button class="action-icon"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button>
-                      <button class="action-icon"><span class="material-symbols-outlined" style="font-size:18px;">how_to_reg</span></button>
-                    </div>
-                  </td>
-                </tr>
+{%- endfor %}
               </tbody>
             </table>
           </div>
 
-          <!-- PAGINATION -->
           <div class="table-footer">
-            <div class="pg-info">Showing 1&ndash;7 of 18 users</div>
-            <nav aria-label="User management pagination">
-              <ul class="pagination mb-0">
-                <li class="page-item disabled"><a class="page-link" href="#"><span class="material-symbols-outlined" style="font-size:16px;">chevron_left</span></a></li>
-                <li class="page-item active"><a class="page-link" href="#">1</a></li>
-                <li class="page-item"><a class="page-link" href="#">2</a></li>
-                <li class="page-item"><a class="page-link" href="#">3</a></li>
-                <li class="page-item"><a class="page-link" href="#"><span class="material-symbols-outlined" style="font-size:16px;">chevron_right</span></a></li>
-              </ul>
-            </nav>
+            <div class="pg-info">
+              Showing all {{ total_users }} account{{ '' if total_users == 1 else 's' }}
+            </div>
+            <div class="pg-info" title="{{ untracked.invitations }}">
+              No account is pending activation or locked out
+            </div>
           </div>
 
         </div>
@@ -394,43 +250,97 @@
 
       <!-- RIGHT: USER DETAILS PANEL -->
       <div class="col-lg-4">
-        <div class="panel-card detail-sticky">
-          <div class="detail-header">
-            <div class="detail-avatar-lg">JR</div>
-            <div>
-              <div class="detail-title">Dr. Joshua Reyes</div>
-              <div class="detail-sub">USR-0001 &middot; joshua.reyes@bphcsn.gov.ph</div>
+        <div class="detail-sticky">
+{%- for user in users %}
+          <div class="panel-card user-detail" id="userDetail{{ user.id }}"{% if not loop.first %} hidden{% endif %}>
+            <div class="detail-header">
+              <div class="detail-avatar-lg">{{ user.initials }}</div>
+              <div>
+                <div class="detail-title">{{ user.full_name }}</div>
+                <div class="detail-sub">
+                  {{ user.username }}
+                  {%- if user.email %} &middot; {{ user.email }}{% endif %}
+                </div>
+              </div>
             </div>
-          </div>
 
-          <div class="d-flex gap-2 mt-3 mb-1">
-            <span class="role-pill role-admin"><span class="material-symbols-outlined" style="font-size:13px;">shield_person</span>Administrator</span>
-            <span class="badge-status badge-active">Active</span>
-          </div>
+            <div class="d-flex gap-2 mt-3 mb-1 flex-wrap">
+              <span class="role-pill {{ user.role_class }}">
+                <span class="material-symbols-outlined" style="font-size:13px;">{{ user.role_icon }}</span>{{ user.role }}
+              </span>
+              {%- if user.is_active %}<span class="badge-status badge-active">Active</span>
+              {%- else %}<span class="badge-status badge-inactive">Deactivated</span>{% endif %}
+            </div>
 
-          <div class="mt-3">
-            <div class="detail-row"><div class="detail-label">Assignment</div><div class="detail-value">Main Health Center</div></div>
-            <div class="detail-row"><div class="detail-label">Contact Number</div><div class="detail-value">0917-330-1122</div></div>
-            <div class="detail-row"><div class="detail-label">Date Added</div><div class="detail-value">Jan 05, 2026</div></div>
-<!-- Sign-ins are not recorded: routes/auth.py writes nothing on a successful
-     login, so no last-login time exists to show. See the same note on the
-     table column. -->
-            <div class="detail-row"><div class="detail-label">Last Login</div><div class="detail-value" style="color:var(--text-muted);">Not tracked</div></div>
-            <div class="detail-row"><div class="detail-label">Account Status</div><div class="detail-value" style="color:var(--success);">Verified</div></div>
-          </div>
+            <div class="mt-3">
+              <div class="detail-row">
+                <div class="detail-label">Username</div>
+                <div class="detail-value">{{ user.username }}</div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-label">Email</div>
+                {%- if user.email %}
+                <div class="detail-value">{{ user.email }}</div>
+                {%- else %}
+                <div class="detail-value muted" title="{{ untracked.contact }}">Not recorded</div>
+                {%- endif %}
+              </div>
+              <div class="detail-row">
+                <div class="detail-label">Contact Number</div>
+                {%- if user.phone %}
+                <div class="detail-value">{{ user.phone }}</div>
+                {%- else %}
+                <div class="detail-value muted" title="{{ untracked.contact }}">Not recorded</div>
+                {%- endif %}
+              </div>
+              {#- created_at is a UTC CURRENT_TIMESTAMP, so it goes through the
+                  same converter every other stored timestamp on the system
+                  uses rather than being printed as written. The mockup froze
+                  this at "Jan 05, 2026". #}
+              <div class="detail-row">
+                <div class="detail-label">Account Created</div>
+                <div class="detail-value">{{ user.created_at | display_timestamp }}</div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-label">Assignment</div>
+                <div class="detail-value muted" title="{{ untracked.assignment }}">Not tracked</div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-label">Last Login</div>
+                <div class="detail-value muted" title="{{ untracked.last_login }}">Not tracked</div>
+              </div>
+            </div>
 
-          <div class="perm-section-title">Access Permissions</div>
-          <div class="perm-item"><span class="material-symbols-outlined">check_circle</span>Full system access</div>
-          <div class="perm-item"><span class="material-symbols-outlined">check_circle</span>Manage patient records</div>
-          <div class="perm-item"><span class="material-symbols-outlined">check_circle</span>Manage medicine inventory</div>
-          <div class="perm-item"><span class="material-symbols-outlined">check_circle</span>Manage user accounts</div>
-          <div class="perm-item"><span class="material-symbols-outlined">check_circle</span>View reports &amp; analytics</div>
+            {#- Read off this role's own role_required() guards at request time
+                (routes/user_views.py::accessible_screens), so the list is the
+                access rule rather than a hand-kept description of it. The
+                mockup listed five permissions for every user. #}
+            <div class="perm-section-title">Screens This Role Can Open</div>
+{%- for screen in user.screens %}
+            <div class="perm-item"><span class="material-symbols-outlined">check_circle</span>{{ screen }}</div>
+{%- else %}
+            <div class="perm-note">This role has no role-restricted screen of its own.</div>
+{%- endfor %}
+            <div class="perm-note">
+              Read from each screen's own access guard, so this list is the rule that is
+              enforced, not a copy of it.
+            </div>
 
-          <div class="d-flex gap-2 mt-3">
-            <button class="btn-ghost-ids" style="flex:1; justify-content:center;"><span class="material-symbols-outlined" style="font-size:18px;">lock_reset</span>Reset Password</button>
-            <button class="btn-primary-teal" style="flex:1; justify-content:center;"><span class="material-symbols-outlined" style="font-size:18px;">edit</span>Edit User</button>
+            <div class="d-flex gap-2 mt-3">
+              <button class="btn-ghost-ids" type="button" style="flex:1; justify-content:center;" disabled
+                      title="{{ untracked.reset_password }}">
+                <span class="material-symbols-outlined" style="font-size:18px;">lock_reset</span>Reset Password
+              </button>
+              <button class="btn-primary-teal" type="button" style="flex:1; justify-content:center;" disabled
+                      title="{{ untracked.write }}">
+                <span class="material-symbols-outlined" style="font-size:18px;">edit</span>Edit User
+              </button>
+            </div>
+            <button class="btn-danger-text w-100 mt-1" type="button" disabled title="{{ untracked.write }}">
+              <span class="material-symbols-outlined" style="font-size:16px;">person_off</span>Deactivate Account
+            </button>
           </div>
-          <button class="btn-danger-text w-100 mt-1"><span class="material-symbols-outlined" style="font-size:16px;">person_off</span>Deactivate Account</button>
+{%- endfor %}
         </div>
       </div>
 
@@ -439,14 +349,11 @@
 
 {% block scripts %}
 <script>
-  function toggleFilterPanel(){
-    var panel = document.getElementById('filterPanel');
-    var btn = document.getElementById('filterToggleBtn');
-    panel.classList.toggle('show');
-    btn.classList.toggle('open');
-  }
-  function selectRow(row){
+  function selectUser(row){
     document.querySelectorAll('#userTable tbody tr').forEach(function(r){ r.classList.remove('selected'); });
     row.classList.add('selected');
+    document.querySelectorAll('.user-detail').forEach(function(panel){ panel.hidden = true; });
+    var detail = document.getElementById('userDetail' + row.dataset.user);
+    if (detail) { detail.hidden = false; }
   }
 </script>{% endblock %}

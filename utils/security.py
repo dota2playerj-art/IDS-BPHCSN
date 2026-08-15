@@ -37,6 +37,11 @@ def role_required(*allowed_roles):
                 return redirect(url_for("auth.dashboard"))
             return view_func(*args, **kwargs)
 
+        # Left on the wrapper so the guard can be read as well as enforced.
+        # User Management lists what each role may open (routes/user_views.py);
+        # reading it off the decorator means that list is the access rule
+        # itself rather than a second copy of it that could quietly disagree.
+        wrapper.allowed_roles = tuple(allowed_roles)
         return wrapper
 
     return decorator

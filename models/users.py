@@ -56,6 +56,37 @@ def get_clinical_staff():
     return [dict(row) for row in rows]
 
 
+def get_all_users():
+    """Every account on the system, for the User Management roster.
+
+    Deliberately not get_clinical_staff(): that one answers a different
+    question -- who a visit may be assigned to -- so it drops the Barangay
+    Official and hides deactivated accounts. A roster that did either would be
+    an incomplete list of who can sign in, which is the one thing this screen
+    exists to show. password_hash is the only column left out.
+
+    Ordered by role then name so the three accounts always read in the same
+    order, rather than in whatever order the rows happen to come back in.
+    """
+    conn = get_db()
+    rows = conn.execute(
+        """
+        SELECT id, username, full_name, role, email, phone, is_active, created_at
+        FROM users
+        ORDER BY
+            CASE role
+                WHEN 'Admin' THEN 0
+                WHEN 'Health Center Staff' THEN 1
+                WHEN 'Barangay Official' THEN 2
+                ELSE 3
+            END,
+            full_name COLLATE NOCASE
+        """
+    ).fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
 def get_user_by_id(user_id):
     conn = get_db()
     user = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()

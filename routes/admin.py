@@ -47,6 +47,7 @@ from routes.patient_views import (
     register_patient_context,
 )
 from routes.report_views import reports_analytics_context
+from routes.user_views import user_management_context
 from utils.security import login_required, role_required
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
@@ -392,11 +393,14 @@ def reports_analytics():
     )
 
 
+# Screen 11. Admin only, unchanged: the roster names every account that can
+# sign in, so it stays with the role that oversees the others. The context is
+# built in routes/user_views.py.
 @admin_bp.route('/user_management')
 @login_required
 @role_required("Admin")
 def user_management():
-    return render_template('user_management.html')
+    return render_template('user_management.html', **user_management_context())
 
 
 # Screen 12. Admin only, unchanged: the trail says who changed what, so the role
