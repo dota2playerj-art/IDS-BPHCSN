@@ -486,7 +486,28 @@
             <span class="material-symbols-outlined" style="font-size:18px;">close</span>Cancel
           </a>
 {%- endif %}
+          {#- Recording only, the guard Add / Edit Medicine and Register Patient
+              already put on their own Reset. Editing a saved consultation fills
+              this form from the stored record via _consultation_to_form(), so in
+              that mode a type="reset" beside Save Changes reverts every field to
+              the values the record loaded with -- and a stray click followed by
+              Save writes those old values straight back, which looks exactly
+              like the save having worked while the correction is gone. Clearing
+              a blank write-up is harmless; reverting one being corrected is not.
+
+              The immunisation checkboxes are not what makes this unsafe: a dose
+              already on file renders as a locked icon rather than a checkbox, so
+              Reset cannot reach it. Only un-given doses are tickable, and
+              resetting those merely unticks work in progress rather than
+              destroying a record. It is the written-up findings above that
+              Reset silently restores.
+
+              Cancel is outside this guard and stays on both modes -- in edit
+              mode it leads to the patient's profile, which is where the
+              Consultation History that opened this form lives. #}
+{%- if not consultation %}
           <button type="reset" class="btn-ghost-ids"><span class="material-symbols-outlined" style="font-size:18px;">restart_alt</span>Reset</button>
+{%- endif %}
           <button type="submit" class="btn-primary-teal">
             <span class="material-symbols-outlined" style="font-size:18px;">{% if consultation %}save{% else %}check_circle{% endif %}</span>
             {%- if consultation %}Save Changes{% else %}Save &amp; Complete Visit{% endif %}
