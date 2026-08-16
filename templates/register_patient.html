@@ -431,7 +431,24 @@
 {%- else %}
           <a href="{{ url_for(patient_records_endpoint) }}" class="btn-danger-text" style="text-decoration:none;">Cancel</a>
 {%- endif %}
+          {#- Add mode only, the guard Add / Edit Medicine already puts on its own
+              Reset. In edit mode a type="reset" sitting beside Save silently
+              reverts every field to the values the record loaded with, so a stray
+              click followed by Save writes the old values straight back -- which
+              looks exactly like the save being dropped. Clearing a blank
+              new-patient form is harmless; reverting an in-progress edit is not.
+
+              `not patient` is the whole test: check-in and advance-booking are
+              add-mode variants, not a third mode. register_patient_context()
+              forces both to falsy whenever `patient` is set, so a form opened for
+              either is registering somebody new and starts blank -- Reset there
+              clears a blank form, exactly as it always has. Cancel is outside
+              this guard and stays on every mode: it is the safe way out, and
+              unlike Reset it does not leave the operator looking at a form that
+              has quietly become the old record again. #}
+{%- if not patient %}
           <button type="reset" class="btn-ghost-ids"><span class="material-symbols-outlined" style="font-size:18px;">restart_alt</span>Reset</button>
+{%- endif %}
           {%- if not patient and not check_in and not booking %}
           <button type="button" class="btn-outline-teal" disabled title="{{ unavailable.save_and_another }}"><span class="material-symbols-outlined" style="font-size:18px;">person_add</span>Save &amp; Register Another</button>
           {%- endif %}
