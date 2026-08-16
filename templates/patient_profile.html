@@ -114,6 +114,71 @@
   }
   .empty-state h5{font-size:16px; font-weight:600; color:var(--text-dark); margin-bottom:6px;}
   .empty-state p{font-size:13.5px; color:var(--text-muted); max-width:360px; margin-bottom:18px;}
+
+{% include "_print.html" %}
+@media print{
+  /* WHAT A PRINTED PROFILE IS
+     ------------------------
+     The screen shows one tab at a time; a printed record shows the whole file
+     at once. Bootstrap hides an inactive pane with display:none and, because
+     these carry .fade, opacity:0 as well -- so both have to be undone or the
+     printout is whichever tab happened to be open. */
+  .tab-content > .tab-pane{
+    display:block !important;
+    opacity:1 !important;
+    margin-bottom:4px;
+  }
+
+  /* Medicine History is left out on purpose. There is no dispensing table yet,
+     so that tab is an empty state saying so -- true on screen, where it tells
+     the operator where the feature stands, and pure noise on a clinical record
+     that is going into a folder. The tabs that print are the five the record
+     actually holds: personal, medical, consultations, immunisations,
+     appointments. */
+  #tab-medicine{display:none !important;}
+
+  /* The two history tables carry a control column each. The chevron column
+     opens a detail row and the Actions column edits the record -- neither
+     means anything on paper. :not([colspan]) exempts the collapsed detail
+     row, whose single wide cell would otherwise match :last-child. */
+  #tab-consult .history-table thead th:first-child,
+  #tab-consult .history-table thead th:last-child,
+  #tab-consult .history-table tbody td:not([colspan]):first-child,
+  #tab-consult .history-table tbody td:not([colspan]):last-child,
+  #tab-appt .history-table thead th:last-child,
+  #tab-appt .history-table tbody td:last-child{display:none !important;}
+
+  /* The identity block at the top of the screen is repeated by the letterhead
+     and by Personal Information below it, so the on-screen version goes. */
+  .profile-header, .profile-actions{display:none !important;}
+
+  /* Two columns of label/value pairs read well on paper and halve the length
+     of the personal and medical sections. */
+  .info-grid{
+    display:grid !important;
+    grid-template-columns:1fr 1fr !important;
+    gap:5px 22px !important;
+  }
+  .info-item{
+    border:0 !important; background:none !important; padding:0 !important;
+    break-inside:avoid;
+  }
+  .info-label{font-size:8.5pt !important; color:#444 !important; text-transform:none !important;}
+  .info-value{font-size:10pt !important; color:#000 !important; font-weight:600 !important;}
+
+  /* An empty state is a friendly on-screen nudge with an icon; on paper the
+     sentence alone is the fact, and it matters -- "no doses on file" is a real
+     clinical statement. */
+  .empty-state{padding:4px 0 !important; align-items:flex-start !important; text-align:left !important;}
+  .empty-state .icon-circle{display:none !important;}
+  .empty-state h5{font-size:10pt !important; margin-bottom:2px !important;}
+  .empty-state p{font-size:9.5pt !important; max-width:none !important; margin-bottom:0 !important;}
+
+  /* Vitals/measurement chips and the timeline lose their decoration but keep
+     their text. */
+  .timeline-dot{display:none !important;}
+  .timeline-item{padding-left:0 !important;}
+}
 {% endblock %}
 
 {% block breadcrumb %}
@@ -127,6 +192,24 @@
     </div>{% endblock %}
 
 {% block content %}
+{#- PRINT LETTERHEAD. Invisible on screen, first thing on paper. A printed
+    record leaves the health centre, so the sheet states which patient it is
+    about, who printed it and when -- an unlabelled printout of a medical
+    record is worse than none. The stamp is filled in by script at print time
+    rather than rendered here, so a page left open overnight cannot print
+    yesterday's date. #}
+    <div class="print-only print-head">
+      <div>
+        <div class="print-org-name">Barangay Poblacion Health Center</div>
+        <div class="print-org-sub">Integrated Data System &mdash; IDS-BPHCSN</div>
+      </div>
+      <div class="print-doc">
+        <div class="print-doc-title">Patient Health Record</div>
+        <div class="print-doc-meta">{{ patient.patient_id }} &middot; {{ patient.full_name }}</div>
+        <div class="print-doc-meta">Printed <span class="print-stamp">&mdash;</span> by {{ sidebar_user_name }}</div>
+      </div>
+    </div>
+
     <!-- PROFILE HEADER -->
     <div class="panel-card">
       <div class="profile-header">
@@ -170,7 +253,14 @@
         </div>
 
         <div class="profile-actions">
-          <button class="btn-ghost-ids" type="button" disabled title="{{ unavailable.print }}"><span class="material-symbols-outlined" style="font-size:18px;">print</span>Print Record</button>
+{#- Print Record is real. It prints this page through the browser against the
+    print stylesheet in _print.html: the sidebar, header, tab strip and every
+    control drop out, all six tabs' worth of record is unfolded into one
+    document, and a letterhead naming the patient and the operator goes on top.
+    Nothing is re-queried and no second template renders the record, so the
+    printout cannot disagree with the screen it was taken from. #}
+          <button class="btn-ghost-ids" type="button" onclick="window.print()"
+                  title="Print {{ patient.full_name }}'s full record — personal details, medical history, consultations, immunizations and appointments"><span class="material-symbols-outlined" style="font-size:18px;">print</span>Print Record</button>
 {#- Schedule Appointment opens the New Appointment dialog on Screen 08 with this
     patient already chosen, and returns here when it is done. It is a link, not
     a second copy of the dialog -- the same arrangement the Appointment History
@@ -194,7 +284,12 @@
     </div>
 
     <!-- SUMMARY CARDS -->
-    <div class="row g-3 mb-4">
+    {#- Screen furniture, not record. These four tiles summarise at a glance
+        what the sections below state in full -- last visit, assigned worker,
+        prescriptions, next appointment -- and on paper they would take the top
+        third of page one to repeat the Consultation and Appointment sections
+        in larger type. The printed record carries the sections themselves. #}
+    <div class="row g-3 mb-4 no-print">
       <div class="col-md-3 col-sm-6">
         <div class="stat-card">
           <div class="stat-icon" style="background:var(--teal-light);"><span class="material-symbols-outlined" style="color:var(--teal-dark);">event_available</span></div>
@@ -274,6 +369,10 @@
 
         <!-- PERSONAL INFORMATION -->
         <div class="tab-pane fade show active" id="tab-personal">
+          {#- The tab strip labels these blocks on screen and is hidden on paper,
+              so each pane carries its own printed heading. Without them the
+              printout is an unlabelled run of tables. #}
+          <h2 class="print-only print-section-title">Personal Information</h2>
           <div class="info-grid">
             <div class="info-item"><div class="info-label">Full Name</div><div class="info-value">{{ patient.full_name }}</div></div>
             <div class="info-item"><div class="info-label">Birthdate</div><div class="info-value">{{ patient.birth_date | long_date('Not recorded') }}</div></div>
@@ -292,6 +391,7 @@
 
         <!-- MEDICAL HISTORY -->
         <div class="tab-pane fade" id="tab-medical">
+          <h2 class="print-only print-section-title">Medical History</h2>
           <div class="info-grid mb-4">
             <div class="info-item"><div class="info-label">Blood Type</div><div class="info-value">{{ patient.blood_type or 'Not recorded' }}</div></div>
             <div class="info-item"><div class="info-label">Known Conditions</div><div class="info-value">{{ patient.medical_conditions_list | join(', ') if patient.medical_conditions_list else 'None recorded' }}</div></div>
@@ -324,6 +424,7 @@
 
         <!-- CONSULTATION HISTORY -->
         <div class="tab-pane fade" id="tab-consult">
+          <h2 class="print-only print-section-title">Consultation History</h2>
 {%- if consultations %}
           <div style="overflow-x:auto;">
             <table class="history-table">
@@ -478,6 +579,11 @@
              older patient who has doses on file — ageing out of the programme
              does not delete a medical record. -->
         <div class="tab-pane fade" id="tab-vaccine">
+          {#- "If applicable" is already decided by show_immunizations: for a
+              patient outside the programme with no doses on file this pane
+              prints the one sentence saying so, which is itself a clinical
+              fact worth having on the record. #}
+          <h2 class="print-only print-section-title">Immunization Record</h2>
 {%- if show_immunizations %}
           <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
             <div>
@@ -597,6 +703,7 @@
 
         <!-- APPOINTMENT HISTORY -->
         <div class="tab-pane fade" id="tab-appt">
+          <h2 class="print-only print-section-title">Appointment History</h2>
 {%- if appointments %}
           <div style="overflow-x:auto;">
             <table class="history-table">
@@ -659,4 +766,39 @@
 
       </div>
     </div>
+
+    <div class="print-only print-foot">
+      Printed from IDS-BPHCSN, Barangay Poblacion Health Center. This is a copy of
+      {{ patient.full_name }}'s record ({{ patient.patient_id }}) as held at the time of printing;
+      the system remains the record of authority.
+    </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // The printed date is stamped at print time, not at render time. A profile
+  // left open on a desk overnight and printed the next morning would otherwise
+  // carry the date the page was loaded, which on a medical record is a wrong
+  // fact rather than a stale one.
+  (function(){
+    function stamp(){
+      var when = new Date().toLocaleString(undefined, {
+        year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit'
+      });
+      document.querySelectorAll('.print-stamp').forEach(function(el){ el.textContent = when; });
+    }
+    // beforeprint covers the browser's own Ctrl+P as well as the button.
+    window.addEventListener('beforeprint', stamp);
+    stamp();
+
+    // ?print=1 opens the profile and goes straight to the print dialog. This is
+    // what the print icon on each Patient Records row points at: printing one
+    // patient from the roster means printing their record, and their record is
+    // this page -- so the icon links here rather than growing a second, thinner
+    // copy of the profile that could disagree with it.
+    if(new URLSearchParams(window.location.search).has('print')){
+      window.addEventListener('load', function(){ window.print(); });
+    }
+  })();
+</script>
 {% endblock %}

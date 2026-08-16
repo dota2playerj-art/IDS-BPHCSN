@@ -16,11 +16,18 @@ also tells the next session what building it would actually take, which
 WHY THESE LIVE HERE AND NOT IN EACH TEMPLATE
 --------------------------------------------
 Export is unavailable for one reason across six screens, and print for one
-reason across five. Written into each template, that is eleven copies of two
-sentences, and the copies drift -- one screen would end up claiming export was
-"not yet built" while another said it was "planned for a later phase", for the
-same absent library. inject_role_context() puts this dict on every render as
-`unavailable`, so a screen states the reason by naming it.
+reason across the four that still have no print layout. Written into each
+template, that is ten copies of two sentences, and the copies drift -- one
+screen would end up claiming export was "not yet built" while another said it
+was "planned for a later phase", for the same absent library.
+inject_role_context() puts this dict on every render as `unavailable`, so a
+screen states the reason by naming it.
+
+Collecting them also means a reason can be corrected in one place when the
+world changes. When printing was built for Patient Profile and Patient Records,
+the print sentence had to stop saying the project had no print stylesheet; had
+that claim been copied into eight templates, some of them would still be
+saying it.
 
 Kept apart from the per-screen UNTRACKED dicts in routes/*_views.py on purpose.
 Those answer a different question -- why a *figure* has no source -- and are
@@ -37,11 +44,21 @@ UNAVAILABLE = {
         "this screen are read from the database on each load, so exporting "
         "them is a reporting feature to be built, not a button to re-enable."
     ),
+    # Printing is now real on Patient Profile and Patient Records, which opt in
+    # by including templates/_print.html. This reason is what the screens that
+    # have NOT been given a print layout still say, and it had to be rewritten
+    # the day the first one was built: it used to open "There is no print
+    # stylesheet", which stopped being true of the project the moment one
+    # existed. A shared sentence is only worth having while it is accurate.
     "print": (
-        "Printing is not implemented. There is no print stylesheet and no "
-        "printable view: sending this page to a printer would produce the "
-        "sidebar, the header and the screen furniture along with the record. A "
-        "usable printout needs a layout of its own, which is separate work."
+        "This screen has no print layout. Printing is built where a printed "
+        "page is a document somebody keeps -- a patient's record and the "
+        "patient list, both on Patient Records and Patient Profile -- and "
+        "those two screens hide their navigation and controls for the printer. "
+        "This one does not, so sending it to a printer would produce the "
+        "sidebar, the header and the screen furniture along with the content. "
+        "Giving it a usable printout means deciding what on it is worth "
+        "keeping on paper, which is a design question, not a switch."
     ),
 
     # ---- Table controls -----------------------------------------------------

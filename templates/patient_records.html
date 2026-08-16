@@ -116,6 +116,45 @@
   }
   .empty-state h5{font-size:17px; font-weight:600; color:var(--text-dark); margin-bottom:6px;}
   .empty-state p{font-size:14px; color:var(--text-muted); max-width:380px; margin-bottom:20px;}
+
+{% include "_print.html" %}
+@media print{
+  /* WHAT A PRINTED ROSTER IS
+     -----------------------
+     The table exactly as narrowed on screen. applyFilters() marks every
+     excluded row with the HTML `hidden` attribute, and hidden elements do not
+     print -- so the search box and all five filters are honoured on paper
+     without this stylesheet knowing anything about them, and without the
+     filtering rule existing a second time in Python. */
+
+  /* The screen's own chrome above the table. */
+  .toolbar, .table-footer, .empty-state{display:none !important;}
+
+  /* Checkbox column and Actions column: one selects rows, the other opens
+     dialogs. Neither survives contact with paper. */
+  #patientTable thead th:first-child,
+  #patientTable thead th:last-child,
+  #patientTable tbody td:first-child,
+  #patientTable tbody td:last-child{display:none !important;}
+
+  /* A roster is long, so it is set tighter than the profile and the address
+     column is allowed to wrap rather than forcing the table wide. */
+  #patientTable{table-layout:auto !important;}
+  #patientTable th, #patientTable td{font-size:8.5pt !important; padding:4px 5px !important;}
+  #patientTable td{word-break:break-word;}
+
+  /* The wrapper exists to give the table a horizontal scrollbar on a narrow
+     screen. On paper it would clip the table instead. */
+  #patientTable{overflow:visible !important;}
+  div[style*="overflow-x"]{overflow:visible !important;}
+
+  /* SELECTION-ONLY PRINTING
+     The bulk bar's Print prints the ticked records rather than the whole
+     roster. It sets this class on the table for the duration of the dialog;
+     rows the operator did not tick are held back the same way a filtered-out
+     row is. */
+  #patientTable.print-selection-only tbody tr:not(.print-picked){display:none !important;}
+}
 {% endblock %}
 
 {% block breadcrumb %}
@@ -127,11 +166,33 @@
     </div>{% endblock %}
 
 {% block content %}
-    <div class="eyebrow">Barangay Poblacion Health Center</div>
-    <div class="page-title">Patient Records</div>
+{#- PRINT LETTERHEAD. Invisible on screen, first thing on paper. The roster
+    describes itself: how many records are on the sheet, out of how many
+    registered, and -- when the operator narrowed the list before printing --
+    what that narrowing was. A printed list of patients with no statement of
+    what it was filtered to is a list nobody can check. Both lines are filled
+    in by script from the live table, so they describe the sheet rather than
+    the page load. #}
+    <div class="print-only print-head">
+      <div>
+        <div class="print-org-name">Barangay Poblacion Health Center</div>
+        <div class="print-org-sub">Integrated Data System &mdash; IDS-BPHCSN</div>
+      </div>
+      <div class="print-doc">
+        <div class="print-doc-title">Patient Records</div>
+        <div class="print-doc-meta print-scope">&mdash;</div>
+        <div class="print-doc-meta">Printed <span class="print-stamp">&mdash;</span> by {{ sidebar_user_name }}</div>
+      </div>
+    </div>
+
+    <div class="eyebrow no-print">Barangay Poblacion Health Center</div>
+    <div class="page-title no-print">Patient Records</div>
 
     <!-- STAT CARDS -->
-    <div class="row g-3 mt-1 mb-4">
+    {#- Dashboard tiles, not roster. They summarise the whole register, which is
+        not what a printed (and possibly filtered) list of patients is about, so
+        they stay on screen -- the sheet's own count goes in the letterhead. #}
+    <div class="row g-3 mt-1 mb-4 no-print">
       <div class="col-md-3 col-sm-6">
         <div class="stat-card">
           <div class="stat-icon" style="background:var(--teal-light);"><span class="material-symbols-outlined" style="color:var(--teal-dark);">groups</span></div>
@@ -186,6 +247,14 @@
         </div>
         <div class="d-flex align-items-center gap-2">
           <button class="btn-outline-teal" type="button" disabled title="{{ unavailable.export }}"><span class="material-symbols-outlined" style="font-size:18px;">file_download</span>Export</button>
+{#- Print the roster. The screen had no whole-list print control before -- the
+    only two Print buttons here were the bulk bar's, which needs a selection,
+    and the per-row icon -- so printing the list the operator is actually
+    looking at needed a control of its own rather than a disabled one to
+    re-enable. It prints the table as currently narrowed: applyFilters() hides
+    excluded rows with the `hidden` attribute and hidden rows do not print. #}
+          <button class="btn-outline-teal" type="button" onclick="printRoster()"
+                  title="Print the patient list exactly as filtered on screen"><span class="material-symbols-outlined" style="font-size:18px;">print</span>Print List</button>
           <a href="{{ url_for(register_patient_endpoint) }}" class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">person_add</span>Add Patient</a>
         </div>
       </div>
@@ -266,7 +335,10 @@
         <div class="count"><span id="selCount">0</span> patient record(s) selected</div>
         <div class="bulk-actions">
           <button type="button" disabled title="{{ unavailable.export }}"><span class="material-symbols-outlined" style="font-size:16px;">file_download</span>Export</button>
-          <button type="button" disabled title="{{ unavailable.print }}"><span class="material-symbols-outlined" style="font-size:16px;">print</span>Print</button>
+{#- Prints the ticked records only, which is the one thing the bulk bar is for.
+    Same page, same stylesheet as Print List; the difference is a class on the
+    table that holds back every row the operator did not tick. #}
+          <button type="button" onclick="printSelected()" title="Print only the selected patient records"><span class="material-symbols-outlined" style="font-size:16px;">print</span>Print</button>
           <button type="button" data-bs-toggle="modal" data-bs-target="#archivePatientModal"><span class="material-symbols-outlined" style="font-size:16px;">archive</span>Change Status</button>
           <button type="button" class="clear-btn" onclick="clearSelection()">Clear</button>
         </div>
@@ -319,7 +391,14 @@
                       already existed. #}
                   <a href="{{ url_for(patient_profile_endpoint, patient_id=patient.id) }}" class="action-icon" title="Open {{ patient.full_name }}'s profile"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></a>
                   <a href="{{ url_for(register_patient_endpoint, patient_id=patient.id) }}" class="action-icon" title="Edit {{ patient.full_name }}"><span class="material-symbols-outlined" style="font-size:18px;">edit</span></a>
-                  <button type="button" class="action-icon" disabled title="{{ unavailable.print }}"><span class="material-symbols-outlined" style="font-size:18px;">print</span></button>
+                  {#- Printing one patient from the roster means printing that
+                      patient's record, and their record is the profile. So this
+                      opens the profile with ?print=1, which goes straight to the
+                      print dialog there, rather than printing a single roster
+                      row -- a one-line table is not a patient record. Same
+                      reasoning as View above: the destination already existed. #}
+                  <a href="{{ url_for(patient_profile_endpoint, patient_id=patient.id, print=1) }}"
+                     class="action-icon" title="Print {{ patient.full_name }}'s full record"><span class="material-symbols-outlined" style="font-size:18px;">print</span></a>
                   <button type="button" class="action-icon" title="Change status of {{ patient.full_name }} (currently {{ patient.status }})"
                           data-bs-toggle="modal" data-bs-target="#archivePatientModal"
                           data-patient-id="{{ patient.id }}" data-patient-name="{{ patient.full_name }}"
@@ -446,6 +525,102 @@
     document.getElementById('selectAll').checked = false;
     updateSelection();
   }
+
+  // ---- PRINTING -------------------------------------------------------------
+  // Both entry points print *this page* against the print stylesheet in
+  // _print.html. Nothing is re-queried and no second template renders the
+  // roster, so the sheet cannot disagree with the screen it was taken from.
+  //
+  // Neither needs to know the filter rules. applyFilters() has already marked
+  // every excluded row `hidden`, and a hidden element does not print, so the
+  // search box and all five filters are honoured on paper for free.
+
+  function visibleRows(){
+    return Array.prototype.slice.call(
+      document.querySelectorAll('#patientTable tbody tr.patient-row:not([hidden])')
+    );
+  }
+
+  // The letterhead has to describe the sheet rather than the register: how many
+  // records are on it, out of how many are registered, and what narrowed it. A
+  // printed list of patients that does not say what it was filtered to is a
+  // list nobody can check against anything.
+  function describePrintScope(count){
+    var total = document.querySelectorAll('#patientTable tbody tr.patient-row').length;
+    var bits  = [];
+    var search = document.getElementById('patientSearch');
+    var fSex = document.getElementById('fSex');
+    var fStatus = document.getElementById('fStatus');
+    var fVisit = document.getElementById('fVisit');
+    var fAgeMin = document.getElementById('fAgeMin');
+    var fAgeMax = document.getElementById('fAgeMax');
+
+    if(search && search.value.trim()){ bits.push('search "' + search.value.trim() + '"'); }
+    if(fSex && fSex.value){ bits.push('sex ' + fSex.options[fSex.selectedIndex].text); }
+    if(fStatus && fStatus.value){ bits.push('status ' + fStatus.options[fStatus.selectedIndex].text); }
+    if(fVisit && fVisit.value){ bits.push('last visit ' + fVisit.options[fVisit.selectedIndex].text); }
+    if(fAgeMin && fAgeMin.value){ bits.push('age from ' + fAgeMin.value); }
+    if(fAgeMax && fAgeMax.value){ bits.push('age to ' + fAgeMax.value); }
+
+    var line = count + ' of ' + total + ' registered patient' + (total === 1 ? '' : 's');
+    return bits.length ? line + ' — filtered by ' + bits.join(', ') : line + ' — full register';
+  }
+
+  function setPrintScope(text){
+    document.querySelectorAll('.print-scope').forEach(function(el){ el.textContent = text; });
+  }
+
+  function printRoster(){
+    setPrintScope(describePrintScope(visibleRows().length));
+    window.print();
+  }
+
+  function printSelected(){
+    var table = document.getElementById('patientTable');
+    var picked = visibleRows().filter(function(row){
+      var box = row.querySelector('.row-check');
+      return box && box.checked;
+    });
+    if(!picked.length){ return; }   // the bulk bar is only shown when something is ticked
+
+    picked.forEach(function(row){ row.classList.add('print-picked'); });
+    table.classList.add('print-selection-only');
+    setPrintScope(picked.length + ' selected patient record' + (picked.length === 1 ? '' : 's'));
+
+    // The marks come off once the dialog is done with the page, so the screen is
+    // never left in a print-only state. afterprint covers both "printed" and
+    // "cancelled"; the timeout is the fallback for browsers that do not fire it.
+    var restore = function(){
+      table.classList.remove('print-selection-only');
+      picked.forEach(function(row){ row.classList.remove('print-picked'); });
+      window.removeEventListener('afterprint', restore);
+    };
+    window.addEventListener('afterprint', restore);
+    window.setTimeout(restore, 1000);
+
+    window.print();
+  }
+
+  // The printed date is stamped at print time, not at page load: a roster left
+  // open on a desk overnight would otherwise print with yesterday's date on it.
+  // This also covers the browser's own Ctrl+P, which reaches neither button.
+  (function(){
+    function stamp(){
+      var when = new Date().toLocaleString(undefined, {
+        year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit'
+      });
+      document.querySelectorAll('.print-stamp').forEach(function(el){ el.textContent = when; });
+    }
+    window.addEventListener('beforeprint', function(){
+      stamp();
+      // Ctrl+P with nothing selected still needs the scope line filled in.
+      var scope = document.querySelector('.print-scope');
+      if(scope && scope.textContent.trim() === '—'){
+        setPrintScope(describePrintScope(visibleRows().length));
+      }
+    });
+    stamp();
+  })();
   // Both status entry points open the same dialog, so the dialog has to say
   // which records it is about. A row icon carries the patient on data-* and sets
   // single_patient_id, which the server prefers; the bulk bar carries neither and

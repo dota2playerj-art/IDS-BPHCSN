@@ -1,0 +1,191 @@
+{#- PRINT STYLESHEET -- shared by Patient Profile and Patient Records.
+
+    Included inside each screen's {% block styles %}, which base.html renders
+    inside its one <style> element, so this file holds raw CSS and no <style>
+    tag of its own.
+
+    WHY A PARTIAL RATHER THAN base.html
+    -----------------------------------
+    The two screens that print need identical chrome-hiding rules, and two
+    copies of those rules would drift the way the export/print sentences did
+    before utils/unavailable.py collected them. One copy, two includes.
+
+    It is deliberately *not* in base.html, where it would apply to all twenty
+    screens. Every other Print button in this project is still disabled and
+    still says printing is not built for that screen; giving those screens a
+    working print layout anyway would make the button and the page disagree.
+    A screen prints when it opts in by including this file.
+
+    WHY @media print AND NOT A SEPARATE PRINT ROUTE
+    ----------------------------------------------
+    Three reasons, in order of weight:
+
+      1. Patient Records filters in the browser -- applyFilters() sets
+         row.hidden on each row it excludes -- so the filtered roster exists
+         only in the DOM. Printing the page prints exactly what the operator
+         narrowed it to. A server route would have to be handed the search
+         text and all five filter values and re-run the matching in Python,
+         which is a second implementation of a rule this project already has
+         one of.
+      2. A print route means a second template rendering the same record, and
+         that copy drifts. The printed profile would answer "what does this
+         patient's record say" a little differently from the screen, which is
+         the failure this project keeps designing out.
+      3. No new endpoints, so no new role-guard surface. The route x role
+         matrix is unchanged by this feature.
+
+    NO COLOUR IS RELIED ON
+    ----------------------
+    Browsers strip background colours from printouts by default and nothing
+    here asks them not to. Status badges are redrawn as outlined text so they
+    survive that, rather than becoming white-on-white or an ink-heavy block.
+#}
+/* Print-only furniture is invisible on screen and appears on paper. */
+.print-only{display:none;}
+
+@media print{
+  /* A4 with a margin wide enough to punch and file. */
+  @page{size:A4 portrait; margin:14mm 12mm;}
+
+  html, body{
+    background:#fff !important;
+    color:#000;
+    font-size:10.5pt;
+  }
+
+  /* ---- Application chrome: none of it is part of the record -------------- */
+  .sidebar,
+  .topheader,
+  .flash-stack,
+  .breadcrumb-nav,
+  .modal,
+  .modal-backdrop,
+  .no-print{display:none !important;}
+
+  /* The layout only exists to sit beside a 280px sidebar that is now gone. */
+  .main-wrap{margin-left:0 !important;}
+  .content{padding:0 !important;}
+
+  /* NOTHING MAY EXCEED THE PAGE WIDTH.
+     A viewport scrolls sideways; paper does not -- it crops, silently, and the
+     reader has no way to know a column was cut off. Two things here push past
+     the edge and both are invisible until the layout is actually previewed at
+     print width: Bootstrap's .row carries negative side margins that its
+     parent's padding normally absorbs, and the tables sit in wrappers whose
+     overflow-x exists to give a narrow screen a scrollbar. */
+  .row{margin-left:0 !important; margin-right:0 !important;}
+  [class*="col-"]{padding-left:0 !important; padding-right:0 !important;}
+  div[style*="overflow-x"]{overflow:visible !important;}
+  html, body{overflow-x:hidden !important; width:auto !important;}
+  table{max-width:100% !important;}
+
+  /* ---- Panels become plain sections ------------------------------------- */
+  /* On screen these are floating white cards on a grey page. On paper the page
+     is already white, so the card treatment is just wasted margin and a shadow
+     that renders as a grey smudge. */
+  .panel-card,
+  .stat-card,
+  .profile-header{
+    box-shadow:none !important;
+    border:0 !important;
+    border-radius:0 !important;
+    background:#fff !important;
+    padding:0 !important;
+    margin:0 0 12px !important;
+  }
+
+  /* ---- Controls ---------------------------------------------------------- */
+  /* Nothing clickable belongs on paper: a printed button is a dead control by
+     definition, which is the thing this project spent a whole commit removing. */
+  button,
+  .btn-primary-teal,
+  .btn-outline-teal,
+  .btn-ghost-ids,
+  .btn-danger-text,
+  .btn-reset,
+  .action-icon,
+  .toolbar-search,
+  .filter-panel,
+  .bulk-bar,
+  .nav-tabs,
+  .dropdown-menu,
+  input, select, textarea{display:none !important;}
+
+  /* Links print as plain text -- a blue underline on paper suggests something
+     the reader can do, and they cannot. */
+  a{color:#000 !important; text-decoration:none !important;}
+
+  /* ---- Tables ------------------------------------------------------------ */
+  table{width:100% !important; border-collapse:collapse !important;}
+  thead{display:table-header-group;}   /* repeat the header on every page */
+  tr{break-inside:avoid; page-break-inside:avoid;}
+  th, td{
+    border:0 !important;
+    border-bottom:1px solid #BBB !important;
+    padding:5px 6px !important;
+    font-size:9.5pt !important;
+    color:#000 !important;
+    background:#fff !important;
+    vertical-align:top;
+  }
+  th{
+    border-bottom:1.2px solid #000 !important;
+    font-weight:700 !important;
+    text-align:left;
+    text-transform:none !important;
+  }
+
+  /* A badge is a coloured pill on screen. Backgrounds do not print, so it is
+     redrawn as outlined text -- readable in one ink, and it still reads as a
+     discrete status rather than a loose word in the cell. */
+  .badge-status{
+    background:none !important;
+    color:#000 !important;
+    border:1px solid #666 !important;
+    border-radius:3px !important;
+    padding:0 5px !important;
+    font-size:8.5pt !important;
+    font-weight:600 !important;
+  }
+
+  /* ---- Print-only furniture ---------------------------------------------- */
+  .print-only{display:block !important;}
+
+  /* The letterhead. Printed records leave the building, so each page set says
+     where it came from, who printed it and when -- a sheet found on a desk
+     with no provenance is not a record. */
+  .print-head{
+    display:flex !important;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:16px;
+    border-bottom:2px solid #000;
+    padding-bottom:8px;
+    margin-bottom:14px;
+  }
+  .print-org-name{font-size:13pt; font-weight:700; line-height:1.25;}
+  .print-org-sub{font-size:9pt; color:#333;}
+  .print-doc{text-align:right;}
+  .print-doc-title{font-size:12pt; font-weight:700;}
+  .print-doc-meta{font-size:9pt; color:#333; margin-top:2px;}
+
+  /* Section headings replace the tab strip, which is how the screen labels
+     these blocks. Without them the printout is an unlabelled run of tables. */
+  .print-section-title{
+    font-size:11pt !important;
+    font-weight:700 !important;
+    margin:14px 0 6px !important;
+    padding-bottom:3px;
+    border-bottom:1px solid #000;
+    break-after:avoid;
+    page-break-after:avoid;
+  }
+
+  .print-foot{
+    margin-top:14px;
+    padding-top:6px;
+    border-top:1px solid #999;
+    font-size:8.5pt;
+    color:#333;
+  }
+}
