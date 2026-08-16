@@ -103,16 +103,29 @@
 
     <div style="height:24px;"></div>
 
-    <!-- REPORT GENERATION TOOLBAR -->
+    <div class="scope-note">
+      <strong>This screen is not connected to a data source.</strong>
+      {{ unavailable.community_reports }}
+      Its controls are shown read-only for that reason rather than accepting a
+      selection that would change nothing. Screens 10, 16 and 17 report the same
+      community from real queries and are reachable from the sidebar.
+    </div>
+
+    <!-- REPORT GENERATION TOOLBAR — one disabled fieldset around the whole
+         toolbar rather than `disabled` on each control, so nothing in it can be
+         live by accident. Generate was the odd one out before: Print and the two
+         exports were already disabled, while the button that would have run the
+         report looked ready and did nothing. -->
     <div class="panel-card">
       <div class="panel-title mb-0">Generate a Community Report</div>
       <div class="panel-sub mb-0">Select a report type and date range to view aggregate, community-wide statistics.</div>
       <div style="height:24px;"></div>
 
+      <fieldset class="unavailable-form" disabled>
       <div class="row g-3 align-items-end">
         <div class="col-lg-4 col-md-6">
-          <label class="field-label">Report Type</label>
-          <select class="form-select" id="reportType">
+          <label class="field-label" for="reportType">Report Type</label>
+          <select class="form-select" id="reportType" title="{{ unavailable.community_reports }}">
             <option selected>Monthly Consultation Summary</option>
             <option>Patient Registration Trend</option>
             <option>Community Vaccination Summary</option>
@@ -122,21 +135,22 @@
         </div>
         <div class="col-lg-2 col-md-3 col-sm-6">
           <label class="field-label">From</label>
-          <input type="date" class="form-control" value="2026-01-01">
+          <input type="date" class="form-control" value="2026-01-01" title="{{ unavailable.community_reports }}">
         </div>
         <div class="col-lg-2 col-md-3 col-sm-6">
           <label class="field-label">To</label>
-          <input type="date" class="form-control" value="{{ clinic_today.isoformat() }}">
+          <input type="date" class="form-control" value="{{ clinic_today.isoformat() }}" title="{{ unavailable.community_reports }}">
         </div>
         <div class="col-lg-4">
           <div class="d-flex gap-2 flex-wrap">
-            <button class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">insights</span>Generate</button>
-            <button class="btn-outline-teal" disabled><span class="material-symbols-outlined" style="font-size:18px;">print</span>Print</button>
-            <button class="btn-outline-teal" disabled><span class="material-symbols-outlined" style="font-size:18px;">picture_as_pdf</span>Export PDF</button>
-            <button class="btn-outline-teal" disabled><span class="material-symbols-outlined" style="font-size:18px;">description</span>Export Excel</button>
+            <button type="button" class="btn-primary-teal" disabled title="{{ unavailable.community_reports }}"><span class="material-symbols-outlined" style="font-size:18px;">insights</span>Generate</button>
+            <button type="button" class="btn-outline-teal" disabled title="{{ unavailable.print }}"><span class="material-symbols-outlined" style="font-size:18px;">print</span>Print</button>
+            <button type="button" class="btn-outline-teal" disabled title="{{ unavailable.export }}"><span class="material-symbols-outlined" style="font-size:18px;">picture_as_pdf</span>Export PDF</button>
+            <button type="button" class="btn-outline-teal" disabled title="{{ unavailable.export }}"><span class="material-symbols-outlined" style="font-size:18px;">description</span>Export Excel</button>
           </div>
         </div>
       </div>
+      </fieldset>
     </div>
 
     <!-- SUMMARY CARDS -->
@@ -197,109 +211,28 @@
 
     <div style="height:24px;"></div>
 
-    <!-- RECENT COMMUNITY REPORTS TABLE -->
+    <!-- RECENT COMMUNITY REPORTS — the table here listed seven reports, with
+         names, date ranges, "Ready" badges and a View and a Download button
+         each, attributed to the two real account holders. None of them existed:
+         no report is generated, stored or downloadable anywhere in this
+         project, and nothing writes a row when one is asked for. Fourteen
+         buttons that could not open anything have gone with the rows that
+         invented their subjects, which is the same treatment Screen 10's
+         "Recent Generated Reports" panel already carries for this exact gap. -->
     <div class="panel-card mb-0">
-
-      <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-3">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
         <div>
-          <div class="panel-title mb-0">Recent Community Reports</div>
-          <div class="panel-sub mb-0">Previously generated reports</div>
-        </div>
-        <div class="d-flex align-items-center gap-2 flex-wrap">
-          <div class="toolbar-search">
-            <span class="material-symbols-outlined" style="font-size:18px;">search</span>
-            <input type="text" placeholder="Search by report name">
-          </div>
-          <button class="filter-btn"><span class="material-symbols-outlined" style="font-size:18px;">filter_list</span>Report Type</button>
-          <button class="filter-btn"><span class="material-symbols-outlined" style="font-size:18px;">sort</span>Sort</button>
+          <div class="panel-title">Recent Community Reports<span class="untracked-tag">Not tracked</span></div>
+          <div class="panel-sub">Previously generated reports</div>
         </div>
       </div>
-
-      <div style="overflow-x:auto;">
-        <table class="report-table">
-          <thead>
-            <tr>
-              <th>Report Name / Type</th>
-              <th>Date Range Covered</th>
-              <th>Generated By</th>
-              <th>Date Generated</th>
-              <th>Status</th>
-              <th style="text-align:right;">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td class="report-name">June 2026 Monthly Consultation Summary</td>
-              <td>June 01&ndash;30, 2026</td>
-              <td>Dr. Joshua Reyes</td>
-              <td>July 02, 2026</td>
-              <td><span class="badge-status badge-ready">Ready</span></td>
-              <td><div class="d-flex justify-content-end gap-1"><button class="action-icon" title="View"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button><button class="action-icon" title="Download"><span class="material-symbols-outlined" style="font-size:18px;">download</span></button></div></td>
-            </tr>
-            <tr>
-              <td class="report-name">Q2 2026 Patient Registration Trend</td>
-              <td>April 01&ndash;June 30, 2026</td>
-              <td>Hon. Roberto Villanueva</td>
-              <td>July 01, 2026</td>
-              <td><span class="badge-status badge-ready">Ready</span></td>
-              <td><div class="d-flex justify-content-end gap-1"><button class="action-icon" title="View"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button><button class="action-icon" title="Download"><span class="material-symbols-outlined" style="font-size:18px;">download</span></button></div></td>
-            </tr>
-            <tr>
-              <td class="report-name">Community Vaccination Summary &ndash; June 2026</td>
-              <td>June 01&ndash;30, 2026</td>
-              <td>Dr. Joshua Reyes</td>
-              <td>June 29, 2026</td>
-              <td><span class="badge-status badge-ready">Ready</span></td>
-              <td><div class="d-flex justify-content-end gap-1"><button class="action-icon" title="View"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button><button class="action-icon" title="Download"><span class="material-symbols-outlined" style="font-size:18px;">download</span></button></div></td>
-            </tr>
-            <tr>
-              <td class="report-name">Top Community Health Concerns &ndash; H1 2026</td>
-              <td>January 01&ndash;June 30, 2026</td>
-              <td>Hon. Roberto Villanueva</td>
-              <td>July 03, 2026</td>
-              <td><span class="badge-status badge-processing">Processing</span></td>
-              <td><div class="d-flex justify-content-end gap-1"><button class="action-icon" title="View"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button><button class="action-icon" title="Download" disabled><span class="material-symbols-outlined" style="font-size:18px;">download</span></button></div></td>
-            </tr>
-            <tr>
-              <td class="report-name">Community Notification Report &ndash; June 2026</td>
-              <td>June 01&ndash;30, 2026</td>
-              <td>Hon. Roberto Villanueva</td>
-              <td>July 01, 2026</td>
-              <td><span class="badge-status badge-ready">Ready</span></td>
-              <td><div class="d-flex justify-content-end gap-1"><button class="action-icon" title="View"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button><button class="action-icon" title="Download"><span class="material-symbols-outlined" style="font-size:18px;">download</span></button></div></td>
-            </tr>
-            <tr>
-              <td class="report-name">May 2026 Monthly Consultation Summary</td>
-              <td>May 01&ndash;31, 2026</td>
-              <td>Dr. Joshua Reyes</td>
-              <td>June 02, 2026</td>
-              <td><span class="badge-status badge-ready">Ready</span></td>
-              <td><div class="d-flex justify-content-end gap-1"><button class="action-icon" title="View"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button><button class="action-icon" title="Download"><span class="material-symbols-outlined" style="font-size:18px;">download</span></button></div></td>
-            </tr>
-            <tr>
-              <td class="report-name">Q1 2026 Patient Registration Trend</td>
-              <td>January 01&ndash;March 31, 2026</td>
-              <td>Hon. Roberto Villanueva</td>
-              <td>April 04, 2026</td>
-              <td><span class="badge-status badge-ready">Ready</span></td>
-              <td><div class="d-flex justify-content-end gap-1"><button class="action-icon" title="View"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button><button class="action-icon" title="Download"><span class="material-symbols-outlined" style="font-size:18px;">download</span></button></div></td>
-            </tr>
-          </tbody>
-        </table>
+      <div class="untracked">
+        <span class="material-symbols-outlined">summarize</span>
+        <div>
+          <div class="untracked-title">No report history is recorded</div>
+          <div class="untracked-body">{{ unavailable.community_reports }}</div>
+        </div>
       </div>
-
-      <div class="table-footer">
-        <div class="pg-info">Showing 1&ndash;7 of 12 reports</div>
-        <nav aria-label="Community reports pagination">
-          <ul class="pagination mb-0">
-            <li class="page-item disabled"><a class="page-link" href="#"><span class="material-symbols-outlined" style="font-size:16px;">chevron_left</span></a></li>
-            <li class="page-item active"><a class="page-link" href="#">1</a></li>
-            <li class="page-item"><a class="page-link" href="#">2</a></li>
-            <li class="page-item"><a class="page-link" href="#"><span class="material-symbols-outlined" style="font-size:16px;">chevron_right</span></a></li>
-          </ul>
-        </nav>
-      </div>
-
     </div>
 {% endblock %}
 

@@ -5,6 +5,7 @@ from models.inventory import get_low_stock_alert
 from utils.dates import today
 from utils.roles import normalize_role
 from utils.security import get_current_user
+from utils.unavailable import UNAVAILABLE
 
 
 def _initials(name):
@@ -142,4 +143,9 @@ def inject_role_context():
     # Official compose/send/schedule community announcements and SMS; Health Center
     # Staff is view-only (individual patient scheduling is their scope, not broadcast).
     context["can_broadcast"] = normalized_role in {"admin", "barangay official"}
+
+    # Why each deliberately disabled control is disabled. On every render rather
+    # than per route, because the same reasons are quoted by screens built from
+    # different blueprints -- see utils/unavailable.py for why they are shared.
+    context["unavailable"] = UNAVAILABLE
     return context

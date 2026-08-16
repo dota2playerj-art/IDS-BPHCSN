@@ -359,8 +359,11 @@
             <div class="field-input-wrap">
               <span class="material-symbols-outlined">lock</span>
               <input type="password" id="password" name="password" placeholder="Enter your password" autocomplete="current-password">
-              <button type="button" class="eye-toggle" aria-label="Show password">
-                <span class="material-symbols-outlined">visibility</span>
+              <!-- Show Password is listed as a component of this screen in
+                   03_SCREEN_SPECIFICATIONS.md. The control was drawn but never
+                   wired; see the script at the foot of this file. -->
+              <button type="button" class="eye-toggle" id="togglePassword" aria-label="Show password" aria-pressed="false" title="Show password">
+                <span class="material-symbols-outlined" id="togglePasswordIcon">visibility</span>
               </button>
             </div>
           </div>
@@ -368,7 +371,11 @@
           <button type="submit" class="btn-signin">Sign In</button>
         </form>
 
-        <a href="#" class="forgot-link">Forgot Password?</a>
+        {#- Not a link. There is no password-reset flow to link to -- no reset
+            route, no token, and no email channel to send one through -- and an
+            anchor to "#" that reloads the login page is a worse answer than the
+            sentence beside it, which is the actual procedure. #}
+        <span class="forgot-link" role="note">Forgot Password?</span>
         <span class="forgot-helper">Please contact the System Administrator to reset your password.</span>
 
         <div class="security-divider"><span>Security</span></div>
@@ -407,6 +414,39 @@
   </div>
 
 </div>
+
+<script>
+  // SHOW PASSWORD
+  //
+  // The control was drawn on this screen from the start and is named as a
+  // component of Screen 01 in the Screen Specifications, but nothing was ever
+  // bound to it: it took a click and did nothing, on the one screen every user
+  // of this system meets first.
+  //
+  // Flipping the input's type is the whole of it. The value is never read,
+  // copied or stored here, and the field returns to type="password" when
+  // hidden again. aria-pressed carries the state for a screen reader, and the
+  // icon, label and tooltip change with it so the button always says what the
+  // next click will do rather than what the field is showing now.
+  (function(){
+    var button = document.getElementById('togglePassword');
+    var field = document.getElementById('password');
+    var icon = document.getElementById('togglePasswordIcon');
+    if(!button || !field || !icon){ return; }
+
+    button.addEventListener('click', function(){
+      var revealing = field.type === 'password';
+      field.type = revealing ? 'text' : 'password';
+      icon.textContent = revealing ? 'visibility_off' : 'visibility';
+      button.setAttribute('aria-pressed', revealing ? 'true' : 'false');
+      button.setAttribute('aria-label', revealing ? 'Hide password' : 'Show password');
+      button.setAttribute('title', revealing ? 'Hide password' : 'Show password');
+      // Revealing must not take the caret out of the field, or the operator has
+      // to click back into it to carry on typing.
+      field.focus();
+    });
+  })();
+</script>
 
 </body>
 </html>

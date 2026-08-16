@@ -51,6 +51,26 @@ def medicine_inventory_context():
     return {
         "items": items,
         "stats": get_inventory_stats(items),
+        "filter_options": _filter_options(items),
+    }
+
+
+def _filter_options(items):
+    """The values the shelf actually holds, for Screen 06's filter dropdowns.
+
+    Read off the items being rendered rather than from the master vocabularies
+    in models/inventory.py: those list every category the form can record, and
+    offering one nothing is stocked under would be a filter that can only ever
+    return an empty table. Screen 12's module filter is built the same way.
+
+    The category shown in a row is drug_class where there is one and category
+    otherwise, so the option list is built from the same expression -- otherwise
+    a filter value could not match the cell beside it.
+    """
+    categories = {(item["drug_class"] or item["category"]) for item in items}
+    return {
+        "categories": sorted(c for c in categories if c),
+        "statuses": sorted({item["stock_status"] for item in items if item["stock_status"]}),
     }
 
 

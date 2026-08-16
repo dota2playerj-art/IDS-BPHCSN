@@ -79,7 +79,7 @@
       <div>
         <div class="eyebrow">Barangay Poblacion Health Center</div>
         <div class="page-title">Notifications</div>
-        <div class="page-desc">{{ clinic_today | full_date }} &middot;<span id="unreadSubtext">5</span> unread notifications.</div>
+        <div class="page-desc">{{ clinic_today | full_date }}</div>
       </div>
       <div class="d-flex gap-2 flex-wrap">
         <span class="status-pill pill-operational"><span class="pill-dot"></span>All Systems Operational</span>
@@ -89,270 +89,80 @@
 
     <div style="height:16px;"></div>
 
-    <div class="d-flex justify-content-end gap-2 flex-wrap">
-      <button class="btn-outline-teal" onclick="markAllRead()"><span class="material-symbols-outlined" style="font-size:18px;">done_all</span>Mark All as Read</button>
-      <button class="btn-outline-teal" onclick="clearAll()"><span class="material-symbols-outlined" style="font-size:18px;">clear_all</span>Clear All</button>
+    {#- WHAT WAS HERE, AND WHY IT IS NOT
+        Nine notifications with invented senders and timestamps, four stat cards
+        counting them ("5 unread"), five filter chips, and a Mark as Read and a
+        Dismiss button on every row, plus Mark All as Read and Clear All above.
+
+        The buttons were the worst case in the system: they were not dead. Their
+        JavaScript really did strike a row through, really did drop it from the
+        list, and really did decrement the counter -- against records that did
+        not exist, with every effect undone by the next page load. A control that
+        appears to work is a stronger claim than one that does nothing, and this
+        one was claiming a notifications feature the schema has no table for.
+
+        Nothing here reports its own absence with an invented figure beside it,
+        so the counts went with the rows. The two things this screen was
+        pretending to do are both done for real elsewhere, and both are named
+        below. #}
+    <div class="scope-note">
+      <strong>There is no notifications feature in this system.</strong>
+      {{ unavailable.notifications }}
     </div>
 
-    <div style="height:24px;"></div>
-
-    <!-- SUMMARY CARDS -->
-    <div class="row g-3 mb-4">
-      <div class="col-md-3 col-sm-6">
-        <div class="stat-card">
-          <div class="stat-icon" style="background:rgba(22,155,146,0.12);"><span class="material-symbols-outlined" style="color:var(--teal);">mark_email_unread</span></div>
-          <div class="stat-value" id="statUnread">5</div>
-          <div class="stat-label">Unread Notifications</div>
-          <div class="stat-trend" style="color:var(--text-muted);">Requires your attention</div>
-        </div>
-      </div>
-      <div class="col-md-3 col-sm-6">
-        <div class="stat-card">
-          <div class="stat-icon" style="background:rgba(22,155,146,0.12);"><span class="material-symbols-outlined" style="color:var(--teal);">campaign</span></div>
-          <div class="stat-value">3</div>
-          <div class="stat-label">Announcement Delivery Alerts</div>
-          <div class="stat-trend" style="color:var(--text-muted);">This week</div>
-        </div>
-      </div>
-      <div class="col-md-3 col-sm-6">
-        <div class="stat-card">
-          <div class="stat-icon" style="background:rgba(245,158,11,0.15);"><span class="material-symbols-outlined" style="color:var(--warning);">event</span></div>
-          <div class="stat-value">2</div>
-          <div class="stat-label">System Reminders</div>
-          <div class="stat-trend" style="color:var(--text-muted);">Upcoming programs</div>
-        </div>
-      </div>
-      <div class="col-md-3 col-sm-6">
-        <div class="stat-card">
-          <div class="stat-icon" style="background:rgba(59,130,246,0.15);"><span class="material-symbols-outlined" style="color:var(--info);">inbox</span></div>
-          <div class="stat-value">9</div>
-          <div class="stat-label">This Week's Total</div>
-          <div class="stat-trend" style="color:var(--text-muted);">All categories</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- FILTER TABS -->
-    <div class="filter-chip-group mb-3">
-      <button class="filter-chip active" data-filter="all" onclick="setFilter('all', this)">All</button>
-      <button class="filter-chip" data-filter="unread" onclick="setFilter('unread', this)">Unread</button>
-      <button class="filter-chip" data-filter="announcement" onclick="setFilter('announcement', this)">Announcements</button>
-      <button class="filter-chip" data-filter="alert" onclick="setFilter('alert', this)">System Alerts</button>
-      <button class="filter-chip" data-filter="reminder" onclick="setFilter('reminder', this)">Reminders</button>
-    </div>
-
-    <!-- NOTIFICATION LIST -->
     <div class="panel-card">
-      <div id="notifListWrap">
-
-        <div class="notif-row unread" data-category="announcement" data-read="false">
-          <div class="notif-icon" style="background:rgba(22,155,146,0.12);"><span class="material-symbols-outlined" style="color:var(--teal);">campaign</span></div>
-          <div class="notif-body">
-            <div class="notif-title-row"><span class="notif-unread-dot"></span><span class="notif-title">Announcement delivered successfully</span></div>
-            <div class="notif-sub">Your announcement "Dengue Prevention Campaign: 4 S'Kontra Dengue" reached 3,214 residents.</div>
-            <div class="notif-time">3 hours ago</div>
-          </div>
-          <div class="notif-actions">
-            <button class="action-icon" title="Mark as read" onclick="toggleRead(this)"><span class="material-symbols-outlined" style="font-size:18px;">mark_email_read</span></button>
-            <button class="action-icon" title="Dismiss" onclick="dismissNotif(this)"><span class="material-symbols-outlined" style="font-size:18px;">close</span></button>
-          </div>
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+        <div>
+          <div class="panel-title">Notification Centre<span class="untracked-tag">Not tracked</span></div>
+          <div class="panel-sub">Alerts, announcements and reminders for this account</div>
         </div>
-
-        <div class="notif-row unread" data-category="alert" data-read="false">
-          <div class="notif-icon" style="background:rgba(59,130,246,0.15);"><span class="material-symbols-outlined" style="color:var(--info);">vaccines</span></div>
-          <div class="notif-body">
-            <div class="notif-title-row"><span class="notif-unread-dot"></span><span class="notif-title">Vaccination coverage milestone reached</span></div>
-            <div class="notif-sub">Vaccination campaign "BCG Immunization Drive" reached 94% coverage.</div>
-            <div class="notif-time">5 hours ago</div>
-          </div>
-          <div class="notif-actions">
-            <button class="action-icon" title="Mark as read" onclick="toggleRead(this)"><span class="material-symbols-outlined" style="font-size:18px;">mark_email_read</span></button>
-            <button class="action-icon" title="Dismiss" onclick="dismissNotif(this)"><span class="material-symbols-outlined" style="font-size:18px;">close</span></button>
-          </div>
-        </div>
-
-        <div class="notif-row unread" data-category="alert" data-read="false">
-          <div class="notif-icon" style="background:rgba(59,130,246,0.15);"><span class="material-symbols-outlined" style="color:var(--info);">summarize</span></div>
-          <div class="notif-body">
-            <div class="notif-title-row"><span class="notif-unread-dot"></span><span class="notif-title">Report ready to view</span></div>
-            <div class="notif-sub">Monthly Consultation Summary report is ready to view.</div>
-            <div class="notif-time">Yesterday</div>
-          </div>
-          <div class="notif-actions">
-            <button class="action-icon" title="Mark as read" onclick="toggleRead(this)"><span class="material-symbols-outlined" style="font-size:18px;">mark_email_read</span></button>
-            <button class="action-icon" title="Dismiss" onclick="dismissNotif(this)"><span class="material-symbols-outlined" style="font-size:18px;">close</span></button>
-          </div>
-        </div>
-
-        <div class="notif-row unread" data-category="reminder" data-read="false">
-          <div class="notif-icon" style="background:rgba(245,158,11,0.15);"><span class="material-symbols-outlined" style="color:var(--warning);">event</span></div>
-          <div class="notif-body">
-            <div class="notif-title-row"><span class="notif-unread-dot"></span><span class="notif-title">Upcoming program reminder</span></div>
-            <div class="notif-sub">Senior Citizen Wellness Program starts tomorrow, Jul 14, 2026.</div>
-            <div class="notif-time">Yesterday</div>
-          </div>
-          <div class="notif-actions">
-            <button class="action-icon" title="Mark as read" onclick="toggleRead(this)"><span class="material-symbols-outlined" style="font-size:18px;">mark_email_read</span></button>
-            <button class="action-icon" title="Dismiss" onclick="dismissNotif(this)"><span class="material-symbols-outlined" style="font-size:18px;">close</span></button>
-          </div>
-        </div>
-
-        <div class="notif-row unread" data-category="announcement" data-read="false">
-          <div class="notif-icon" style="background:rgba(22,155,146,0.12);"><span class="material-symbols-outlined" style="color:var(--teal);">description</span></div>
-          <div class="notif-body">
-            <div class="notif-title-row"><span class="notif-unread-dot"></span><span class="notif-title">Report generated</span></div>
-            <div class="notif-sub">Community Vaccination Summary &ndash; June 2026 report has been generated.</div>
-            <div class="notif-time">2 days ago</div>
-          </div>
-          <div class="notif-actions">
-            <button class="action-icon" title="Mark as read" onclick="toggleRead(this)"><span class="material-symbols-outlined" style="font-size:18px;">mark_email_read</span></button>
-            <button class="action-icon" title="Dismiss" onclick="dismissNotif(this)"><span class="material-symbols-outlined" style="font-size:18px;">close</span></button>
-          </div>
-        </div>
-
-        <div class="notif-row" data-category="alert" data-read="true">
-          <div class="notif-icon" style="background:rgba(59,130,246,0.15);"><span class="material-symbols-outlined" style="color:var(--info);">vaccines</span></div>
-          <div class="notif-body">
-            <div class="notif-title-row"><span class="notif-title">Vaccination coverage update</span></div>
-            <div class="notif-sub">Anti-Measles Vaccination Drive reached 91% coverage.</div>
-            <div class="notif-time">2 days ago</div>
-          </div>
-          <div class="notif-actions">
-            <button class="action-icon" title="Dismiss" onclick="dismissNotif(this)"><span class="material-symbols-outlined" style="font-size:18px;">close</span></button>
-          </div>
-        </div>
-
-        <div class="notif-row" data-category="announcement" data-read="true">
-          <div class="notif-icon" style="background:rgba(22,155,146,0.12);"><span class="material-symbols-outlined" style="color:var(--teal);">campaign</span></div>
-          <div class="notif-body">
-            <div class="notif-title-row"><span class="notif-title">Announcement published</span></div>
-            <div class="notif-sub">Your announcement "Child Immunization Vaccination Schedule &ndash; July" was published.</div>
-            <div class="notif-time">3 days ago</div>
-          </div>
-          <div class="notif-actions">
-            <button class="action-icon" title="Dismiss" onclick="dismissNotif(this)"><span class="material-symbols-outlined" style="font-size:18px;">close</span></button>
-          </div>
-        </div>
-
-        <div class="notif-row" data-category="reminder" data-read="true">
-          <div class="notif-icon" style="background:rgba(245,158,11,0.15);"><span class="material-symbols-outlined" style="color:var(--warning);">event</span></div>
-          <div class="notif-body">
-            <div class="notif-title-row"><span class="notif-title">Upcoming program reminder</span></div>
-            <div class="notif-sub">Maternal Health &amp; Prenatal Nutrition Seminar is scheduled for Jul 18, 2026.</div>
-            <div class="notif-time">4 days ago</div>
-          </div>
-          <div class="notif-actions">
-            <button class="action-icon" title="Dismiss" onclick="dismissNotif(this)"><span class="material-symbols-outlined" style="font-size:18px;">close</span></button>
-          </div>
-        </div>
-
-        <div class="notif-row" data-category="alert" data-read="true">
-          <div class="notif-icon" style="background:rgba(59,130,246,0.15);"><span class="material-symbols-outlined" style="color:var(--info);">event_busy</span></div>
-          <div class="notif-body">
-            <div class="notif-title-row"><span class="notif-title">Announcement expired</span></div>
-            <div class="notif-sub">"TB Awareness and DOTS Program Orientation" announcement has expired.</div>
-            <div class="notif-time">2 weeks ago</div>
-          </div>
-          <div class="notif-actions">
-            <button class="action-icon" title="Dismiss" onclick="dismissNotif(this)"><span class="material-symbols-outlined" style="font-size:18px;">close</span></button>
-          </div>
-        </div>
-
       </div>
 
-      <!-- EMPTY STATE -->
-      <div class="empty-state" id="emptyState">
-        <div class="icon-circle">
-          <span class="material-symbols-outlined" style="font-size:28px; color:var(--teal);">done_all</span>
+      <div class="untracked">
+        <span class="material-symbols-outlined">notifications_off</span>
+        <div>
+          <div class="untracked-title">No notification is stored, so none can be shown</div>
+          <div class="untracked-body">
+            The schema has no notifications table and nothing in the application writes one.
+            There is no unread count, no delivery alert and no reminder on file for this or
+            any account, which is also why this screen's sidebar item carries no badge.
+          </div>
         </div>
-        <h5>You're all caught up</h5>
-        <p>You have no notifications right now. New alerts about your announcements, campaigns, and reports will appear here.</p>
+      </div>
+
+      <div style="height:18px;"></div>
+
+      {#- The two real answers, linked rather than described, so this screen is
+          a signpost instead of a dead end. Both are already reachable by this
+          role -- see 09_UI_Architecture section 2. #}
+      <div class="row g-3">
+        <div class="col-md-6">
+          <div class="stat-card h-100">
+            <div class="stat-icon" style="background:rgba(22,155,146,0.12);"><span class="material-symbols-outlined" style="color:var(--teal);">campaign</span></div>
+            <div class="stat-label" style="font-weight:600; color:var(--text-dark); font-size:14px;">Messages sent to the community</div>
+            <div class="stat-trend" style="color:var(--text-muted); font-weight:400; line-height:1.55;">
+              Every SMS broadcast is recorded with its audience, its recipient count and who sent it.
+            </div>
+            <div style="height:12px;"></div>
+            <a href="{{ url_for(sms_notifications_endpoint) }}" class="btn-outline-teal" style="display:inline-flex; text-decoration:none;">
+              <span class="material-symbols-outlined" style="font-size:18px;">sms</span>Open SMS Notifications
+            </a>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="stat-card h-100">
+            <div class="stat-icon" style="background:rgba(59,130,246,0.15);"><span class="material-symbols-outlined" style="color:var(--info);">summarize</span></div>
+            <div class="stat-label" style="font-weight:600; color:var(--text-dark); font-size:14px;">What the barangay's figures are doing</div>
+            <div class="stat-trend" style="color:var(--text-muted); font-weight:400; line-height:1.55;">
+              Immunisation coverage, programme membership and the community reports are computed on each load.
+            </div>
+            <div style="height:12px;"></div>
+            <a href="{{ url_for('vaccination_campaigns') }}" class="btn-outline-teal" style="display:inline-flex; text-decoration:none;">
+              <span class="material-symbols-outlined" style="font-size:18px;">vaccines</span>Open Vaccination Campaigns
+            </a>
+          </div>
+        </div>
       </div>
     </div>
 {% endblock %}
 
-{% block scripts %}
-<script>
-  var currentFilter = 'all';
-
-  function updateCounts(){
-    var rows = document.querySelectorAll('.notif-row');
-    var unreadCount = 0;
-    rows.forEach(function(r){
-      if(r.getAttribute('data-read') === 'false'){ unreadCount++; }
-    });
-    document.getElementById('statUnread').textContent = unreadCount;
-    document.getElementById('unreadSubtext').textContent = unreadCount;
-    document.getElementById('sidebarBadge').textContent = unreadCount;
-    document.getElementById('headerBellDot').style.display = unreadCount > 0 ? 'block' : 'none';
-    checkEmpty();
-  }
-
-  function checkEmpty(){
-    var rows = document.querySelectorAll('.notif-row');
-    var wrap = document.getElementById('notifListWrap');
-    var empty = document.getElementById('emptyState');
-    if(rows.length === 0){
-      wrap.style.display = 'none';
-      empty.classList.add('show');
-    } else {
-      wrap.style.display = 'block';
-      empty.classList.remove('show');
-    }
-  }
-
-  function applyFilter(){
-    var rows = document.querySelectorAll('.notif-row');
-    rows.forEach(function(r){
-      var cat = r.getAttribute('data-category');
-      var read = r.getAttribute('data-read');
-      var show = true;
-      if(currentFilter === 'unread'){ show = (read === 'false'); }
-      else if(currentFilter !== 'all'){ show = (cat === currentFilter); }
-      r.style.display = show ? 'flex' : 'none';
-    });
-  }
-
-  function setFilter(filterValue, btn){
-    currentFilter = filterValue;
-    document.querySelectorAll('.filter-chip').forEach(function(c){ c.classList.remove('active'); });
-    btn.classList.add('active');
-    applyFilter();
-  }
-
-  function toggleRead(iconBtn){
-    var row = iconBtn.closest('.notif-row');
-    row.setAttribute('data-read', 'true');
-    row.classList.remove('unread');
-    var dot = row.querySelector('.notif-unread-dot');
-    if(dot){ dot.remove(); }
-    iconBtn.remove();
-    updateCounts();
-    applyFilter();
-  }
-
-  function dismissNotif(iconBtn){
-    var row = iconBtn.closest('.notif-row');
-    row.remove();
-    updateCounts();
-  }
-
-  function markAllRead(){
-    document.querySelectorAll('.notif-row').forEach(function(row){
-      row.setAttribute('data-read', 'true');
-      row.classList.remove('unread');
-      var dot = row.querySelector('.notif-unread-dot');
-      if(dot){ dot.remove(); }
-      var markBtn = row.querySelector('[title="Mark as read"]');
-      if(markBtn){ markBtn.remove(); }
-    });
-    updateCounts();
-  }
-
-  function clearAll(){
-    document.getElementById('notifListWrap').innerHTML = '';
-    updateCounts();
-  }
-
-  updateCounts();
-</script>{% endblock %}

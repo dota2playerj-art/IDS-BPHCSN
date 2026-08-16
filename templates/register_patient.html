@@ -419,10 +419,21 @@
       <div class="form-actions">
         <div class="req-legend"><span class="req">*</span> Indicates a required field</div>
         <div class="d-flex align-items-center gap-2 flex-wrap">
-          <button type="button" class="btn-danger-text">Cancel</button>
+          {#- Cancel is a link out, the shape Add / Edit Medicine already uses. It
+              was a dead <button>: the one control on this form whose whole job is
+              to abandon the form did nothing when clicked, so the only way out
+              was the browser's Back button. Where it goes depends on what the
+              form was opened for, so leaving lands where the operator started. #}
+{%- if patient %}
+          <a href="{{ url_for(patient_profile_endpoint, patient_id=patient.id) }}" class="btn-danger-text" style="text-decoration:none;">Cancel</a>
+{%- elif check_in or booking %}
+          <a href="{{ url_for(appointment_scheduling_endpoint) }}" class="btn-danger-text" style="text-decoration:none;">Cancel</a>
+{%- else %}
+          <a href="{{ url_for(patient_records_endpoint) }}" class="btn-danger-text" style="text-decoration:none;">Cancel</a>
+{%- endif %}
           <button type="reset" class="btn-ghost-ids"><span class="material-symbols-outlined" style="font-size:18px;">restart_alt</span>Reset</button>
           {%- if not patient and not check_in and not booking %}
-          <button type="button" class="btn-outline-teal"><span class="material-symbols-outlined" style="font-size:18px;">person_add</span>Save &amp; Register Another</button>
+          <button type="button" class="btn-outline-teal" disabled title="{{ unavailable.save_and_another }}"><span class="material-symbols-outlined" style="font-size:18px;">person_add</span>Save &amp; Register Another</button>
           {%- endif %}
           <button type="submit" class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">{% if check_in %}how_to_reg{% elif booking %}event_available{% else %}save{% endif %}</span>{% if patient %}Save Changes{% elif check_in %}Save &amp; Check In{% elif booking %}Save &amp; Book Appointment{% else %}Save Patient Record{% endif %}</button>
         </div>

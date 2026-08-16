@@ -117,6 +117,48 @@
   }
   .btn-outline-teal:hover{background:var(--teal-light); color:var(--teal-dark);}
 
+  /* UNAVAILABLE CONTROLS
+     A control either works or is disabled and says why in its title. Nothing is
+     left looking live while silently doing nothing when clicked -- the rule
+     User Management set for Add / Edit User, applied everywhere.
+
+     The treatment lives here rather than being restated per screen so it cannot
+     drift: one faded, not-allowed appearance for every disabled control in the
+     system, whatever button class it carries. `disabled` on the element itself
+     is what actually stops the click; this only makes that visible. */
+  button:disabled{opacity:0.55; cursor:not-allowed;}
+  button:disabled:hover{background:inherit;}
+  /* A dead form is wrapped in one of these: a single `disabled` fieldset stops
+     every control inside it natively, rather than each input being disabled by
+     hand and one of them being missed. Border and padding are stripped because
+     it is a wrapper, not a visible grouping. */
+  fieldset.unavailable-form{border:0; padding:0; margin:0; min-width:0;}
+  /* The note that explains an unavailable control or a dead screen. Same box on
+     every screen that needs one, matching User Management's scope note. */
+  .scope-note{
+    background:var(--bg); border:1px solid var(--border-color); border-radius:12px; padding:14px 16px;
+    font-size:12.5px; color:var(--text-muted); line-height:1.55; margin-bottom:18px;
+  }
+  .scope-note strong{color:var(--text-dark); font-weight:600;}
+
+  /* Where a panel would be if there were anything to put in it. Dashed and
+     un-panel-like on purpose, so it cannot be mistaken at a glance for a panel
+     reporting zero. Screen 10 defined these first and still carries its own
+     identical copy; they are here so a screen needing the same statement does
+     not have to make a fourth one that drifts. */
+  .untracked{
+    background:var(--bg); border:1px dashed var(--border-color); border-radius:12px;
+    padding:18px 20px; display:flex; gap:14px; align-items:flex-start;
+  }
+  .untracked .material-symbols-outlined{font-size:22px; color:#9CA3AF; margin-top:1px;}
+  .untracked-title{font-size:13.5px; font-weight:700; color:var(--text-dark); margin-bottom:4px;}
+  .untracked-body{font-size:12.5px; color:var(--text-muted); line-height:1.55;}
+  .untracked-tag{
+    display:inline-block; font-size:10.5px; font-weight:700; letter-spacing:0.04em;
+    text-transform:uppercase; color:#6B7280; background:#F3F4F6; border-radius:6px;
+    padding:2px 8px; margin-left:8px; vertical-align:middle;
+  }
+
   /* TOOLBAR SEARCH - an input wrapper, so 12px per Inputs radius. min/max-width stay per-page. */
   .toolbar-search{
     background:var(--bg); border:1px solid var(--border-color); border-radius:12px; padding:10px 14px;

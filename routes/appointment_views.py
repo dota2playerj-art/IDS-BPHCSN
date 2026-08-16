@@ -81,9 +81,35 @@ def appointment_return_url(form_data, scheduling_endpoint, profile_endpoint):
     return url_for(scheduling_endpoint)
 
 
+def _booking_for_patient(patient_id):
+    """Open the New Appointment dialog on a named patient, or None.
+
+    The counterpart of _open_booking() for the other direction: ?book=<id> is
+    how the Patient Profile offers "Schedule Appointment" without holding a
+    second copy of the booking dialog, exactly as ?reschedule= and ?cancel=
+    already work for that screen's Appointment History.
+
+    Nothing is booked here -- this only decides which patient the dialog opens
+    on. The submit still goes through process_book_appointment() and is
+    validated there, because a POST need not come from this page.
+
+    A patient the dialog cannot offer is not preselected: the picker lists
+    Active records only, so an Inactive or Deceased id would open a dialog with
+    nothing chosen and no reason given. The link lands on the screen instead,
+    where the queue and the calendar are.
+    """
+    raw = (str(patient_id) if patient_id is not None else "").strip()
+    if not raw.isdigit():
+        return None
+    patient = get_patient_by_id(int(raw))
+    if patient is None or patient["status"] != SCHEDULABLE_PATIENT_STATUS:
+        return None
+    return {"open": True, "mode": "existing", "form": {"patient_id": raw}}
+
+
 def appointment_scheduling_context(month=None, booking=None, reschedule=None,
                                    reschedule_id=None, cancel_id=None,
-                                   return_to=""):
+                                   return_to="", book_patient_id=None):
     """Everything Screen 08 renders.
 
     Three things now, and they are kept visibly apart because they answer
@@ -151,6 +177,19 @@ def appointment_scheduling_context(month=None, booking=None, reschedule=None,
     return {
         "queue": entries,
         "queue_stats": get_queue_stats(entries),
+        # The filter panel's two dropdowns, built from the rows in today's queue
+        # rather than from APPOINTMENT_TYPES and the status vocabulary. Those
+        # list everything that can be booked or reached; offering a service
+        # nobody is here for today would be an option that can only empty the
+        # table. Screen 12's module filter is built the same way.
+        "queue_filter_options": {
+            "services": sorted({
+                entry["appointment_type"] or "Consultation" for entry in entries
+            }),
+            "statuses": sorted({
+                entry["display_status"] for entry in entries if entry["display_status"]
+            }),
+        },
         "checkin_patients": patients,
         "queue_date": reference,
         "immunization_alert": immunization_alert,
@@ -166,7 +205,10 @@ def appointment_scheduling_context(month=None, booking=None, reschedule=None,
         # own note in the template for why they are not merged.
         "upcoming": upcoming,
         "upcoming_stats": get_upcoming_stats(upcoming, reference),
-        **booking_context(booking),
+        # A booking bounced back from a failed submit wins over ?book=<id>: the
+        # operator's own entry must never be discarded in favour of a dialog
+        # reopened blank on a patient.
+        **booking_context(booking or _booking_for_patient(book_patient_id)),
         **reschedule_context(reschedule, reschedule_id),
         **cancel_context(cancel_id),
         # Rendered as a hidden field in both dialogs, so wherever the operator

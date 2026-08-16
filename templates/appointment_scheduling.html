@@ -456,10 +456,10 @@
           <button class="filter-btn" id="filterToggleBtn" onclick="toggleFilterPanel()">
             <span class="material-symbols-outlined" style="font-size:18px;">filter_list</span>Advanced Filter
           </button>
-          <button class="filter-btn"><span class="material-symbols-outlined" style="font-size:18px;">sort</span>Sort</button>
+          <button class="filter-btn" type="button" disabled title="{{ unavailable.sort }}"><span class="material-symbols-outlined" style="font-size:18px;">sort</span>Sort</button>
         </div>
         <div class="d-flex align-items-center gap-2">
-          <button class="btn-outline-teal"><span class="material-symbols-outlined" style="font-size:18px;">file_download</span>Export</button>
+          <button class="btn-outline-teal" type="button" disabled title="{{ unavailable.export }}"><span class="material-symbols-outlined" style="font-size:18px;">file_download</span>Export</button>
           <!-- The two things a desk does here, and the pair is deliberate: Check
                In records somebody who is standing there now, New Appointment
                commits to a day that has not come yet. Booking is offered beside
@@ -470,52 +470,58 @@
         </div>
       </div>
 
-      <!-- ADVANCED FILTER PANEL — still decorative: Apply Filter is not wired to
-           anything, and the live filtering on this screen is the search box
-           above. What was corrected here is only the content it displays, which
-           was inventing data: a date pinned to 2026-07-07 and four made-up staff
-           names. It now shows the real queue date and the same service and staff
-           vocabularies the booking dialog offers, so nothing on this screen
-           claims a person or a date that does not exist. -->
+      <!-- ADVANCED FILTER PANEL — live, and narrowed to what today's queue can
+           answer. It works with the search box above rather than beside it: both
+           run through one pass, so using them together narrows to the
+           intersection.
+
+           An earlier pass corrected what this panel displayed -- it had a date
+           pinned to 2026-07-07 and four invented staff names. This one corrects
+           what it offers. Two of the four controls are gone because this table
+           cannot answer them:
+
+             Date, because this panel filters today's queue and only today's;
+             a date picker here implied other days could be shown from it, and
+             they cannot. Other days are on the calendar and the Upcoming panel.
+
+             Healthcare Worker, because the queue table has no assigned-staff
+             column. It is on the Upcoming Bookings table below, which this
+             panel does not filter.
+
+           The two that remain are built from the rows actually in the queue, so
+           no option can select a cohort that is not there -- the rule Screen 12's
+           module filter set. -->
       <div class="filter-panel" id="filterPanel">
         <div class="row g-3">
-          <div class="col-md-3 col-sm-6">
+          <div class="col-md-4 col-sm-6">
+            <label for="fService">Service</label>
+            <select class="form-select" id="fService">
+              <option value="" selected>All Services</option>
+{%- for option in queue_filter_options.services %}
+              <option value="{{ option | lower }}">{{ option }}</option>
+{%- endfor %}
+            </select>
+          </div>
+          <div class="col-md-4 col-sm-6">
+            <label for="fStatus">Status</label>
+            <select class="form-select" id="fStatus">
+              <option value="" selected>All Statuses</option>
+{%- for option in queue_filter_options.statuses %}
+              <option value="{{ option | lower }}">{{ option }}</option>
+{%- endfor %}
+            </select>
+          </div>
+          <div class="col-md-4 col-sm-6">
             <label>Date</label>
-            <input type="date" class="form-control" value="{{ queue_date }}">
-          </div>
-          <div class="col-md-3 col-sm-6">
-            <label>Service</label>
-            <select class="form-select">
-              <option selected>All Services</option>
-{%- for option in appointment_types %}
-              <option>{{ option }}</option>
-{%- endfor %}
-            </select>
-          </div>
-          <div class="col-md-3 col-sm-6">
-            <label>Status</label>
-            <select class="form-select">
-              <option selected>All Statuses</option>
-              <option>Scheduled</option>
-              <option>Waiting</option>
-              <option>Completed</option>
-              <option>Cancelled</option>
-              <option>No Show</option>
-            </select>
-          </div>
-          <div class="col-md-3 col-sm-6">
-            <label>Healthcare Worker</label>
-            <select class="form-select">
-              <option selected>All Staff</option>
-{%- for member in clinical_staff %}
-              <option>{{ member.full_name }}</option>
-{%- endfor %}
-            </select>
+            <div style="font-size:12.5px; color:var(--text-muted); line-height:1.5; padding-top:6px;">
+              {{ queue_date | display_date }} &mdash; this panel filters today's queue only.
+              Other days are on the calendar and in Upcoming Bookings.
+            </div>
           </div>
         </div>
         <div class="filter-actions">
-          <button class="btn-reset">Reset Filters</button>
-          <button class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">filter_alt</span>Apply Filter</button>
+          <button class="btn-reset" type="button" onclick="clearQueueFilters()">Reset Filters</button>
+          <button class="btn-primary-teal" type="button" onclick="applyQueueFilters()"><span class="material-symbols-outlined" style="font-size:18px;">filter_alt</span>Apply Filter</button>
         </div>
       </div>
 
@@ -549,7 +555,9 @@
 {%- for entry in queue %}
 {%- set patient_name = entry.first_name ~ ' ' ~ entry.last_name %}
             <tr class="queue-row{% if entry.is_in_consultation %} row-inconsult{% elif entry.is_ready %} row-ready{% endif %}"
-                data-search="{{ (entry.first_name ~ ' ' ~ (entry.middle_name or '') ~ ' ' ~ entry.last_name ~ ' ' ~ entry.patient_reference ~ ' ' ~ (entry.notes or '') ~ ' ' ~ (entry.appointment_type or '')) | lower }}">
+                data-search="{{ (entry.first_name ~ ' ' ~ (entry.middle_name or '') ~ ' ' ~ entry.last_name ~ ' ' ~ entry.patient_reference ~ ' ' ~ (entry.notes or '') ~ ' ' ~ (entry.appointment_type or '')) | lower }}"
+                data-service="{{ (entry.appointment_type or 'Consultation') | lower }}"
+                data-status="{{ (entry.display_status or '') | lower }}">
               <td>
 {%- if entry.is_in_consultation %}
                 <span class="material-symbols-outlined" style="font-size:18px; color:var(--teal-dark);" title="In consultation now">stethoscope</span>
@@ -643,7 +651,7 @@
                   </button>
 {%- endif %}
                   <a href="{{ url_for(patient_profile_endpoint, patient_id=entry.patient_id) }}" class="action-icon" title="Open {{ patient_name }}'s profile"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></a>
-                  <button type="button" class="action-icon"><span class="material-symbols-outlined" style="font-size:18px;">print</span></button>
+                  <button type="button" class="action-icon" disabled title="{{ unavailable.print }}"><span class="material-symbols-outlined" style="font-size:18px;">print</span></button>
                 </div>
               </td>
             </tr>
@@ -809,7 +817,7 @@
                   </button>
 {%- endif %}
                   <a href="{{ url_for(patient_profile_endpoint, patient_id=entry.patient_id) }}" class="action-icon" title="Open {{ patient_name }}'s profile"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></a>
-                  <button type="button" class="action-icon"><span class="material-symbols-outlined" style="font-size:18px;">print</span></button>
+                  <button type="button" class="action-icon" disabled title="{{ unavailable.print }}"><span class="material-symbols-outlined" style="font-size:18px;">print</span></button>
                 </div>
               </td>
             </tr>
@@ -1382,17 +1390,33 @@
     document.getElementById('skeletonWrap').classList.remove('show');
   }
 
-  // Live filter over today's queue. Each row carries the text worth matching on
-  // in data-search, already lower-cased by the template, so this stays a
-  // substring test rather than re-deriving the haystack on every keystroke.
-  var queueSearch = document.getElementById('queueSearch');
-  if(queueSearch){
-    queueSearch.addEventListener('input', function(){
+  // Live narrowing over today's queue. Each row carries the text worth matching
+  // on in data-search, already lower-cased by the template, so this stays a
+  // substring test rather than re-deriving the haystack on every keystroke; the
+  // filter panel's two fields are on the row in the same way.
+  //
+  // The search box and the panel were separate ideas in the mockup -- one live,
+  // one decorative. They are one pass now, so a search and a filter narrow to
+  // the intersection instead of the later one undoing the earlier.
+  //
+  // The two panel functions are global because its buttons call them by name.
+  var applyQueueFilters, clearQueueFilters;
+  (function(){
+    var queueSearch = document.getElementById('queueSearch');
+    var fService = document.getElementById('fService');
+    var fStatus = document.getElementById('fStatus');
+    if(!queueSearch){ return; }
+
+    applyQueueFilters = function(){
       var term = queueSearch.value.trim().toLowerCase();
+      var service = fService ? fService.value : '';
+      var status = fStatus ? fStatus.value : '';
       var rows = document.querySelectorAll('#queueBody .queue-row');
       var shown = 0;
       rows.forEach(function(row){
-        var match = !term || row.dataset.search.indexOf(term) !== -1;
+        var match = (!term || row.dataset.search.indexOf(term) !== -1)
+                 && (!service || row.dataset.service === service)
+                 && (!status || row.dataset.status === status);
         row.style.display = match ? '' : 'none';
         if(match){ shown++; }
       });
@@ -1403,8 +1427,20 @@
       document.getElementById('emptyState').classList.toggle('show', rows.length > 0 && shown === 0);
       var wrap = document.getElementById('tableWrap');
       if(wrap){ wrap.style.display = shown === 0 ? 'none' : ''; }
+    };
+
+    clearQueueFilters = function(){
+      queueSearch.value = '';
+      if(fService){ fService.value = ''; }
+      if(fStatus){ fStatus.value = ''; }
+      applyQueueFilters();
+    };
+
+    queueSearch.addEventListener('input', applyQueueFilters);
+    [fService, fStatus].forEach(function(control){
+      if(control){ control.addEventListener('change', applyQueueFilters); }
     });
-  }
+  })();
 
   // Same pattern for the check-in dialog's patient picker.
   var checkInSearch = document.getElementById('checkInSearch');

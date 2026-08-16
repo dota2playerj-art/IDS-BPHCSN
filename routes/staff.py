@@ -146,6 +146,10 @@ def staff_appointment_scheduling():
             reschedule_id=request.args.get("reschedule"),
             cancel_id=request.args.get("cancel"),
             return_to=request.args.get("back"),
+            # ?book=<patient_id> is the same arrangement for the other
+            # direction: the profile's Schedule Appointment action opens the New
+            # Appointment dialog here, on that patient.
+            book_patient_id=request.args.get("book"),
         ),
     )
 

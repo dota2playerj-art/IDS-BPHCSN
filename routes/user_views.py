@@ -72,10 +72,10 @@ UNTRACKED = {
         "screen there is nothing to narrow down, so the controls the mockup "
         "drew would have filtered a list that is already complete."
     ),
-    "export": (
-        "Exporting is not implemented anywhere in this project. No screen "
-        "writes a CSV or PDF, so this would produce nothing."
-    ),
+    # "export" used to be here. Export is absent for one reason on every screen
+    # that offers it, so the sentence moved to utils/unavailable.py and this
+    # screen quotes the shared one -- two near-identical descriptions of one
+    # missing library is exactly the drift that file exists to prevent.
     # Task 4 of the brief: flagged for a decision, deliberately not built.
     "write": (
         "Creating, editing and deactivating accounts is not implemented. "

@@ -182,69 +182,73 @@
           <button class="filter-btn" id="filterToggleBtn" onclick="toggleFilterPanel()">
             <span class="material-symbols-outlined" style="font-size:18px;">filter_list</span>Advanced Filter
           </button>
-          <button class="filter-btn"><span class="material-symbols-outlined" style="font-size:18px;">sort</span>Sort</button>
+          <button class="filter-btn" type="button" disabled title="{{ unavailable.sort }}"><span class="material-symbols-outlined" style="font-size:18px;">sort</span>Sort</button>
         </div>
         <div class="d-flex align-items-center gap-2">
-          <button class="btn-outline-teal"><span class="material-symbols-outlined" style="font-size:18px;">file_download</span>Export</button>
+          <button class="btn-outline-teal" type="button" disabled title="{{ unavailable.export }}"><span class="material-symbols-outlined" style="font-size:18px;">file_download</span>Export</button>
           <a href="{{ url_for(register_patient_endpoint) }}" class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">person_add</span>Add Patient</a>
         </div>
       </div>
 
-      <!-- ADVANCED FILTER PANEL -->
+      <!-- ADVANCED FILTER PANEL — live, and narrowed to what the rows can answer.
+           It filters the records already on this page, alongside the search box:
+           every registered patient is rendered here, so narrowing them in the
+           browser gives the same answer a re-query would, without a round trip.
+
+           Each dropdown is built from the values actually present in the table,
+           the rule Screen 12's module filter already follows, so no option can
+           select a cohort that does not exist. What the mockup offered and this
+           does not: Barangay / Purok, because address is one free-text field
+           with no purok in it; and Registration Date, which is not a column on
+           this table. Both are named in the note below rather than dropped
+           silently. -->
       <div class="filter-panel" id="filterPanel">
         <div class="row g-3">
           <div class="col-md-3 col-sm-6">
-            <label>Age Range</label>
+            <label for="fAgeMin">Age Range</label>
             <div class="d-flex gap-2">
-              <input type="number" class="form-control" placeholder="Min">
-              <input type="number" class="form-control" placeholder="Max">
+              <input type="number" class="form-control" id="fAgeMin" placeholder="Min" min="0" aria-label="Minimum age">
+              <input type="number" class="form-control" id="fAgeMax" placeholder="Max" min="0" aria-label="Maximum age">
             </div>
           </div>
           <div class="col-md-3 col-sm-6">
-            <label>Gender</label>
-            <select class="form-select">
-              <option selected>All Genders</option>
-              <option>Male</option>
-              <option>Female</option>
+            <label for="fSex">Sex</label>
+            <select class="form-select" id="fSex">
+              <option value="" selected>All</option>
+{%- for value in filter_options.sexes %}
+              <option value="{{ value | lower }}">{{ value }}</option>
+{%- endfor %}
             </select>
           </div>
           <div class="col-md-3 col-sm-6">
-            <label>Barangay / Purok</label>
-            <select class="form-select">
-              <option selected>All Puroks</option>
-              <option>Purok 1</option>
-              <option>Purok 2</option>
-              <option>Purok 3</option>
-              <option>Purok 4</option>
-              <option>Purok 5</option>
-              <option>Purok 6</option>
-              <option>Purok 7</option>
+            <label for="fStatus">Status</label>
+            <select class="form-select" id="fStatus">
+              <option value="" selected>All Statuses</option>
+{%- for value in filter_options.statuses %}
+              <option value="{{ value | lower }}">{{ value }}</option>
+{%- endfor %}
             </select>
           </div>
           <div class="col-md-3 col-sm-6">
-            <label>Status</label>
-            <select class="form-select">
-              <option selected>All Statuses</option>
-              <option>Active</option>
-              <option>Follow-up</option>
-              <option>Prenatal</option>
-              <option>Immunization</option>
-              <option>Critical / Referred</option>
-              <option>Archived</option>
+            <label for="fVisit">Last Visit</label>
+            <select class="form-select" id="fVisit">
+              <option value="" selected>Any</option>
+              <option value="visited">Has visited</option>
+              <option value="never">No visits yet</option>
             </select>
           </div>
-          <div class="col-md-3 col-sm-6">
-            <label>Registration Date</label>
-            <input type="date" class="form-control">
-          </div>
-          <div class="col-md-3 col-sm-6">
-            <label>Last Visit</label>
-            <input type="date" class="form-control">
+          <div class="col-12">
+            <div style="font-size:12.5px; color:var(--text-muted); line-height:1.5;">
+              Filters narrow the {{ patients|length }} record{{ '' if patients|length == 1 else 's' }} on
+              this page and combine with the search box. Purok and registration date are not offered:
+              address is stored as one free-text line with no purok in it, and registration date is not
+              a column on this table.
+            </div>
           </div>
         </div>
         <div class="filter-actions">
-          <button class="btn-reset">Reset Filters</button>
-          <button class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">filter_alt</span>Apply Filter</button>
+          <button class="btn-reset" type="button" onclick="clearFilters()">Reset Filters</button>
+          <button class="btn-primary-teal" type="button" onclick="applyFilters()"><span class="material-symbols-outlined" style="font-size:18px;">filter_alt</span>Apply Filter</button>
         </div>
       </div>
 
@@ -261,8 +265,8 @@
       <div class="bulk-bar" id="bulkBar">
         <div class="count"><span id="selCount">0</span> patient record(s) selected</div>
         <div class="bulk-actions">
-          <button type="button"><span class="material-symbols-outlined" style="font-size:16px;">file_download</span>Export</button>
-          <button type="button"><span class="material-symbols-outlined" style="font-size:16px;">print</span>Print</button>
+          <button type="button" disabled title="{{ unavailable.export }}"><span class="material-symbols-outlined" style="font-size:16px;">file_download</span>Export</button>
+          <button type="button" disabled title="{{ unavailable.print }}"><span class="material-symbols-outlined" style="font-size:16px;">print</span>Print</button>
           <button type="button" data-bs-toggle="modal" data-bs-target="#archivePatientModal"><span class="material-symbols-outlined" style="font-size:16px;">archive</span>Change Status</button>
           <button type="button" class="clear-btn" onclick="clearSelection()">Clear</button>
         </div>
@@ -287,7 +291,18 @@
           </thead>
           <tbody id="tableBody">
 {%- for patient in patients %}
-            <tr>
+            {#- The row carries what the toolbar matches on, written by the server:
+                data-search is the same text the search box tests as a substring,
+                already lower-cased so the browser is not re-deriving it on every
+                keystroke, and the rest are the filter panel's fields in their
+                stored form rather than their displayed one. This is the shape
+                Screen 12 and Screen 09 already use. #}
+            <tr class="patient-row"
+                data-search="{{ (patient.patient_id ~ ' ' ~ patient.full_name ~ ' ' ~ (patient.contact_number or '') ~ ' ' ~ (patient.display_address or '')) | lower }}"
+                data-sex="{{ (patient.sex or '') | lower }}"
+                data-status="{{ (patient.status or '') | lower }}"
+                data-age="{{ patient.age if patient.age is not none else '' }}"
+                data-visited="{{ 'visited' if patient.last_visit else 'never' }}">
               <td><input type="checkbox" class="form-check-input row-check" name="patient_ids" value="{{ patient.id }}" data-status="{{ patient.status }}" onclick="updateSelection()" aria-label="Select {{ patient.full_name }}"></td>
               <td class="pat-id">{{ patient.patient_id }}</td>
               <td class="pat-name"><a href="{{ url_for(patient_profile_endpoint, patient_id=patient.id) }}">{{ patient.full_name }}</a></td>
@@ -299,9 +314,12 @@
               <td><span class="badge-status {{ patient.status_badge_class }}">{{ patient.status }}</span></td>
               <td>
                 <div class="d-flex justify-content-end gap-1">
-                  <button type="button" class="action-icon"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button>
+                  {#- View opens the profile, the same place the name in this row
+                      links to. It was a dead button; the destination for it
+                      already existed. #}
+                  <a href="{{ url_for(patient_profile_endpoint, patient_id=patient.id) }}" class="action-icon" title="Open {{ patient.full_name }}'s profile"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></a>
                   <a href="{{ url_for(register_patient_endpoint, patient_id=patient.id) }}" class="action-icon" title="Edit {{ patient.full_name }}"><span class="material-symbols-outlined" style="font-size:18px;">edit</span></a>
-                  <button type="button" class="action-icon"><span class="material-symbols-outlined" style="font-size:18px;">print</span></button>
+                  <button type="button" class="action-icon" disabled title="{{ unavailable.print }}"><span class="material-symbols-outlined" style="font-size:18px;">print</span></button>
                   <button type="button" class="action-icon" title="Change status of {{ patient.full_name }} (currently {{ patient.status }})"
                           data-bs-toggle="modal" data-bs-target="#archivePatientModal"
                           data-patient-id="{{ patient.id }}" data-patient-name="{{ patient.full_name }}"
@@ -325,27 +343,21 @@
         <h5>No patient records found</h5>
         <p>We couldn't find any patients matching your search or filter criteria. Try adjusting your filters or search terms.</p>
         <div class="d-flex gap-2">
-          <button class="btn-outline-teal" onclick="resetDemo()"><span class="material-symbols-outlined" style="font-size:18px;">restart_alt</span>Clear Filters</button>
+          <button class="btn-outline-teal" type="button" onclick="clearFilters()"><span class="material-symbols-outlined" style="font-size:18px;">restart_alt</span>Clear Filters</button>
           <a href="{{ url_for(register_patient_endpoint) }}" class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">person_add</span>Add Patient</a>
         </div>
       </div>
 
-      <!-- PAGINATION — the page buttons below are still decoration; only the
-           count line is live. Real paging is separate follow-up work. -->
+      <!-- TABLE FOOTER — the page buttons that used to sit here were not merely
+           inert, they were false: a fixed 1 / 2 / 3 … 346 that would have meant
+           a roster of several thousand patients. The query returns every
+           registered patient and the table renders all of them, so there is no
+           page to turn to. The count line says so, and narrows live as the
+           search and filters do. -->
 {%- if patients %}
       <div class="table-footer" id="tableFooter">
-        <div class="pg-info">Showing 1&ndash;{{ patients|length }} of {{ "{:,}".format(stats.total_patients) }} patients</div>
-        <nav aria-label="Patient records pagination">
-          <ul class="pagination mb-0">
-            <li class="page-item disabled"><a class="page-link" href="#"><span class="material-symbols-outlined" style="font-size:16px;">chevron_left</span></a></li>
-            <li class="page-item active"><a class="page-link" href="#">1</a></li>
-            <li class="page-item"><a class="page-link" href="#">2</a></li>
-            <li class="page-item"><a class="page-link" href="#">3</a></li>
-            <li class="page-item disabled"><a class="page-link" href="#">&hellip;</a></li>
-            <li class="page-item"><a class="page-link" href="#">346</a></li>
-            <li class="page-item"><a class="page-link" href="#"><span class="material-symbols-outlined" style="font-size:16px;">chevron_right</span></a></li>
-          </ul>
-        </nav>
+        <div class="pg-info" id="patientCount">Showing all {{ patients|length }} registered patient{{ '' if patients|length == 1 else 's' }}</div>
+        <div class="pg-info" title="{{ unavailable.pagination }}">Single page</div>
       </div>
 {%- endif %}
 
@@ -407,17 +419,26 @@
     panel.classList.toggle('show');
     btn.classList.toggle('open');
   }
+  // Only rows currently visible count as selectable. Once the toolbar can
+  // narrow the table, "select all" has to mean the records on show -- ticking
+  // the header box while a filter is applied must not quietly include patients
+  // the operator filtered out, because the bulk bar posts every checked id.
+  function visibleChecks(){
+    return Array.prototype.slice.call(
+      document.querySelectorAll('#patientTable tbody tr.patient-row:not([hidden]) .row-check')
+    );
+  }
   function updateSelection(){
-    var checks = document.querySelectorAll('.row-check');
-    var checked = document.querySelectorAll('.row-check:checked');
+    var checks = visibleChecks();
+    var checked = checks.filter(function(c){ return c.checked; });
     var bulkBar = document.getElementById('bulkBar');
     document.getElementById('selCount').textContent = checked.length;
     bulkBar.classList.toggle('show', checked.length > 0);
-    document.getElementById('selectAll').checked = (checked.length === checks.length);
+    document.getElementById('selectAll').checked =
+      (checks.length > 0 && checked.length === checks.length);
   }
   function toggleAll(source){
-    var checks = document.querySelectorAll('.row-check');
-    checks.forEach(function(c){ c.checked = source.checked; });
+    visibleChecks().forEach(function(c){ c.checked = source.checked; });
     updateSelection();
   }
   function clearSelection(){
@@ -511,22 +532,105 @@
     });
   }
 
-  // The table and footer are absent entirely when there are no patients, so
-  // these guard before touching them.
-  function showEmptyDemo(){
-    var table = document.getElementById('patientTable');
-    var footer = document.getElementById('tableFooter');
-    if(table){ table.closest('div[style]').style.display = 'none'; }
-    if(footer){ footer.style.display = 'none'; }
-    document.getElementById('bulkBar').classList.remove('show');
-    document.getElementById('emptyState').classList.add('show');
-  }
-  function resetDemo(){
-    var table = document.getElementById('patientTable');
-    var footer = document.getElementById('tableFooter');
-    if(!table){ return; }
-    table.closest('div[style]').style.display = '';
-    if(footer){ footer.style.display = ''; }
-    document.getElementById('emptyState').classList.remove('show');
-  }
+  // LIVE NARROWING OVER THE ROWS ALREADY ON THE PAGE
+  //
+  // The query returns every registered patient and the table renders all of
+  // them, so narrowing here gives the same answer a re-query would -- there is
+  // no unseen page a match could be hiding on. This is the arrangement Screen 12
+  // and Screen 09's history table already use: the server writes what each row
+  // should be matched on into data-* attributes, and this only decides which
+  // rows are visible. It derives nothing and re-formats nothing.
+  //
+  // The search box and the filter panel are one operation, not two. They run
+  // through the same pass so using both narrows to the intersection, rather than
+  // the later one silently undoing the earlier.
+  //
+  // Two functions are global because the panel's buttons call them by name from
+  // their onclick attributes; everything else stays inside the closure.
+  var applyFilters, clearFilters;
+  (function(){
+    var search  = document.getElementById('patientSearch');
+    var fSex    = document.getElementById('fSex');
+    var fStatus = document.getElementById('fStatus');
+    var fAgeMin = document.getElementById('fAgeMin');
+    var fAgeMax = document.getElementById('fAgeMax');
+    var fVisit  = document.getElementById('fVisit');
+    var counter = document.getElementById('patientCount');
+    var empty   = document.getElementById('emptyState');
+    var footer  = document.getElementById('tableFooter');
+    var table   = document.getElementById('patientTable');
+    var rows    = document.querySelectorAll('#patientTable tbody tr.patient-row');
+    var total   = rows.length;
+
+    // With no patients at all the table, footer and toolbar rows are not
+    // rendered; there is nothing to narrow and nothing to bind to.
+    if(!table || !search){ return; }
+
+    function matches(row){
+      var term = search.value.trim().toLowerCase();
+      if(term && (row.dataset.search || '').indexOf(term) === -1){ return false; }
+      if(fSex.value && row.dataset.sex !== fSex.value){ return false; }
+      if(fStatus.value && row.dataset.status !== fStatus.value){ return false; }
+      if(fVisit.value && row.dataset.visited !== fVisit.value){ return false; }
+
+      // An age the record does not carry cannot satisfy a bound, so a row with
+      // no birth date drops out of an age-bounded search rather than being
+      // treated as though it were age zero.
+      var min = parseInt(fAgeMin.value, 10);
+      var max = parseInt(fAgeMax.value, 10);
+      if(!isNaN(min) || !isNaN(max)){
+        var age = parseInt(row.dataset.age, 10);
+        if(isNaN(age)){ return false; }
+        if(!isNaN(min) && age < min){ return false; }
+        if(!isNaN(max) && age > max){ return false; }
+      }
+      return true;
+    }
+
+    applyFilters = function(){
+      var shown = 0;
+      rows.forEach(function(row){
+        var hit = matches(row);
+        row.hidden = !hit;
+        // A hidden row must not stay selected: the bulk bar posts every checked
+        // patient_id, and a record the operator can no longer see is not one
+        // they meant to include.
+        if(!hit){
+          var box = row.querySelector('.row-check');
+          if(box){ box.checked = false; }
+        }
+        if(hit){ shown++; }
+      });
+      updateSelection();
+
+      var narrowed = shown !== total;
+      if(counter){
+        counter.textContent = narrowed
+          ? 'Showing ' + shown + ' of ' + total + ' registered patients'
+          : 'Showing all ' + total + ' registered patient' + (total === 1 ? '' : 's');
+      }
+      // The empty state doubles as the no-matches message.
+      if(empty){ empty.classList.toggle('show', shown === 0); }
+      if(footer){ footer.style.display = shown === 0 ? 'none' : ''; }
+      table.closest('div[style]').style.display = shown === 0 ? 'none' : '';
+    };
+
+    clearFilters = function(){
+      search.value = '';
+      fSex.value = '';
+      fStatus.value = '';
+      fVisit.value = '';
+      fAgeMin.value = '';
+      fAgeMax.value = '';
+      applyFilters();
+    };
+
+    // Typing narrows as you go; the panel's own Apply button is kept because the
+    // panel can be filled in before it is wanted, but the selects apply on
+    // change too so the button is a confirmation rather than the only way.
+    search.addEventListener('input', applyFilters);
+    [fSex, fStatus, fVisit, fAgeMin, fAgeMax].forEach(function(control){
+      control.addEventListener('change', applyFilters);
+    });
+  })();
 </script>{% endblock %}

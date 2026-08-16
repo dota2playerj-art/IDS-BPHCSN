@@ -148,11 +148,30 @@ FORM_OPTIONS = {
 }
 
 
+def _filter_options(patients):
+    """The values the roster actually holds, for Screen 03's filter dropdowns.
+
+    Built from the rows being rendered rather than from a fixed list, so the
+    panel cannot offer a cohort that does not exist -- the rule Screen 12's
+    module filter already follows. The mockup's dropdown offered seven puroks
+    and six statuses including "Prenatal", none of which the schema stores.
+
+    Sorted so the order is stable between loads instead of following whatever
+    order the rows arrived in.
+    """
+    return {
+        "sexes": sorted({p["sex"] for p in patients if p.get("sex")}),
+        "statuses": sorted({p["status"] for p in patients if p.get("status")}),
+    }
+
+
 def patient_records_context():
     """Everything Screen 03 renders: the roster and the four stat cards."""
+    patients = get_all_patients()
     return {
-        "patients": get_all_patients(),
+        "patients": patients,
         "stats": get_patient_stats(),
+        "filter_options": _filter_options(patients),
     }
 
 

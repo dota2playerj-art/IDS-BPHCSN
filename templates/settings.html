@@ -103,24 +103,19 @@
 
     <div style="height:16px;"></div>
 
-    <!-- VALIDATION EXAMPLE -->
-    <div class="alert-ids alert-warning-ids">
-      <span class="material-symbols-outlined">warning</span>
-      <div>
-        <strong>SMS Gateway connection failed</strong>
-        Unable to verify the API key with Semaphore Gateway. Please check your credentials and test the connection again.
-      </div>
-      <span class="material-symbols-outlined alert-close">close</span>
-    </div>
-
-    <!-- SUCCESS EXAMPLE -->
-    <div class="alert-ids alert-success-ids">
-      <span class="material-symbols-outlined">check_circle</span>
-      <div>
-        <strong>Settings saved successfully</strong>
-        Your changes to Health Center Information have been applied system-wide.
-      </div>
-      <span class="material-symbols-outlined alert-close">close</span>
+    <!-- The two alerts that used to sit here were mockup examples: one reported
+         an SMS gateway connection failure and the other announced "Settings
+         saved successfully — your changes have been applied system-wide". Both
+         asserted an event that had not happened and could not happen, the
+         second one describing a save this screen cannot perform. They are
+         replaced by the note below, which states what this screen actually is. -->
+    <div class="scope-note">
+      <strong>This screen is not connected to storage.</strong>
+      {{ unavailable.settings }}
+      Every field below is shown read-only for that reason, rather than
+      accepting an entry that would be lost on the next page load. The
+      configuration that is real lives in <code>config.py</code>, in
+      <code>schema.sql</code>, and in the constants each model documents.
     </div>
 
     <!-- SETTINGS PANEL -->
@@ -144,6 +139,13 @@
         </div>
 
         <div class="col-lg-9">
+          <!-- One disabled fieldset around every pane, rather than `disabled` on
+               each of the fifty-odd inputs inside them: a fieldset disables its
+               whole subtree natively, so no control can be missed here and none
+               can be added later that is live by accident. The nav pills on the
+               left stay outside it -- moving between panes is reading, not
+               entry, and remains available. -->
+          <fieldset class="unavailable-form" disabled>
           <div class="settings-body tab-content">
 
             <!-- GENERAL SETTINGS -->
@@ -317,7 +319,7 @@
                   <label class="field-label">API Key<span class="req">*</span></label>
                   <div class="key-input-group">
                     <input type="password" class="form-control" value="sk_live_a83f92h1kd93js82">
-                    <button type="button" class="key-toggle-btn"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button>
+                    <button type="button" class="key-toggle-btn" disabled title="{{ unavailable.sms_gateway }}"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button>
                   </div>
                   <div class="form-text-hint">Key is masked for security. Only the last 4 characters are visible to other administrators.</div>
                 </div>
@@ -329,7 +331,7 @@
                 </div>
               </div>
 
-              <button type="button" class="btn-outline-teal"><span class="material-symbols-outlined" style="font-size:18px;">wifi_tethering</span>Test Connection</button>
+              <button type="button" class="btn-outline-teal" disabled title="{{ unavailable.sms_gateway }}"><span class="material-symbols-outlined" style="font-size:18px;">wifi_tethering</span>Test Connection</button>
 
               <div class="subsection-divider"></div>
               <div class="subsection-title"><span class="material-symbols-outlined" style="color:var(--teal-dark); font-size:18px;">payments</span>Billing Info</div>
@@ -494,9 +496,9 @@
               </div>
 
               <div class="d-flex gap-2 flex-wrap">
-                <button class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">backup</span>Backup Now</button>
-                <button class="btn-outline-teal"><span class="material-symbols-outlined" style="font-size:18px;">download</span>Download Backup</button>
-                <button class="btn-ghost-ids"><span class="material-symbols-outlined" style="font-size:18px;">restore</span>Restore Backup</button>
+                <button type="button" class="btn-primary-teal" disabled title="{{ unavailable.backup }}"><span class="material-symbols-outlined" style="font-size:18px;">backup</span>Backup Now</button>
+                <button type="button" class="btn-outline-teal" disabled title="{{ unavailable.backup }}"><span class="material-symbols-outlined" style="font-size:18px;">download</span>Download Backup</button>
+                <button type="button" class="btn-ghost-ids" disabled title="{{ unavailable.backup }}"><span class="material-symbols-outlined" style="font-size:18px;">restore</span>Restore Backup</button>
               </div>
             </div>
 
@@ -528,7 +530,7 @@
                 </div>
               </div>
 
-              <button class="btn-ghost-ids"><span class="material-symbols-outlined" style="font-size:18px;">cleaning_services</span>Clear Cache</button>
+              <button type="button" class="btn-ghost-ids" disabled title="{{ unavailable.settings }} There is also no application cache to clear: pages are served with no-store and every figure is read from the database on each request."><span class="material-symbols-outlined" style="font-size:18px;">cleaning_services</span>Clear Cache</button>
             </div>
 
             <!-- ABOUT SYSTEM -->
@@ -547,17 +549,20 @@
             </div>
 
           </div>
+          </fieldset>
         </div>
       </div>
     </div>
 
-    <!-- FORM ACTIONS -->
+    <!-- FORM ACTIONS — outside the fieldset above, so each carries its own
+         reason rather than inheriting the fieldset's. There is nothing to save,
+         nothing to cancel and no stored default to reset to. -->
     <div class="form-actions">
-      <div class="req-legend"><span style="color:var(--danger);">*</span> Indicates a required field</div>
+      <div class="req-legend">Fields marked <span style="color:var(--danger);">*</span> would be required if this screen were connected.</div>
       <div class="d-flex align-items-center gap-2 flex-wrap">
-        <button type="button" class="btn-danger-text">Cancel</button>
-        <button type="button" class="btn-ghost-ids"><span class="material-symbols-outlined" style="font-size:18px;">restart_alt</span>Reset to Default</button>
-        <button type="button" class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">save</span>Save Changes</button>
+        <button type="button" class="btn-danger-text" disabled title="{{ unavailable.settings }}">Cancel</button>
+        <button type="button" class="btn-ghost-ids" disabled title="{{ unavailable.settings }}"><span class="material-symbols-outlined" style="font-size:18px;">restart_alt</span>Reset to Default</button>
+        <button type="button" class="btn-primary-teal" disabled title="{{ unavailable.settings }}"><span class="material-symbols-outlined" style="font-size:18px;">save</span>Save Changes</button>
       </div>
     </div>
 {% endblock %}

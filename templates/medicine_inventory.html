@@ -181,60 +181,68 @@
         <div class="d-flex align-items-center gap-2 flex-wrap">
           <div class="toolbar-search">
             <span class="material-symbols-outlined" style="font-size:18px;">search</span>
-            <input type="text" placeholder="Search by medicine name, generic name, or category">
+            <input type="text" id="itemSearch" placeholder="Search by medicine name, generic name, or category" autocomplete="off">
           </div>
           <button class="filter-btn" id="filterToggleBtn" onclick="toggleFilterPanel()">
             <span class="material-symbols-outlined" style="font-size:18px;">filter_list</span>Advanced Filter
           </button>
-          <button class="filter-btn"><span class="material-symbols-outlined" style="font-size:18px;">sort</span>Sort</button>
+          <button class="filter-btn" type="button" disabled title="{{ unavailable.sort }}"><span class="material-symbols-outlined" style="font-size:18px;">sort</span>Sort</button>
         </div>
         <div class="d-flex align-items-center gap-2">
-          <button class="btn-outline-teal"><span class="material-symbols-outlined" style="font-size:18px;">file_download</span>Export</button>
+          <button class="btn-outline-teal" type="button" disabled title="{{ unavailable.export }}"><span class="material-symbols-outlined" style="font-size:18px;">file_download</span>Export</button>
           <a href="{{ url_for(add_edit_medicine_endpoint) }}" class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">add</span>Add Medicine</a>
         </div>
       </div>
 
-      <!-- ADVANCED FILTER PANEL -->
+      <!-- ADVANCED FILTER PANEL — live, over the items already on this page.
+           Every stocked item is rendered here, so narrowing in the browser gives
+           the same answer a re-query would.
+
+           Both dropdowns are built from the values the shelf actually holds
+           (routes/inventory_views.py::_filter_options), not from the master
+           vocabularies the Add / Edit form offers: a category nothing is stocked
+           under would be an option that can only return an empty table. The
+           mockup listed eight fixed categories and six statuses regardless of
+           what was on the shelf.
+
+           Expiration is one bound rather than the two the mockup drew. "Expiring
+           on or before" is the question this screen exists to answer; a from-date
+           as well only narrows away the items a pharmacist is looking for. -->
       <div class="filter-panel" id="filterPanel">
         <div class="row g-3">
-          <div class="col-md-3 col-sm-6">
-            <label>Category</label>
-            <select class="form-select">
-              <option selected>All Categories</option>
-              <option>Antihypertensive</option>
-              <option>Analgesic / Antipyretic</option>
-              <option>Antibiotic</option>
-              <option>Antidiabetic</option>
-              <option>Vitamins &amp; Supplements</option>
-              <option>Oral Rehydration</option>
-              <option>Antihistamine</option>
-              <option>Bronchodilator</option>
+          <div class="col-md-4 col-sm-6">
+            <label for="fCategory">Category</label>
+            <select class="form-select" id="fCategory">
+              <option value="" selected>All Categories</option>
+{%- for value in filter_options.categories %}
+              <option value="{{ value | lower }}">{{ value }}</option>
+{%- endfor %}
             </select>
           </div>
-          <div class="col-md-3 col-sm-6">
-            <label>Stock Status</label>
-            <select class="form-select">
-              <option selected>All Statuses</option>
-              <option>In Stock</option>
-              <option>Low Stock</option>
-              <option>Critical</option>
-              <option>Near Expiry</option>
-              <option>Expires Today</option>
-              <option>Expired</option>
+          <div class="col-md-4 col-sm-6">
+            <label for="fStatus">Stock Status</label>
+            <select class="form-select" id="fStatus">
+              <option value="" selected>All Statuses</option>
+{%- for value in filter_options.statuses %}
+              <option value="{{ value | lower }}">{{ value }}</option>
+{%- endfor %}
             </select>
           </div>
-          <div class="col-md-3 col-sm-6">
-            <label>Expiration From</label>
-            <input type="date" class="form-control">
+          <div class="col-md-4 col-sm-6">
+            <label for="fExpiry">Expiring on or before</label>
+            <input type="date" class="form-control" id="fExpiry">
           </div>
-          <div class="col-md-3 col-sm-6">
-            <label>Expiration To</label>
-            <input type="date" class="form-control">
+          <div class="col-12">
+            <div style="font-size:12.5px; color:var(--text-muted); line-height:1.5;">
+              Filters narrow the {{ items|length }} item{{ '' if items|length == 1 else 's' }} on this page
+              and combine with the search box. An item with no expiry date on file is not returned by an
+              expiry filter, since there is no date to compare.
+            </div>
           </div>
         </div>
         <div class="filter-actions">
-          <button class="btn-reset">Reset Filters</button>
-          <button class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">filter_alt</span>Apply Filter</button>
+          <button class="btn-reset" type="button" onclick="clearFilters()">Reset Filters</button>
+          <button class="btn-primary-teal" type="button" onclick="applyFilters()"><span class="material-symbols-outlined" style="font-size:18px;">filter_alt</span>Apply Filter</button>
         </div>
       </div>
 
@@ -264,7 +272,15 @@
           </thead>
           <tbody>
 {%- for item in items %}
-            <tr>
+            {#- What the toolbar matches on, written by the server in the item's
+                stored form. data-category mirrors the expression the Category
+                cell below prints, so a filter value always matches the cell
+                beside it. Same shape as Screens 03, 09 and 12. #}
+            <tr class="item-row"
+                data-search="{{ (item.name ~ ' ' ~ (item.generic_name or '') ~ ' ' ~ (item.drug_class or '') ~ ' ' ~ (item.category or '') ~ ' ' ~ (item.supplier or '')) | lower }}"
+                data-category="{{ (item.drug_class or item.category or '') | lower }}"
+                data-status="{{ (item.stock_status or '') | lower }}"
+                data-expiry="{{ item.expiry_date or '' }}">
               <td><div class="med-name">{{ item.name }}</div><div class="med-generic">{{ item.generic_name or item.category }}</div></td>
               <td><span class="cat-pill">{{ item.drug_class or item.category }}</span></td>
               <td>{{ item.display_dosage or '—' }}</td>
@@ -281,10 +297,10 @@
               <td><span class="badge-status {{ item.status_badge_class }}">{{ item.stock_status }}</span></td>
               <td>
                 <div class="d-flex justify-content-end gap-1">
-                  <button class="action-icon"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button>
+                  <button type="button" class="action-icon" disabled title="{{ unavailable.medicine_detail }}"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button>
                   <a href="{{ url_for(add_edit_medicine_endpoint, medicine_id=item.id) }}" class="action-icon" title="Edit {{ item.name }}"><span class="material-symbols-outlined" style="font-size:18px;">edit</span></a>
-                  <button class="action-icon"><span class="material-symbols-outlined" style="font-size:18px;">print</span></button>
-                  <button class="action-icon"><span class="material-symbols-outlined" style="font-size:18px;">archive</span></button>
+                  <button type="button" class="action-icon" disabled title="{{ unavailable.print }}"><span class="material-symbols-outlined" style="font-size:18px;">print</span></button>
+                  <button type="button" class="action-icon" disabled title="{{ unavailable.medicine_archive }}"><span class="material-symbols-outlined" style="font-size:18px;">archive</span></button>
                 </div>
               </td>
             </tr>
@@ -302,27 +318,18 @@
         <h5>No medicines found</h5>
         <p>We couldn't find any medicines matching your search or filter criteria. Try adjusting your filters or search terms.</p>
         <div class="d-flex gap-2">
-          <button class="btn-outline-teal" onclick="resetDemo()"><span class="material-symbols-outlined" style="font-size:18px;">restart_alt</span>Clear Filters</button>
+          <button class="btn-outline-teal" type="button" onclick="clearFilters()"><span class="material-symbols-outlined" style="font-size:18px;">restart_alt</span>Clear Filters</button>
           <a href="{{ url_for(add_edit_medicine_endpoint) }}" class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">add</span>Add Medicine</a>
         </div>
       </div>
 
-      <!-- PAGINATION — the page buttons below are still decoration; only the
-           count line is live. Real paging is separate follow-up work. -->
+      <!-- TABLE FOOTER — the 1 / 2 / 3 … 23 that used to sit here was false, not
+           merely inert: it implied a shelf of several hundred items. Every
+           stocked item is rendered above, so there is no page to turn to. -->
 {%- if items %}
       <div class="table-footer" id="tableFooter">
-        <div class="pg-info">Showing 1&ndash;{{ items|length }} of {{ "{:,}".format(stats.total_items) }} inventory items</div>
-        <nav aria-label="Medicine inventory pagination">
-          <ul class="pagination mb-0">
-            <li class="page-item disabled"><a class="page-link" href="#"><span class="material-symbols-outlined" style="font-size:16px;">chevron_left</span></a></li>
-            <li class="page-item active"><a class="page-link" href="#">1</a></li>
-            <li class="page-item"><a class="page-link" href="#">2</a></li>
-            <li class="page-item"><a class="page-link" href="#">3</a></li>
-            <li class="page-item disabled"><a class="page-link" href="#">&hellip;</a></li>
-            <li class="page-item"><a class="page-link" href="#">23</a></li>
-            <li class="page-item"><a class="page-link" href="#"><span class="material-symbols-outlined" style="font-size:16px;">chevron_right</span></a></li>
-          </ul>
-        </nav>
+        <div class="pg-info" id="itemCount">Showing all {{ items|length }} inventory item{{ '' if items|length == 1 else 's' }}</div>
+        <div class="pg-info" title="{{ unavailable.pagination }}">Single page</div>
       </div>
 {%- endif %}
 
@@ -348,22 +355,73 @@
     var el = document.getElementById(id);
     if(el){ el.classList.toggle('show', on); }
   }
-  function showEmptyDemo(){
-    show('tableWrap', 'none');
-    toggle('skeletonWrap', false);
-    show('tableFooter', 'none');
-    toggle('emptyState', true);
-  }
-  function showLoadingDemo(){
-    show('tableWrap', 'none');
-    toggle('emptyState', false);
-    show('tableFooter', 'none');
-    toggle('skeletonWrap', true);
-  }
-  function resetDemo(){
-    show('tableWrap', '');
-    show('tableFooter', '');
-    toggle('emptyState', false);
-    toggle('skeletonWrap', false);
-  }
+
+  // LIVE NARROWING OVER THE ITEMS ALREADY ON THE PAGE
+  //
+  // Same arrangement as Screens 03, 09 and 12: the server writes what each row
+  // should be matched on into data-* attributes, and this only decides which
+  // rows are visible. It derives nothing and re-formats nothing.
+  //
+  // The search box and the filter panel are one operation, so using both
+  // narrows to the intersection rather than the later undoing the earlier.
+  // Both functions are global because the panel's buttons call them by name.
+  var applyFilters, clearFilters;
+  (function(){
+    var search  = document.getElementById('itemSearch');
+    var fCat    = document.getElementById('fCategory');
+    var fStatus = document.getElementById('fStatus');
+    var fExpiry = document.getElementById('fExpiry');
+    var counter = document.getElementById('itemCount');
+    var rows    = document.querySelectorAll('#invTable tbody tr.item-row');
+    var total   = rows.length;
+
+    // An empty inventory renders no table, no footer and nothing to narrow.
+    if(!search || !total){ return; }
+
+    function matches(row){
+      var term = search.value.trim().toLowerCase();
+      if(term && (row.dataset.search || '').indexOf(term) === -1){ return false; }
+      if(fCat.value && row.dataset.category !== fCat.value){ return false; }
+      if(fStatus.value && row.dataset.status !== fStatus.value){ return false; }
+      if(fExpiry.value){
+        // Both sides are ISO yyyy-mm-dd, which orders correctly as plain text.
+        // An item with no expiry on file has no date to compare, so it drops
+        // out rather than being treated as expiring on any date asked for.
+        var expiry = row.dataset.expiry;
+        if(!expiry || expiry > fExpiry.value){ return false; }
+      }
+      return true;
+    }
+
+    applyFilters = function(){
+      var shown = 0;
+      rows.forEach(function(row){
+        var hit = matches(row);
+        row.hidden = !hit;
+        if(hit){ shown++; }
+      });
+      if(counter){
+        counter.textContent = shown === total
+          ? 'Showing all ' + total + ' inventory item' + (total === 1 ? '' : 's')
+          : 'Showing ' + shown + ' of ' + total + ' inventory items';
+      }
+      // The empty state doubles as the no-matches message.
+      toggle('emptyState', shown === 0);
+      show('tableWrap', shown === 0 ? 'none' : '');
+      show('tableFooter', shown === 0 ? 'none' : '');
+    };
+
+    clearFilters = function(){
+      search.value = '';
+      fCat.value = '';
+      fStatus.value = '';
+      fExpiry.value = '';
+      applyFilters();
+    };
+
+    search.addEventListener('input', applyFilters);
+    [fCat, fStatus, fExpiry].forEach(function(control){
+      control.addEventListener('change', applyFilters);
+    });
+  })();
 </script>{% endblock %}

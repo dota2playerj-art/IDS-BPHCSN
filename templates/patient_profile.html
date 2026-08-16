@@ -170,8 +170,24 @@
         </div>
 
         <div class="profile-actions">
-          <button class="btn-ghost-ids"><span class="material-symbols-outlined" style="font-size:18px;">print</span>Print Record</button>
-          <button class="btn-outline-teal"><span class="material-symbols-outlined" style="font-size:18px;">calendar_month</span>Schedule Appointment</button>
+          <button class="btn-ghost-ids" type="button" disabled title="{{ unavailable.print }}"><span class="material-symbols-outlined" style="font-size:18px;">print</span>Print Record</button>
+{#- Schedule Appointment opens the New Appointment dialog on Screen 08 with this
+    patient already chosen, and returns here when it is done. It is a link, not
+    a second copy of the dialog -- the same arrangement the Appointment History
+    tab below already uses for Reschedule and Cancel.
+
+    It is offered only for a patient the dialog can actually book: the picker
+    lists Active records, so for any other status this states why instead of
+    opening a dialog with nothing selected. #}
+{%- if patient.status == 'Active' %}
+          <a href="{{ url_for(appointment_scheduling_endpoint, book=patient.id, back='profile:' ~ patient.id) }}"
+             class="btn-outline-teal" title="Book an appointment for {{ patient.full_name }}"><span class="material-symbols-outlined" style="font-size:18px;">calendar_month</span>Schedule Appointment</a>
+{%- else %}
+          <button class="btn-outline-teal" type="button" disabled
+                  title="Appointments can only be booked for an Active patient. {{ patient.full_name }} is {{ patient.status }} — change the status on Patient Records first.">
+            <span class="material-symbols-outlined" style="font-size:18px;">calendar_month</span>Schedule Appointment
+          </button>
+{%- endif %}
           <a href="{{ url_for(register_patient_endpoint, patient_id=patient.id) }}" class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">edit</span>Edit Profile</a>
         </div>
       </div>
@@ -622,7 +638,7 @@
                          class="action-icon" style="color:var(--danger);"
                          title="Cancel this appointment — the record is kept, its status becomes Cancelled"><span class="material-symbols-outlined" style="font-size:18px;">event_busy</span></a>
 {%- endif %}
-                      <button type="button" class="action-icon"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button>
+                      <button type="button" class="action-icon" disabled title="{{ unavailable.appointment_detail }}"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button>
                     </div>
                   </td>
                 </tr>
