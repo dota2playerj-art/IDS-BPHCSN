@@ -129,11 +129,19 @@ UNAVAILABLE = {
         "Recorded activity lives on Audit Logs, and community messages on "
         "SMS Notifications."
     ),
+    # This used to open "This screen is not connected to a data source", which
+    # was true of Community Reports and is not any more -- its cards and both
+    # its charts now read from routes/official_views.py. Rewritten rather than
+    # left standing, for the same reason the print sentence above had to be:
+    # a shared reason is only worth having while it is accurate. What is still
+    # missing is narrower and is what this now names.
     "community_reports": (
-        "This screen is not connected to a data source. Its figures and report "
-        "list are written into the markup, so generating, opening or "
-        "downloading one of them would produce nothing. The reporting that is "
-        "real lives on Reports & Analytics, Health Programs and Vaccination "
-        "Campaigns."
+        "Generating a report is not implemented. Nothing in this project "
+        "produces a report document -- there is no generation route, no stored "
+        "report and nothing to open afterwards -- and the date range beside "
+        "this control has nothing to filter, because every figure on this "
+        "screen is read over the fixed window its own panel states. The "
+        "figures are real; it is turning them into a document that does not "
+        "exist yet."
     ),
 }

@@ -1,4 +1,8 @@
-"""Context for Screen 15, the Barangay Official dashboard.
+"""Context for the Barangay Official screens: 15, 16, 17 and 18.
+
+The dashboard (15) is what this module was written for; Health Programs (16),
+Vaccination Campaigns (17) and Community Reports (18) joined it as each was
+taken off its static markup, and all four are built the same way.
 
 Built the way routes/report_views.py and routes/dashboard_views.py are: nothing
 here counts anything itself. Every figure is read from the function that already
@@ -105,6 +109,54 @@ LOCAL_UNTRACKED = {
         "history behind them and no coverage to report."
     ),
 }
+
+
+def _month_over_month(trend):
+    """This month against last, read off a trend the report already built.
+
+    Every "vs last month" figure on Screen 18 comes from here rather than from a
+    second query with its own month boundary. The trend the card is compared
+    against is the one plotted directly beneath it, so a card and its chart
+    cannot disagree about how many consultations August holds.
+
+    `change_pct` is None when the previous month is zero: a percentage change
+    from nothing is undefined, and rendering "+1100%" -- or, worse, "+100%" --
+    for the first month of a system's life is an invented figure. The template
+    prints the absolute change in that case and names the month it is against.
+    """
+    if not trend:
+        return None
+
+    current = trend[-1]
+    previous = trend[-2] if len(trend) > 1 else None
+    change = current["count"] - previous["count"] if previous else None
+    change_pct = (
+        round(change * 100 / previous["count"])
+        if previous and previous["count"] else None
+    )
+    return {
+        "count": current["count"],
+        "label": current["label"],
+        "previous_count": previous["count"] if previous else None,
+        "previous_label": previous["label"] if previous else None,
+        "change": change,
+        "change_pct": change_pct,
+    }
+
+
+def _ranked_conditions(conditions):
+    """get_condition_counts()' rows, most common first.
+
+    The model returns them in CONDITION_OPTIONS order because Screen 10 plots
+    them against a fixed axis; a panel headed "Top Community Health Concerns"
+    has to lead with the top one. This reorders that list, it does not recount
+    it -- ties break alphabetically, so equal counts do not reshuffle between
+    page loads.
+    """
+    return sorted(
+        conditions["counts"],
+        key=lambda item: (-item["count"], item["condition"].lower()),
+    )
 
 
 def _announcement_feed(limit):
@@ -232,4 +284,74 @@ def vaccination_campaigns_context():
         # The reason texts only; this screen needs none of Screen 10's figures,
         # so UNTRACKED is read directly rather than by running the whole report.
         "untracked": {**UNTRACKED, **LOCAL_UNTRACKED},
+    }
+
+
+def community_reports_context():
+    """Everything Screen 18 renders.
+
+    Built exactly as the three above are: reports_analytics_context() is called
+    and nothing here counts anything itself. That matters more on this screen
+    than on the others, because Community Reports is the screen a barangay
+    official would read a figure off and put in front of somebody -- a number
+    here that disagreed with Reports & Analytics would be two reports of one
+    barangay wearing one name.
+
+    WHAT WAS ON IT BEFORE
+    ---------------------
+    Nothing. The route rendered the template with no context at all, so every
+    figure on it was markup: 318 consultations this month "+22 vs last month",
+    63 registrations "+12%", an 83% vaccination coverage rate "across all active
+    campaigns", 12 reports generated year-to-date, a six-month consultation line
+    running 275-318, and a seven-bar chart of community health concerns topped by
+    209 cases of the common cold. None of the seven conditions on that chart was
+    read from anything, and three of them -- influenza, dengue, the common cold
+    -- are not in the vocabulary this system records at all.
+
+    WHAT IT CAN REPORT, AND WHAT IT CANNOT
+    --------------------------------------
+    Consultations, registrations, immunisation coverage, appointment outcomes and
+    broadcast activity are all stored and are all reported here from the function
+    that already owns each one.
+
+    Two things on it are still not tracked, and both reuse a reason already
+    written elsewhere rather than getting new wording:
+
+      * how many reports have been generated, and which -- UNTRACKED
+        ["generated_reports"], the same gap Screen 10's own "Recent Generated
+        Reports" panel names;
+      * a coverage rate against the whole barangay -- LOCAL_UNTRACKED
+        ["population"]. The coverage figure this screen does show is against the
+        registered children the DOH schedule applies to, and says so.
+
+    The "all active campaigns" the old coverage card claimed to average over are
+    covered by LOCAL_UNTRACKED["campaigns"], which Screen 17 already carries.
+    """
+    reports = reports_analytics_context()
+    patients = reports["patient_report"]
+    consultations = reports["consultation_report_stats"]
+
+    # No "clinic_date" and no "trend_months" here, unlike the three builders
+    # above. The template prints today through inject_role_context()'s
+    # clinic_today, which is what every screen in the project renders its page
+    # date from, and it names its own window off the trend it is plotting rather
+    # than off a separate month count -- so both keys would arrive unread.
+    return {
+        # --- Screen 10's figures, unchanged.
+        "patient_report": patients,
+        "consultation_report_stats": consultations,
+        "appointment_report": reports["appointment_report"],
+        "immunization_coverage": reports["immunization_coverage"],
+        # --- The same figures asked the way this screen's cards ask them. Both
+        # are read off the trends above, not counted again; see _month_over_month.
+        "consultation_month": _month_over_month(consultations["trend"]),
+        "registration_month": _month_over_month(patients["registration_trend"]),
+        # --- get_condition_counts()' rows reordered, not recounted.
+        "conditions": patients["conditions"],
+        "top_conditions": _ranked_conditions(patients["conditions"]),
+        # --- Screen 09's figures. This role composes and sends broadcasts, so
+        # the community notification report its own Report Type menu offers is
+        # the one report on that menu with a real source behind it.
+        "broadcast_stats": get_broadcast_stats(),
+        "untracked": {**reports["untracked"], **LOCAL_UNTRACKED},
     }

@@ -10,6 +10,7 @@ from flask import Blueprint, flash, redirect, render_template, request, session,
 
 from routes.broadcast_views import process_send_broadcast, sms_notifications_context
 from routes.official_views import (
+    community_reports_context,
     health_programs_context,
     official_dashboard_context,
     vaccination_campaigns_context,
@@ -101,7 +102,14 @@ def vaccination_campaigns():
 @login_required
 @role_required("Barangay Official")
 def community_reports():
-    return render_template('community_reports.html')
+    """Screen 18. Rendered with no context at all until now -- every figure and
+    both charts on it were written into the template. See
+    official_views.community_reports_context() for where each one comes from and
+    for the two the barangay's records cannot answer.
+
+    Same guard as the three screens above it: this role and no other. Nothing on
+    the page posts, and there is no POST counterpart in this blueprint."""
+    return render_template('community_reports.html', **community_reports_context())
 
 
 @official_bp.route('/notifications')
