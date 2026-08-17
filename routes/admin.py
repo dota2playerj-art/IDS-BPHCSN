@@ -391,9 +391,12 @@ def send_sms_broadcast():
 @login_required
 @role_required("Admin")
 def reports_analytics():
+    # The whole query string, not just `type`: the toolbar's Generate now submits
+    # `from` and `to` alongside it as a GET, so the report a URL describes is the
+    # report the page renders and the one Print puts on paper.
     return render_template(
         'reports_analytics.html',
-        **reports_analytics_context(report_type=request.args.get("type", "all")),
+        **reports_analytics_context(args=request.args),
     )
 
 

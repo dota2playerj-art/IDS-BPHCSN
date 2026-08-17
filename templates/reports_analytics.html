@@ -102,6 +102,24 @@
   .rank-label{font-size:13.5px; color:var(--text-dark); flex:1;}
   .rank-count{font-size:13px; font-weight:700; color:var(--text-dark);}
   .empty-note{font-size:13px; color:var(--text-muted); padding:16px 0;}
+
+  .range-pill{
+    display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:600;
+    background:var(--teal-light); color:var(--teal-dark); border-radius:999px; padding:5px 12px;
+  }
+  .range-error{
+    background:#FEF2F2; border:1px solid #FECACA; color:#B91C1C; border-radius:12px;
+    padding:12px 16px; font-size:12.5px; line-height:1.55; margin-bottom:16px;
+  }
+  .range-error ul{margin:6px 0 0; padding-left:18px;}
+  /* Printed and shown beside every panel a date range cannot narrow -- stock,
+     the roster breakdowns, the derived programme memberships. See
+     report_views.SNAPSHOT_NOTE for why those three are snapshots. */
+  .snapshot-note{
+    font-size:11.5px; line-height:1.55; color:var(--text-muted);
+    border-left:3px solid var(--border-color); padding-left:10px; margin-top:10px;
+  }
+{% include "_print.html" %}
 {% endblock %}
 
 {% block breadcrumb %}
@@ -113,76 +131,140 @@
     </div>{% endblock %}
 
 {% block content %}
-    <div class="eyebrow">Barangay Poblacion Health Center</div>
-    <div class="page-title">Reports &amp; Analytics</div>
-    <div class="page-desc">Consolidated statistics on patient growth, appointments, medicine stock, SMS reach, and health programs for DOH reporting and internal planning.</div>
+{%- import "_chart_table.html" as ct %}
+{%- set sections = selection.sections %}
+{%- set window = report_window %}
 
-    <!-- TOOLBAR â€” still decorative. The two selects and the three export buttons
-         are not wired to anything; every figure below is computed over a fixed
-         window (the last {{ trend_months }} clinic months for the trends,
-         year-to-date for the appointment totals, whole-roster for the patient
-         breakdowns) and the note beside them says so, rather than letting a
-         control imply a filter the screen does not apply. -->
-    <div class="panel-card">
-      <div class="row g-3 align-items-end">
-        <div class="col-md-3">
-          <label class="toolbar-label">Date Range</label>
-          <select class="form-select" disabled title="Report filtering is not wired up yet â€” every figure below covers the fixed window described beside it.">
-            <option selected>Last {{ trend_months }} Months</option>
-          </select>
-        </div>
-        <div class="col-md-3">
-          <label class="toolbar-label">Report Type</label>
-          <select class="form-select" disabled title="Report filtering is not wired up yet.">
-            <option selected>All Reports</option>
-          </select>
-        </div>
-        <div class="col-md-6">
-          <div class="d-flex justify-content-md-end gap-2 flex-wrap">
-            <button class="btn-ghost-ids" type="button" disabled title="{{ unavailable.print }}"><span class="material-symbols-outlined" style="font-size:18px;">print</span>Print Report</button>
-            <button class="btn-outline-teal" type="button" disabled title="{{ unavailable.export }}"><span class="material-symbols-outlined" style="font-size:18px;">description</span>Export to Excel</button>
-            <button class="btn-primary-teal" type="button" disabled title="{{ unavailable.export }}"><span class="material-symbols-outlined" style="font-size:18px;">picture_as_pdf</span>Export to PDF</button>
-          </div>
-        </div>
-        <div class="col-12">
-          <div class="panel-sub">
-            Figures as of {{ report_date | long_date }}. Trends cover the last {{ trend_months }} clinic
-            months; appointment totals are year-to-date {{ appointment_report.year }}; patient breakdowns
-            cover the whole registered roster. Filtering and export are not wired up yet.
-          </div>
-        </div>
+{#- THE LETTERHEAD. This screen's whole purpose is figures that leave the
+    building for the RHU, so the sheet names the report, the exact days it
+    counts, and who took it off the system and when. Every date comes from the
+    same resolved window the figures below were counted over. #}
+    <div class="print-only print-head">
+      <div>
+        <div class="print-org-name">Barangay Poblacion Health Center</div>
+        <div class="print-org-sub">Integrated Data System &mdash; IDS-BPHCSN</div>
+      </div>
+      <div class="print-doc">
+        <div class="print-doc-title">{{ selection.type_label }}</div>
+        <div class="print-doc-meta">{{ window.start | long_date }} &ndash; {{ window.end | long_date }}{% if not window.custom %} (default window){% endif %}</div>
+        <div class="print-doc-meta">Printed <span class="print-stamp">&mdash;</span> by {{ sidebar_user_name }}</div>
       </div>
     </div>
 
+    <div class="eyebrow no-print">Barangay Poblacion Health Center</div>
+    <div class="page-title no-print">Reports &amp; Analytics</div>
+    <div class="page-desc no-print">Consolidated statistics on patient growth, appointments, medicine stock, SMS reach, and health programs for DOH reporting and internal planning.</div>
+
+{%- if selection.errors %}
+    <div class="range-error no-print">
+      <strong>That range was not used.</strong> The report below covers the default window instead
+      &mdash; a report quietly counting different days from the ones typed would be worse than one that says so.
+      <ul>
+{%- for problem in selection.errors %}
+        <li>{{ problem }}</li>
+{%- endfor %}
+      </ul>
+    </div>
+{%- endif %}
+
+    <!-- TOOLBAR — real. Both selects were disabled and said filtering was not
+         wired up; it is now. A GET form submitting to this same route, so the
+         generated report has a URL, Print prints exactly what that URL
+         describes, and no new endpoint is added for a role guard to cover.
+         Export stays disabled and honest: it is separate work, and
+         unavailable.export says which. -->
+    <form method="get" class="panel-card no-print">
+      <div class="row g-3 align-items-end">
+        <div class="col-md-3">
+          <label class="toolbar-label" for="fromDate">From</label>
+          <input type="date" class="form-control" id="fromDate" name="from"
+                 value="{{ window.start.isoformat() }}" max="{{ report_date.isoformat() }}">
+        </div>
+        <div class="col-md-3">
+          <label class="toolbar-label" for="toDate">To</label>
+          <input type="date" class="form-control" id="toDate" name="to"
+                 value="{{ window.end.isoformat() }}" max="{{ report_date.isoformat() }}">
+        </div>
+        <div class="col-md-3">
+          <label class="toolbar-label" for="reportType">Report Type</label>
+          <select class="form-select" id="reportType" name="type">
+{%- for key, meta in selection.types.items() %}
+            <option value="{{ key }}"{{ ' selected' if key == selection.type }}>{{ meta.label }}</option>
+{%- endfor %}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <div class="d-flex justify-content-md-end gap-2 flex-wrap">
+            <button class="btn-primary-teal" type="submit"><span class="material-symbols-outlined" style="font-size:18px;">insights</span>Generate</button>
+            <button class="btn-ghost-ids" type="button" onclick="window.print()"
+                    title="Print this report — the sidebar, header and controls drop out, every chart prints as a data table, and the range above goes on the letterhead"><span class="material-symbols-outlined" style="font-size:18px;">print</span>Print</button>
+          </div>
+        </div>
+        <div class="col-12">
+          <div class="d-flex gap-2 flex-wrap">
+            <button class="btn-outline-teal" type="button" disabled title="{{ unavailable.export }}"><span class="material-symbols-outlined" style="font-size:18px;">description</span>Export to Excel</button>
+            <button class="btn-outline-teal" type="button" disabled title="{{ unavailable.export }}"><span class="material-symbols-outlined" style="font-size:18px;">picture_as_pdf</span>Export to PDF</button>
+          </div>
+        </div>
+        <div class="col-12">
+          <span class="range-pill"><span class="material-symbols-outlined" style="font-size:14px;">date_range</span>
+            {{ window.start | display_date }} &ndash; {{ window.end | display_date }}
+          </span>
+          <span class="panel-sub" style="margin-left:8px;">
+{%- if window.custom %}Generated range &middot; {{ selection.type_label }}.
+{%- else %}Default window &middot; the last {{ trend_months }} clinic months.{% endif %}
+            Registrations, appointments, consultations and SMS are counted inside it.
+            Medicine stock, the roster breakdowns and the programme memberships are not &mdash;
+            those are the position today and each says so.
+          </span>
+        </div>
+      </div>
+    </form>
+
     <!-- KPI CARDS -->
+    <h2 class="print-only print-section-title">Summary</h2>
     <div class="row g-3 mb-4">
+{%- if 'registrations' in sections %}
       <div class="col-md-3 col-sm-6">
         <div class="stat-card">
           <div class="stat-icon" style="background:var(--teal-light);"><span class="material-symbols-outlined" style="color:var(--teal-dark);">groups</span></div>
           <!-- Straight from get_patient_stats(), the same call behind Screen 03's
-               own stat cards, so the two screens cannot report different totals. -->
+               own stat cards, so the two screens cannot report different totals.
+               The headline is the whole register and stays that on any range --
+               a report cannot narrow how many patients exist. The line under it
+               is the ranged figure. -->
           <div class="stat-value">{{ "{:,}".format(patient_report.stats.total_patients) }}</div>
           <div class="stat-label">Total Registered Patients</div>
-          <div class="stat-trend" style="color:{{ 'var(--success)' if patient_report.stats.new_this_month else 'var(--text-muted)' }};">
+          <div class="stat-trend" style="color:{{ 'var(--success)' if patient_report.window.registered else 'var(--text-muted)' }};">
+{%- if window.custom %}
+            {%- if patient_report.window.registered %}+{{ patient_report.window.registered }} in this range
+            {%- else %}None registered in this range{% endif -%}
+{%- else %}
             {%- if patient_report.stats.new_this_month %}+{{ patient_report.stats.new_this_month }} this month
             {%- else %}None registered yet this month{% endif -%}
+{%- endif %}
           </div>
         </div>
       </div>
+{%- endif %}
+{%- if 'appointments' in sections %}
+{%- set appt = appointment_report.window %}
       <div class="col-md-3 col-sm-6">
         <div class="stat-card">
           <div class="stat-icon" style="background:#DBEAFE;"><span class="material-symbols-outlined" style="color:var(--info);">calendar_month</span></div>
-          <div class="stat-value">{{ "{:,}".format(appointment_report.ytd_total) }}</div>
-          <div class="stat-label">Appointments (YTD {{ appointment_report.year }})</div>
+          <div class="stat-value">{{ "{:,}".format(appt.total) }}</div>
+          <div class="stat-label">Appointments{% if not window.custom %} (last {{ trend_months }} months){% endif %}</div>
           <!-- Attendance is of resolved appointments only -- see
                get_appointment_report() for why the not-yet-happened ones are
                excluded rather than counted as failures. -->
           <div class="stat-trend" style="color:var(--text-muted);">
-            {%- if appointment_report.attendance_pct is not none %}{{ appointment_report.attendance_pct }}% attended &middot; {{ appointment_report.ytd_walk_ins }} walk-in{{ '' if appointment_report.ytd_walk_ins == 1 else 's' }}
-            {%- else %}None resolved yet{% endif -%}
+            {%- if appt.attendance_pct is not none %}{{ appt.attendance_pct }}% attended &middot; {{ appt.walk_ins }} walk-in{{ '' if appt.walk_ins == 1 else 's' }}
+            {%- else %}None resolved in this range{% endif -%}
           </div>
         </div>
       </div>
+{%- endif %}
+{%- if 'inventory' in sections %}
       <div class="col-md-3 col-sm-6">
         <div class="stat-card">
           <div class="stat-icon" style="background:#FEF3C7;"><span class="material-symbols-outlined" style="color:var(--warning);">inventory_2</span></div>
@@ -192,12 +274,14 @@
                two would contradict each other if they measured different sets. -->
           <div class="stat-label">Inventory Items Tracked</div>
           {%- if inventory_report.low_stock_count %}
-          <div class="stat-trend" style="color:var(--danger);">{{ inventory_report.low_stock_count }} low stock</div>
+          <div class="stat-trend" style="color:var(--danger);">{{ inventory_report.low_stock_count }} low stock &middot; today</div>
           {%- else %}
-          <div class="stat-trend" style="color:var(--success);">All above reorder level</div>
+          <div class="stat-trend" style="color:var(--success);">All above reorder level &middot; today</div>
           {%- endif %}
         </div>
       </div>
+{%- endif %}
+{%- if 'consultations' in sections %}
       <div class="col-md-3 col-sm-6">
         <div class="stat-card">
           <!-- This slot held an SMS sent-and-delivered figure that nothing in
@@ -206,69 +290,98 @@
                that is real instead, and SMS keeps its own panel to report its
                own absence in. -->
           <div class="stat-icon" style="background:#EDE9FE;"><span class="material-symbols-outlined" style="color:var(--purple);">clinical_notes</span></div>
-          <div class="stat-value">{{ "{:,}".format(consultation_report_stats.total) }}</div>
+          <div class="stat-value">{{ "{:,}".format(consultation_report_stats.window.total) }}</div>
           <div class="stat-label">Consultations Recorded</div>
           <div class="stat-trend" style="color:var(--text-muted);">
-            {{ consultation_report_stats.recorded_this_month }} this month &middot;
-            {{ consultation_report_stats.patients_seen }} patient{{ '' if consultation_report_stats.patients_seen == 1 else 's' }} seen
+            {{ consultation_report_stats.window.patients_seen }} patient{{ '' if consultation_report_stats.window.patients_seen == 1 else 's' }} seen &middot;
+            {{ consultation_report_stats.total }} on record in total
           </div>
         </div>
       </div>
+{%- endif %}
     </div>
 
     <!-- ROW: PATIENT REGISTRATION TRENDS + APPOINTMENT STATISTICS -->
     <div class="row g-3">
+{%- if 'registrations' in sections %}
       <div class="col-lg-6">
         <div class="panel-card">
-          <div class="panel-title">Patient Registration Trends</div>
+          <h2 class="print-only print-section-title">Patient Registration Trends</h2>
+          <div class="panel-title no-print">Patient Registration Trends</div>
 {%- set reg_trend = patient_report.registration_trend %}
           <div class="panel-sub">
-            New patient registrations, {{ reg_trend[0].label }}&ndash;{{ reg_trend[-1].label }} {{ report_date.year }}
-            &middot; {{ reg_trend | sum(attribute='count') }} in this window
+            New patient registrations, {{ reg_trend[0].label }}&ndash;{{ reg_trend[-1].label }}
+            &middot; {{ patient_report.window.registered }} between
+            {{ window.start | display_date }} and {{ window.end | display_date }}
           </div>
           <div class="chart-wrap"><canvas id="chartRegTrend"></canvas></div>
+{{ ct.chart_table('New patient registrations, by month',
+                  reg_trend | map(attribute='label') | list,
+                  [{'name': 'Registrations', 'values': reg_trend | map(attribute='count') | list}]) }}
         </div>
       </div>
+{%- endif %}
+{%- if 'appointments' in sections %}
+{%- set appt = appointment_report.window %}
+{%- set atrend = appointment_report.trend %}
       <div class="col-lg-6">
         <div class="panel-card">
-          <div class="panel-title">Appointment Statistics</div>
+          <h2 class="print-only print-section-title">Appointment Statistics</h2>
+          <div class="panel-title no-print">Appointment Statistics</div>
           <!-- The three bars partition every status the appointments CHECK
                admits, so a month's stack is that month's whole appointment
                count. See _OUTCOME_BY_STATUS in models/appointments.py. -->
           <div class="panel-sub">
-            Monthly appointment outcomes &middot; {{ appointment_report.ytd_total }} year-to-date
-            ({{ appointment_report.ytd_booked }} booked, {{ appointment_report.ytd_walk_ins }} walk-in)
+            Monthly appointment outcomes &middot; {{ appt.total }} in this range
+            ({{ appt.booked }} booked, {{ appt.walk_ins }} walk-in)
           </div>
           <div class="chart-wrap"><canvas id="chartAppt"></canvas></div>
-          <div class="mini-legend">
-            <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--success);"></span>Attended ({{ appointment_report.ytd_attended }}) &mdash; arrived, seen or completed</div>
-            <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--info);"></span>Still expected ({{ appointment_report.ytd_expected }})</div>
-            <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--danger);"></span>Cancelled or no-show ({{ appointment_report.ytd_missed }})</div>
+{{ ct.chart_table('Appointment outcomes, by month',
+                  atrend | map(attribute='label') | list,
+                  [{'name': 'Attended',            'values': atrend | map(attribute='attended') | list},
+                   {'name': 'Still expected',      'values': atrend | map(attribute='expected') | list},
+                   {'name': 'Cancelled / no-show', 'values': atrend | map(attribute='missed')   | list}]) }}
+          <div class="mini-legend no-print">
+            <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--success);"></span>Attended ({{ appt.attended }}) &mdash; arrived, seen or completed</div>
+            <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--info);"></span>Still expected ({{ appt.expected }})</div>
+            <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--danger);"></span>Cancelled or no-show ({{ appt.missed }})</div>
           </div>
         </div>
       </div>
+{%- endif %}
     </div>
 
     <!-- ROW: MEDICINE INVENTORY STATUS + LOW STOCK MEDICINES -->
+{%- if 'inventory' in sections %}
     <div class="row g-3">
       <div class="col-lg-6">
         <div class="panel-card">
-          <div class="panel-title">Medicine Inventory Status</div>
+          <h2 class="print-only print-section-title">Medicine Inventory Status</h2>
+          <div class="panel-title no-print">Medicine Inventory Status</div>
 {%- set dist = inventory_report.status_distribution %}
           <div class="panel-sub">{{ dist.total }} item{{ "s" if dist.total != 1 }} by stock condition &middot; each counted once, under its most urgent condition</div>
           <div class="chart-wrap short"><canvas id="chartInvStatus"></canvas></div>
-          <div class="mini-legend">
+{{ ct.chart_table('Inventory items by stock condition, today',
+                  ['In Stock', 'Low Stock', 'Near Expiry', 'Expired'],
+                  [{'name': 'Items', 'values': [dist.in_stock, dist.low_stock, dist.near_expiry, dist.expired]}],
+                  first_head='Condition') }}
+          <div class="mini-legend no-print">
             <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--success);"></span>In Stock ({{ dist.in_stock }})</div>
             <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--warning);"></span>Low Stock ({{ dist.low_stock }})</div>
             <div class="mini-legend-item"><span class="mini-legend-dot" style="background:#FFEDD5;"></span>Near Expiry ({{ dist.near_expiry }})</div>
             <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--danger);"></span>Expired ({{ dist.expired }})</div>
           </div>
+{#- Stock has no history at all -- inventory_items holds the current level and
+    nothing records an issue, which is the same gap untracked.dispensing names.
+    So this panel answers today and only today, whatever range was generated. #}
+          <div class="snapshot-note">{{ snapshot_note }} {{ untracked.dispensing }}</div>
         </div>
       </div>
       <div class="col-lg-6">
         <div class="panel-card">
-          <div class="panel-title">Low Stock Medicines</div>
-          <div class="panel-sub">Below reorder level, needs restock</div>
+          <h2 class="print-only print-section-title">Low Stock Medicines</h2>
+          <div class="panel-title no-print">Low Stock Medicines</div>
+          <div class="panel-sub">Below reorder level as of {{ report_date | display_date }}, needs restock</div>
           <div>
 {%- for item in inventory_report.low_stock_items %}
             <!-- Most critical first, ordered by get_low_stock_alert(): stock as a
@@ -285,16 +398,32 @@
             <div class="panel-sub">Every item is above its reorder level.</div>
 {%- endif %}
           </div>
+          <div class="snapshot-note">{{ snapshot_note }}</div>
         </div>
       </div>
     </div>
+{%- endif %}
 
     <!-- ROW: SMS DELIVERY + BARANGAY HEALTH PROGRAM STATISTICS -->
     <div class="row g-3">
+{%- if 'sms' in sections %}
+{%- set sms = broadcast_stats.window %}
       <div class="col-lg-6">
         <div class="panel-card">
-          <div class="panel-title">SMS Delivery Statistics<span class="untracked-tag">Not yet tracked</span></div>
-          <div class="panel-sub">Whether a message reached the handset it was sent to</div>
+          <h2 class="print-only print-section-title">SMS Notification Activity</h2>
+          <div class="panel-title no-print">SMS Notification Activity</div>
+          <div class="panel-sub">
+            Broadcasts published {{ window.start | display_date }} &ndash; {{ window.end | display_date }}
+          </div>
+          <div class="mt-2">
+            <div class="rank-row"><span class="rank-label">Broadcasts published in this range</span><span class="rank-count">{{ sms.broadcasts }}</span></div>
+            <div class="rank-row"><span class="rank-label">Messages handed to the gateway</span><span class="rank-count">{{ sms.messages_sent }}</span></div>
+            <div class="rank-row"><span class="rank-label">Messages that failed to send</span><span class="rank-count">{{ sms.messages_failed }}</span></div>
+            <div class="rank-row"><span class="rank-label">Broadcasts on record, all time</span><span class="rank-count">{{ broadcast_stats.total_broadcasts }}</span></div>
+          </div>
+{#- Sends and failures are stored and are ranged above. Delivery is the half that
+    is still missing, and it stays stated rather than quietly dropped now that
+    the panel has real figures in it. #}
           <div class="untracked mt-3">
             <span class="material-symbols-outlined">query_stats</span>
             <div>
@@ -304,11 +433,18 @@
           </div>
         </div>
       </div>
+{%- endif %}
+{%- if 'programs' in sections %}
       <div class="col-lg-6">
         <div class="panel-card">
-          <div class="panel-title">Barangay Health Program Statistics</div>
+          <h2 class="print-only print-section-title">Barangay Health Program Statistics</h2>
+          <div class="panel-title no-print">Barangay Health Program Statistics</div>
           <div class="panel-sub">Programme membership that stored data can establish</div>
           <div class="chart-wrap short"><canvas id="chartPrograms"></canvas></div>
+{{ ct.chart_table('Programme membership, whole register',
+                  programs | map(attribute='name') | list,
+                  [{'name': 'Patients', 'values': programs | map(attribute='count') | list}],
+                  first_head='Programme') }}
 {%- for program in programs %}
           <div class="basis-note"><strong>{{ program.name }} ({{ program.count }})</strong> &mdash; {{ program.basis }}.</div>
 {%- endfor %}
@@ -319,15 +455,21 @@
               <div class="untracked-body">{{ untracked.programs }}</div>
             </div>
           </div>
+{#- Both memberships are derived from the register as it stands and from the
+    whole dose history, not from anything dated into a period. #}
+          <div class="snapshot-note">{{ snapshot_note }}</div>
         </div>
       </div>
+{%- endif %}
     </div>
 
     <!-- ROW: AGE DISTRIBUTION + GENDER DISTRIBUTION -->
+{%- if 'demographics' in sections %}
     <div class="row g-3">
       <div class="col-lg-6">
         <div class="panel-card">
-          <div class="panel-title">Patient Age Distribution</div>
+          <h2 class="print-only print-section-title">Patient Age Distribution</h2>
+          <div class="panel-title no-print">Patient Age Distribution</div>
 {%- set ages = patient_report.age_distribution %}
           <!-- Ages come from calculate_age() on each stored birthdate -- the same
                function behind the Age column on Screen 03 and the senior count
@@ -337,28 +479,45 @@
             {%- if ages.unknown %} &middot; {{ ages.unknown }} with no usable birthdate, not plotted{% endif %}
           </div>
           <div class="chart-wrap"><canvas id="chartAge"></canvas></div>
+{{ ct.chart_table('Registered patients by age group, whole register',
+                  ages.bands | map(attribute='label') | list,
+                  [{'name': 'Patients', 'values': ages.bands | map(attribute='count') | list}],
+                  first_head='Age group') }}
+{#- Deliberately the whole register, on any range. Narrowed to the dates it
+    would silently become "the age profile of people who happened to register in
+    June", which is a different question from the one this heading asks. See
+    get_patient_report(). #}
+          <div class="snapshot-note">{{ snapshot_note }}</div>
         </div>
       </div>
       <div class="col-lg-6">
         <div class="panel-card">
-          <div class="panel-title">Patient Gender Distribution</div>
+          <h2 class="print-only print-section-title">Patient Gender Distribution</h2>
+          <div class="panel-title no-print">Patient Gender Distribution</div>
 {%- set sexes = patient_report.sex_distribution %}
           <div class="panel-sub">{{ sexes.total }} total registered patient{{ '' if sexes.total == 1 else 's' }}</div>
           <div class="chart-wrap"><canvas id="chartGender"></canvas></div>
+{{ ct.chart_table('Registered patients by sex, whole register',
+                  ['Female', 'Male', 'Not recorded'],
+                  [{'name': 'Patients', 'values': [sexes.female, sexes.male, sexes.unrecorded]}],
+                  first_head='Sex') }}
           <!-- Percentages are of the whole roster, so they and any unrecorded
                rows add up to the total printed above. -->
-          <div class="mini-legend">
+          <div class="mini-legend no-print">
             <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--teal);"></span>Female ({{ sexes.female }} &middot; {{ sexes.female_pct }}%)</div>
             <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--info);"></span>Male ({{ sexes.male }} &middot; {{ sexes.male_pct }}%)</div>
 {%- if sexes.unrecorded %}
             <div class="mini-legend-item"><span class="mini-legend-dot" style="background:#C7CBD1;"></span>Not recorded ({{ sexes.unrecorded }} &middot; {{ sexes.unrecorded_pct }}%)</div>
 {%- endif %}
           </div>
+          <div class="snapshot-note">{{ snapshot_note }}</div>
         </div>
       </div>
     </div>
+{%- endif %}
 
     <!-- ROW: PRENATAL + SENIOR CITIZEN PROGRAM STATS -->
+{%- if 'seniors' in sections %}
     <div class="row g-3">
       <div class="col-lg-6">
         <div class="panel-card">
@@ -375,17 +534,19 @@
               <div class="untracked-body">{{ untracked.prenatal }}</div>
             </div>
           </div>
-{%- set prenatal_visits = appointment_report.services | selectattr('service', 'equalto', 'Prenatal Check-up') | list %}
+{%- set prenatal_visits = appointment_report.window.services | selectattr('service', 'equalto', 'Prenatal Check-up') | list %}
           <div class="basis-note mt-3">
             For reference, {{ prenatal_visits[0].count if prenatal_visits else 0 }} Prenatal Check-up
             appointment{{ '' if (prenatal_visits and prenatal_visits[0].count == 1) else 's' }} were booked
-            year-to-date {{ appointment_report.year }} &mdash; a count of visits, not of patients enrolled.
+            between {{ window.start | display_date }} and {{ window.end | display_date }}
+            &mdash; a count of visits, not of patients enrolled.
           </div>
         </div>
       </div>
       <div class="col-lg-6">
         <div class="panel-card">
-          <div class="panel-title">Senior Citizen Statistics</div>
+          <h2 class="print-only print-section-title">Senior Citizen Statistics</h2>
+          <div class="panel-title no-print">Senior Citizen Statistics</div>
 {%- set seniors = patient_report.senior_conditions %}
           <div class="panel-sub">Patients aged {{ patient_report.senior_age }} and above</div>
           <div class="program-stat-row mt-3">
@@ -406,6 +567,10 @@
                the breakdown that IS derivable -- how the senior cohort divides
                by band and by recorded chronic condition. -->
           <div class="chart-wrap short"><canvas id="chartSenior"></canvas></div>
+{{ ct.chart_table('Senior patients by recorded chronic condition, whole register',
+                  seniors.counts | map(attribute='condition') | list,
+                  [{'name': 'Seniors', 'values': seniors.counts | map(attribute='count') | list}],
+                  first_head='Condition') }}
           <div class="basis-note">
             Conditions counted from the Register Patient form's own list
             ({{ seniors.counts | map(attribute='condition') | join(', ') }}). A patient with two is
@@ -413,38 +578,54 @@
 {%- if seniors.other_only %} {{ seniors.other_only }} senior{{ '' if seniors.other_only == 1 else 's' }}
             recorded only free-text conditions and {{ 'is' if seniors.other_only == 1 else 'are' }} not counted here.{% endif %}
           </div>
+          <div class="snapshot-note">{{ snapshot_note }}</div>
         </div>
       </div>
     </div>
+{%- endif %}
 
-    <!-- TOP HEALTH SERVICES â€” the appointment_type of every appointment booked
-         this year, walk-ins included. That is a record of what was actually
-         asked for, which is what this panel claims to show; it is not a record
-         of programme membership, which nothing stores. -->
+    <!-- TOP HEALTH SERVICES â€” the appointment_type of every appointment in the
+         window, walk-ins included. That is a record of what was actually asked
+         for, which is what this panel claims to show; it is not a record of
+         programme membership, which nothing stores. -->
+{%- if 'services' in sections %}
+{%- set svc = appointment_report.window.services %}
     <div class="panel-card">
-      <div class="panel-title">Health Services Availed</div>
+      <h2 class="print-only print-section-title">Health Services Availed</h2>
+      <div class="panel-title no-print">Health Services Availed</div>
       <div class="panel-sub">
-        Appointments by service, year-to-date {{ appointment_report.year }}
-        &middot; {{ appointment_report.ytd_total }} in total, walk-ins included
+        Appointments by service, {{ window.start | display_date }} &ndash; {{ window.end | display_date }}
+        &middot; {{ appointment_report.window.total }} in total, walk-ins included
       </div>
-{%- if appointment_report.services %}
+{%- if svc %}
       <div class="chart-wrap"><canvas id="chartTopServices"></canvas></div>
+{{ ct.chart_table('Appointments by service requested',
+                  svc | map(attribute='service') | list,
+                  [{'name': 'Appointments', 'values': svc | map(attribute='count') | list}],
+                  first_head='Service') }}
 {%- else %}
-      <div class="empty-note">No appointments have been recorded this year, so there is nothing to rank yet.</div>
+      <div class="empty-note">No appointments fall in this range, so there is nothing to rank.</div>
 {%- endif %}
     </div>
+{%- endif %}
 
     <!-- ROW: CONSULTATION ACTIVITY + MOST COMMON DIAGNOSES -->
     <div class="row g-3">
+{%- if 'consultations' in sections %}
       <div class="col-lg-7">
         <div class="panel-card">
-          <div class="panel-title">Consultation Activity</div>
+          <h2 class="print-only print-section-title">Consultation Activity</h2>
+          <div class="panel-title no-print">Consultation Activity</div>
 {%- set ctrend = consultation_report_stats.trend %}
           <div class="panel-sub">
-            Consultations written up, {{ ctrend[0].label }}&ndash;{{ ctrend[-1].label }} {{ report_date.year }}
+            Consultations written up, {{ ctrend[0].label }}&ndash;{{ ctrend[-1].label }}
+            &middot; {{ consultation_report_stats.window.total }} in this range
             &middot; {{ consultation_report_stats.total }} on record in total
           </div>
           <div class="chart-wrap"><canvas id="chartMonthlyActivity"></canvas></div>
+{{ ct.chart_table('Consultations written up, by month',
+                  ctrend | map(attribute='label') | list,
+                  [{'name': 'Consultations', 'values': ctrend | map(attribute='count') | list}]) }}
           <!-- This panel was "Consultations vs. medicine units dispensed". The
                consultation series is real; the dispensing series had no source
                and has been removed rather than left as a plausible second line. -->
@@ -457,24 +638,33 @@
           </div>
         </div>
       </div>
+{%- endif %}
+{%- if 'diagnoses' in sections %}
+{%- set diags = consultation_report_stats.window.top_diagnoses %}
       <div class="col-lg-5">
         <div class="panel-card">
-          <div class="panel-title">Most Common Diagnoses</div>
+          <h2 class="print-only print-section-title">Most Common Diagnoses</h2>
+          <div class="panel-title no-print">Most Common Diagnoses</div>
+{#- Ranked from the window's own consultations, not from all time. Leaving this
+    at all-time was the subtle failure available here: a sheet headed "March to
+    June" would have carried the year's top diagnoses underneath it and read as
+    though those were March-to-June's. #}
           <div class="panel-sub">
-            Across all {{ consultation_report_stats.total }} recorded consultation{{ '' if consultation_report_stats.total == 1 else 's' }}
+            Across the {{ consultation_report_stats.window.total }} consultation{{ '' if consultation_report_stats.window.total == 1 else 's' }}
+            recorded {{ window.start | display_date }} &ndash; {{ window.end | display_date }}
           </div>
           <div class="mt-2">
-{%- for entry in consultation_report_stats.top_diagnoses %}
+{%- for entry in diags %}
             <div class="rank-row">
               <span class="rank-pos">{{ loop.index }}</span>
               <span class="rank-label">{{ entry.label }}</span>
               <span class="rank-count">{{ entry.count }}</span>
             </div>
 {%- else %}
-            <div class="empty-note">No diagnoses have been recorded yet.</div>
+            <div class="empty-note">No consultation was written up in this range.</div>
 {%- endfor %}
           </div>
-{%- if consultation_report_stats.top_diagnoses %}
+{%- if diags %}
           <!-- diagnosis is prose a health worker typed, not a coded vocabulary,
                so entries are grouped case-insensitively and nothing is mapped
                onto ICD or any other classification the system does not hold. -->
@@ -485,12 +675,15 @@
 {%- endif %}
         </div>
       </div>
+{%- endif %}
     </div>
 
     <!-- RECENT GENERATED REPORTS â€” the table below listed five exports, with
-         names, timestamps and staff, that never happened. Nothing writes a row
-         when a report is generated, so there is no history to show. -->
-    <div class="panel-card mb-0">
+         names, timestamps and staff, that never happened. Generating a report on
+         this screen is real now; recording that one was generated still is not,
+         and export is still to be built. Kept off the printout -- a sheet for the
+         RHU has no use for a note about this application's own history. -->
+    <div class="panel-card mb-0 no-print">
       <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
         <div>
           <div class="panel-title">Recent Generated Reports<span class="untracked-tag">Not yet tracked</span></div>
@@ -504,6 +697,14 @@
           <div class="untracked-body">{{ untracked.generated_reports }}</div>
         </div>
       </div>
+    </div>
+
+    <div class="print-only print-foot">
+      {{ selection.type_label }} &middot; {{ window.start | long_date }} to {{ window.end | long_date }}
+      &middot; generated from Barangay Poblacion Health Center records by IDS-BPHCSN.
+      Registrations, appointments, consultations and SMS activity are counted inside this range.
+      Medicine stock, the roster breakdowns and the programme memberships are the position as of
+      {{ report_date | long_date }} and are marked as such where they appear.
     </div>
 
 {% endblock %}
@@ -556,8 +757,8 @@
       counts: {{ programs | map(attribute='count') | list | tojson }}
     },
     services: {
-      labels: {{ appointment_report.services | map(attribute='service') | list | tojson }},
-      counts: {{ appointment_report.services | map(attribute='count') | list | tojson }}
+      labels: {{ appointment_report.window.services | map(attribute='service') | list | tojson }},
+      counts: {{ appointment_report.window.services | map(attribute='count') | list | tojson }}
     },
     seniorConditions: {
       labels: {{ patient_report.senior_conditions.counts | map(attribute='condition') | list | tojson }},
@@ -690,5 +891,20 @@
     },
     options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:countAxis, x:{grid:{display:false}}} }
   });
+
+  // The printed date is stamped when the dialog opens, not at page load: a
+  // report left open on a desk overnight would otherwise print with yesterday's
+  // date on it. beforeprint also covers the browser's own Ctrl+P, which never
+  // reaches the Print button. Same treatment Patient Records already carries.
+  (function(){
+    function stamp(){
+      var when = new Date().toLocaleString(undefined, {
+        year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit'
+      });
+      document.querySelectorAll('.print-stamp').forEach(function(el){ el.textContent = when; });
+    }
+    window.addEventListener('beforeprint', stamp);
+    stamp();
+  })();
 </script>{% endblock %}
 

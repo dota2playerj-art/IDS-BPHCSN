@@ -37,28 +37,39 @@ and the answers are shared.
 
 UNAVAILABLE = {
     # ---- File output --------------------------------------------------------
+    # Export is planned, not impossible, and this now says which. It is held
+    # back deliberately rather than being missing: the team took printing and
+    # report generation first because those close the loop -- a health worker can
+    # produce a dated, ranged sheet for the RHU today -- and a file writer is a
+    # dependency and a download route on top of that. Naming what is missing
+    # tells the next session what building it actually takes.
     "export": (
-        "Export is not implemented. No screen in this project writes a CSV, "
-        "Excel or PDF file: there is no file-generation library in "
-        "requirements.txt and no download route to serve one. The figures on "
-        "this screen are read from the database on each load, so exporting "
-        "them is a reporting feature to be built, not a button to re-enable."
+        "Export to a file is not built yet. It is planned as its own piece of "
+        "work and needs two things this project does not have: a "
+        "file-generation library in requirements.txt, and a download route to "
+        "serve what it writes. Nothing about the figures is in the way -- they "
+        "are read from the database on each load, and Print already puts this "
+        "screen's report on paper over whatever range was generated, so the "
+        "content an export would carry exists and is correct today."
     ),
-    # Printing is now real on Patient Profile and Patient Records, which opt in
-    # by including templates/_print.html. This reason is what the screens that
-    # have NOT been given a print layout still say, and it had to be rewritten
-    # the day the first one was built: it used to open "There is no print
-    # stylesheet", which stopped being true of the project the moment one
-    # existed. A shared sentence is only worth having while it is accurate.
+    # Printing is real on four screens now -- Patient Profile, Patient Records,
+    # Reports & Analytics and Community Reports -- each opting in by including
+    # templates/_print.html. This reason is what the screens that have NOT been
+    # given a print layout still say, and it has now been rewritten twice: it
+    # opened "There is no print stylesheet" until the first one was built, and
+    # named only the two patient screens until the two report screens joined
+    # them. A shared sentence is only worth having while it is accurate.
     "print": (
         "This screen has no print layout. Printing is built where a printed "
-        "page is a document somebody keeps -- a patient's record and the "
-        "patient list, both on Patient Records and Patient Profile -- and "
-        "those two screens hide their navigation and controls for the printer. "
-        "This one does not, so sending it to a printer would produce the "
-        "sidebar, the header and the screen furniture along with the content. "
-        "Giving it a usable printout means deciding what on it is worth "
-        "keeping on paper, which is a design question, not a switch."
+        "page is a document somebody keeps or sends -- a patient's record and "
+        "the patient list on Patient Profile and Patient Records, and a dated, "
+        "ranged report on Reports & Analytics and Community Reports -- and "
+        "those four screens hide their navigation and controls for the printer "
+        "and put a letterhead on top. This one does not, so sending it to a "
+        "printer would produce the sidebar, the header and the screen "
+        "furniture along with the content. Giving it a usable printout means "
+        "deciding what on it is worth keeping on paper, which is a design "
+        "question, not a switch."
     ),
 
     # ---- Table controls -----------------------------------------------------
@@ -129,19 +140,17 @@ UNAVAILABLE = {
         "Recorded activity lives on Audit Logs, and community messages on "
         "SMS Notifications."
     ),
-    # This used to open "This screen is not connected to a data source", which
-    # was true of Community Reports and is not any more -- its cards and both
-    # its charts now read from routes/official_views.py. Rewritten rather than
-    # left standing, for the same reason the print sentence above had to be:
-    # a shared reason is only worth having while it is accurate. What is still
-    # missing is narrower and is what this now names.
-    "community_reports": (
-        "Generating a report is not implemented. Nothing in this project "
-        "produces a report document -- there is no generation route, no stored "
-        "report and nothing to open afterwards -- and the date range beside "
-        "this control has nothing to filter, because every figure on this "
-        "screen is read over the fixed window its own panel states. The "
-        "figures are real; it is turning them into a document that does not "
-        "exist yet."
-    ),
+    # THERE IS NO "community_reports" ENTRY ANY MORE, AND THAT IS THE POINT.
+    # It has been deleted twice over. It first said Community Reports had no
+    # data source, which stopped being true when the screen was wired to real
+    # queries; it was rewritten to say report generation was not implemented,
+    # and that stopped being true when Generate was built. Nothing on that
+    # screen is disabled for a screen-specific reason now -- its Print works,
+    # its Generate works, and its two Export buttons quote the shared `export`
+    # reason above like every other screen's do.
+    #
+    # A reason with nothing quoting it is exactly the drift this file exists to
+    # prevent, so it goes rather than sitting here describing a state the
+    # application has left. If some future control needs a Community Reports
+    # reason, it writes a true one.
 }

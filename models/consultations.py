@@ -40,7 +40,7 @@ from datetime import datetime
 
 from database.connection import get_db
 from models.patients import calculate_age, format_age
-from utils.dates import recent_months, today
+from utils.dates import recent_months, resolve_range, today
 
 # Growth monitoring cohort -- DOH Operation Timbang Plus / WHO 0-59 months.
 PEDIATRIC_AGE_YEARS = 5
@@ -367,7 +367,8 @@ def _rank_free_text(rows, limit):
     return ranked[:limit] if limit else ranked
 
 
-def get_consultation_stats(months=6, limit=TOP_DIAGNOSIS_LIMIT, on_date=None):
+def get_consultation_stats(months=6, limit=TOP_DIAGNOSIS_LIMIT, on_date=None,
+                           start=None, end=None):
     """The consultation figures Screen 10 reports.
 
     Returns totals, a month-by-month trend over the same window the other trend
@@ -376,10 +377,27 @@ def get_consultation_stats(months=6, limit=TOP_DIAGNOSIS_LIMIT, on_date=None):
     `recorded_this_month` counts by the month the visit is dated to, which is the
     same basis the trend's last bar uses -- so the KPI card and the right-hand
     end of the chart cannot print different numbers for the same period.
+
+    THE `window` BLOCK
+    ------------------
+    `start`/`end` ask for a specific range. Everything above stays exactly as it
+    was -- `total` is still every consultation ever recorded, and every existing
+    caller reads unchanged numbers -- and the range-scoped answers arrive in
+    their own `window` block. Two rules follow from that split and are worth
+    stating, because both were ways this could have gone quietly wrong:
+
+    * The window's totals and its trend are counted from one pass over the same
+      rows, so the cards a generated report prints and the chart beneath them
+      cannot disagree about the range they both describe.
+    * The diagnoses and complaints in `window` are ranked from the window's rows
+      only. Leaving them at all-time would have been the subtle failure here: a
+      report headed "March to June" would have listed the year's top complaints
+      underneath it and read as though those were March-to-June's.
     """
     reference = on_date or today()
-    windows = recent_months(months, reference)
+    window = resolve_range(start=start, end=end, months=months, on_date=reference)
     current_month = reference.strftime("%Y-%m")
+    lo, hi = window["start"].isoformat(), window["end"].isoformat()
 
     conn = get_db()
     total = conn.execute("SELECT COUNT(*) FROM consultations").fetchone()[0]
@@ -400,15 +418,39 @@ def get_consultation_stats(months=6, limit=TOP_DIAGNOSIS_LIMIT, on_date=None):
     complaints = [
         row[0] for row in conn.execute("SELECT chief_complaint FROM consultations")
     ]
+
+    # The window's own rows. consultation_date is stored as clinic-local date
+    # text (it is the day of the visit, not a UTC instant), so the range compares
+    # against its leading ten characters directly -- no timezone conversion, and
+    # a row carrying a time still lands on its own day.
+    scoped = conn.execute(
+        """
+        SELECT diagnosis, chief_complaint, patient_id,
+               substr(consultation_date, 1, 7) AS month
+        FROM consultations
+        WHERE substr(consultation_date, 1, 10) BETWEEN ? AND ?
+        """,
+        (lo, hi),
+    ).fetchall()
     conn.close()
+
+    # THE TREND IS CLIPPED TO THE RANGE, NOT TO WHOLE MONTHS.
+    # A report for 1-10 August whose August bar showed the whole month would put
+    # 11 on the chart directly under a card reading 6, and the reader has no way
+    # to tell which of the two answers the range they asked for. Counting the
+    # trend from the window's own rows makes the bars sum to the card by
+    # construction; a part-month is a part-month on the chart as well.
+    scoped_by_month = {}
+    for row in scoped:
+        scoped_by_month[row["month"]] = scoped_by_month.get(row["month"], 0) + 1
 
     trend = [
         {
-            "month": start.strftime("%Y-%m"),
+            "month": start_day.strftime("%Y-%m"),
             "label": label,
-            "count": by_month.get(start.strftime("%Y-%m"), 0),
+            "count": scoped_by_month.get(start_day.strftime("%Y-%m"), 0),
         }
-        for start, _, label in windows
+        for start_day, _, label in window["months"]
     ]
 
     return {
@@ -419,6 +461,18 @@ def get_consultation_stats(months=6, limit=TOP_DIAGNOSIS_LIMIT, on_date=None):
         "trend": trend,
         "top_diagnoses": _rank_free_text(diagnoses, limit),
         "top_complaints": _rank_free_text(complaints, limit),
+        "window": {
+            "start": window["start"],
+            "end": window["end"],
+            "custom": window["custom"],
+            "total": len(scoped),
+            "patients_seen": len({row["patient_id"] for row in scoped}),
+            "trend": trend,
+            "top_diagnoses": _rank_free_text(
+                [row["diagnosis"] for row in scoped], limit),
+            "top_complaints": _rank_free_text(
+                [row["chief_complaint"] for row in scoped], limit),
+        },
     }
 
 

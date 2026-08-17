@@ -47,7 +47,12 @@ from models.immunizations import (
     get_dose_coverage,
     get_immunization_coverage,
 )
-from routes.report_views import UNTRACKED, reports_analytics_context
+from routes.report_views import (
+    SNAPSHOT_NOTE,
+    UNTRACKED,
+    parse_report_range,
+    reports_analytics_context,
+)
 from utils.dates import today
 
 # How many rows the announcement feed shows before it stops.
@@ -108,6 +113,52 @@ LOCAL_UNTRACKED = {
         "accepts only the schedule's own vaccine codes -- so there is no dose "
         "history behind them and no coverage to report."
     ),
+}
+
+
+# Screen 18's Report Type menu, which was five option elements inside a disabled
+# fieldset. The five labels are the ones that were already there; what is new is
+# that each now names the panels it keeps and says whether its figures actually
+# move when the dates change.
+#
+# "concerns" is the one worth reading twice. The panel it keeps is headed "Top
+# Community Health Concerns", and the honest answer to that over a date range is
+# in two halves: the diagnoses written up during the range, which are ranged, and
+# the chronic conditions recorded against the roster, which are not -- those
+# describe who is registered today. Both are shown, each labelled with which it
+# is, rather than silently ranging one or silently freezing the other.
+COMMUNITY_REPORT_TYPES = {
+    "all": {
+        "label": "Full Community Report",
+        "sections": {"consultations", "registrations", "vaccination", "concerns",
+                     "notifications", "appointments"},
+        "ranged": True,
+    },
+    "consultations": {
+        "label": "Monthly Consultation Summary",
+        "sections": {"consultations"},
+        "ranged": True,
+    },
+    "registrations": {
+        "label": "Patient Registration Trend",
+        "sections": {"registrations"},
+        "ranged": True,
+    },
+    "vaccination": {
+        "label": "Community Vaccination Summary",
+        "sections": {"vaccination"},
+        "ranged": True,
+    },
+    "concerns": {
+        "label": "Top Community Health Concerns",
+        "sections": {"concerns"},
+        "ranged": True,
+    },
+    "notifications": {
+        "label": "Community Notification Report",
+        "sections": {"notifications"},
+        "ranged": True,
+    },
 }
 
 
@@ -287,7 +338,7 @@ def vaccination_campaigns_context():
     }
 
 
-def community_reports_context():
+def community_reports_context(args=None):
     """Everything Screen 18 renders.
 
     Built exactly as the three above are: reports_analytics_context() is called
@@ -327,7 +378,16 @@ def community_reports_context():
     The "all active campaigns" the old coverage card claimed to average over are
     covered by LOCAL_UNTRACKED["campaigns"], which Screen 17 already carries.
     """
-    reports = reports_analytics_context()
+    selection = parse_report_range(
+        args if args is not None else {},
+        types=COMMUNITY_REPORT_TYPES,
+    )
+    start, end = selection["start"], selection["end"]
+
+    # The whole report is built from the one selection, so every panel on the
+    # sheet covers the range the letterhead prints -- there is no second window
+    # anywhere on this screen for a figure to be counted over by accident.
+    reports = reports_analytics_context(args=args)
     patients = reports["patient_report"]
     consultations = reports["consultation_report_stats"]
 
@@ -337,6 +397,9 @@ def community_reports_context():
     # date from, and it names its own window off the trend it is plotting rather
     # than off a separate month count -- so both keys would arrive unread.
     return {
+        "selection": selection,
+        "report_window": selection["window"],
+        "snapshot_note": SNAPSHOT_NOTE,
         # --- Screen 10's figures, unchanged.
         "patient_report": patients,
         "consultation_report_stats": consultations,
@@ -349,9 +412,10 @@ def community_reports_context():
         # --- get_condition_counts()' rows reordered, not recounted.
         "conditions": patients["conditions"],
         "top_conditions": _ranked_conditions(patients["conditions"]),
-        # --- Screen 09's figures. This role composes and sends broadcasts, so
-        # the community notification report its own Report Type menu offers is
-        # the one report on that menu with a real source behind it.
-        "broadcast_stats": get_broadcast_stats(),
+        # --- Screen 09's figures, over the same range, read from the report
+        # rather than queried again here. This role composes and sends
+        # broadcasts, so the Community Notification Report its own Report Type
+        # menu offers is a real report with a real source behind it.
+        "broadcast_stats": reports["broadcast_stats"],
         "untracked": {**reports["untracked"], **LOCAL_UNTRACKED},
     }

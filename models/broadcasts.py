@@ -44,7 +44,14 @@ to be made up, so none is stored or shown.
 from database.connection import get_db
 from models.consultations import PEDIATRIC_AGE_YEARS
 from models.patients import SENIOR_AGE, calculate_age
-from utils.dates import day_start_utc, display_timestamp, month_bounds, today
+from utils.dates import (
+    day_start_utc,
+    display_timestamp,
+    month_bounds,
+    range_bounds_utc,
+    resolve_range,
+    today,
+)
 from utils.phone import is_valid_ph_mobile, normalize_phone_number, to_local_ph_mobile
 from utils.sms import (
     LIVE,
@@ -505,12 +512,19 @@ def get_broadcast_recipients(broadcast_id, limit=None):
     return [dict(row) for row in rows]
 
 
-def get_broadcast_stats(history=None):
+def get_broadcast_stats(history=None, start=None, end=None, months=6):
     """The four figures above the history table.
 
     Every one of them is counted from stored rows or from the live roster. There
     is no delivery rate here, for the reason the module header gives: nothing in
     this system is ever told that a message arrived.
+
+    `start`/`end` add a `window` block counting the same things over a requested
+    range. `reachable_contacts` is deliberately not ranged and stays out of it:
+    it counts who could be texted *now*, from the current roster, which is a fact
+    about today rather than something that happened during a period. A report
+    claiming "10 contacts reachable in March" would be asserting the March
+    roster, which this system does not keep a history of.
     """
     if history is None:
         history = get_broadcast_history(limit=1000)
@@ -524,6 +538,10 @@ def get_broadcast_stats(history=None):
     )
     reachable, _ = resolve_recipients("all_patients")
 
+    window = resolve_range(start=start, end=end, months=months)
+    lo, hi = range_bounds_utc(window)
+    scoped = [b for b in history if lo <= str(b["sent_at"]) < hi]
+
     return {
         "total_broadcasts": len(history),
         "this_month": this_month,
@@ -536,4 +554,13 @@ def get_broadcast_stats(history=None):
             1 for broadcast in history if broadcast["delivery_mode"] == LIVE
         ),
         "reachable_contacts": len(reachable),
+        "window": {
+            "start": window["start"],
+            "end": window["end"],
+            "custom": window["custom"],
+            "broadcasts": len(scoped),
+            "messages_sent": sum(b["sent_count"] for b in scoped),
+            "messages_failed": sum(b["failed_count"] for b in scoped),
+            "simulated": sum(1 for b in scoped if b["delivery_mode"] == SIMULATED),
+        },
     }

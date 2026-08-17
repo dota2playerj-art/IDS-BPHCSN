@@ -25,7 +25,7 @@ import calendar as _calendar
 from datetime import date, datetime, timedelta
 
 from database.connection import get_db
-from utils.dates import now, recent_months, today
+from utils.dates import now, recent_months, resolve_range, today
 
 # Statuses that still represent a commitment the patient is expected to keep.
 PENDING_STATUSES = ("Scheduled", "Confirmed")
@@ -1232,7 +1232,36 @@ _OUTCOME_BY_STATUS = {
 OUTCOMES = (OUTCOME_EXPECTED, OUTCOME_ATTENDED, OUTCOME_MISSED)
 
 
-def get_appointment_report(months=6, on_date=None):
+def _outcome_summary(counts, walk_ins, total, services):
+    """One period's appointment outcomes, however that period was chosen.
+
+    Shared by the year-to-date block and the ranged `window` block below so the
+    two cannot compute an attendance rate differently. The rate is of *resolved*
+    appointments for the reason get_appointment_report() gives.
+    """
+    resolved = counts[OUTCOME_ATTENDED] + counts[OUTCOME_MISSED]
+    return {
+        "total": total,
+        "expected": counts[OUTCOME_EXPECTED],
+        "attended": counts[OUTCOME_ATTENDED],
+        "missed": counts[OUTCOME_MISSED],
+        "walk_ins": walk_ins,
+        "booked": total - walk_ins,
+        "resolved": resolved,
+        "attendance_pct": (
+            round(counts[OUTCOME_ATTENDED] / resolved * 100, 1) if resolved else None
+        ),
+        "missed_pct": (
+            round(counts[OUTCOME_MISSED] / resolved * 100, 1) if resolved else None
+        ),
+        "services": sorted(
+            ({"service": name, "count": count} for name, count in services.items()),
+            key=lambda item: (-item["count"], item["service"].lower()),
+        ),
+    }
+
+
+def get_appointment_report(months=6, on_date=None, start=None, end=None):
     """The appointment figures Screen 10 reports.
 
     Three things: how the year's appointments have turned out, how that breaks
@@ -1252,8 +1281,9 @@ def get_appointment_report(months=6, on_date=None):
     the attendance rate down.
     """
     reference = on_date or today()
-    windows = recent_months(months, reference)
+    window = resolve_range(start=start, end=end, months=months, on_date=reference)
     year = reference.strftime("%Y")
+    lo, hi = window["start"].isoformat(), window["end"].isoformat()
 
     conn = get_db()
     rows = conn.execute(
@@ -1263,6 +1293,19 @@ def get_appointment_report(months=6, on_date=None):
         FROM appointments
         GROUP BY month, status, is_walkin, appointment_type
         """
+    ).fetchall()
+    # The window's own rows, by day rather than by month: a range starting on the
+    # 12th must not be handed the whole of that month. appointment_date is stored
+    # as clinic-local date text, so it compares directly.
+    scoped = conn.execute(
+        """
+        SELECT substr(appointment_date, 1, 7) AS month, status, is_walkin,
+               appointment_type, COUNT(*) AS count
+        FROM appointments
+        WHERE substr(appointment_date, 1, 10) BETWEEN ? AND ?
+        GROUP BY month, status, is_walkin, appointment_type
+        """,
+        (lo, hi),
     ).fetchall()
     conn.close()
 
@@ -1288,13 +1331,35 @@ def get_appointment_report(months=6, on_date=None):
             service = (row["appointment_type"] or "").strip() or "Unspecified"
             services[service] = services.get(service, 0) + row["count"]
 
+    scoped_counts = {outcome: 0 for outcome in OUTCOMES}
+    scoped_total = 0
+    scoped_walk_ins = 0
+    scoped_services = {}
+    scoped_by_month = {}
+    for row in scoped:
+        outcome = _OUTCOME_BY_STATUS.get(row["status"], OUTCOME_EXPECTED)
+        scoped_counts[outcome] += row["count"]
+        scoped_total += row["count"]
+        if row["is_walkin"]:
+            scoped_walk_ins += row["count"]
+        service = (row["appointment_type"] or "").strip() or "Unspecified"
+        scoped_services[service] = scoped_services.get(service, 0) + row["count"]
+        bucket = scoped_by_month.setdefault(
+            row["month"], {name: 0 for name in OUTCOMES} | {"total": 0}
+        )
+        bucket[outcome] += row["count"]
+        bucket["total"] += row["count"]
+
+    # Clipped to the range, not rounded out to whole months -- see the same note
+    # in get_consultation_stats(). The stacked bars therefore sum to the totals
+    # the cards beside them print.
     trend = []
-    for start, _, label in windows:
-        bucket = by_month.get(
-            start.strftime("%Y-%m"), {name: 0 for name in OUTCOMES} | {"total": 0}
+    for month_start, _, label in window["months"]:
+        bucket = scoped_by_month.get(
+            month_start.strftime("%Y-%m"), {name: 0 for name in OUTCOMES} | {"total": 0}
         )
         trend.append({
-            "month": start.strftime("%Y-%m"),
+            "month": month_start.strftime("%Y-%m"),
             "label": label,
             "expected": bucket[OUTCOME_EXPECTED],
             "attended": bucket[OUTCOME_ATTENDED],
@@ -1302,7 +1367,7 @@ def get_appointment_report(months=6, on_date=None):
             "total": bucket["total"],
         })
 
-    resolved = ytd[OUTCOME_ATTENDED] + ytd[OUTCOME_MISSED]
+    ytd_summary = _outcome_summary(ytd, ytd_walk_ins, ytd_total, services)
     return {
         "year": year,
         "ytd_total": ytd_total,
@@ -1311,20 +1376,24 @@ def get_appointment_report(months=6, on_date=None):
         "ytd_missed": ytd[OUTCOME_MISSED],
         "ytd_walk_ins": ytd_walk_ins,
         "ytd_booked": ytd_total - ytd_walk_ins,
-        "resolved": resolved,
-        "attendance_pct": (
-            round(ytd[OUTCOME_ATTENDED] / resolved * 100, 1) if resolved else None
-        ),
-        "missed_pct": (
-            round(ytd[OUTCOME_MISSED] / resolved * 100, 1) if resolved else None
-        ),
+        "resolved": ytd_summary["resolved"],
+        "attendance_pct": ytd_summary["attendance_pct"],
+        "missed_pct": ytd_summary["missed_pct"],
         "trend": trend,
         # Most-requested first. Ties break alphabetically so the chart does not
         # reshuffle between page loads on equal counts.
-        "services": sorted(
-            ({"service": name, "count": count} for name, count in services.items()),
-            key=lambda item: (-item["count"], item["service"].lower()),
-        ),
+        "services": ytd_summary["services"],
+        # The same outcomes over the requested range. Every key above keeps its
+        # year-to-date meaning untouched, so the four screens already reading
+        # them are unaffected; only the two report screens read this block.
+        "window": {
+            "start": window["start"],
+            "end": window["end"],
+            "custom": window["custom"],
+            **_outcome_summary(
+                scoped_counts, scoped_walk_ins, scoped_total, scoped_services
+            ),
+        },
     }
 
 

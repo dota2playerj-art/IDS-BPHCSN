@@ -1,0 +1,62 @@
+{#- CHART -> TABLE, FOR PAPER.
+
+    A <canvas> is a bitmap the browser paints after the page has loaded, and
+    printing one is unreliable in a way that stays invisible until somebody
+    actually prints. "Background graphics" is off by default in every browser's
+    print dialog; with it off a canvas comes out as a blank box in some browsers
+    and is dropped entirely in others. A report that loses half its content
+    depending on a checkbox in a dialog is not a report, and nothing in this
+    project can make an operator tick that box.
+
+    So every chart on the two report screens carries a table of the same numbers.
+    On screen the table is hidden and the chart is shown; on paper _print.html
+    reverses exactly that -- `canvas` is hidden and `.print-table` is shown.
+
+    THE TABLE IS NOT A SECOND COPY OF THE DATA
+    ------------------------------------------
+    Both are handed the identical Jinja expression from the identical context.
+    The chart serialises it through | tojson and this iterates it, so changing a
+    figure changes both or neither; there is no path by which the printed table
+    could report something the on-screen chart does not. That is the rule the
+    rest of this project already follows for a panel subtitle and the chart
+    beneath it.
+
+    `datasets` is a list of {'name', 'values'}, values parallel to `labels`. One
+    dataset prints label/value; several print one column each plus a row total,
+    which is what the stacked appointment-outcome chart needs.
+#}
+{% macro chart_table(caption, labels, datasets, first_head='Period') %}
+{%- set multi = datasets | length > 1 %}
+{%- set columns = 1 + (datasets | length) + (1 if multi else 0) %}
+  <table class="print-only print-table">
+    <caption>{{ caption }}</caption>
+    <thead>
+      <tr>
+        <th scope="col">{{ first_head }}</th>
+{%- for series in datasets %}
+        <th scope="col" class="num">{{ series.name }}</th>
+{%- endfor %}
+{%- if multi %}
+        <th scope="col" class="num">Total</th>
+{%- endif %}
+      </tr>
+    </thead>
+    <tbody>
+{%- for label in labels %}
+{#- The row index has to be taken before the inner loop, which shadows `loop`. #}
+{%- set row = loop.index0 %}
+      <tr>
+        <th scope="row">{{ label }}</th>
+{%- for series in datasets %}
+        <td class="num">{{ series['values'][row] }}</td>
+{%- endfor %}
+{%- if multi %}
+        <td class="num">{{ datasets | sum(attribute='values.' ~ row) }}</td>
+{%- endif %}
+      </tr>
+{%- else %}
+      <tr><td colspan="{{ columns }}">Nothing recorded in this range.</td></tr>
+{%- endfor %}
+    </tbody>
+  </table>
+{%- endmacro %}

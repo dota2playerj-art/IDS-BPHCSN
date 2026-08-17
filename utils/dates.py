@@ -141,6 +141,77 @@ def recent_months(count, end=None):
     return windows
 
 
+def month_span(start, end):
+    """Every clinic month the inclusive [start, end] range touches, oldest first.
+
+    The same (first_day, next_first_day, label) shape recent_months() returns, so
+    a chart plots a custom range through exactly the code that already plots the
+    default one.
+
+    The label carries the year only when the range crosses one. "Jan" appearing
+    twice on a single axis would be two different months wearing one name, and a
+    reader counting bars would have no way to tell which year a figure belonged
+    to; within one year the bare month is what every existing chart already
+    prints and is left alone.
+    """
+    fmt = "%b" if start.year == end.year else "%b %Y"
+    windows = []
+    cursor = start.replace(day=1)
+    last = end.replace(day=1)
+    while cursor <= last:
+        next_start = (cursor + timedelta(days=32)).replace(day=1)
+        windows.append((cursor, next_start, cursor.strftime(fmt)))
+        cursor = next_start
+    return windows
+
+
+def resolve_range(start=None, end=None, months=6, on_date=None):
+    """The one window a report covers, however it was asked for.
+
+    Every ranged figure in this project resolves its window here, so a report's
+    cards, its trend charts and its letterhead cannot disagree about which days
+    they cover. Returns:
+
+        start   first day counted, inclusive
+        end     last day counted, inclusive
+        months  the (first, next_first, label) triples the trend plots
+        custom  True when the caller asked for a specific range
+
+    With no explicit range this reproduces the fixed window the screens have
+    always used -- recent_months() itself, not a re-derivation of it -- so the
+    default view is byte-identical to what it was before ranges existed.
+    """
+    reference = on_date or today()
+    if start and end:
+        return {
+            "start": start,
+            "end": end,
+            "months": month_span(start, end),
+            "custom": True,
+        }
+    windows = recent_months(months, reference)
+    return {
+        "start": windows[0][0],
+        "end": reference,
+        "months": windows,
+        "custom": False,
+    }
+
+
+def range_bounds_utc(window):
+    """A resolved range -> the half-open UTC text pair the timestamp columns want.
+
+    created_at and sent_at are written by SQLite's CURRENT_TIMESTAMP and are
+    therefore UTC, while the range the operator typed means clinic-local days.
+    The end is exclusive and one day past the last day counted, so a row written
+    at 23:30 on the closing date is inside the report rather than a day past it.
+    """
+    return (
+        day_start_utc(window["start"]),
+        day_start_utc(window["end"] + timedelta(days=1)),
+    )
+
+
 def _parse(value):
     if not value:
         return None

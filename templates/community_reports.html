@@ -103,11 +103,49 @@
   .pagination .page-item.active .page-link{background-color:var(--teal); border-color:var(--teal); color:#fff;}
   .pagination .page-link:hover{background-color:rgba(22,155,146,0.12); color:var(--teal); border-color:rgba(22,155,146,0.12);}
   .pagination .page-item.disabled .page-link{color:var(--border-color); background:#fff;}
+
+  .range-pill{
+    display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:600;
+    background:var(--teal-light); color:var(--teal-dark); border-radius:999px; padding:5px 12px;
+  }
+  .range-error{
+    background:#FEF2F2; border:1px solid #FECACA; color:#B91C1C; border-radius:12px;
+    padding:12px 16px; font-size:12.5px; line-height:1.55; margin-bottom:16px;
+  }
+  .range-error ul{margin:6px 0 0; padding-left:18px;}
+  .snapshot-note{
+    font-size:11.5px; line-height:1.55; color:var(--text-muted);
+    border-left:3px solid var(--border-color); padding-left:10px; margin-top:10px;
+  }
+{% include "_print.html" %}
 {% endblock %}
 
 {# content: no breadcrumb, per instruction (audit 4.1b - deliberate, do not re-add) #}
 {% block content %}
-    <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+{%- import "_chart_table.html" as ct %}
+{%- set sections = selection.sections %}
+{%- set window = report_window %}
+
+{#- THE LETTERHEAD. A generated report leaves the building -- that is the whole
+    point of the feature -- so the sheet says which report it is, exactly which
+    days it counts, who printed it and when. A page of barangay health figures
+    found on a desk with no range on it is not a report; it is a number nobody
+    can check. Every date here comes from the same resolved window the figures
+    below were counted over, so the heading cannot describe a different range
+    from the one on the page. #}
+    <div class="print-only print-head">
+      <div>
+        <div class="print-org-name">Barangay Poblacion Health Center</div>
+        <div class="print-org-sub">Integrated Data System &mdash; IDS-BPHCSN</div>
+      </div>
+      <div class="print-doc">
+        <div class="print-doc-title">{{ selection.type_label }}</div>
+        <div class="print-doc-meta">{{ window.start | long_date }} &ndash; {{ window.end | long_date }}{% if not window.custom %} (default window){% endif %}</div>
+        <div class="print-doc-meta">Printed <span class="print-stamp">&mdash;</span> by {{ sidebar_user_name }}</div>
+      </div>
+    </div>
+
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 no-print">
       <div>
         <div class="eyebrow">Barangay Poblacion Health Center</div>
         <div class="page-title">Community Reports</div>
@@ -119,74 +157,97 @@
       </div>
     </div>
 
-    <div style="height:24px;"></div>
+    <div style="height:24px;" class="no-print"></div>
 
-{#- This note used to open "This screen is not connected to a data source",
-    which was the plain truth of it: the route rendered the template with no
-    context and every figure below was markup. That is no longer the case, so
-    the note now says what is read and what is not, rather than disclaiming the
-    whole page. #}
-    <div class="scope-note">
+    <div class="scope-note no-print">
       <strong>Every figure on this screen is read from stored records.</strong>
       The cards and both charts come from the same functions behind Reports &amp; Analytics,
       Health Programs and Vaccination Campaigns, so this screen cannot report a different
       barangay from the ones beside it in the sidebar. Two things on it still have no source and
       say so where they sit: how many reports have been generated, and coverage measured
       against the whole barangay rather than against registered patients.
-      Producing a report <em>document</em> is a separate matter &mdash; {{ unavailable.community_reports }}
     </div>
 
-    <!-- REPORT GENERATION TOOLBAR — one disabled fieldset around the whole
-         toolbar rather than `disabled` on each control, so nothing in it can be
-         live by accident. Generate was the odd one out before: Print and the two
-         exports were already disabled, while the button that would have run the
-         report looked ready and did nothing.
-         The fieldset stays disabled, but for a narrower reason than before. The
-         five report types below are all readable on this page already; what does
-         not exist is a route that turns any of them into a document, and a date
-         range these figures could be re-read over — every one of them is counted
-         over the fixed window its own panel states. -->
-    <div class="panel-card">
+{%- if selection.errors %}
+    <div class="range-error no-print">
+      <strong>That range was not used.</strong> The report below covers the default window instead
+      &mdash; a report quietly counting different days from the ones typed would be worse than one that says so.
+      <ul>
+{%- for problem in selection.errors %}
+        <li>{{ problem }}</li>
+{%- endfor %}
+      </ul>
+    </div>
+{%- endif %}
+
+    <!-- REPORT GENERATION TOOLBAR — real. It was a disabled fieldset whose
+         reason said generation was not built and the date range had nothing to
+         filter; both of those are now false, so the fieldset is gone.
+         It is a GET form submitting to this same route. Three things follow from
+         that and all three are the reason for it: the generated report has a URL
+         and can be bookmarked or handed to somebody, Print prints exactly what
+         the URL describes, and no new endpoint means the route x role matrix is
+         untouched by this feature.
+         Export PDF and Export Excel stay disabled and stay honest — they are a
+         separate piece of work, and unavailable.export says so. -->
+{#- no-print: the whole toolbar is controls, and _print.html's rule is that
+    nothing clickable belongs on paper. Its own inputs and buttons are hidden by
+    that stylesheet already, but without this the panel's heading, its three
+    field labels and the range pill would print as an orphaned block above the
+    figures -- and the range is on the letterhead, where a reader looks for it. #}
+    <form method="get" class="panel-card no-print" id="generateForm">
       <div class="panel-title mb-0">Generate a Community Report</div>
-      <div class="panel-sub mb-0">Report generation is not built. The statistics these five reports would carry are on this page below, each over the window its panel names.</div>
+      <div class="panel-sub mb-0">
+        Choose a report and the days it should cover. Every figure below is recounted for that range.
+      </div>
       <div style="height:24px;"></div>
 
-      <fieldset class="unavailable-form" disabled>
       <div class="row g-3 align-items-end">
         <div class="col-lg-4 col-md-6">
           <label class="field-label" for="reportType">Report Type</label>
-          <select class="form-select" id="reportType" title="{{ unavailable.community_reports }}">
-            <option selected>Monthly Consultation Summary</option>
-            <option>Patient Registration Trend</option>
-            <option>Community Vaccination Summary</option>
-            <option>Top Community Health Concerns</option>
-            <option>Community Notification Report</option>
+          <select class="form-select" id="reportType" name="type">
+{%- for key, meta in selection.types.items() %}
+            <option value="{{ key }}"{{ ' selected' if key == selection.type }}>{{ meta.label }}</option>
+{%- endfor %}
           </select>
         </div>
-{#- "From" carried a frozen 2026-01-01. It was the last hardcoded date on this
-    screen, and it described a window nothing on the page was ever read over.
-    Both boxes now show the window the trends below actually plot — its first
-    month from the trend itself, its end from utils.dates.today() — so the range
-    moves with the clock and matches what the reader is looking at. #}
+{#- Both boxes are filled from the window actually in force, so reloading a
+    generated report shows the range it was generated for rather than resetting
+    to the default underneath the figures it produced. `max` stops the picker
+    offering a closing date after today; the server re-checks the pair regardless
+    and falls back to the default window with a stated reason. #}
         <div class="col-lg-2 col-md-3 col-sm-6">
-          <label class="field-label">From</label>
-          <input type="date" class="form-control" value="{{ consultation_report_stats.trend[0].month }}-01" title="{{ unavailable.community_reports }}">
+          <label class="field-label" for="fromDate">From</label>
+          <input type="date" class="form-control" id="fromDate" name="from"
+                 value="{{ window.start.isoformat() }}" max="{{ clinic_today.isoformat() }}">
         </div>
         <div class="col-lg-2 col-md-3 col-sm-6">
-          <label class="field-label">To</label>
-          <input type="date" class="form-control" value="{{ clinic_today.isoformat() }}" title="{{ unavailable.community_reports }}">
+          <label class="field-label" for="toDate">To</label>
+          <input type="date" class="form-control" id="toDate" name="to"
+                 value="{{ window.end.isoformat() }}" max="{{ clinic_today.isoformat() }}">
         </div>
         <div class="col-lg-4">
           <div class="d-flex gap-2 flex-wrap">
-            <button type="button" class="btn-primary-teal" disabled title="{{ unavailable.community_reports }}"><span class="material-symbols-outlined" style="font-size:18px;">insights</span>Generate</button>
-            <button type="button" class="btn-outline-teal" disabled title="{{ unavailable.print }}"><span class="material-symbols-outlined" style="font-size:18px;">print</span>Print</button>
+            <button type="submit" class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">insights</span>Generate</button>
+            <button type="button" class="btn-outline-teal" onclick="window.print()"
+                    title="Print this report — the sidebar, header and controls drop out, the charts print as data tables, and the range above goes on the letterhead"><span class="material-symbols-outlined" style="font-size:18px;">print</span>Print</button>
             <button type="button" class="btn-outline-teal" disabled title="{{ unavailable.export }}"><span class="material-symbols-outlined" style="font-size:18px;">picture_as_pdf</span>Export PDF</button>
             <button type="button" class="btn-outline-teal" disabled title="{{ unavailable.export }}"><span class="material-symbols-outlined" style="font-size:18px;">description</span>Export Excel</button>
           </div>
         </div>
+        <div class="col-12">
+          <span class="range-pill"><span class="material-symbols-outlined" style="font-size:14px;">date_range</span>
+            {{ window.start | display_date }} &ndash; {{ window.end | display_date }}
+          </span>
+          <span class="panel-sub" style="margin-left:8px;">
+{%- if window.custom %}Generated range &middot; {{ selection.type_label }}.
+{%- else %}Default window &middot; the last {{ window.months | length }} clinic months.{% endif %}
+            Immunisation coverage is judged as of {{ window.end | display_date }}; it is a
+            position on a day, not something counted across one.
+          </span>
+        </div>
       </div>
-      </fieldset>
-    </div>
+    </form>
 
     <!-- SUMMARY CARDS — the first three are counted; the fourth is not.
          Each delta is read off the trend chart directly below it rather than
@@ -197,10 +258,25 @@
     anywhere. Kept as a Jinja comment rather than an HTML one so the invented
     figures are not still sitting in the delivered markup — the same treatment
     health_programs.html and vaccination_campaigns.html already carry. #}
+    <h2 class="print-only print-section-title">Summary</h2>
     <div class="row g-3 mb-4">
+{#- Each card reports the window in force. On the default view that is still
+    "this month" with its month-over-month delta, which is what the screen has
+    always shown; on a generated range it is the range's own count, because
+    "this month" printed under a heading reading "March to June" would be a
+    figure from outside the report the reader asked for. #}
+{%- if 'consultations' in sections %}
       <div class="col-md-3 col-sm-6">
         <div class="stat-card">
           <div class="stat-icon" style="background:rgba(22,155,146,0.12);"><span class="material-symbols-outlined" style="color:var(--teal);">clinical_notes</span></div>
+{%- if window.custom %}
+          <div class="stat-value">{{ consultation_report_stats.window.total }}</div>
+          <div class="stat-label">Consultations Recorded</div>
+          <div class="stat-trend" style="color:var(--text-muted);">
+            {{ window.start | display_date }} &ndash; {{ window.end | display_date }} &middot;
+            {{ consultation_report_stats.window.patients_seen }} patient{{ '' if consultation_report_stats.window.patients_seen == 1 else 's' }} seen
+          </div>
+{%- else %}
           <div class="stat-value">{{ consultation_month.count }}</div>
           <div class="stat-label">Consultations Recorded This Month</div>
           <div class="stat-trend" style="color:var(--text-muted);">
@@ -213,11 +289,22 @@
             {{ '+' if consultation_month.change >= 0 else '' }}{{ consultation_month.change }} vs {{ consultation_month.previous_label }} ({{ consultation_month.previous_count }} recorded)
 {%- endif %}
           </div>
+{%- endif %}
         </div>
       </div>
+{%- endif %}
+{%- if 'registrations' in sections %}
       <div class="col-md-3 col-sm-6">
         <div class="stat-card">
           <div class="stat-icon" style="background:rgba(59,130,246,0.15);"><span class="material-symbols-outlined" style="color:var(--info);">person_add</span></div>
+{%- if window.custom %}
+          <div class="stat-value">{{ patient_report.window.registered }}</div>
+          <div class="stat-label">New Patient Registrations</div>
+          <div class="stat-trend" style="color:var(--text-muted);">
+            {{ window.start | display_date }} &ndash; {{ window.end | display_date }} &middot;
+            {{ patient_report.total }} on the register in total
+          </div>
+{%- else %}
           <div class="stat-value">{{ registration_month.count }}</div>
           <div class="stat-label">New Patient Registrations This Month</div>
           <div class="stat-trend" style="color:var(--text-muted);">
@@ -230,13 +317,16 @@
             {{ '+' if registration_month.change >= 0 else '' }}{{ registration_month.change }} vs {{ registration_month.previous_label }} ({{ registration_month.previous_count }} recorded)
 {%- endif %}
           </div>
+{%- endif %}
         </div>
       </div>
+{%- endif %}
 {#- "Vaccination Coverage Rate / All active campaigns" was two inventions in one
     card: the 83%, and the campaigns it claimed to average across. Nothing groups
     doses into a campaign — untracked.campaigns, which Screen 17 already carries.
     What is recorded is which children are up to date on the DOH EPI schedule,
     and that is what this now reports, against the denominator it actually has. #}
+{%- if 'vaccination' in sections %}
       <div class="col-md-3 col-sm-6">
         <div class="stat-card">
           <div class="stat-icon" style="background:rgba(34,197,94,0.15);"><span class="material-symbols-outlined" style="color:var(--success);">verified</span></div>
@@ -244,7 +334,8 @@
           <div class="stat-value">{{ immunization_coverage.up_to_date_pct }}%</div>
           <div class="stat-label">Children Up to Date on the DOH Schedule</div>
           <div class="stat-trend" style="color:var(--text-muted);" title="{{ untracked.population }}">
-            {{ immunization_coverage.up_to_date_children }} of {{ immunization_coverage.eligible_children }} registered children &middot; not a barangay-wide rate
+            {{ immunization_coverage.up_to_date_children }} of {{ immunization_coverage.eligible_children }} registered children
+            as of {{ window.end | display_date }} &middot; not a barangay-wide rate
           </div>
 {%- else %}
           <div class="stat-value" style="font-size:16px; color:var(--text-muted);">No children</div>
@@ -255,28 +346,50 @@
       </div>
       <div class="col-md-3 col-sm-6">
         <div class="stat-card">
+          <div class="stat-icon" style="background:rgba(34,197,94,0.15);"><span class="material-symbols-outlined" style="color:var(--success);">vaccines</span></div>
+          <div class="stat-value">{{ immunization_coverage.window.doses_given }}</div>
+          <div class="stat-label">Immunization Doses Given</div>
+          <div class="stat-trend" style="color:var(--text-muted);">
+            {{ window.start | display_date }} &ndash; {{ window.end | display_date }} &middot;
+            to {{ immunization_coverage.window.children_dosed }} child{{ '' if immunization_coverage.window.children_dosed == 1 else 'ren' }}
+          </div>
+        </div>
+      </div>
+{%- endif %}
+{%- if selection.type == 'all' %}
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
           <div class="stat-icon" style="background:rgba(245,158,11,0.15);"><span class="material-symbols-outlined" style="color:var(--warning);">summarize</span></div>
           <div class="stat-value" style="font-size:16px; color:var(--text-muted);">Not tracked</div>
           <div class="stat-label">Community Reports Generated Year-to-Date</div>
           <div class="stat-trend" style="color:var(--text-muted);" title="{{ untracked.generated_reports }}">Nothing writes a row when a report is produced</div>
         </div>
       </div>
+{%- endif %}
     </div>
 
     <!-- CHART SECTION — both canvases kept, because both now have a source. -->
     <div class="row g-3">
+{%- if 'consultations' in sections %}
       <div class="col-lg-6">
         <div class="panel-card h-100 mb-0">
 {%- set ctrend = consultation_report_stats.trend %}
-          <div class="panel-title mb-0">Monthly Consultations Trend</div>
+          <h2 class="print-only print-section-title">Monthly Consultations Trend</h2>
+          <div class="panel-title mb-0 no-print">Monthly Consultations Trend</div>
           <div class="panel-sub mb-0">
-            Consultations written up, {{ ctrend[0].label }}&ndash;{{ ctrend[-1].label }} {{ clinic_today.year }}
+            Consultations written up, {{ ctrend[0].label }}&ndash;{{ ctrend[-1].label }}
+            &middot; {{ consultation_report_stats.window.total }} in this range
             &middot; {{ consultation_report_stats.total }} on record in total
           </div>
-          <div style="height:24px;"></div>
+          <div style="height:24px;" class="no-print"></div>
           <div class="chart-wrap"><canvas id="chartConsultTrend"></canvas></div>
+{{ ct.chart_table('Consultations written up, by month',
+                  ctrend | map(attribute='label') | list,
+                  [{'name': 'Consultations', 'values': ctrend | map(attribute='count') | list}]) }}
         </div>
       </div>
+{%- endif %}
+{%- if 'concerns' in sections %}
       <div class="col-lg-6">
         <div class="panel-card h-100 mb-0">
 {#- This plotted seven conditions — Hypertension 186, Diabetes 124, Influenza 98,
@@ -284,22 +397,24 @@
     None was read from anything, and influenza, dengue and the common cold are
     not in the vocabulary this system records at all: the registration form
     offers four conditions, and those four are what is counted below. #}
-          <div class="panel-title mb-0">Top Community Health Concerns</div>
+          <h2 class="print-only print-section-title">Top Community Health Concerns</h2>
+          <div class="panel-title mb-0 no-print">Top Community Health Concerns</div>
           <div class="panel-sub mb-0">
             Chronic conditions recorded at registration, across all {{ conditions.cohort_size }} patient{{ '' if conditions.cohort_size == 1 else 's' }} &middot; no patient-level data
           </div>
-          <div style="height:24px;"></div>
+          <div style="height:24px;" class="no-print"></div>
 {%- if conditions.with_any %}
           <div class="chart-wrap"><canvas id="chartHealthConcerns"></canvas></div>
+{{ ct.chart_table('Chronic conditions recorded at registration (whole register)',
+                  top_conditions | map(attribute='condition') | list,
+                  [{'name': 'Patients', 'values': top_conditions | map(attribute='count') | list}],
+                  first_head='Condition') }}
           <div class="basis-note mt-3">
             A patient with two conditions is counted under each, so these do not sum to the roster.
 {%- if conditions.other_only %}
             {{ conditions.other_only }} patient{{ '' if conditions.other_only == 1 else 's' }}
             recorded only free-text conditions and {{ 'is' if conditions.other_only == 1 else 'are' }} not counted here.
 {%- endif %}
-            Presenting illness is typed as free text on the consultation form and is not coded, so it is
-            listed rather than charted &mdash; see Most Common Diagnoses on
-            <a href="{{ url_for(reports_analytics_endpoint) }}" class="panel-link" style="display:inline;">Reports &amp; Analytics</a>.
           </div>
 {%- else %}
           <div class="empty-note">
@@ -307,8 +422,47 @@
             conditions are counted here as they are entered; nothing is inferred from a consultation.
           </div>
 {%- endif %}
+{#- The honest half of this panel. "Top health concerns" over a date range has
+    two answers and they are different questions: what people were diagnosed with
+    during the range, and what chronic conditions the register holds. The first is
+    ranged and is listed below; the second is the chart above and describes who is
+    registered today, not who was ill during the range. Showing one without
+    saying which it is would let a reader take the standing register for the
+    period's illness. #}
+          <div class="snapshot-note">
+            The chart above is the whole register as it stands today &mdash; {{ snapshot_note }}
+            What <em>was</em> recorded between {{ window.start | display_date }} and
+            {{ window.end | display_date }} is listed beside it.
+          </div>
         </div>
       </div>
+      <div class="col-lg-6">
+        <div class="panel-card h-100 mb-0">
+          <h2 class="print-only print-section-title">Diagnoses Recorded in This Range</h2>
+          <div class="panel-title mb-0 no-print">Diagnoses Recorded in This Range</div>
+          <div class="panel-sub mb-0">
+            {{ window.start | display_date }} &ndash; {{ window.end | display_date }} &middot;
+            from {{ consultation_report_stats.window.total }} consultation{{ '' if consultation_report_stats.window.total == 1 else 's' }}
+          </div>
+          <div style="height:12px;"></div>
+{%- for entry in consultation_report_stats.window.top_diagnoses %}
+          <div class="fig-row">
+            <span class="fig-name">{{ entry.label }}</span>
+            <span class="fig-value">{{ entry.count }}</span>
+          </div>
+{%- else %}
+          <div class="empty-note">No consultation was written up in this range.</div>
+{%- endfor %}
+{%- if consultation_report_stats.window.top_diagnoses %}
+          <div class="basis-note mt-3">
+            Grouped by the text entered, ignoring case. Diagnosis is prose a health worker typed and is
+            not coded against ICD or any other classification this system holds, so two spellings of one
+            condition count separately.
+          </div>
+{%- endif %}
+        </div>
+      </div>
+{%- endif %}
     </div>
 
     <div style="height:24px;"></div>
@@ -321,60 +475,75 @@
          get_appointment_report() -- the same figures the role is already served
          on Reports & Analytics -- and not the queue. -->
     <div class="row g-3">
+{%- if 'appointments' in sections %}
+{%- set appt = appointment_report.window %}
       <div class="col-lg-6">
         <div class="panel-card h-100 mb-0">
-          <div class="panel-title mb-0">Appointment Outcomes, {{ appointment_report.year }}</div>
-          <div class="panel-sub mb-0">{{ appointment_report.ytd_total }} appointment{{ '' if appointment_report.ytd_total == 1 else 's' }} dated to this year</div>
+          <h2 class="print-only print-section-title">Appointment Outcomes</h2>
+          <div class="panel-title mb-0 no-print">Appointment Outcomes</div>
+          <div class="panel-sub mb-0">
+            {{ window.start | display_date }} &ndash; {{ window.end | display_date }} &middot;
+            {{ appt.total }} appointment{{ '' if appt.total == 1 else 's' }} dated into this range
+          </div>
           <div style="height:16px;"></div>
           <div class="fig-row">
             <span class="fig-name">Attended<span class="fig-note">Completed, plus those in the clinic right now</span></span>
-            <span class="fig-value">{{ appointment_report.ytd_attended }}</span>
+            <span class="fig-value">{{ appt.attended }}</span>
           </div>
           <div class="fig-row">
             <span class="fig-name">Cancelled or no-show</span>
-            <span class="fig-value">{{ appointment_report.ytd_missed }}</span>
+            <span class="fig-value">{{ appt.missed }}</span>
           </div>
           <div class="fig-row">
             <span class="fig-name">Still expected<span class="fig-note">Booked, not yet resolved</span></span>
-            <span class="fig-value">{{ appointment_report.ytd_expected }}</span>
+            <span class="fig-value">{{ appt.expected }}</span>
           </div>
           <div class="fig-row">
-            <span class="fig-name">Attendance rate<span class="fig-note">Of the {{ appointment_report.resolved }} that have resolved &mdash; a visit still to happen has not yet succeeded or failed</span></span>
-{%- if appointment_report.attendance_pct is not none %}
-            <span class="fig-value">{{ appointment_report.attendance_pct }}%</span>
+            <span class="fig-name">Attendance rate<span class="fig-note">Of the {{ appt.resolved }} that have resolved &mdash; a visit still to happen has not yet succeeded or failed</span></span>
+{%- if appt.attendance_pct is not none %}
+            <span class="fig-value">{{ appt.attendance_pct }}%</span>
 {%- else %}
             <span class="fig-value muted">No resolved visits</span>
 {%- endif %}
           </div>
           <div class="fig-row">
-            <span class="fig-name">Walk-ins<span class="fig-note">Of {{ appointment_report.ytd_booked }} booked in advance</span></span>
-            <span class="fig-value">{{ appointment_report.ytd_walk_ins }}</span>
+            <span class="fig-name">Walk-ins<span class="fig-note">Of {{ appt.booked }} booked in advance</span></span>
+            <span class="fig-value">{{ appt.walk_ins }}</span>
           </div>
         </div>
       </div>
+{%- endif %}
+{%- if 'notifications' in sections %}
+{%- set sms = broadcast_stats.window %}
       <div class="col-lg-6">
         <div class="panel-card h-100 mb-0">
-          <div class="panel-title mb-0">Community Notifications</div>
-          <div class="panel-sub mb-0">SMS broadcasts this barangay has published</div>
+          <h2 class="print-only print-section-title">Community Notifications</h2>
+          <div class="panel-title mb-0 no-print">Community Notifications</div>
+          <div class="panel-sub mb-0">
+            SMS broadcasts published {{ window.start | display_date }} &ndash; {{ window.end | display_date }}
+          </div>
           <div style="height:16px;"></div>
           <div class="fig-row">
-            <span class="fig-name">Broadcasts sent this month</span>
-            <span class="fig-value">{{ broadcast_stats.this_month }}</span>
-          </div>
-          <div class="fig-row">
-            <span class="fig-name">Broadcasts on record<span class="fig-note">{{ broadcast_stats.simulated_broadcasts }} through the simulated gateway</span></span>
-            <span class="fig-value">{{ broadcast_stats.total_broadcasts }}</span>
+            <span class="fig-name">Broadcasts published in this range<span class="fig-note">{{ sms.simulated }} through the simulated gateway</span></span>
+            <span class="fig-value">{{ sms.broadcasts }}</span>
           </div>
           <div class="fig-row">
             <span class="fig-name">Messages handed to the gateway</span>
-            <span class="fig-value">{{ broadcast_stats.messages_sent }}</span>
+            <span class="fig-value">{{ sms.messages_sent }}</span>
           </div>
           <div class="fig-row">
             <span class="fig-name">Messages that failed to send</span>
-            <span class="fig-value">{{ broadcast_stats.messages_failed }}</span>
+            <span class="fig-value">{{ sms.messages_failed }}</span>
           </div>
           <div class="fig-row">
-            <span class="fig-name">Contacts reachable by SMS<span class="fig-note">Patients with a usable mobile number on file</span></span>
+            <span class="fig-name">Broadcasts on record, all time</span>
+            <span class="fig-value">{{ broadcast_stats.total_broadcasts }}</span>
+          </div>
+{#- Deliberately outside the range. This counts who could be texted now, from
+    today's roster; the system keeps no history of who was reachable in March, so
+    a ranged version of it would be asserting a roster it does not hold. #}
+          <div class="fig-row">
+            <span class="fig-name">Contacts reachable by SMS<span class="fig-note">Patients with a usable mobile number on file, today</span></span>
             <span class="fig-value">{{ broadcast_stats.reachable_contacts }}</span>
           </div>
           <div class="untracked mt-3">
@@ -386,6 +555,7 @@
           </div>
         </div>
       </div>
+{%- endif %}
     </div>
 
     <div style="height:24px;"></div>
@@ -398,7 +568,11 @@
          buttons that could not open anything have gone with the rows that
          invented their subjects, which is the same treatment Screen 10's
          "Recent Generated Reports" panel already carries for this exact gap. -->
-    <div class="panel-card mb-0">
+{#- Still not tracked, and generating a report on this screen has not changed
+    that: nothing writes a row when one is produced. Kept off the printout --
+    a sheet handed to the RHU has no use for a note about this application's
+    internal history. #}
+    <div class="panel-card mb-0 no-print">
       <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
         <div>
           <div class="panel-title">Recent Community Reports<span class="untracked-tag">Not tracked</span></div>
@@ -410,12 +584,20 @@
         <div>
           <div class="untracked-title">No report history is recorded</div>
           <!-- Screen 10's own reason, reused rather than restated: its "Recent
-               Generated Reports" panel is empty for exactly this gap. It used to
-               quote unavailable.community_reports here, which described the whole
-               screen having no data source and no longer says anything true. -->
+               Generated Reports" panel is empty for exactly this gap. Generating
+               a report is real now; recording that one was generated is not. -->
           <div class="untracked-body">{{ untracked.generated_reports }}</div>
         </div>
       </div>
+    </div>
+
+{#- The sheet says what produced it and over what. Without this a printed page
+    of barangay figures is a page of numbers with no provenance. #}
+    <div class="print-only print-foot">
+      {{ selection.type_label }} &middot; {{ window.start | long_date }} to {{ window.end | long_date }}
+      &middot; generated from Barangay Poblacion Health Center records by IDS-BPHCSN.
+      Figures are counted from stored consultations, registrations, appointments, immunisation
+      doses and SMS broadcasts. Immunisation coverage is the position as of {{ window.end | long_date }}.
     </div>
 {% endblock %}
 
@@ -493,4 +675,19 @@
     },
     options: { indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:countAxis, y:{grid:{display:false}}} }
   });
+
+  // The printed date is stamped when the dialog opens, not at page load: a
+  // report left open on a desk overnight would otherwise print with yesterday's
+  // date on it. beforeprint also covers the browser's own Ctrl+P, which never
+  // reaches the Print button. Same treatment Patient Records already carries.
+  (function(){
+    function stamp(){
+      var when = new Date().toLocaleString(undefined, {
+        year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit'
+      });
+      document.querySelectorAll('.print-stamp').forEach(function(el){ el.textContent = when; });
+    }
+    window.addEventListener('beforeprint', stamp);
+    stamp();
+  })();
 </script>{% endblock %}

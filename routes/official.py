@@ -45,7 +45,7 @@ def official_reports_analytics():
     page submits."""
     return render_template(
         'reports_analytics.html',
-        **reports_analytics_context(report_type=request.args.get("type", "all")),
+        **reports_analytics_context(args=request.args),
     )
 
 
@@ -107,9 +107,11 @@ def community_reports():
     official_views.community_reports_context() for where each one comes from and
     for the two the barangay's records cannot answer.
 
-    Same guard as the three screens above it: this role and no other. Nothing on
-    the page posts, and there is no POST counterpart in this blueprint."""
-    return render_template('community_reports.html', **community_reports_context())
+    Same guard as the three screens above it: this role and no other. Generate
+    submits the report type and the two dates back to this same GET, so there is
+    still no POST counterpart in this blueprint and no new guard surface."""
+    return render_template('community_reports.html',
+                           **community_reports_context(args=request.args))
 
 
 @official_bp.route('/notifications')

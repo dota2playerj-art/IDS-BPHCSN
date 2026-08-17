@@ -49,7 +49,7 @@ from datetime import timedelta
 from database.connection import get_db
 from models.consultations import PEDIATRIC_AGE_YEARS, as_date
 from models.patients import add_months, calculate_age
-from utils.dates import today
+from utils.dates import resolve_range, today
 
 # ---------------------------------------------------------------------------
 # The Department of Health Expanded Program on Immunization infant schedule.
@@ -471,7 +471,7 @@ def get_immunization_alert(limit=None, on_date=None):
     }
 
 
-def get_immunization_coverage(on_date=None):
+def get_immunization_coverage(on_date=None, start=None, end=None, months=6):
     """Programme-level immunisation figures for Screen 10.
 
     `enrolled` is the number of distinct patients with at least one dose on
@@ -484,16 +484,42 @@ def get_immunization_coverage(on_date=None):
     The due/overdue figures come from get_immunization_alert(), the same call
     behind both dashboards and the queue badges, so this panel cannot report a
     different number of defaulters from the rest of the project.
+
+    WHY ONLY DOSES ARE RANGED
+    -------------------------
+    Doses are events and the `window` block counts them between two dates.
+    Coverage is not: "up to date on the schedule" is a judgement about a child
+    made on one day, and the only honest way to range it is to ask it as of the
+    range's closing date -- which is what passing `end` does, through the
+    existing `on_date`. There is no such thing as a child being up to date
+    "during March", and a report that offered one would be inventing a reading
+    the DOH schedule does not have.
     """
+    window = resolve_range(start=start, end=end, months=months, on_date=on_date)
     conn = get_db()
     enrolled = conn.execute(
         "SELECT COUNT(DISTINCT patient_id) FROM immunizations"
     ).fetchone()[0]
     doses_given = conn.execute("SELECT COUNT(*) FROM immunizations").fetchone()[0]
+    scoped = conn.execute(
+        """
+        SELECT COUNT(*) AS doses, COUNT(DISTINCT patient_id) AS children
+        FROM immunizations
+        WHERE substr(date_administered, 1, 10) BETWEEN ? AND ?
+        """,
+        (window["start"].isoformat(), window["end"].isoformat()),
+    ).fetchone()
     conn.close()
 
     alert = get_immunization_alert(on_date=on_date)
     return {
+        "window": {
+            "start": window["start"],
+            "end": window["end"],
+            "custom": window["custom"],
+            "doses_given": scoped["doses"],
+            "children_dosed": scoped["children"],
+        },
         "enrolled": enrolled,
         "doses_given": doses_given,
         "needing_attention": alert["child_count"],

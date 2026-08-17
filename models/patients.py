@@ -10,7 +10,15 @@ import json
 from datetime import date, datetime
 
 from database.connection import get_db
-from utils.dates import day_start_utc, days_ago, month_bounds, recent_months, today
+from utils.dates import (
+    day_start_utc,
+    days_ago,
+    month_bounds,
+    range_bounds_utc,
+    recent_months,
+    resolve_range,
+    today,
+)
 from utils.phone import is_valid_ph_mobile, to_local_ph_mobile
 
 # The vocabularies the Register Patient form offers. The template renders its
@@ -500,7 +508,7 @@ def get_condition_counts(patients=None, conditions=CONDITION_OPTIONS, min_age=No
     }
 
 
-def get_registration_trend(months=6, end=None):
+def get_registration_trend(months=6, end=None, start=None):
     """New patient registrations per clinic month, oldest first.
 
     The window boundaries are built in Python and converted to UTC instants
@@ -511,30 +519,80 @@ def get_registration_trend(months=6, end=None):
     Months with no registrations are returned as zeros rather than omitted --
     a trend line that skipped its empty months would compress the gap and read
     as steady activity through a period when nobody registered at all.
+
+    `start` alongside `end` asks for a specific range instead of the last
+    `months`. The two parameters keep the meaning they already had -- `end` was
+    always the day whose month the window finishes on -- so resolve_range() reads
+    an existing call and a ranged one the same way and no caller had to change.
     """
-    windows = recent_months(months, end)
+    window = resolve_range(start=start, end=end, months=months)
+    # Each month's bar is clipped to the range, so the first and last may be part
+    # months. A report for 1-10 August whose August bar counted the whole month
+    # would put a figure on the chart that is not in the report -- see the same
+    # note in get_consultation_stats(). The clamp is a no-op on the default
+    # window, whose bounds are month boundaries already.
+    lo_text, hi_text = range_bounds_utc(window)
     conn = get_db()
     trend = []
-    for start, next_start, label in windows:
+    for month_start, next_start, label in window["months"]:
+        bar_lo = max(day_start_utc(month_start), lo_text)
+        bar_hi = min(day_start_utc(next_start), hi_text)
         count = conn.execute(
             "SELECT COUNT(*) FROM patients WHERE created_at >= ? AND created_at < ?",
-            (day_start_utc(start), day_start_utc(next_start)),
-        ).fetchone()[0]
-        trend.append({"month": start.strftime("%Y-%m"), "label": label, "count": count})
+            (bar_lo, bar_hi),
+        ).fetchone()[0] if bar_lo < bar_hi else 0
+        trend.append(
+            {"month": month_start.strftime("%Y-%m"), "label": label, "count": count}
+        )
     conn.close()
     return trend
 
 
-def get_patient_report(months=6):
+def count_registered_in(window):
+    """Patients registered inside a resolved range.
+
+    Counted against the range's own day boundaries rather than by summing the
+    trend above: the trend counts whole months, and a range that starts on the
+    12th would otherwise report the registrations from the 1st to the 11th as
+    though the operator had asked for them.
+    """
+    lo, hi = range_bounds_utc(window)
+    conn = get_db()
+    count = conn.execute(
+        "SELECT COUNT(*) FROM patients WHERE created_at >= ? AND created_at < ?",
+        (lo, hi),
+    ).fetchone()[0]
+    conn.close()
+    return count
+
+
+def get_patient_report(months=6, start=None, end=None):
     """Everything Screen 10 shows about patients, from one read of the roster.
 
     get_all_patients() is called once and handed to each breakdown, so the age
     bands, the sex split and the condition counts all describe the same roster --
     and the headline totals come straight from get_patient_stats(), the function
     Screen 03's own stat cards use.
+
+    WHAT A DATE RANGE CAN AND CANNOT NARROW HERE
+    --------------------------------------------
+    Registrations are an event and are ranged: `registration_trend` and the
+    `window` block below both answer "who joined the register between these
+    dates".
+
+    The age bands, the sex split and the condition counts are not, and are
+    deliberately left describing the whole roster. They answer "who is registered
+    here", which is a standing fact about today and not something that happened
+    during a period. Narrowing them to a range would silently turn them into
+    "the age profile of patients who happened to register in June" -- a real but
+    completely different figure, and one nobody reading a chart headed "Patient
+    Age Distribution" would take it for. The screens label these as whole-roster
+    for that reason; see `window["roster_is_ranged"]`, which is always False and
+    exists so a template can state it rather than assume it.
     """
     patients = get_all_patients()
     stats = get_patient_stats()
+    window = resolve_range(start=start, end=end, months=months)
     return {
         "stats": stats,
         "total": len(patients),
@@ -544,8 +602,15 @@ def get_patient_report(months=6):
         "senior_conditions": get_condition_counts(patients, min_age=SENIOR_AGE),
         "senior_count": stats["senior_count"],
         "senior_share_pct": stats["senior_share_pct"],
-        "registration_trend": get_registration_trend(months),
+        "registration_trend": get_registration_trend(months, end=end, start=start),
         "senior_age": SENIOR_AGE,
+        "window": {
+            "start": window["start"],
+            "end": window["end"],
+            "custom": window["custom"],
+            "registered": count_registered_in(window),
+            "roster_is_ranged": False,
+        },
     }
 
 

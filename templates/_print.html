@@ -148,8 +148,50 @@
     font-weight:600 !important;
   }
 
+  /* ---- Charts become tables ---------------------------------------------- */
+  /* Added when the two report screens learned to print. A <canvas> is a bitmap
+     painted after load, and every browser's print dialog defaults "background
+     graphics" to off -- with it off a chart prints as an empty box or is dropped
+     outright, which loses half a report without telling anybody. Each chart on
+     those screens therefore carries a .print-table of the same series, built by
+     _chart_table.html from the identical context expression the chart plots.
+     Here the two swap places. Screens with no .print-table are unaffected: they
+     have no canvas either. */
+  canvas{display:none !important;}
+  .chart-wrap, .chart-wrap.short, .chart-wrap-sm{height:auto !important; min-height:0 !important;}
+
+  table.print-table{
+    display:table !important;
+    width:100% !important;
+    margin:4px 0 10px !important;
+    break-inside:avoid; page-break-inside:avoid;
+  }
+  table.print-table caption{
+    caption-side:top;
+    text-align:left;
+    font-size:9.5pt;
+    font-weight:700;
+    color:#000;
+    padding:0 0 3px;
+  }
+  table.print-table td.num, table.print-table th.num{text-align:right;}
+  /* The first column of a chart table is <th scope="row"> -- it labels the row,
+     which is what makes the table readable to a screen reader as well as on
+     paper. Without this it would also pick up the heavy black underline the
+     rule above gives column headers, and every data row would be drawn as
+     though it were a heading. Row headers are ordinary cells to look at. */
+  table.print-table tbody th{
+    border-bottom:1px solid #BBB !important;
+    font-weight:400 !important;
+  }
+
   /* ---- Print-only furniture ---------------------------------------------- */
   .print-only{display:block !important;}
+  /* A table cannot be display:block without collapsing its own layout, and the
+     rule above is a blanket one. Both are re-stated for the elements whose
+     correct display value is not `block`. */
+  tr.print-only{display:table-row !important;}
+  span.print-only, .print-inline{display:inline !important;}
 
   /* The letterhead. Printed records leave the building, so each page set says
      where it came from, who printed it and when -- a sheet found on a desk
