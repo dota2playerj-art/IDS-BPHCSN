@@ -1,0 +1,809 @@
+"""Export Excel, for both report screens.
+
+Reports & Analytics (Screen 10) and Community Reports (Screen 18) each offer an
+Export Excel control. This module is what both of them press. It reads the same
+context builder the screen itself rendered from -- reports_analytics_context()
+and community_reports_context() -- so a figure in the downloaded workbook cannot
+disagree with the figure the operator was looking at when they clicked. Nothing
+here counts anything; there is no SQL in this file and no arithmetic that the
+model functions do not already do.
+
+That is the rule this whole project reports under, applied to a file instead of
+a screen: get_consultation_stats() is the only thing that knows how many
+consultations there were, and every surface that states the number reads it from
+there. An export that issued its own query would eventually disagree with the
+page it was exported from, and both would look right in isolation.
+
+WHY THIS EXISTS AT ALL
+----------------------
+It is not in 03_SCREEN_SPECIFICATIONS. It is here on the confirmed team decision
+that it answers a real need the specification did not anticipate: barangay
+health workers submit statistics upward to the RHU and the Municipal Health
+Office, and those offices work in spreadsheets. Print already produces a sheet
+somebody can file; it does not produce figures somebody can add up, chart or
+paste into a municipal consolidation. That is the gap this closes.
+
+WHAT IT COVERS
+--------------
+Whatever the screen is currently showing. The export route parses the same query
+string the screen does, through the same parse_report_range(), so the workbook
+covers the report type and the date range in force -- the default window, or a
+custom range that was generated -- and says on its first sheet which of the two
+it is. The buttons on both screens link to the *resolved* window rather than to
+whatever is typed in the date boxes, so Export Excel and Print produce the same
+report, which is the report on the screen.
+
+CHARTS BECOME COLUMNS
+---------------------
+A spreadsheet has no canvas. Every chart on both screens already carries a table
+of its own numbers for the printer -- templates/_chart_table.html, which exists
+because a <canvas> prints as a blank box with "Background graphics" unticked --
+and those same series are what the workbook writes as rows. The health worker
+opening the file gets the numbers behind every chart, which is what a
+spreadsheet is for; nobody needs a picture of a bar chart in Excel.
+
+WHAT IS DELIBERATELY NOT IN IT
+------------------------------
+The "not yet tracked" notes are, on their own final sheet. An export that
+silently dropped them would be the one place in this system where a figure's
+absence stopped being stated -- and it is the copy that leaves the building, so
+it is the copy where an unexplained blank does the most damage. A reader of the
+workbook can see that delivery confirmation, dispensing history and programme
+enrolment are not recorded, in the same words the screen uses.
+"""
+from io import BytesIO
+
+from flask import send_file
+
+from utils.dates import display_date, long_date, now, today
+from utils.security import get_current_user
+from utils.workbook import (
+    XLSX_MIMETYPE, build, figures, safe_filename, sheet, table,
+)
+
+# The order sections appear in as sheets. One list for both screens, so a
+# section common to the two -- consultations, registrations, appointments -- sits
+# in the same relative place in either workbook and a reader who has seen one
+# knows where to look in the other.
+SECTION_ORDER = (
+    "registrations",
+    "consultations",
+    "diagnoses",
+    "concerns",
+    "appointments",
+    "services",
+    "vaccination",
+    "demographics",
+    "seniors",
+    "programs",
+    "inventory",
+    "sms",
+    "notifications",
+)
+
+# Sheet name per section. Kept inside Excel's 31-character limit here rather
+# than being truncated by the writer, so the names are chosen rather than
+# chopped.
+SHEET_TITLES = {
+    "registrations": "Registrations",
+    "consultations": "Consultations",
+    "diagnoses": "Diagnoses",
+    "concerns": "Health Concerns",
+    "appointments": "Appointments",
+    "services": "Health Services",
+    "vaccination": "Immunisation",
+    "demographics": "Demographics",
+    "seniors": "Senior Citizens",
+    "programs": "Health Programmes",
+    "inventory": "Medicine Inventory",
+    "sms": "SMS Activity",
+    "notifications": "Notifications",
+}
+
+# One line saying what each sheet holds, for the index on the cover.
+SHEET_SUMMARIES = {
+    "registrations": "New patient registrations per month, and the range's total.",
+    "consultations": "Consultations written up per month, and who was seen.",
+    "diagnoses": "The most common diagnoses recorded inside the range.",
+    "concerns": "Chronic conditions on the register, and the range's diagnoses.",
+    "appointments": "Appointment outcomes per month, and the attendance rate.",
+    "services": "Which services the range's appointments were booked for.",
+    "vaccination": "Immunisation coverage on the closing date, and doses given.",
+    "demographics": "Age, sex and chronic-condition breakdowns of the register.",
+    "seniors": "The senior cohort and the conditions recorded against it.",
+    "programs": "Programme membership the stored data can establish.",
+    "inventory": "Stock condition today, and every item below its reorder level.",
+    "sms": "SMS broadcast activity inside the range, and all time.",
+    "notifications": "SMS broadcast activity inside the range, and all time.",
+}
+
+# Which "not yet tracked" reasons a section is responsible for stating. The
+# reason texts themselves are never written here -- they are looked up from the
+# context's own `untracked` dict, which is routes/report_views.UNTRACKED and
+# official_views.LOCAL_UNTRACKED merged. One wording, quoted by the screen and
+# by the file it exports.
+SECTION_UNTRACKED = {
+    "vaccination": ("population", "campaigns"),
+    "seniors": ("prenatal",),
+    "programs": ("programs",),
+    "inventory": ("dispensing",),
+    "sms": ("sms",),
+    "notifications": ("delivery",),
+}
+
+# Stated on every workbook, whichever sections it holds. Exporting a report is
+# still not recorded anywhere -- this feature did not change that -- and the
+# screens both say so, so the file says so too.
+ALWAYS_UNTRACKED = ("generated_reports",)
+
+
+# ---------------------------------------------------------------------------
+# The two entry points
+# ---------------------------------------------------------------------------
+
+def excel_response(built):
+    """A (bytes, filename) pair as the download itself.
+
+    All three export routes -- the Administrator's and the Barangay Official's
+    views of Screen 10, and Community Reports -- return through here, so the
+    attachment header, the MIME type and the filename are decided once. A route
+    that assembled its own response is how one of the three would end up serving
+    a workbook the browser offers to open as a text file.
+    """
+    payload, filename = built
+    return send_file(
+        BytesIO(payload),
+        mimetype=XLSX_MIMETYPE,
+        as_attachment=True,
+        download_name=filename,
+    )
+
+
+def exported_by():
+    """The signed-in account's own name, for the cover sheet.
+
+    Read the way utils/context.py reads it for the sidebar and the print
+    letterhead, so the name on an exported workbook is the name on the printed
+    sheet of the same report. get_current_user() hands back a sqlite3.Row, which
+    indexes but has no .get().
+    """
+    user = get_current_user()
+    if user is not None and "full_name" in user.keys():
+        return (user["full_name"] or "").strip()
+    return ""
+
+
+def analytics_workbook(context, produced_by=""):
+    """Reports & Analytics (Screen 10) as a workbook: bytes and a filename."""
+    return _workbook(context, "Reports & Analytics", produced_by)
+
+
+def community_workbook(context, produced_by=""):
+    """Community Reports (Screen 18) as a workbook: bytes and a filename."""
+    return _workbook(context, "Community Reports", produced_by)
+
+
+def _workbook(context, screen, produced_by):
+    """Both screens' export, built from one screen's own context.
+
+    The screen name is the only thing that differs structurally, and it differs
+    only on the cover sheet and in the filename. Everything else is decided by
+    which sections the selected report type keeps -- which is the same
+    `selection.sections` set the template branches on -- so the two screens
+    cannot grow different ideas of what a consultation sheet contains.
+    """
+    selection = context["selection"]
+    window = context["report_window"]
+    sections = [
+        name for name in SECTION_ORDER
+        if name in selection["sections"] and name in _SECTION_BUILDERS
+    ]
+
+    sheets = [_cover_sheet(context, screen, sections, produced_by)]
+    summary = _summary_sheet(context, sections)
+    if summary:
+        sheets.append(summary)
+    for name in sections:
+        built = _SECTION_BUILDERS[name](context)
+        if built:
+            sheets.append(
+                sheet(SHEET_TITLES[name], built, heading=_heading(name, window))
+            )
+    sheets.append(_not_tracked_sheet(context, sections))
+
+    filename = safe_filename(
+        f"IDS-BPHCSN {screen} - {selection['type_label']} - "
+        f"{window['start'].isoformat()} to {window['end'].isoformat()}.xlsx"
+    )
+    return build(sheets), filename
+
+
+def _heading(name, window):
+    return (
+        f"{SHEET_TITLES[name]} — {display_date(window['start'])} to "
+        f"{display_date(window['end'])}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Cover, summary and notes
+# ---------------------------------------------------------------------------
+
+def _cover_sheet(context, screen, sections, produced_by):
+    """What this file is, what it covers, and what is in it.
+
+    A workbook of figures with no provenance is the spreadsheet version of the
+    unlabelled printout _print.html's letterhead exists to prevent. This names
+    the health center, the report, the exact days counted, who took it off the
+    system and when -- and then, because a spreadsheet hides its other sheets
+    behind tabs, indexes them.
+    """
+    selection = context["selection"]
+    window = context["report_window"]
+    stamped = now()
+
+    detail = [
+        ("Report", selection["type_label"]),
+        ("Screen", screen),
+        ("Covers", f"{long_date(window['start'])} to {long_date(window['end'])}"),
+        (
+            "Range",
+            "Custom range, generated on the screen"
+            if window["custom"] else
+            f"Default window — the last {len(window['months'])} clinic months",
+        ),
+        ("Exported", stamped.strftime("%B %d, %Y at %I:%M %p")),
+        ("Exported by", produced_by or "—"),
+        ("Source", "Barangay Poblacion Health Center records, via IDS-BPHCSN"),
+    ]
+
+    index = [
+        [SHEET_TITLES[name], SHEET_SUMMARIES[name]] for name in sections
+    ]
+    if index:
+        index.insert(0, ["Summary", "The headline figures from every sheet below."])
+    index.append(["Not Tracked", "Figures this system has no source for, and why."])
+
+    blocks = [
+        table("This report", ("Item", "Detail"), detail, empty="—"),
+        table("Sheets in this workbook", ("Sheet", "What it holds"), index),
+    ]
+
+    if selection["errors"]:
+        # The screen refuses a range it cannot read and falls back to the default
+        # window with the reason printed above the figures. The export carries
+        # that refusal rather than quietly presenting the fallback as though it
+        # were what was asked for.
+        blocks.append(table(
+            "The range asked for was not used",
+            ("Problem",),
+            [[problem] for problem in selection["errors"]],
+            note=("The figures in this workbook cover the default window instead. "
+                  "A report quietly counting different days from the ones typed "
+                  "would be worse than one that says so."),
+        ))
+
+    return sheet(
+        "Report",
+        blocks,
+        heading="Barangay Poblacion Health Center",
+        intro=(
+            "Integrated Data System for Barangay Poblacion Health Center "
+            "Networking (IDS-BPHCSN).\n"
+            + context["snapshot_note"]
+            + "\nEvery sheet says, under its own heading, whether its figures "
+            "were counted inside the range or describe the position today."
+        ),
+    )
+
+
+def _summary_sheet(context, sections):
+    """The stat cards, as rows. One place a reader can check the headline totals.
+
+    Each row carries the basis it was counted on, because half of these are
+    ranged and half are not, and a column of numbers with no basis beside them is
+    exactly how a snapshot figure ends up quoted as a period one.
+    """
+    window = context["report_window"]
+    ranged = f"{display_date(window['start'])} to {display_date(window['end'])}"
+    standing = f"Position as of {display_date(today())}, not narrowed by the range"
+    rows = []
+
+    if "registrations" in sections:
+        patients = context["patient_report"]
+        rows.append(("Total registered patients", patients["stats"]["total_patients"], standing))
+        rows.append(("Registered in this range", patients["window"]["registered"], ranged))
+    if "consultations" in sections:
+        consultations = context["consultation_report_stats"]
+        rows.append(("Consultations recorded", consultations["window"]["total"], ranged))
+        rows.append(("Patients seen", consultations["window"]["patients_seen"], ranged))
+        rows.append(("Consultations on record, all time", consultations["total"],
+                     "Every consultation ever recorded"))
+    if "appointments" in sections:
+        appointments = context["appointment_report"]["window"]
+        rows.append(("Appointments", appointments["total"], ranged))
+        rows.append(("Attendance rate (%)", appointments["attendance_pct"],
+                     f"Of the {appointments['resolved']} that have resolved, {ranged}"))
+    if "vaccination" in sections:
+        coverage = context["immunization_coverage"]
+        rows.append(("Children up to date on the DOH schedule (%)",
+                     coverage["up_to_date_pct"],
+                     f"{coverage['up_to_date_children']} of "
+                     f"{coverage['eligible_children']} registered children, as of "
+                     f"{display_date(window['end'])}"))
+        rows.append(("Immunisation doses given", coverage["window"]["doses_given"], ranged))
+    if "inventory" in sections:
+        inventory = context["inventory_report"]
+        rows.append(("Inventory items tracked", inventory["total_items"], standing))
+        rows.append(("Items below reorder level", inventory["low_stock_count"], standing))
+    if "programs" in sections:
+        for program in context["programs"]:
+            rows.append((f"{program['name']} — members", program["count"],
+                         f"{program['basis']}. {standing}"))
+    if "concerns" in sections:
+        conditions = context["conditions"]
+        rows.append(("Patients with a recorded chronic condition",
+                     conditions["with_any"], standing))
+    for key in ("sms", "notifications"):
+        if key in sections:
+            broadcasts = context["broadcast_stats"]
+            rows.append(("SMS broadcasts published", broadcasts["window"]["broadcasts"], ranged))
+            rows.append(("Messages handed to the gateway",
+                         broadcasts["window"]["messages_sent"], ranged))
+            break
+
+    if not rows:
+        return None
+    return sheet(
+        "Summary",
+        [figures("Headline figures", rows)],
+        heading=f"Summary — {ranged}",
+    )
+
+
+def _not_tracked_sheet(context, sections):
+    """Everything the barangay's records cannot answer, in the screen's words."""
+    untracked = context["untracked"]
+    keys = []
+    for name in sections:
+        for key in SECTION_UNTRACKED.get(name, ()):
+            if key not in keys:
+                keys.append(key)
+    for key in ALWAYS_UNTRACKED:
+        if key not in keys:
+            keys.append(key)
+
+    rows = [[key.replace("_", " ").capitalize(), untracked[key]]
+            for key in keys if key in untracked]
+    return sheet(
+        "Not Tracked",
+        [table("What this system has no source for", ("Subject", "Why"), rows,
+               empty="Nothing in this report has an untracked figure.")],
+        heading="Not Tracked",
+        intro=(
+            "These are stated on the screens this report came from and are "
+            "carried into the export deliberately. A figure with no data source "
+            "reports its own absence rather than being filled with a plausible "
+            "number -- an invented one is worse than a blank, because it will be "
+            "read into an RHU or DOH submission and believed."),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Shared block builders
+#
+# The pieces both screens are made of. A section that appears on Screen 10 and
+# Screen 18 -- registrations, consultations, appointments -- is built by the same
+# function from the same context keys, which is what stops the two exports from
+# drifting into two answers.
+# ---------------------------------------------------------------------------
+
+def _trend_block(title, trend, series, note=None):
+    """A month-by-month chart's own numbers.
+
+    `series` is a list of (column heading, key) taken off each trend row. With
+    more than one it adds a Total column, which is what the stacked
+    appointment-outcome chart needs -- the same shape _chart_table.html renders
+    for the printer.
+    """
+    columns = ["Month"] + [heading for heading, _ in series]
+    multi = len(series) > 1
+    if multi:
+        columns.append("Total")
+    rows = []
+    for point in trend:
+        values = [point[key] for _, key in series]
+        rows.append([point["label"]] + values + ([sum(values)] if multi else []))
+    return table(title, columns, rows, note=note)
+
+
+def _ranked_block(title, entries, label_key, count_key, heads, note=None,
+                  empty="Nothing recorded in this range."):
+    """A ranked or fixed-order list -- diagnoses, services, conditions, bands."""
+    return table(
+        title, heads,
+        [[entry[label_key], entry[count_key]] for entry in entries],
+        note=note, empty=empty,
+    )
+
+
+def _month_change_rows(change, subject):
+    """The "vs last month" figure Screen 18's cards print, as rows.
+
+    Read off the trend the card sits above, exactly as _month_over_month() reads
+    it -- not recounted here. `change_pct` is None when the previous month is
+    zero, and stays absent rather than being rendered as a percentage change from
+    nothing.
+    """
+    if not change:
+        return []
+    rows = [(f"{subject} in {change['label']}", change["count"], "The trend's last month")]
+    if change["previous_label"]:
+        rows.append((f"{subject} in {change['previous_label']}",
+                     change["previous_count"], "The month before it"))
+        rows.append(("Change", change["change"], f"Against {change['previous_label']}"))
+        if change["change_pct"] is not None:
+            rows.append(("Change (%)", change["change_pct"],
+                         f"Against {change['previous_label']}"))
+        else:
+            rows.append(("Change (%)", None,
+                         f"{change['previous_label']} recorded none, so a "
+                         f"percentage change is undefined"))
+    return rows
+
+
+def _condition_rows(counts):
+    return [[entry["condition"], entry["count"]] for entry in counts]
+
+
+# ---------------------------------------------------------------------------
+# Sections
+# ---------------------------------------------------------------------------
+
+def _registrations(context):
+    patients = context["patient_report"]
+    window = context["report_window"]
+    trend = patients["registration_trend"]
+
+    rows = [
+        ("Registered in this range", patients["window"]["registered"],
+         f"patients.created_at between {display_date(window['start'])} and "
+         f"{display_date(window['end'])}"),
+        ("Total registered patients", patients["stats"]["total_patients"],
+         "The whole register, today"),
+        ("Registered this calendar month", patients["stats"]["new_this_month"],
+         "The clinic month to date, not narrowed by the range"),
+    ]
+    rows.extend(_month_change_rows(context.get("registration_month"), "Registrations"))
+
+    return [
+        _trend_block("New patient registrations, by month", trend,
+                     [("Registrations", "count")],
+                     note=("The first and last months are clipped to the range, so a "
+                           "part month is a part month here. The bars therefore sum to "
+                           "the range total below rather than to whole calendar months.")),
+        figures("Registration totals", rows),
+    ]
+
+
+def _consultations(context):
+    consultations = context["consultation_report_stats"]
+    window = context["report_window"]
+
+    rows = [
+        ("Consultations recorded in this range", consultations["window"]["total"],
+         f"consultations.consultation_date between "
+         f"{display_date(window['start'])} and {display_date(window['end'])}"),
+        ("Patients seen in this range", consultations["window"]["patients_seen"],
+         "Distinct patients, so a patient seen twice counts once"),
+        ("Consultations on record, all time", consultations["total"],
+         "Every consultation ever recorded"),
+        ("Patients seen, all time", consultations["patients_seen"],
+         "Distinct patients across the whole record"),
+    ]
+    rows.extend(_month_change_rows(context.get("consultation_month"), "Consultations"))
+
+    return [
+        _trend_block("Consultations written up, by month", consultations["trend"],
+                     [("Consultations", "count")],
+                     note=("Counted from the range's own rows, clipped to it, so the "
+                           "months sum to the range total below.")),
+        figures("Consultation totals", rows),
+    ]
+
+
+def _diagnoses(context):
+    consultations = context["consultation_report_stats"]
+    window = context["report_window"]
+    return [
+        _ranked_block(
+            "Most common diagnoses recorded in this range",
+            consultations["window"]["top_diagnoses"], "label", "count",
+            ("Diagnosis", "Consultations"),
+            note=("Ranked from this range's consultations only. Diagnosis is prose a "
+                  "health worker typed and is not coded against ICD or any other "
+                  "classification this system holds, so entries are grouped ignoring "
+                  "case and two spellings of one condition count separately."),
+            empty="No consultation was written up in this range.",
+        ),
+        _ranked_block(
+            "Most common presenting complaints in this range",
+            consultations["window"]["top_complaints"], "label", "count",
+            ("Complaint", "Consultations"),
+            empty="No consultation was written up in this range.",
+        ),
+        figures("Basis", [
+            ("Consultations these are ranked from", consultations["window"]["total"],
+             f"{display_date(window['start'])} to {display_date(window['end'])}"),
+        ]),
+    ]
+
+
+def _concerns(context):
+    """Screen 18's "Top Community Health Concerns", both halves of it.
+
+    The question has two answers over a date range and they are different
+    questions: what the register records as chronic conditions, which describes
+    who is registered today, and what was diagnosed during the range. Both are
+    here, each labelled with which it is, exactly as the screen shows them --
+    presenting one alone would let a reader take the standing register for the
+    period's illness.
+    """
+    conditions = context["conditions"]
+    ranked = context["top_conditions"]
+    consultations = context["consultation_report_stats"]
+    window = context["report_window"]
+
+    other_only = conditions["other_only"]
+    basis = (
+        "Counted from the registration form's own condition list. A patient with "
+        "two conditions is counted under each, so these do not sum to the "
+        f"{conditions['cohort_size']} patients on the register."
+    )
+    if other_only:
+        basis += (
+            f" {other_only} patient{'' if other_only == 1 else 's'} recorded only "
+            f"free-text conditions and {'is' if other_only == 1 else 'are'} not "
+            "counted here."
+        )
+
+    return [
+        table("Chronic conditions recorded at registration, whole register",
+              ("Condition", "Patients"), _condition_rows(ranked),
+              note=(context["snapshot_note"] + " " + basis),
+              empty="No patient has a recorded chronic condition yet."),
+        _ranked_block(
+            "Diagnoses recorded in this range",
+            consultations["window"]["top_diagnoses"], "label", "count",
+            ("Diagnosis", "Consultations"),
+            note=(f"From the {consultations['window']['total']} consultation"
+                  f"{'' if consultations['window']['total'] == 1 else 's'} written up "
+                  f"between {display_date(window['start'])} and "
+                  f"{display_date(window['end'])}. Grouped by the text entered, "
+                  "ignoring case."),
+            empty="No consultation was written up in this range.",
+        ),
+        figures("Register totals", [
+            ("Patients on the register", conditions["cohort_size"], "Today"),
+            ("Patients with any recorded condition", conditions["with_any"], "Today"),
+            ("Patients with free-text conditions only", other_only,
+             "Not counted in the table above"),
+        ]),
+    ]
+
+
+def _appointments(context):
+    appointments = context["appointment_report"]
+    window = appointments["window"]
+    return [
+        _trend_block(
+            "Appointment outcomes, by month", appointments["trend"],
+            [("Attended", "attended"), ("Still expected", "expected"),
+             ("Cancelled / no-show", "missed")],
+            note=("The three outcomes partition every status an appointment can "
+                  "hold, so a month's row totals that month's appointments."),
+        ),
+        figures("Appointment outcomes in this range", [
+            ("Appointments", window["total"], "Dated into the range, walk-ins included"),
+            ("Attended", window["attended"],
+             "Completed, plus those in the clinic right now"),
+            ("Cancelled or no-show", window["missed"], ""),
+            ("Still expected", window["expected"], "Booked, not yet resolved"),
+            ("Resolved", window["resolved"],
+             "Attended plus cancelled/no-show — a visit still to happen has "
+             "neither succeeded nor failed"),
+            ("Attendance rate (%)", window["attendance_pct"],
+             "Of the resolved appointments only"),
+            ("Missed rate (%)", window["missed_pct"],
+             "Of the resolved appointments only"),
+            ("Walk-ins", window["walk_ins"], ""),
+            ("Booked in advance", window["booked"], ""),
+        ]),
+    ]
+
+
+def _services(context):
+    window = context["appointment_report"]["window"]
+    return [
+        _ranked_block(
+            "Appointments by service requested", window["services"],
+            "service", "count", ("Service", "Appointments"),
+            note=("What was actually asked for, walk-ins included. This is a record "
+                  "of visits, not of who is enrolled in a programme -- nothing in "
+                  "this system stores an enrolment."),
+            empty="No appointment falls in this range, so there is nothing to rank.",
+        ),
+        figures("Basis", [
+            ("Appointments in this range", window["total"], "Walk-ins included"),
+        ]),
+    ]
+
+
+def _vaccination(context):
+    coverage = context["immunization_coverage"]
+    window = context["report_window"]
+    closing = display_date(window["end"])
+    return [
+        figures("Immunisation coverage", [
+            ("Registered children the schedule applies to",
+             coverage["eligible_children"], f"As of {closing}"),
+            ("Children up to date on the DOH schedule",
+             coverage["up_to_date_children"], f"As of {closing}"),
+            ("Children up to date (%)", coverage["up_to_date_pct"],
+             "Against registered children, not against the barangay"),
+            ("Children needing attention", coverage["needing_attention"],
+             f"Due or overdue a dose as of {closing}"),
+            ("Children overdue a dose", coverage["overdue_children"], f"As of {closing}"),
+            ("Children awaiting a first dose", coverage["awaiting_first_dose"],
+             "Due a dose and with nothing on record yet"),
+        ], note=("Coverage is a judgement about a child made on one day, so it is "
+                 f"reported as of the range's closing date, {closing}. There is no "
+                 "such thing as a child being up to date \"during\" a period.")),
+        figures("Doses", [
+            ("Doses given in this range", coverage["window"]["doses_given"],
+             f"{display_date(window['start'])} to {closing}"),
+            ("Children dosed in this range", coverage["window"]["children_dosed"],
+             "Distinct children"),
+            ("Doses on record, all time", coverage["doses_given"], ""),
+            ("Patients with at least one dose", coverage["enrolled"],
+             "The only reading of programme membership the data supports"),
+        ]),
+    ]
+
+
+def _demographics(context):
+    patients = context["patient_report"]
+    ages = patients["age_distribution"]
+    sexes = patients["sex_distribution"]
+    conditions = patients["conditions"]
+
+    return [
+        table("Registered patients by age group, whole register",
+              ("Age group", "Patients"),
+              [[band["label"], band["count"]] for band in ages["bands"]],
+              note=(context["snapshot_note"] + " Ages are calculated from each stored "
+                    "birthdate on the day of export.")),
+        figures("Age basis", [
+            ("Patients with a usable birthdate", ages["known"], "Plotted above"),
+            ("Patients with no usable birthdate", ages["unknown"],
+             "Counted here rather than dropped into a band"),
+        ]),
+        table("Registered patients by sex, whole register",
+              ("Sex", "Patients", "Share of roster (%)"),
+              [["Female", sexes["female"], sexes["female_pct"]],
+               ["Male", sexes["male"], sexes["male_pct"]],
+               ["Not recorded", sexes["unrecorded"], sexes["unrecorded_pct"]]],
+              note="Shares are of the whole roster, so they sum to 100%."),
+        table("Chronic conditions recorded at registration, whole register",
+              ("Condition", "Patients"), _condition_rows(conditions["counts"]),
+              note=("A patient with two conditions is counted under each, so these do "
+                    f"not sum to the {conditions['cohort_size']} patients on the "
+                    "register.")),
+    ]
+
+
+def _seniors(context):
+    patients = context["patient_report"]
+    seniors = patients["senior_conditions"]
+    age = patients["senior_age"]
+    return [
+        table(f"Senior patients ({age}+) by recorded chronic condition",
+              ("Condition", "Seniors"), _condition_rows(seniors["counts"]),
+              note=(context["snapshot_note"] + " A senior with two conditions is "
+                    f"counted under each, so these do not sum to "
+                    f"{seniors['cohort_size']}.")),
+        figures("The senior cohort", [
+            (f"Patients aged {age} and above", patients["senior_count"], "By birthdate"),
+            ("Share of the roster (%)", patients["senior_share_pct"], ""),
+            ("Seniors with free-text conditions only", seniors["other_only"],
+             "Not counted in the table above"),
+        ]),
+    ]
+
+
+def _programs(context):
+    return [
+        table("Programme membership the stored data can establish",
+              ("Programme", "Patients", "Counted from"),
+              [[program["name"], program["count"], program["basis"]]
+               for program in context["programs"]],
+              note=(context["snapshot_note"] + " Both memberships are derived from the "
+                    "register and the whole dose history, not read from an enrolment "
+                    "somebody recorded.")),
+    ]
+
+
+def _inventory(context):
+    inventory = context["inventory_report"]
+    distribution = inventory["status_distribution"]
+    return [
+        table("Inventory items by stock condition, today",
+              ("Condition", "Items"),
+              [["In Stock", distribution["in_stock"]],
+               ["Low Stock", distribution["low_stock"]],
+               ["Near Expiry", distribution["near_expiry"]],
+               ["Expired", distribution["expired"]]],
+              note=(context["snapshot_note"] + " Each item is counted once, under the "
+                    "most urgent condition that applies to it, so these sum to the "
+                    "total below.")),
+        figures("Inventory totals", [
+            ("Items tracked", inventory["total_items"], "The whole inventory, today"),
+            ("Items below reorder level", inventory["low_stock_count"], "Today"),
+            ("Items out of stock", inventory["out_of_stock_count"], "Today"),
+        ]),
+        table("Items below their reorder level, today",
+              ("Item", "Dosage", "Stock", "Reorder level", "Unit",
+               "% of reorder level", "Status"),
+              [[item["name"], item.get("display_dosage") or "",
+                item.get("stock_quantity") or 0,
+                item.get("low_stock_threshold") or 0,
+                item.get("unit") or "", item.get("threshold_pct"),
+                item.get("stock_status") or ""]
+               for item in inventory["low_stock_items"]],
+              note="Most urgent first: stock as a fraction of the item's own reorder level.",
+              empty="Every item is above its reorder level."),
+    ]
+
+
+def _broadcasts(context):
+    broadcasts = context["broadcast_stats"]
+    window = context["report_window"]
+    scoped = broadcasts["window"]
+    return [
+        figures("SMS activity in this range", [
+            ("Broadcasts published", scoped["broadcasts"],
+             f"{display_date(window['start'])} to {display_date(window['end'])}"),
+            ("Messages handed to the gateway", scoped["messages_sent"], ""),
+            ("Messages that failed to send", scoped["messages_failed"], ""),
+            ("Broadcasts sent through the simulated gateway", scoped["simulated"],
+             "utils/sms.py records a broadcast without contacting a provider"),
+        ]),
+        figures("All time", [
+            ("Broadcasts on record", broadcasts["total_broadcasts"], ""),
+            ("Messages handed to the gateway", broadcasts["messages_sent"], ""),
+            ("Messages that failed to send", broadcasts["messages_failed"], ""),
+            ("Contacts reachable by SMS", broadcasts["reachable_contacts"],
+             "Patients with a usable mobile number on file, today — not narrowed "
+             "by the range, because no history of who was reachable is kept"),
+        ]),
+    ]
+
+
+_SECTION_BUILDERS = {
+    "registrations": _registrations,
+    "consultations": _consultations,
+    "diagnoses": _diagnoses,
+    "concerns": _concerns,
+    "appointments": _appointments,
+    "services": _services,
+    "vaccination": _vaccination,
+    "demographics": _demographics,
+    "seniors": _seniors,
+    "programs": _programs,
+    "inventory": _inventory,
+    # One builder, two section names. Screen 10 calls this section "sms" and
+    # Screen 18 calls it "notifications"; they are the same figures from
+    # get_broadcast_stats() and are deliberately not built twice.
+    "sms": _broadcasts,
+    "notifications": _broadcasts,
+}

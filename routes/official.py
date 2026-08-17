@@ -15,6 +15,12 @@ from routes.official_views import (
     official_dashboard_context,
     vaccination_campaigns_context,
 )
+from routes.report_export import (
+    analytics_workbook,
+    community_workbook,
+    excel_response,
+    exported_by,
+)
 from routes.report_views import reports_analytics_context
 from utils.security import login_required, role_required
 
@@ -47,6 +53,24 @@ def official_reports_analytics():
         'reports_analytics.html',
         **reports_analytics_context(args=request.args),
     )
+
+
+# Export Excel for the screen above. Byte-for-byte the Administrator's export --
+# routes/report_export.py builds both from the identical context, for the same
+# reason routes/report_views.py builds the identical screen for both roles. Two
+# thin routes and one builder, so the two roles cannot be handed workbooks that
+# disagree about how many consultations the barangay recorded.
+#
+# Still a GET with no POST counterpart anywhere in this blueprint, so this role's
+# access to Screen 10 stays read-only in the same structural sense it already was.
+@official_bp.route('/reports_analytics/export.xlsx')
+@login_required
+@role_required("Barangay Official")
+def official_export_reports_analytics_excel():
+    return excel_response(analytics_workbook(
+        reports_analytics_context(args=request.args),
+        produced_by=exported_by(),
+    ))
 
 
 @official_bp.route('/sms_notifications')
@@ -112,6 +136,21 @@ def community_reports():
     still no POST counterpart in this blueprint and no new guard surface."""
     return render_template('community_reports.html',
                            **community_reports_context(args=request.args))
+
+
+# Export Excel for Screen 18. Reads community_reports_context() -- the screen's
+# own context, not a second assembly of the same figures -- and shares every
+# section builder with the export above through routes/report_export.py. The
+# sections a report type keeps are the same `selection.sections` set the template
+# branches on, so the workbook holds exactly the panels the screen was showing.
+@official_bp.route('/community-reports/export.xlsx')
+@login_required
+@role_required("Barangay Official")
+def export_community_reports_excel():
+    return excel_response(community_workbook(
+        community_reports_context(args=request.args),
+        produced_by=exported_by(),
+    ))
 
 
 @official_bp.route('/notifications')

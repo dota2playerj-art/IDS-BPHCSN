@@ -5,3 +5,11 @@ Werkzeug==3.1.8
 # the app still runs -- it falls back to a fixed +08:00, identical today -- but
 # with it the zone would track any future rule change on its own.
 tzdata==2025.2
+# Writes the .xlsx workbook behind Export Excel on Reports & Analytics and
+# Community Reports. Chosen because it is the standard library for the format in
+# Python, is pure Python (its one dependency, et-xmlfile, is too, so there is no
+# compiler and no wheel-for-your-platform problem on a health center PC), and
+# generates the file entirely offline -- nothing in it reaches the network,
+# which is the constraint this project is built under. See utils/workbook.py for
+# why not xlsxwriter, not pandas, and not plain CSV.
+openpyxl==3.1.5

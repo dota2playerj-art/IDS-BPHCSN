@@ -46,6 +46,7 @@ from routes.patient_views import (
     process_register_patient,
     register_patient_context,
 )
+from routes.report_export import analytics_workbook, excel_response, exported_by
 from routes.report_views import reports_analytics_context
 from routes.user_views import user_management_context
 from utils.security import login_required, role_required
@@ -398,6 +399,27 @@ def reports_analytics():
         'reports_analytics.html',
         **reports_analytics_context(args=request.args),
     )
+
+
+# Export Excel, for the screen above. A GET reading the same query string the
+# screen does, through the same reports_analytics_context() -- so the workbook
+# covers the report type and range the operator was looking at, and no figure in
+# it was counted a second time. The toolbar links here with the *resolved*
+# window rather than with whatever is typed in the date boxes, which is what
+# makes Export and Print produce the same report.
+#
+# A new endpoint, so a new row in the route x role matrix, and it carries the
+# same guard as the screen it exports: this role and no other. The Barangay
+# Official's identical export lives in its own blueprint for exactly the reason
+# the two render routes do.
+@admin_bp.route('/reports_analytics/export.xlsx')
+@login_required
+@role_required("Admin")
+def export_reports_analytics_excel():
+    return excel_response(analytics_workbook(
+        reports_analytics_context(args=request.args),
+        produced_by=exported_by(),
+    ))
 
 
 # Screen 11. Admin only, unchanged: the roster names every account that can

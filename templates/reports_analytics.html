@@ -167,12 +167,32 @@
     </div>
 {%- endif %}
 
+{#- THE EXPORT LINK'S RANGE IS THE RESOLVED ONE, NOT THE TYPED ONE.
+    Built from `window`, which is what the figures below were actually counted
+    over, rather than from the raw query string. Three things follow:
+
+      * Export Excel downloads the report on the screen, which is what Print
+        already prints. A range typed into the boxes but not Generated changes
+        neither of them.
+      * A range the server refused falls back to the default window, and the
+        export follows it there rather than re-sending the refused dates.
+      * `from` and `to` are sent only when the range is custom, so the default
+        view exports through the identical default resolution instead of
+        pinning today's dates into the URL and calling it a custom range. #}
+{%- if window.custom %}
+{%- set excel_url = url_for(reports_excel_endpoint, type=selection.type, **{'from': window.start.isoformat(), 'to': window.end.isoformat()}) %}
+{%- else %}
+{%- set excel_url = url_for(reports_excel_endpoint, type=selection.type) %}
+{%- endif %}
+
     <!-- TOOLBAR — real. Both selects were disabled and said filtering was not
          wired up; it is now. A GET form submitting to this same route, so the
          generated report has a URL, Print prints exactly what that URL
          describes, and no new endpoint is added for a role guard to cover.
-         Export stays disabled and honest: it is separate work, and
-         unavailable.export says which. -->
+         Export to Excel is real too, and is the one control here that does add
+         an endpoint — it has to, because a download is a different response from
+         a page. Export to PDF stays disabled and honest: it is separate work
+         still to be done, and unavailable.export_pdf says which. -->
     <form method="get" class="panel-card no-print">
       <div class="row g-3 align-items-end">
         <div class="col-md-3">
@@ -202,8 +222,9 @@
         </div>
         <div class="col-12">
           <div class="d-flex gap-2 flex-wrap">
-            <button class="btn-outline-teal" type="button" disabled title="{{ unavailable.export }}"><span class="material-symbols-outlined" style="font-size:18px;">description</span>Export to Excel</button>
-            <button class="btn-outline-teal" type="button" disabled title="{{ unavailable.export }}"><span class="material-symbols-outlined" style="font-size:18px;">picture_as_pdf</span>Export to PDF</button>
+            <a class="btn-outline-teal" href="{{ excel_url }}" download
+               title="Download this report as an Excel workbook — the same figures over the same range, one sheet per section, with every chart's numbers as rows"><span class="material-symbols-outlined" style="font-size:18px;">description</span>Export to Excel</a>
+            <button class="btn-outline-teal" type="button" disabled title="{{ unavailable.export_pdf }}"><span class="material-symbols-outlined" style="font-size:18px;">picture_as_pdf</span>Export to PDF</button>
           </div>
         </div>
         <div class="col-12">

@@ -15,11 +15,12 @@ also tells the next session what building it would actually take, which
 
 WHY THESE LIVE HERE AND NOT IN EACH TEMPLATE
 --------------------------------------------
-Export is unavailable for one reason across six screens, and print for one
-reason across the four that still have no print layout. Written into each
-template, that is ten copies of two sentences, and the copies drift -- one
-screen would end up claiming export was "not yet built" while another said it
-was "planned for a later phase", for the same absent library.
+Export is unavailable for one reason across the four screens that still offer
+it, and print for one reason across the screens that have no print layout.
+Written into each template, that is a dozen copies of two sentences, and the
+copies drift -- one screen would end up claiming export was "not yet built"
+while another said it was "planned for a later phase", for the same absent
+library.
 inject_role_context() puts this dict on every render as `unavailable`, so a
 screen states the reason by naming it.
 
@@ -27,7 +28,20 @@ Collecting them also means a reason can be corrected in one place when the
 world changes. When printing was built for Patient Profile and Patient Records,
 the print sentence had to stop saying the project had no print stylesheet; had
 that claim been copied into eight templates, some of them would still be
-saying it.
+saying it. The same thing has now happened to export: Export Excel is real on
+the two report screens, so the shared sentence claiming the project had no
+file-generation library had to go before the screens still quoting it started
+lying about a dependency that is now installed.
+
+A REASON CAN ALSO SPLIT
+-----------------------
+"export" used to cover Export Excel and Export PDF together, which was correct
+while neither existed. Excel became real on the report screens and PDF did not,
+so one sentence would now have to be false about one of the two. It split into
+"export" -- the screens that have no export of any kind -- and "export_pdf",
+which the two report screens quote beside a working Export Excel. Splitting is
+the cheap outcome; the expensive one is a single sentence stretched to cover two
+states of the world until it is true of neither.
 
 Kept apart from the per-screen UNTRACKED dicts in routes/*_views.py on purpose.
 Those answer a different question -- why a *figure* has no source -- and are
@@ -37,20 +51,42 @@ and the answers are shared.
 
 UNAVAILABLE = {
     # ---- File output --------------------------------------------------------
-    # Export is planned, not impossible, and this now says which. It is held
-    # back deliberately rather than being missing: the team took printing and
-    # report generation first because those close the loop -- a health worker can
-    # produce a dated, ranged sheet for the RHU today -- and a file writer is a
-    # dependency and a download route on top of that. Naming what is missing
-    # tells the next session what building it actually takes.
+    # THIS SENTENCE HAS BEEN REWRITTEN BECAUSE THE WORLD CHANGED, WHICH IS THE
+    # WHOLE REASON THE REASONS LIVE IN ONE FILE.
+    # It used to say export needed two things the project did not have, "a
+    # file-generation library in requirements.txt, and a download route to serve
+    # what it writes". Both now exist -- openpyxl is a dependency and the two
+    # report screens each have an export.xlsx route -- so that claim would be
+    # false on the six screens still quoting it. What is actually missing on
+    # those six is different and is what this now names: nobody has decided what
+    # a spreadsheet of a *roster* should contain.
+    #
+    # The two report screens do not quote this any more. Their Export Excel is a
+    # working link, and a control that works carries no reason at all.
     "export": (
-        "Export to a file is not built yet. It is planned as its own piece of "
-        "work and needs two things this project does not have: a "
-        "file-generation library in requirements.txt, and a download route to "
-        "serve what it writes. Nothing about the figures is in the way -- they "
-        "are read from the database on each load, and Print already puts this "
-        "screen's report on paper over whatever range was generated, so the "
-        "content an export would carry exists and is correct today."
+        "Export is not built for this screen. The machinery exists -- openpyxl "
+        "is a dependency and Reports & Analytics and Community Reports each "
+        "download a real .xlsx workbook of their figures -- so what is missing "
+        "here is not a library or a route. It is the decision about what a "
+        "spreadsheet of this screen's rows should hold: which columns, which "
+        "rows when the table is filtered, and what a reader is meant to do with "
+        "the file. A report has one obvious answer to that and a working list "
+        "does not, which is why the report screens were taken first."
+    ),
+    # Export PDF, on the two report screens only, and still honestly disabled.
+    # Deliberately its own entry rather than a share of "export" above: Excel
+    # became real on those screens and PDF did not, and one sentence covering
+    # both would now have to be false about one of them. It is a separate piece
+    # of work by the team's own decision, and this says what that work is.
+    "export_pdf": (
+        "Export to PDF is not built yet. It is planned as its own piece of work "
+        "and needs a PDF writer this project does not have -- openpyxl produces "
+        "spreadsheets and nothing else -- plus a decision about whether the PDF "
+        "should reproduce this screen's charts, which no server-side library "
+        "here can draw. Nothing about the figures is in the way: Export Excel "
+        "downloads them over this same range today, and Print already puts this "
+        "report on paper with its letterhead and its charts as data tables, "
+        "which is the paper document a PDF would be a file of."
     ),
     # Printing is real on four screens now -- Patient Profile, Patient Records,
     # Reports & Analytics and Community Reports -- each opting in by including

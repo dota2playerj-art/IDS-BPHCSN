@@ -85,6 +85,12 @@ def inject_role_context():
             # view-only -- there is no URL for a forged POST to reach.
             "send_broadcast_endpoint": "send_sms_broadcast",
             "reports_analytics_endpoint": "reports_analytics",
+            # Export Excel on Screen 10. Named per role for the same reason every
+            # endpoint above is: reports_analytics.html is one template rendered
+            # by two blueprints, and each role must be handed the download route
+            # its own guard admits. A shared literal would send one of the two
+            # roles to a URL it bounces straight off.
+            "reports_excel_endpoint": "export_reports_analytics_excel",
         }
     elif normalized_role == "barangay official":
         context = {
@@ -95,6 +101,11 @@ def inject_role_context():
             "sms_notifications_endpoint": "official_sms_notifications",
             "send_broadcast_endpoint": "official_send_sms_broadcast",
             "reports_analytics_endpoint": "official_reports_analytics",
+            "reports_excel_endpoint": "official_export_reports_analytics_excel",
+            # Screen 18's own export. Only this role reaches Community Reports at
+            # all, so the name is absent for the other two -- and community_reports.html
+            # would fail loudly rather than quietly emitting a URL they cannot open.
+            "community_excel_endpoint": "export_community_reports_excel",
         }
     else:
         context = {
