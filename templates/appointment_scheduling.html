@@ -651,7 +651,23 @@
                   </button>
 {%- endif %}
                   <a href="{{ url_for(patient_profile_endpoint, patient_id=entry.patient_id) }}" class="action-icon" title="Open {{ patient_name }}'s profile"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></a>
-                  <button type="button" class="action-icon" disabled title="{{ unavailable.print }}"><span class="material-symbols-outlined" style="font-size:18px;">print</span></button>
+                  {#- Printing from a booking means printing the patient's record,
+                      exactly as it does on a Patient Records row. The row itself is
+                      a line in a working queue -- a name, a time and a status -- and
+                      a printed copy of it is not a document anybody keeps; what a
+                      clinician wants on paper before seeing this patient is the
+                      patient's record, and that record is their profile. So this
+                      links to the profile with ?print=1, which goes straight to the
+                      print dialog there.
+
+                      This is the same leap the View action beside it already makes:
+                      View on this screen does not open the appointment, it opens the
+                      patient. Print follows View rather than inventing a second
+                      answer to "what does this row stand for". Nothing new is
+                      rendered for the printer -- patient_profile.html already
+                      includes _print.html and already has its letterhead. #}
+                  <a href="{{ url_for(patient_profile_endpoint, patient_id=entry.patient_id, print=1) }}"
+                     class="action-icon" title="Print {{ patient_name }}'s full record"><span class="material-symbols-outlined" style="font-size:18px;">print</span></a>
                 </div>
               </td>
             </tr>
@@ -817,7 +833,10 @@
                   </button>
 {%- endif %}
                   <a href="{{ url_for(patient_profile_endpoint, patient_id=entry.patient_id) }}" class="action-icon" title="Open {{ patient_name }}'s profile"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></a>
-                  <button type="button" class="action-icon" disabled title="{{ unavailable.print }}"><span class="material-symbols-outlined" style="font-size:18px;">print</span></button>
+                  {#- Same as the queue table above: printing a booking prints the
+                      patient's record, which is their profile. #}
+                  <a href="{{ url_for(patient_profile_endpoint, patient_id=entry.patient_id, print=1) }}"
+                     class="action-icon" title="Print {{ patient_name }}'s full record"><span class="material-symbols-outlined" style="font-size:18px;">print</span></a>
                 </div>
               </td>
             </tr>

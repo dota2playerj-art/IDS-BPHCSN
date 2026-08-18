@@ -11,10 +11,17 @@
     before utils/unavailable.py collected them. One copy, two includes.
 
     It is deliberately *not* in base.html, where it would apply to all twenty
-    screens. Every other Print button in this project is still disabled and
-    still says printing is not built for that screen; giving those screens a
-    working print layout anyway would make the button and the page disagree.
-    A screen prints when it opts in by including this file.
+    screens. A screen prints when it opts in by including this file, and only
+    four do.
+
+    That is also why a Print control on a screen without this file is either
+    disabled with a reason of its own -- Medicine Inventory's row icon says no
+    per-item page exists to print from -- or points somewhere that does include
+    it. Appointment Scheduling's two row icons take the second route: they link
+    to the patient's profile with ?print=1, exactly as Patient Records' row icon
+    does, because printing from a booking means printing that patient's record
+    and the record is a page that already prints. Giving a screen a working print
+    layout it has not opted into would make its button and its page disagree.
 
     WHY @media print AND NOT A SEPARATE PRINT ROUTE
     ----------------------------------------------

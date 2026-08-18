@@ -20,7 +20,14 @@ from routes.appointment_views import (
     process_reschedule_appointment,
     process_start_consultation,
 )
-from routes.audit_views import audit_logs_context
+from routes.audit_export import (
+    audit_document,
+    audit_workbook,
+    excel_response as audit_excel_response,
+    exported_by as audit_exported_by,
+    pdf_response as audit_pdf_response,
+)
+from routes.audit_views import audit_export_context, audit_logs_context
 from routes.dashboard_views import dashboard_context
 from routes.broadcast_views import process_send_broadcast, sms_notifications_context
 from routes.consultation_views import (
@@ -464,6 +471,32 @@ def audit_logs():
         'audit_logs.html',
         **audit_logs_context(module=request.args.get("module")),
     )
+
+
+# Export Excel and Export PDF for the trail above. Both carry the same guard as
+# the screen -- Admin and no other role -- because the file is the screen's
+# contents and a download that widened who could read them would be a hole the
+# render route does not have. Each reads the same ?module= the screen does, so the
+# button exports the trail in front of the operator; routes/audit_export.py
+# assembles it once and renders it as either file.
+@admin_bp.route('/audit_logs/export.xlsx')
+@login_required
+@role_required("Admin")
+def export_audit_logs_excel():
+    return audit_excel_response(audit_workbook(
+        audit_export_context(module=request.args.get("module")),
+        produced_by=audit_exported_by(),
+    ))
+
+
+@admin_bp.route('/audit_logs/export.pdf')
+@login_required
+@role_required("Admin")
+def export_audit_logs_pdf():
+    return audit_pdf_response(audit_document(
+        audit_export_context(module=request.args.get("module")),
+        produced_by=audit_exported_by(),
+    ))
 
 
 @admin_bp.route('/settings')

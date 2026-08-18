@@ -73,9 +73,21 @@ def log_action(user_id, action, module=None, details=None, ip_address=None):
 
 
 def get_audit_logs(module=None, limit=100):
-    """Recent entries, newest first, with the acting user's name resolved."""
+    """Recent entries, newest first, with the acting user's name resolved.
+
+    `limit=None` returns every matching entry rather than a page of them. The
+    screen always passes a page size, because a table nobody can scroll past is
+    not more useful for being longer. The export passes None: a downloaded audit
+    trail that silently stopped at the hundredth entry would be the worst place in
+    this system for a quiet omission, since the whole point of the file is that it
+    is the complete record of who changed what.
+    """
     clause = "WHERE a.module = ?" if module else ""
-    parameters = ([module] if module else []) + [limit]
+    parameters = [module] if module else []
+    cap = ""
+    if limit is not None:
+        cap = "LIMIT ?"
+        parameters = parameters + [limit]
 
     conn = get_db()
     rows = conn.execute(
@@ -86,7 +98,7 @@ def get_audit_logs(module=None, limit=100):
         JOIN users u ON u.id = a.user_id
         {clause}
         ORDER BY a.created_at DESC, a.id DESC
-        LIMIT ?
+        {cap}
         """,
         parameters,
     ).fetchall()

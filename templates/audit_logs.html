@@ -187,9 +187,25 @@
               <a class="btn-ghost-ids" href="{{ url_for('admin.audit_logs', module=selected_module) }}">
                 <span class="material-symbols-outlined" style="font-size:18px;">refresh</span>Refresh
               </a>
-              <button class="btn-outline-teal" disabled title="{{ untracked.export }}">
-                <span class="material-symbols-outlined" style="font-size:18px;">file_download</span>Export
-              </button>
+              {#- Both links carry `module`, the same filter the Refresh link beside
+                  them carries, so Export downloads the trail the operator is
+                  actually looking at rather than always the whole thing. The
+                  search box cannot come with them -- it narrows rows in the
+                  browser, so the server never sees it -- and the file's cover
+                  sheet says so outright rather than leaving a reader to wonder
+                  why their search did not apply.
+
+                  Both routes are Admin-only, the same guard as this screen: the
+                  file is the screen's contents, and a download anyone could fetch
+                  would be a hole the render route does not have. #}
+              <a class="btn-outline-teal" href="{{ url_for('admin.export_audit_logs_excel', module=selected_module) }}" download
+                 title="Download the trail as an Excel workbook — every entry matching the module filter, newest first, with a sheet naming what the trail does not record">
+                <span class="material-symbols-outlined" style="font-size:18px;">description</span>Export to Excel
+              </a>
+              <a class="btn-outline-teal" href="{{ url_for('admin.export_audit_logs_pdf', module=selected_module) }}" download
+                 title="Download the trail as a PDF — every entry matching the module filter on the health center's letterhead, with a sheet naming what the trail does not record">
+                <span class="material-symbols-outlined" style="font-size:18px;">picture_as_pdf</span>Export to PDF
+              </a>
             </div>
           </div>
 

@@ -52,12 +52,17 @@ split when the gap is real for one control and not another, deleted when the gap
 closes -- and one file is where all three happen so none of them is missed.
 
 A reason can also split because it is aimed at the wrong *scope* rather than
-because it became false. "print" is a sentence about a screen, and it was being
+because it became false. "print" was a sentence about a screen, and it was being
 quoted by the print icon on a Medicine Inventory row -- a control offering to
 print one item, answered by a paragraph about the sidebar. "medicine_print" now
-says what actually stops that button, and "print" keeps the screens it was
-written for. Nothing about it had gone false; it was simply answering a question
-the control was not asking.
+says what actually stops that button. Nothing about "print" had gone false; it
+was simply answering a question the control was not asking.
+
+And then "print" went entirely, which is the other half of this file's rule. Its
+last two citations were the print icons on Appointment Scheduling, and those are
+now working links into the patient's own profile. A shared reason is worth having
+while something quotes it and not one commit longer, so it was deleted rather
+than left describing screens that no longer ask.
 
 Kept apart from the per-screen UNTRACKED dicts in routes/*_views.py on purpose.
 Those answer a different question -- why a *figure* has no source -- and are
@@ -96,25 +101,20 @@ UNAVAILABLE = {
     # export.pdf route -- so the two templates that quoted it stopped, and a reason
     # with nothing quoting it is the drift this file exists to prevent. It goes,
     # exactly as "community_reports" went below. See the module docstring.
-    # Printing is real on four screens now -- Patient Profile, Patient Records,
-    # Reports & Analytics and Community Reports -- each opting in by including
-    # templates/_print.html. This reason is what the screens that have NOT been
-    # given a print layout still say, and it has now been rewritten twice: it
-    # opened "There is no print stylesheet" until the first one was built, and
-    # named only the two patient screens until the two report screens joined
-    # them. A shared sentence is only worth having while it is accurate.
-    "print": (
-        "This screen has no print layout. Printing is built where a printed "
-        "page is a document somebody keeps or sends -- a patient's record and "
-        "the patient list on Patient Profile and Patient Records, and a dated, "
-        "ranged report on Reports & Analytics and Community Reports -- and "
-        "those four screens hide their navigation and controls for the printer "
-        "and put a letterhead on top. This one does not, so sending it to a "
-        "printer would produce the sidebar, the header and the screen "
-        "furniture along with the content. Giving it a usable printout means "
-        "deciding what on it is worth keeping on paper, which is a design "
-        "question, not a switch."
-    ),
+    # THERE IS NO "print" ENTRY ANY MORE, AND THAT IS THE POINT.
+    # It said a screen had no print layout, and it was true of every screen that
+    # quoted it, right up to the last one. Its last two citations were the print
+    # icons on Appointment Scheduling's two tables, and those are now working
+    # links: printing from a booking opens that patient's profile with ?print=1,
+    # the same answer Patient Records gives for its own rows. Nothing quotes this
+    # any more, and a reason with nothing quoting it is exactly the drift this
+    # file exists to prevent -- so it goes, the way "export_pdf" and
+    # "community_reports" went. See the module docstring.
+    #
+    # The screens that print now do so because they include templates/_print.html.
+    # A screen that wants a print layout and has not got one writes a true reason
+    # for its own control, which is what "medicine_print" below is.
+
     # A SHARED REASON CAN ALSO BE THE WRONG *SCOPE*, NOT MERELY WRONG.
     # The print icon on a Medicine Inventory row used to quote "print" above, and
     # that sentence is true -- Screen 06 has no print layout -- but it answers a

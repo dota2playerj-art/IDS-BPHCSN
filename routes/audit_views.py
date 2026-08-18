@@ -51,10 +51,17 @@ UNTRACKED = {
         "query supports a module filter only, which is the one offered above; "
         "the rest would need columns audit_logs does not have."
     ),
-    "export": (
-        "Exporting the trail is not implemented. The entries below are the "
-        "complete record and can be read on screen."
-    ),
+    # THERE IS NO "export" ENTRY ANY MORE, AND THAT IS THE POINT.
+    # It said exporting the trail is not implemented. Export Excel and Export PDF
+    # are now real on this screen -- routes/audit_export.py assembles the trail
+    # once and renders it as either file -- so nothing quotes this, and a reason
+    # with nothing quoting it is the drift utils/unavailable.py exists to prevent.
+    # It goes the way "print" and "export_pdf" went, rather than sitting here
+    # describing a state the screen has left.
+    #
+    # This screen also never quoted the shared `export` reason, which was its own
+    # small drift: it was the only Export button in the project explaining itself
+    # in different words from the rest. That is moot now that the button works.
 }
 
 
@@ -132,6 +139,29 @@ def _decorate(entry):
         "changes": changes,
         "notes": notes,
         "is_sms": entry.get("module") == MODULE_SMS,
+    }
+
+
+def audit_export_context(module=None):
+    """Every entry the export writes, for the module filter in force.
+
+    Separate from audit_logs_context() for one reason: that one caps at PAGE_SIZE
+    because a screen is a page, and this one must not, because a file is the
+    record. Both resolve `module` the same way and decorate rows through the same
+    _decorate(), so the file and the screen cannot describe the same entry
+    differently -- they differ only in how many entries they carry.
+    """
+    modules = [row["module"] for row in get_audit_stats()["by_module"]]
+    selected = module if module in modules else None
+    entries = [_decorate(e) for e in get_audit_logs(module=selected, limit=None)]
+
+    return {
+        "entries": entries,
+        "selected_module": selected,
+        "module_options": modules,
+        "total": len(entries),
+        "page_size": PAGE_SIZE,
+        "untracked": UNTRACKED,
     }
 
 
