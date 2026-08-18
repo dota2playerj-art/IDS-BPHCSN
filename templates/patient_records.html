@@ -436,6 +436,19 @@
 {%- if patients %}
       <div class="table-footer" id="tableFooter">
         <div class="pg-info" id="patientCount">Showing all {{ patients|length }} registered patient{{ '' if patients|length == 1 else 's' }}</div>
+        {#- The order the rows arrive in, stated where a reader is already looking
+            to find out what they are looking at. The Sort control beside the
+            search box is disabled and its reason says the rows come in the order
+            the query returns them "which each screen states beside its table" --
+            which was true of Appointment Scheduling's queue and of neither of the
+            two alphabetical rosters. Rather than split one accurate sentence into
+            three, the two screens it was wrong about now say their order, and the
+            shared reason becomes true everywhere it is quoted.
+
+            It is a separate element from the count on purpose: applyFilters()
+            rewrites #patientCount as the roster narrows, and the ordering does not
+            change when it does. #}
+        <div class="pg-info">Sorted by surname, A&ndash;Z</div>
         <div class="pg-info" title="{{ unavailable.pagination }}">Single page</div>
       </div>
 {%- endif %}

@@ -355,6 +355,9 @@
 {%- if items %}
       <div class="table-footer" id="tableFooter">
         <div class="pg-info" id="itemCount" data-retired="{{ stats.retired_count }}">Showing all {{ items|length }} inventory item{{ '' if items|length == 1 else 's' }}{% if stats.retired_count %}, including {{ stats.retired_count }} retired{% endif %}</div>
+        {#- Stated for the same reason Patient Records now states it, and kept out
+            of #itemCount because applyFilters() rewrites that line. #}
+        <div class="pg-info">Sorted by medicine name, A&ndash;Z</div>
         <div class="pg-info" title="{{ unavailable.pagination }}">Single page</div>
       </div>
 {%- endif %}

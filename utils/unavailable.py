@@ -136,6 +136,15 @@ UNAVAILABLE = {
     ),
 
     # ---- Table controls -----------------------------------------------------
+    # THE SECOND SENTENCE HERE IS A CLAIM ABOUT THE TEMPLATES, AND IT WAS ONLY
+    # TRUE OF ONE OF THE THREE SCREENS THAT QUOTE IT.
+    # Appointment Scheduling's queue has always said "in arrival order, patients
+    # in consultation first". Patient Records and Medicine Inventory stated no
+    # order anywhere, though both are alphabetical -- ORDER BY last_name and
+    # ORDER BY name COLLATE NOCASE. Rather than split one correct sentence into
+    # three per-screen ones, the two screens were given the line they were
+    # missing, so the claim below is now true wherever it is quoted. If a fourth
+    # screen ever quotes this, it owes its reader the same sentence in its footer.
     "sort": (
         "Column sorting is not implemented. The rows arrive in the order the "
         "query returns them, which each screen states beside its table. A "
@@ -175,10 +184,18 @@ UNAVAILABLE = {
         "path is not being changed for a convenience shortcut. Use Register "
         "Patient again from the sidebar."
     ),
+    # REWRITTEN: the old sentence listed "notes" among the fields "already in
+    # this row". The Appointment History table on Patient Profile has five
+    # columns before its actions -- Date, Time, Purpose, Assigned To, Status --
+    # and notes is not one of them. Same defect medicine_detail had: a list of
+    # fields that quietly included one the screen does not show.
     "appointment_detail": (
-        "There is no separate view for one appointment. Everything the booking "
-        "records -- its date, time, service, assigned staff, status and notes "
-        "-- is already in this row, so opening it would repeat the row."
+        "There is no separate view for one appointment. What the booking records "
+        "is almost all in this row already -- its date, time, purpose, assigned "
+        "staff and status -- so a detail view would mostly repeat the row it "
+        "opened from. What it would add is the booking's notes, which this table "
+        "has no column for; those are shown on Appointment Scheduling, under the "
+        "patient's name on the same booking."
     ),
     # REWRITTEN, AND IT WAS THE FALSEST SENTENCE IN THIS FILE.
     # It said "retiring a stock item is not implemented" while inventory_items
@@ -208,11 +225,21 @@ UNAVAILABLE = {
     ),
 
     # ---- Whole screens with no data source ---------------------------------
+    # REWRITTEN: "There is no settings table" was false. schema.sql defines one
+    # -- setting_key, setting_value, updated_by, updated_at -- and has since the
+    # first schema. What is true is the half that follows: nothing reads or
+    # writes it. Naming the wiring as the gap rather than the table is the same
+    # correction medicine_archive needed, and for the same reason: a reason that
+    # denies an existing structure sends the next session off to build something
+    # that is already there.
     "settings": (
-        "Settings are not stored. There is no settings table and no route that "
-        "reads or writes one, so nothing typed on this screen is saved and "
-        "nothing on it is read by the running system. The values shown are the "
-        "defaults the application is actually built with."
+        "Nothing on this screen is stored or read. The settings table exists in "
+        "schema.sql -- setting_key, setting_value, updated_by, updated_at, ready "
+        "for exactly this -- but no model function and no route touches it, so "
+        "the gap is the wiring rather than the place to put the values. Nothing "
+        "typed here is saved and nothing here is read by the running system: the "
+        "values shown are the defaults the application is actually built with, "
+        "which is why they are shown at all."
     ),
     "backup": (
         "Backup and restore are not implemented. The database is a single "
@@ -220,11 +247,30 @@ UNAVAILABLE = {
         "it taken outside the application; doing it from this screen needs a "
         "job that can safely quiesce and copy an open database."
     ),
+    # REWRITTEN: THIS ONE HAD GONE FALSE, NOT MERELY IMPRECISE.
+    # It said utils/sms.py records a broadcast "without contacting a provider",
+    # and that there is "no connection to test and no credential in use". All
+    # three claims describe a file that no longer exists. utils/sms.py is a real
+    # Semaphore client: send_announcement_sms() posts to Semaphore's endpoint,
+    # gateway_configured() reports whether a key is present, and
+    # deliver_announcement_sms() chooses live or simulated per send by reading
+    # SEMAPHORE_API_KEY from the environment. Its own docstring is headed
+    # "TURNING THIS FEATURE LIVE" and says the feature is complete.
+    # A reason that denies a working integration is the same defect as the one
+    # medicine_archive had, and it was worse here: it was the stated grounds for
+    # disabling a Test Connection button that now has something real to test.
     "sms_gateway": (
-        "The SMS gateway is simulated. utils/sms.py records a broadcast and "
-        "its recipients without contacting a provider, so there is no "
-        "connection to test and no credential in use. Screen 09 states the "
-        "same thing beside the composer."
+        "There is no API key configured, so there is nothing for these controls "
+        "to act on. The integration itself is real and finished -- utils/sms.py "
+        "posts to Semaphore's endpoint, and every send checks the "
+        "SEMAPHORE_API_KEY environment variable to decide whether it goes on the "
+        "wire or is recorded as simulated. Broadcasts are written to history "
+        "either way, which is why SMS Notifications works today and marks its "
+        "rows 'simulated'. Setting that variable is the whole activation step; "
+        "nothing on this screen is part of it, because this screen stores "
+        "nothing. A key revealed here would be a key this project never held, "
+        "and a connection tested here would be testing the server's environment "
+        "rather than anything typed above."
     ),
     "notifications": (
         "There is no notifications table. Nothing in this system writes, "

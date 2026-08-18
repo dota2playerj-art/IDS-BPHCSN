@@ -61,7 +61,11 @@
 
   .status-pill{display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600; padding:5px 12px; border-radius:999px;}
   .status-connected{background:#DCFCE7; color:#15803D;}
+  /* Not configured is not a fault -- the feature works and records history
+     without a key -- so it is grey rather than red. */
+  .status-unconfigured{background:#F3F4F6; color:#4B5563;}
   .status-dot-sm{width:7px;height:7px;border-radius:50%; background:#15803D;}
+  .status-unconfigured .status-dot-sm{background:#6B7280;}
 
   .backup-row{display:flex; align-items:center; justify-content:space-between; padding:14px 0; border-bottom:1px solid var(--border-color);}
   .backup-row:last-child{border-bottom:none;}
@@ -318,15 +322,39 @@
                 <div class="col-md-8">
                   <label class="field-label">API Key<span class="req">*</span></label>
                   <div class="key-input-group">
-                    <input type="password" class="form-control" value="sk_live_a83f92h1kd93js82">
+                    {#- No value. What sat here was a made-up string that read as
+                        a live secret: it carried the same prefix a real provider
+                        key uses, so anyone
+                        looking at this screen -- or at a screenshot of it in the
+                        defence -- would have taken it for the barangay's actual
+                        credential. It was never one. The real key is read from
+                        the SEMAPHORE_API_KEY environment variable by
+                        utils/sms.py and is never stored in this project or
+                        displayed by it.
+
+                        The field stays inside the disabled fieldset opened above,
+                        so emptying it does not make it editable -- nothing on
+                        this screen is. It is blank because there is nothing true
+                        to put in it, not because it is waiting for input. #}
+                    <input type="password" class="form-control" value="" placeholder="Set by the SEMAPHORE_API_KEY environment variable">
                     <button type="button" class="key-toggle-btn" disabled title="{{ unavailable.sms_gateway }}"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button>
                   </div>
-                  <div class="form-text-hint">Key is masked for security. Only the last 4 characters are visible to other administrators.</div>
+                  {#- The old hint promised "only the last 4 characters are
+                      visible to other administrators", describing a masking rule
+                      this project does not implement -- there is no key stored to
+                      mask and no per-administrator view of one. #}
+                  <div class="form-text-hint">The key is read from the server's environment, not from this screen. utils/sms.py checks for it on every send.</div>
                 </div>
                 <div class="col-md-4">
                   <label class="field-label">Connection Status</label>
                   <div style="padding-top:11px;">
-                    <span class="status-pill status-connected"><span class="status-dot-sm"></span>Connected</span>
+                    {#- This said "Connected", in green, beside the fake key --
+                        a claim about live system state that nothing had checked.
+                        It also directly contradicted the reason on the two
+                        disabled controls in this same panel, which says sends are
+                        simulated. Broadcasts are recorded either way; what the
+                        key decides is whether they also go on the wire. #}
+                    <span class="status-pill status-unconfigured"><span class="status-dot-sm"></span>Not configured</span>
                   </div>
                 </div>
               </div>

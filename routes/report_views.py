@@ -231,10 +231,16 @@ UNTRACKED = {
         "note are the only programme memberships the data can actually "
         "establish."
     ),
+    # The last sentence used to read "The audit_logs table records consultation
+    # edits only", which stopped being true when SMS broadcast logging landed.
+    # models/audit.py has said "the consultation edit path and the SMS broadcast
+    # path only" all along, so the project was contradicting itself about its own
+    # audit trail in two files. This now says what the trail actually holds.
     "generated_reports": (
         "Report exports are not recorded. Nothing writes a row when a report is "
         "printed or exported, so there is no history of generated reports to "
-        "list. The audit_logs table records consultation edits only."
+        "list. The audit_logs table records two things, and neither is this one: "
+        "consultation edits and SMS broadcasts."
     ),
 }
 
