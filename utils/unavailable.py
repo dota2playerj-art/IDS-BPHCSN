@@ -33,15 +33,23 @@ the two report screens, so the shared sentence claiming the project had no
 file-generation library had to go before the screens still quoting it started
 lying about a dependency that is now installed.
 
-A REASON CAN ALSO SPLIT
------------------------
+A REASON CAN SPLIT, AND THEN GO
+-------------------------------
 "export" used to cover Export Excel and Export PDF together, which was correct
 while neither existed. Excel became real on the report screens and PDF did not,
-so one sentence would now have to be false about one of the two. It split into
+so one sentence would have had to be false about one of the two. It split into
 "export" -- the screens that have no export of any kind -- and "export_pdf",
-which the two report screens quote beside a working Export Excel. Splitting is
-the cheap outcome; the expensive one is a single sentence stretched to cover two
-states of the world until it is true of neither.
+which the two report screens quoted beside a working Export Excel.
+
+"export_pdf" is now gone as well. Export PDF became real on both report screens --
+fpdf2 is a dependency and each screen has its own export.pdf route beside its
+export.xlsx one -- so the two templates that quoted the reason stopped quoting it,
+and a reason with nothing quoting it is exactly the drift this file exists to
+prevent. It went the way "community_reports" did below: deleted once true of
+nothing, rather than left sitting here describing a state the application has
+left. This is the whole life of a shared reason -- born when the gap is real,
+split when the gap is real for one control and not another, deleted when the gap
+closes -- and one file is where all three happen so none of them is missed.
 
 Kept apart from the per-screen UNTRACKED dicts in routes/*_views.py on purpose.
 Those answer a different question -- why a *figure* has no source -- and are
@@ -65,29 +73,21 @@ UNAVAILABLE = {
     # working link, and a control that works carries no reason at all.
     "export": (
         "Export is not built for this screen. The machinery exists -- openpyxl "
-        "is a dependency and Reports & Analytics and Community Reports each "
-        "download a real .xlsx workbook of their figures -- so what is missing "
-        "here is not a library or a route. It is the decision about what a "
-        "spreadsheet of this screen's rows should hold: which columns, which "
-        "rows when the table is filtered, and what a reader is meant to do with "
-        "the file. A report has one obvious answer to that and a working list "
-        "does not, which is why the report screens were taken first."
+        "and fpdf2 are dependencies, and Reports & Analytics and Community "
+        "Reports each download a real spreadsheet and a real PDF of their "
+        "figures -- so what is missing here is not a library or a route. It is "
+        "the decision about what an export of this screen's rows should hold: "
+        "which columns, which rows when the table is filtered, and what a reader "
+        "is meant to do with the file. A report has one obvious answer to that "
+        "and a working list does not, which is why the report screens were taken "
+        "first."
     ),
-    # Export PDF, on the two report screens only, and still honestly disabled.
-    # Deliberately its own entry rather than a share of "export" above: Excel
-    # became real on those screens and PDF did not, and one sentence covering
-    # both would now have to be false about one of them. It is a separate piece
-    # of work by the team's own decision, and this says what that work is.
-    "export_pdf": (
-        "Export to PDF is not built yet. It is planned as its own piece of work "
-        "and needs a PDF writer this project does not have -- openpyxl produces "
-        "spreadsheets and nothing else -- plus a decision about whether the PDF "
-        "should reproduce this screen's charts, which no server-side library "
-        "here can draw. Nothing about the figures is in the way: Export Excel "
-        "downloads them over this same range today, and Print already puts this "
-        "report on paper with its letterhead and its charts as data tables, "
-        "which is the paper document a PDF would be a file of."
-    ),
+    # THERE IS NO "export_pdf" ENTRY ANY MORE, AND THAT IS THE POINT.
+    # It said Export PDF was not built while it was not. Export PDF is now real on
+    # both report screens -- fpdf2 is a dependency and each screen has its own
+    # export.pdf route -- so the two templates that quoted it stopped, and a reason
+    # with nothing quoting it is the drift this file exists to prevent. It goes,
+    # exactly as "community_reports" went below. See the module docstring.
     # Printing is real on four screens now -- Patient Profile, Patient Records,
     # Reports & Analytics and Community Reports -- each opting in by including
     # templates/_print.html. This reason is what the screens that have NOT been

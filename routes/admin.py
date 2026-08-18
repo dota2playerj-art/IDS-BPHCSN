@@ -46,7 +46,13 @@ from routes.patient_views import (
     process_register_patient,
     register_patient_context,
 )
-from routes.report_export import analytics_workbook, excel_response, exported_by
+from routes.report_export import (
+    analytics_pdf,
+    analytics_workbook,
+    excel_response,
+    exported_by,
+    pdf_response,
+)
 from routes.report_views import reports_analytics_context
 from routes.user_views import user_management_context
 from utils.security import login_required, role_required
@@ -417,6 +423,21 @@ def reports_analytics():
 @role_required("Admin")
 def export_reports_analytics_excel():
     return excel_response(analytics_workbook(
+        reports_analytics_context(args=request.args),
+        produced_by=exported_by(),
+    ))
+
+
+# Export PDF, for the same screen. The twin of the route above: same context, same
+# resolved window, same assembled report -- routes/report_export.py renders it as a
+# PDF instead of a workbook, so the two files cannot disagree about a figure. Its
+# own endpoint and its own guard, this role and no other, for the same reason the
+# Excel route has them.
+@admin_bp.route('/reports_analytics/export.pdf')
+@login_required
+@role_required("Admin")
+def export_reports_analytics_pdf():
+    return pdf_response(analytics_pdf(
         reports_analytics_context(args=request.args),
         produced_by=exported_by(),
     ))

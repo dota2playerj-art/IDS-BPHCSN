@@ -188,17 +188,17 @@
          and can be bookmarked or handed to somebody, Print prints exactly what
          the URL describes, and no new endpoint means the route x role matrix is
          untouched by this feature.
-         Export Excel is real as well, and is the one control on this screen that
-         does add an endpoint — a download is a different response from a page,
-         so it cannot be a GET back to this route. Its link carries the resolved
-         window rather than the typed one, so it downloads the report on the
-         screen, which is what Print prints.
-         Export PDF stays disabled and stays honest — it is a separate piece of
-         work still to be done, and unavailable.export_pdf says so. -->
+         Export Excel and Export PDF are real as well, and are the two controls on
+         this screen that add an endpoint — a download is a different response from
+         a page, so it cannot be a GET back to this route. Both links carry the
+         resolved window rather than the typed one, so they download the report on
+         the screen, which is what Print prints. -->
 {%- if window.custom %}
 {%- set excel_url = url_for(community_excel_endpoint, type=selection.type, **{'from': window.start.isoformat(), 'to': window.end.isoformat()}) %}
+{%- set pdf_url = url_for(community_pdf_endpoint, type=selection.type, **{'from': window.start.isoformat(), 'to': window.end.isoformat()}) %}
 {%- else %}
 {%- set excel_url = url_for(community_excel_endpoint, type=selection.type) %}
+{%- set pdf_url = url_for(community_pdf_endpoint, type=selection.type) %}
 {%- endif %}
 {#- no-print: the whole toolbar is controls, and _print.html's rule is that
     nothing clickable belongs on paper. Its own inputs and buttons are hidden by
@@ -241,7 +241,8 @@
             <button type="submit" class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">insights</span>Generate</button>
             <button type="button" class="btn-outline-teal" onclick="window.print()"
                     title="Print this report — the sidebar, header and controls drop out, the charts print as data tables, and the range above goes on the letterhead"><span class="material-symbols-outlined" style="font-size:18px;">print</span>Print</button>
-            <button type="button" class="btn-outline-teal" disabled title="{{ unavailable.export_pdf }}"><span class="material-symbols-outlined" style="font-size:18px;">picture_as_pdf</span>Export PDF</button>
+            <a class="btn-outline-teal" href="{{ pdf_url }}" download
+               title="Download this report as a PDF — the same figures over the same range, a section per panel with every chart's numbers as a table, on the health center's letterhead"><span class="material-symbols-outlined" style="font-size:18px;">picture_as_pdf</span>Export PDF</a>
             <a class="btn-outline-teal" href="{{ excel_url }}" download
                title="Download this report as an Excel workbook — the same figures over the same range, one sheet per section, with every chart's numbers as rows"><span class="material-symbols-outlined" style="font-size:18px;">description</span>Export Excel</a>
           </div>

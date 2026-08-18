@@ -13,3 +13,17 @@ tzdata==2025.2
 # which is the constraint this project is built under. See utils/workbook.py for
 # why not xlsxwriter, not pandas, and not plain CSV.
 openpyxl==3.1.5
+# Writes the .pdf behind Export PDF on the same two report screens. Chosen for a
+# small, direct API that models a letterhead-and-footer paginated document exactly
+# the way templates/_print.html already does -- header() and footer() are called
+# on every page, and table() paginates a long table and repeats its heading row on
+# its own. The whole set installs from prebuilt wheels, so there is no compiler to
+# run on a health center PC, and it generates the file entirely offline. Not
+# WeasyPrint (needs the native GTK/Cairo/Pango stack -- the platform-install
+# problem openpyxl was picked to avoid) and not reportlab (heavier, bundles a
+# compiled accelerator, and its Platypus flowables buy nothing this report needs).
+# fpdf2 itself is pure Python but declares Pillow, which is compiled, for image
+# handling this report does not use; the honest claim is "installs from wheels,
+# runs offline", not openpyxl's stronger "pure Python all the way down". See
+# utils/document.py.
+fpdf2==2.8.4

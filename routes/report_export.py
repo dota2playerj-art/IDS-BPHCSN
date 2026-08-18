@@ -1,12 +1,22 @@
-"""Export Excel, for both report screens.
+"""Export Excel and Export PDF, for both report screens.
 
 Reports & Analytics (Screen 10) and Community Reports (Screen 18) each offer an
-Export Excel control. This module is what both of them press. It reads the same
-context builder the screen itself rendered from -- reports_analytics_context()
-and community_reports_context() -- so a figure in the downloaded workbook cannot
-disagree with the figure the operator was looking at when they clicked. Nothing
-here counts anything; there is no SQL in this file and no arithmetic that the
-model functions do not already do.
+Export Excel and an Export PDF control. This module is what all of them press. It
+reads the same context builder the screen itself rendered from --
+reports_analytics_context() and community_reports_context() -- so a figure in the
+downloaded file cannot disagree with the figure the operator was looking at when
+they clicked. Nothing here counts anything; there is no SQL in this file and no
+arithmetic that the model functions do not already do.
+
+ONE ASSEMBLY, TWO FILES
+-----------------------
+The workbook and the PDF are not two builds of the report. _assemble() builds one
+list of sheet dictionaries -- a cover, a summary, a sheet per section, and a "not
+tracked" sheet -- and hands the identical structure to either renderer:
+utils/workbook.build() writes it as .xlsx, utils/document.render() writes it as
+.pdf. A figure cannot read one way in the spreadsheet and another on the printout,
+because there is one assembly and two renderers. That is the project's "one query,
+every screen" rule carried up a level to "one report, every file".
 
 That is the rule this whole project reports under, applied to a file instead of
 a screen: get_consultation_stats() is the only thing that knows how many
@@ -56,6 +66,7 @@ from io import BytesIO
 from flask import send_file
 
 from utils.dates import display_date, long_date, now, today
+from utils.document import PDF_MIMETYPE, render
 from utils.security import get_current_user
 from utils.workbook import (
     XLSX_MIMETYPE, build, figures, safe_filename, sheet, table,
@@ -141,22 +152,32 @@ ALWAYS_UNTRACKED = ("generated_reports",)
 # The two entry points
 # ---------------------------------------------------------------------------
 
-def excel_response(built):
+def _download(built, mimetype):
     """A (bytes, filename) pair as the download itself.
 
-    All three export routes -- the Administrator's and the Barangay Official's
-    views of Screen 10, and Community Reports -- return through here, so the
-    attachment header, the MIME type and the filename are decided once. A route
-    that assembled its own response is how one of the three would end up serving
-    a workbook the browser offers to open as a text file.
+    Every export route -- the Administrator's and the Barangay Official's views of
+    Screen 10, and Community Reports, each in both formats -- returns through here,
+    so the attachment header and the filename are decided once. A route that
+    assembled its own response is how one of them would end up serving a file the
+    browser offers to open as text.
     """
     payload, filename = built
     return send_file(
         BytesIO(payload),
-        mimetype=XLSX_MIMETYPE,
+        mimetype=mimetype,
         as_attachment=True,
         download_name=filename,
     )
+
+
+def excel_response(built):
+    """A built workbook (bytes, filename) as an .xlsx download."""
+    return _download(built, XLSX_MIMETYPE)
+
+
+def pdf_response(built):
+    """A built document (bytes, filename) as a .pdf download."""
+    return _download(built, PDF_MIMETYPE)
 
 
 def exported_by():
@@ -175,22 +196,62 @@ def exported_by():
 
 def analytics_workbook(context, produced_by=""):
     """Reports & Analytics (Screen 10) as a workbook: bytes and a filename."""
-    return _workbook(context, "Reports & Analytics", produced_by)
+    sheets, stem = _assemble(context, "Reports & Analytics", produced_by)
+    return build(sheets), safe_filename(stem + ".xlsx")
 
 
 def community_workbook(context, produced_by=""):
     """Community Reports (Screen 18) as a workbook: bytes and a filename."""
-    return _workbook(context, "Community Reports", produced_by)
+    sheets, stem = _assemble(context, "Community Reports", produced_by)
+    return build(sheets), safe_filename(stem + ".xlsx")
 
 
-def _workbook(context, screen, produced_by):
-    """Both screens' export, built from one screen's own context.
+def analytics_pdf(context, produced_by=""):
+    """Reports & Analytics (Screen 10) as a PDF document: bytes and a filename."""
+    return _document(context, "Reports & Analytics", produced_by)
+
+
+def community_pdf(context, produced_by=""):
+    """Community Reports (Screen 18) as a PDF document: bytes and a filename."""
+    return _document(context, "Community Reports", produced_by)
+
+
+def _document(context, screen, produced_by):
+    """Both screens' PDF, from the same sheets the workbook is built from.
+
+    The renderer is handed the report's identity for the running letterhead and
+    footer -- which report, over which days, taken off by whom -- because a PDF can
+    be split and a loose page still has to say what it is. The figures themselves
+    are in the sheets, which are the workbook's sheets.
+    """
+    sheets, stem = _assemble(context, screen, produced_by)
+    selection = context["selection"]
+    window = context["report_window"]
+    stamped = now()
+    exported = stamped.strftime("%B %d, %Y at %I:%M %p")
+    footer_left = f"IDS-BPHCSN · Exported {exported}"
+    if produced_by:
+        footer_left += f" by {produced_by}"
+    payload = render(
+        sheets,
+        org="Barangay Poblacion Health Center",
+        org_sub="Integrated Data System (IDS-BPHCSN)",
+        doc_title=f"{screen} — {selection['type_label']}",
+        range_label=f"{long_date(window['start'])} to {long_date(window['end'])}",
+        footer_left=footer_left,
+    )
+    return payload, safe_filename(stem + ".pdf")
+
+
+def _assemble(context, screen, produced_by):
+    """The report as a list of sheet dicts, and a filename stem, for either file.
 
     The screen name is the only thing that differs structurally, and it differs
-    only on the cover sheet and in the filename. Everything else is decided by
-    which sections the selected report type keeps -- which is the same
-    `selection.sections` set the template branches on -- so the two screens
-    cannot grow different ideas of what a consultation sheet contains.
+    only on the cover sheet and in the stem. Everything else is decided by which
+    sections the selected report type keeps -- the same `selection.sections` set
+    the template branches on -- so the two screens cannot grow different ideas of
+    what a consultation section contains, and the .xlsx and the .pdf of one report
+    cannot grow different ideas either: they are this one structure, rendered twice.
     """
     selection = context["selection"]
     window = context["report_window"]
@@ -211,11 +272,11 @@ def _workbook(context, screen, produced_by):
             )
     sheets.append(_not_tracked_sheet(context, sections))
 
-    filename = safe_filename(
+    stem = (
         f"IDS-BPHCSN {screen} - {selection['type_label']} - "
-        f"{window['start'].isoformat()} to {window['end'].isoformat()}.xlsx"
+        f"{window['start'].isoformat()} to {window['end'].isoformat()}"
     )
-    return build(sheets), filename
+    return sheets, stem
 
 
 def _heading(name, window):

@@ -16,10 +16,13 @@ from routes.official_views import (
     vaccination_campaigns_context,
 )
 from routes.report_export import (
+    analytics_pdf,
     analytics_workbook,
+    community_pdf,
     community_workbook,
     excel_response,
     exported_by,
+    pdf_response,
 )
 from routes.report_views import reports_analytics_context
 from utils.security import login_required, role_required
@@ -68,6 +71,21 @@ def official_reports_analytics():
 @role_required("Barangay Official")
 def official_export_reports_analytics_excel():
     return excel_response(analytics_workbook(
+        reports_analytics_context(args=request.args),
+        produced_by=exported_by(),
+    ))
+
+
+# Export PDF for Screen 10, the Barangay Official's view. The twin of the Excel
+# route above and byte-for-byte the Administrator's PDF -- one assembly in
+# routes/report_export.py, rendered as a document. Still a GET with no POST
+# counterpart in this blueprint, so this role's access to Screen 10 stays
+# read-only in the same structural sense the render and Excel routes are.
+@official_bp.route('/reports_analytics/export.pdf')
+@login_required
+@role_required("Barangay Official")
+def official_export_reports_analytics_pdf():
+    return pdf_response(analytics_pdf(
         reports_analytics_context(args=request.args),
         produced_by=exported_by(),
     ))
@@ -148,6 +166,20 @@ def community_reports():
 @role_required("Barangay Official")
 def export_community_reports_excel():
     return excel_response(community_workbook(
+        community_reports_context(args=request.args),
+        produced_by=exported_by(),
+    ))
+
+
+# Export PDF for Screen 18. The twin of the Excel route above: the same
+# community_reports_context(), the same resolved window, the same assembled
+# report, rendered as a document instead of a workbook. Same guard as the screen
+# it exports -- this role and no other.
+@official_bp.route('/community-reports/export.pdf')
+@login_required
+@role_required("Barangay Official")
+def export_community_reports_pdf():
+    return pdf_response(community_pdf(
         community_reports_context(args=request.args),
         produced_by=exported_by(),
     ))
