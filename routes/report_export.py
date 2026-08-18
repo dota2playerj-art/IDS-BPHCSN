@@ -395,7 +395,7 @@ def _summary_sheet(context, sections):
         rows.append(("Immunisation doses given", coverage["window"]["doses_given"], ranged))
     if "inventory" in sections:
         inventory = context["inventory_report"]
-        rows.append(("Inventory items tracked", inventory["total_items"], standing))
+        rows.append(("Inventory items in service", inventory["total_items"], standing))
         rows.append(("Items below reorder level", inventory["low_stock_count"], standing))
     if "programs" in sections:
         for program in context["programs"]:
@@ -808,7 +808,9 @@ def _inventory(context):
                     "most urgent condition that applies to it, so these sum to the "
                     "total below.")),
         figures("Inventory totals", [
-            ("Items tracked", inventory["total_items"], "The whole inventory, today"),
+            ("Items tracked", inventory["total_items"],
+             "Items in service today; retired items are excluded, as they are "
+             "from the reorder figure below"),
             ("Items below reorder level", inventory["low_stock_count"], "Today"),
             ("Items out of stock", inventory["out_of_stock_count"], "Today"),
         ]),

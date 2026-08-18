@@ -78,6 +78,17 @@
      var(--danger) rather than a new colour. */
   .badge-expirestoday{background:var(--danger); color:#fff;}
   .badge-expired{background:#F3F4F6; color:#4B5563;}
+  /* Retired borrows Expired's grey deliberately: both mean "not part of what is
+     dispensable today", and giving retirement a colour of its own would imply a
+     condition to act on when the whole point is that there is none. */
+  .badge-retired{background:#F3F4F6; color:#4B5563;}
+
+  /* A retired row stays in the table -- it is still a record, and taking it out
+     would leave no way to see or undo a retirement -- but it is muted so it does
+     not read as part of the working shelf. It is dimmed rather than hidden, and
+     it un-dims on hover so it stays readable when someone goes looking for it. */
+  .item-row.retired{opacity:0.55;}
+  .item-row.retired:hover{opacity:1;}
 
   .action-icon{
     width:32px; height:32px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center;
@@ -132,8 +143,13 @@
         <div class="stat-card">
           <div class="stat-icon" style="background:var(--teal-light);"><span class="material-symbols-outlined" style="color:var(--teal-dark);">inventory_2</span></div>
           <div class="stat-value">{{ "{:,}".format(stats.total_items) }}</div>
-          <div class="stat-label">Total Inventory Items</div>
-          <div class="stat-trend" style="color:var(--text-muted);">{{ stats.medicine_count }} medicine{{ "s" if stats.medicine_count != 1 }}, {{ stats.total_items - stats.medicine_count }} supply &amp; equipment</div>
+          <div class="stat-label">Items In Service</div>
+          {#- All four cards count the working inventory, so a retired item is in
+              none of them. The table below lists every row including retired
+              ones, so the cards and the row count differ whenever anything is
+              retired -- this line says so outright rather than leaving a reader
+              to notice the gap and distrust both numbers. #}
+          <div class="stat-trend" style="color:var(--text-muted);">{{ stats.medicine_count }} medicine{{ "s" if stats.medicine_count != 1 }}, {{ stats.total_items - stats.medicine_count }} supply &amp; equipment{% if stats.retired_count %} &middot; {{ stats.retired_count }} retired, not counted{% endif %}</div>
         </div>
       </div>
       <div class="col-md-3 col-sm-6">
@@ -276,10 +292,14 @@
                 stored form. data-category mirrors the expression the Category
                 cell below prints, so a filter value always matches the cell
                 beside it. Same shape as Screens 03, 09 and 12. #}
-            <tr class="item-row"
+            <tr class="item-row{% if item.is_retired %} retired{% endif %}"
                 data-search="{{ (item.name ~ ' ' ~ (item.generic_name or '') ~ ' ' ~ (item.drug_class or '') ~ ' ' ~ (item.category or '') ~ ' ' ~ (item.supplier or '')) | lower }}"
                 data-category="{{ (item.drug_class or item.category or '') | lower }}"
-                data-status="{{ (item.stock_status or '') | lower }}"
+                {#- The Status filter matches on what the Status cell prints, so a
+                    retired item is reachable through "Retired" in that same
+                    dropdown. Patient Records filters its Inactive and Deceased
+                    records through its one Status control in exactly this way. #}
+                data-status="{{ (item.display_status or '') | lower }}"
                 data-expiry="{{ item.expiry_date or '' }}">
               <td><div class="med-name">{{ item.name }}</div><div class="med-generic">{{ item.generic_name or item.category }}</div></td>
               <td><span class="cat-pill">{{ item.drug_class or item.category }}</span></td>
@@ -294,12 +314,18 @@
               <td>{{ "{:,}".format(item.low_stock_threshold) }} {{ item.unit or '' }}</td>
               <td>{{ item.expiry_date | display_date('No expiry') }}</td>
               <td>{{ item.supplier or '—' }}</td>
-              <td><span class="badge-status {{ item.status_badge_class }}">{{ item.stock_status }}</span></td>
+              {#- "Retired" replaces the stock condition rather than sitting beside
+                  it. An item nobody is restocking must not be labelled "Low Stock"
+                  here while the alert, the cards and the dashboards have all
+                  stopped counting it -- the row would be contradicting them. The
+                  stock figure, reorder level and expiry date are all still in the
+                  row, so nothing about the item is hidden by this. #}
+              <td><span class="badge-status {{ item.status_badge_class }}">{{ item.display_status }}</span>{% if item.is_retired %}<div class="med-generic">{{ item.stock_status }} when retired</div>{% endif %}</td>
               <td>
                 <div class="d-flex justify-content-end gap-1">
                   <button type="button" class="action-icon" disabled title="{{ unavailable.medicine_detail }}"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button>
                   <a href="{{ url_for(add_edit_medicine_endpoint, medicine_id=item.id) }}" class="action-icon" title="Edit {{ item.name }}"><span class="material-symbols-outlined" style="font-size:18px;">edit</span></a>
-                  <button type="button" class="action-icon" disabled title="{{ unavailable.print }}"><span class="material-symbols-outlined" style="font-size:18px;">print</span></button>
+                  <button type="button" class="action-icon" disabled title="{{ unavailable.medicine_print }}"><span class="material-symbols-outlined" style="font-size:18px;">print</span></button>
                   <button type="button" class="action-icon" disabled title="{{ unavailable.medicine_archive }}"><span class="material-symbols-outlined" style="font-size:18px;">archive</span></button>
                 </div>
               </td>
@@ -328,7 +354,7 @@
            stocked item is rendered above, so there is no page to turn to. -->
 {%- if items %}
       <div class="table-footer" id="tableFooter">
-        <div class="pg-info" id="itemCount">Showing all {{ items|length }} inventory item{{ '' if items|length == 1 else 's' }}</div>
+        <div class="pg-info" id="itemCount" data-retired="{{ stats.retired_count }}">Showing all {{ items|length }} inventory item{{ '' if items|length == 1 else 's' }}{% if stats.retired_count %}, including {{ stats.retired_count }} retired{% endif %}</div>
         <div class="pg-info" title="{{ unavailable.pagination }}">Single page</div>
       </div>
 {%- endif %}
@@ -401,8 +427,15 @@
         if(hit){ shown++; }
       });
       if(counter){
+        // The retired note is part of the unfiltered sentence the server rendered,
+        // and rebuilding the text here without it would quietly drop the one line
+        // that explains why the stat cards above read lower than this count. Once
+        // a filter is on, "S of N" is about the narrowing and the note would be
+        // answering a question nobody asked, so it only rides the "all" form.
+        var retired = parseInt(counter.dataset.retired || '0', 10) || 0;
         counter.textContent = shown === total
           ? 'Showing all ' + total + ' inventory item' + (total === 1 ? '' : 's')
+            + (retired ? ', including ' + retired + ' retired' : '')
           : 'Showing ' + shown + ' of ' + total + ' inventory items';
       }
       // The empty state doubles as the no-matches message.

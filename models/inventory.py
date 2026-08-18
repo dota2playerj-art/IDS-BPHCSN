@@ -114,8 +114,28 @@ TEXT_FIELDS = tuple(
 # window is stated once for the whole project.
 NEAR_EXPIRY_DAYS = 90
 
+# The stored lifecycle status that takes an item out of service. It is one of
+# ITEM_STATUSES above, set on the Add / Edit Medicine form, and until now it was
+# written by that form and read by nothing at all: an Inactive item still sat in
+# the list looking stocked, still counted in all four stat cards, and could still
+# raise a low-stock alert on both dashboards, the sidebar badge and Reports &
+# Analytics. Naming it here is what lets every operating figure below agree on
+# which rows are in service.
+#
+# It is deliberately the same soft flag patients have -- schema.sql calls it "a
+# soft lifecycle flag, as on patients" -- and it retires a row rather than
+# removing one. Nothing is deleted and no history is lost; the row keeps its
+# batch number, its expiry date and its stock figure, and going back to Active
+# restores it everywhere.
+RETIRED_STATUS = "Inactive"
+
 # stock status -> the badge class Screen 06's stylesheet defines.
 STATUS_BADGE_CLASS = {
+    # Retired is not a stock condition and is not returned by stock_status(). It
+    # is what Screen 06 shows *instead* of one for an item out of service, since
+    # "Low Stock" on something nobody is restocking is exactly the sentence this
+    # badge should never say.
+    "Retired": "badge-retired",
     "In Stock": "badge-instock",
     "Low Stock": "badge-lowstock",
     "Critical": "badge-critical",
@@ -240,8 +260,24 @@ def _to_item(row, on_date=None):
         item.get("stock_quantity"), item.get("low_stock_threshold")
     )
 
+    # stock_status stays the pure stock condition whatever the item's lifecycle
+    # status is -- it is a fact about the shelf, and a retired item can still be
+    # short or expired. What changes for a retired item is not the fact but who
+    # is in scope for it, and that is decided once, in in_service() below, rather
+    # than by quietly rewriting the fact here.
     item["stock_status"] = status
-    item["status_badge_class"] = STATUS_BADGE_CLASS.get(status, "badge-instock")
+    item["is_retired"] = item.get("status") == RETIRED_STATUS
+
+    # What Screen 06 puts in its Status column. A retired row shows "Retired"
+    # rather than a stock condition it is not being judged on, which also puts
+    # the value into that screen's existing Status filter -- so retired items are
+    # reachable through the one control that already filters by status, exactly
+    # as Inactive and Deceased patients are on Patient Records, instead of
+    # needing a "show retired" toggle this project has nowhere else.
+    item["display_status"] = "Retired" if item["is_retired"] else status
+    item["status_badge_class"] = STATUS_BADGE_CLASS.get(
+        item["display_status"], "badge-instock"
+    )
     item["stock_percent"] = percent
     item["stock_fill_class"] = fill_class
     item["days_until_expiry"] = days_until_expiry(item.get("expiry_date"), on_date)
@@ -299,6 +335,35 @@ def get_inventory_item_by_id(item_id):
     return _to_item(row) if row else None
 
 
+def in_service(items):
+    """The items every operating figure in this module is computed over.
+
+    One definition of "in scope", read by the stat cards, the status doughnut and
+    the low-stock alert, so those three cannot come to disagree about whether a
+    retired item counts. An item the health centre has stopped stocking is not
+    short of stock in any sense that asks somebody to reorder it, is not awaiting
+    disposal off a shelf it is no longer on, and is not part of how the working
+    inventory divides up.
+
+    This is the pattern the project already uses for patients, not a new one. The
+    roster on Patient Records lists every patient whatever their status, and the
+    exclusion of the non-Active ones happens further out, in the derived lists
+    where being non-Active changes what should be done: the SMS audience excludes
+    them in its SQL (models/broadcasts.py) and the immunisation follow-up list and
+    coverage denominator exclude them in Python (models/immunizations.py), each
+    for a reason particular to what that list is for. This is the inventory's
+    version of the same step.
+
+    Deliberately NOT applied in get_all_inventory_items(). Hiding retired rows
+    from Screen 06 would contradict the promise the equivalent patient dialog
+    makes -- "the patient stays listed here under the new status" -- and would
+    leave an operator no way to see, or undo, a retirement. They stay listed,
+    badged "Retired", and filterable by that value; they simply stop being
+    counted.
+    """
+    return [item for item in items if not item["is_retired"]]
+
+
 def get_inventory_stats(items=None):
     """Counts behind the four stat cards on Screen 06.
 
@@ -306,9 +371,18 @@ def get_inventory_stats(items=None):
     stock edit that crosses a threshold moves the cards on the next render with
     nothing else to keep in step. `items` may be passed in to avoid a second
     query when the caller has already loaded the list.
+
+    Retired items are excluded from all four cards by in_service(). The cards
+    report the working inventory, while the table below them lists every row, so
+    the two would appear to disagree whenever anything is retired -- and rather
+    than let a reader guess, retired_count is returned alongside so Screen 06 can
+    name the difference in words instead of leaving it to be discovered.
     """
     if items is None:
         items = get_all_inventory_items()
+
+    retired_count = sum(1 for item in items if item["is_retired"])
+    items = in_service(items)
 
     low_stock = [item for item in items if item["is_low_stock"]]
     out_of_stock = [item for item in items if item["is_out_of_stock"]]
@@ -329,6 +403,7 @@ def get_inventory_stats(items=None):
     return {
         "total_items": len(items),
         "medicine_count": sum(1 for item in items if item["category"] == "Medicine"),
+        "retired_count": retired_count,
         "low_stock_count": len(low_stock),
         "out_of_stock_count": len(out_of_stock),
         "near_expiry_count": len(near_expiry),
@@ -364,10 +439,18 @@ def get_status_distribution(items=None):
     reader will treat as "must be pulled from the shelf". It keeps its own
     "Expires Today" badge on Screen 06 -- the badge answers what to do about one
     row, this chart answers how the shelf divides up, and those differ.
+
+    Retired items are excluded by in_service(), which the Low Stock invariant
+    above actually requires: that segment is promised to equal the low_stock_count
+    the dashboards and the sidebar badge report, and those now exclude retired
+    items, so counting them here would break the one thing this function is
+    documented to guarantee. `total` is therefore the working inventory too, which
+    is what the legend and the panel subtitle are describing.
     """
     if items is None:
         items = get_all_inventory_items()
 
+    items = in_service(items)
     low_stock = expired = near_expiry = in_stock = 0
     for item in items:
         remaining = item["days_until_expiry"]
@@ -400,8 +483,15 @@ def get_inventory_report():
     The counts and the ordered low-stock list come from get_low_stock_alert() --
     the same call behind the two dashboards and the sidebar badge -- so Screen 10
     cannot report a different low-stock figure from the rest of the project.
+
+    Every figure here is over the working inventory: `items` is narrowed by
+    in_service() before anything is counted from it, so the totals, the
+    out-of-stock list and the doughnut all describe the same set of rows that the
+    low-stock list does. A report that counted retired items in its total while
+    the alert beside it did not would be the same disagreement this function was
+    written to prevent, one level up.
     """
-    items = get_all_inventory_items()
+    items = in_service(get_all_inventory_items())
     alert = get_low_stock_alert()
 
     return {
@@ -452,8 +542,16 @@ def get_low_stock_alert(limit=None):
     The list is keyed "low_stock_items" rather than the more obvious "items"
     because this dict is handed to Jinja, where `low_stock.items` would resolve
     to dict.items -- the built-in method -- and silently iterate nothing.
+
+    Retired items are excluded by in_service(), and this is the exclusion that
+    matters most: an item the centre has stopped stocking cannot be "below its
+    reorder level" in any sense that asks somebody to go and reorder it. Because
+    every low-stock figure in the project reads this one function, that exclusion
+    reaches the sidebar badge, both dashboards and Reports & Analytics without any
+    of them being touched -- which is the whole reason the figure was centralised
+    here.
     """
-    items = get_all_inventory_items()
+    items = in_service(get_all_inventory_items())
     low_stock = sorted(
         (item for item in items if item["is_low_stock"]), key=_criticality
     )

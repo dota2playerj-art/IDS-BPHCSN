@@ -295,8 +295,11 @@
           <div class="stat-value">{{ "{:,}".format(inventory_report.total_items) }}</div>
           <!-- Counts the whole inventory, not medicines alone: the low-stock figure
                beside it does too (a supply can be below its reorder level), and the
-               two would contradict each other if they measured different sets. -->
-          <div class="stat-label">Inventory Items Tracked</div>
+               two would contradict each other if they measured different sets. For
+               the same reason it counts items in service only -- a retired item is
+               excluded from the low-stock figure beside it, so counting it here
+               would reintroduce exactly the mismatch this note is about. -->
+          <div class="stat-label">Inventory Items In Service</div>
           {%- if inventory_report.low_stock_count %}
           <div class="stat-trend" style="color:var(--danger);">{{ inventory_report.low_stock_count }} low stock &middot; today</div>
           {%- else %}

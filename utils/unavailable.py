@@ -51,6 +51,14 @@ left. This is the whole life of a shared reason -- born when the gap is real,
 split when the gap is real for one control and not another, deleted when the gap
 closes -- and one file is where all three happen so none of them is missed.
 
+A reason can also split because it is aimed at the wrong *scope* rather than
+because it became false. "print" is a sentence about a screen, and it was being
+quoted by the print icon on a Medicine Inventory row -- a control offering to
+print one item, answered by a paragraph about the sidebar. "medicine_print" now
+says what actually stops that button, and "print" keeps the screens it was
+written for. Nothing about it had gone false; it was simply answering a question
+the control was not asking.
+
 Kept apart from the per-screen UNTRACKED dicts in routes/*_views.py on purpose.
 Those answer a different question -- why a *figure* has no source -- and are
 specific to one screen's data. This answers why an *action* cannot be taken,
@@ -107,6 +115,25 @@ UNAVAILABLE = {
         "deciding what on it is worth keeping on paper, which is a design "
         "question, not a switch."
     ),
+    # A SHARED REASON CAN ALSO BE THE WRONG *SCOPE*, NOT MERELY WRONG.
+    # The print icon on a Medicine Inventory row used to quote "print" above, and
+    # that sentence is true -- Screen 06 has no print layout -- but it answers a
+    # question about the whole screen while sitting on a control that offers to
+    # print one item. Patient Records' row-level print icon does not print its
+    # row; it opens that patient's own page with ?print=1, because the record is
+    # the page. Medicine Inventory has no per-item page for the equivalent link to
+    # point at, and that -- not the missing screen stylesheet -- is what actually
+    # stops this button. So it says so itself.
+    "medicine_print": (
+        "There is nothing to print one item from. Where printing a single record "
+        "is built, the row does not print itself: the print icon on a Patient "
+        "Records row opens that patient's own page and sends that to the "
+        "printer, because the patient's record is a page that already exists. A "
+        "stock item has no page of its own -- Edit is a form, not a record -- so "
+        "there is no equivalent to link to here, and a printed copy of one table "
+        "row is not a document anybody would keep. This waits on the same "
+        "decision the View action does."
+    ),
 
     # ---- Table controls -----------------------------------------------------
     "sort": (
@@ -123,11 +150,22 @@ UNAVAILABLE = {
     ),
 
     # ---- Records ------------------------------------------------------------
+    # REWRITTEN: the old sentence claimed "everything recorded about it is in
+    # this row", which was false. Eight stored fields -- item code, brand name,
+    # date received, batch number, manufacturer, unit cost, storage location and
+    # notes -- appear in no template but add_edit_medicine.html. Reading any of
+    # them means opening the editable form, which is the exact complaint the
+    # read-only View on Consultation History was built to answer.
     "medicine_detail": (
-        "There is no read-only detail screen for a stock item. Everything "
-        "recorded about it is in this row and on the Add / Edit Medicine form, "
-        "so a view action would open the same fields the Edit action already "
-        "opens."
+        "There is no read-only detail screen for a stock item, and no route that "
+        "would serve one. The row beside this button does not show everything "
+        "the record holds either: its item code, brand name, date received, "
+        "batch number, manufacturer, unit cost, storage location and notes are "
+        "stored, but appear nowhere except the Add / Edit Medicine form. So "
+        "reading those means opening the form that can also change them. What is "
+        "undecided is whether a stock item should get its own screen, or the "
+        "treatment Consultation History uses -- a read-only panel that expands "
+        "in place, needing no new route or template."
     ),
     "save_and_another": (
         "Save & Register Another is not implemented. Saving already redirects "
@@ -142,12 +180,31 @@ UNAVAILABLE = {
         "records -- its date, time, service, assigned staff, status and notes "
         "-- is already in this row, so opening it would repeat the row."
     ),
+    # REWRITTEN, AND IT WAS THE FALSEST SENTENCE IN THIS FILE.
+    # It said "retiring a stock item is not implemented" while inventory_items
+    # has carried a status flag since the first schema, and the Add / Edit
+    # Medicine form has offered Active / Inactive on it all along. It also said
+    # patients are archived with "its own confirmation and audit entry" -- the
+    # confirmation dialog is real, but no audit entry is written for a patient
+    # archive either; log_action() is called from two places in this project and
+    # neither is that one. Holding medicines to a bar the feature it cites does
+    # not clear is how a reason ends up arguing against building something for a
+    # standard nothing meets.
+    # And "would take its batch and expiry history with it" described a loss that
+    # could not happen: retiring is an UPDATE, nothing is deleted, and there is no
+    # batch or expiry history to lose -- inventory_items holds one batch number
+    # and one expiry date per row and there is no history table.
     "medicine_archive": (
-        "Retiring a stock item is not implemented. Patients are archived "
-        "through a dedicated endpoint with its own confirmation and audit "
-        "entry; medicines have no such path yet, and a stock item that "
-        "disappeared without one would take its batch and expiry history with "
-        "it."
+        "The status this would set already exists, and this button is not what "
+        "sets it. An item is Active or Inactive, the Add / Edit Medicine form "
+        "offers both, and an Inactive item is badged Retired in the table below, "
+        "left out of all four cards above it, and left out of every low-stock "
+        "figure in the system. What is missing is only the shortcut: patients "
+        "have a dedicated archive endpoint and a confirmation dialog that names "
+        "the record and offers just the statuses it can legally move to, and "
+        "medicines have neither, so retiring one means opening Edit and changing "
+        "the status there. Nothing is lost by that route -- it is the same "
+        "single field either way."
     ),
 
     # ---- Whole screens with no data source ---------------------------------

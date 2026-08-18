@@ -66,11 +66,19 @@ def _filter_options(items):
     The category shown in a row is drug_class where there is one and category
     otherwise, so the option list is built from the same expression -- otherwise
     a filter value could not match the cell beside it.
+
+    Statuses are read from display_status, not stock_status, for the same reason:
+    that is what the Status cell prints. It means "Retired" appears in this
+    dropdown exactly when something is retired, so a retired item is reached
+    through the status control that is already there rather than through a
+    separate "show retired" toggle -- which is how Patient Records reaches its
+    Inactive and Deceased records, and this project does not have a second
+    pattern for the same question.
     """
     categories = {(item["drug_class"] or item["category"]) for item in items}
     return {
         "categories": sorted(c for c in categories if c),
-        "statuses": sorted({item["stock_status"] for item in items if item["stock_status"]}),
+        "statuses": sorted({item["display_status"] for item in items if item["display_status"]}),
     }
 
 
