@@ -56,6 +56,19 @@ ACTION_SMS_BROADCAST_SENT = "Sent community SMS broadcast"
 # the same reason the module names are.
 ACTION_LOGIN_SUCCESS = "Signed in"
 ACTION_LOGIN_FAILED = "Refused sign-in attempt"
+# A third outcome, and its own phrase rather than a variant of the one above.
+# "The password did not match" and "the account has been deactivated" are refusals
+# with nothing else in common: the first is a typo or a guess, the second is a
+# revoked credential still being presented -- often, and this is the whole point,
+# with the CORRECT password. Collapsing them into one phrase would bury the only
+# entry on this screen that tells an administrator a credential they thought they
+# had withdrawn is still in someone's hands and still being used.
+ACTION_LOGIN_BLOCKED = "Blocked sign-in to deactivated account"
+
+# Every action that means somebody was turned away at the login form. Grouped so
+# the Security Events figure counts refusals rather than one particular kind of
+# refusal -- adding a fourth outcome later must not silently shrink that number.
+REFUSAL_ACTIONS = (ACTION_LOGIN_FAILED, ACTION_LOGIN_BLOCKED)
 
 # Modules that are not a change to a stored record, and so are excluded from the
 # "Record Updates" figure on the Audit Logs screen. A broadcast is a message that
@@ -157,8 +170,17 @@ def get_audit_stats():
 
     That gap is closed. The login route now writes one entry per successful
     sign-in and one per sign-in refused against an account that exists, so
-    `logins` and `failed_logins` below are counts of real rows and both cards
+    `logins` and `refused_logins` below are counts of real rows and both cards
     report them.
+
+    A refusal comes in two kinds and they are counted separately as well as
+    together. `failed_logins` is a credential that did not match on an account
+    that is allowed to sign in; `blocked_logins` is an account that has been
+    deactivated, refused whether or not the password was right. The Security
+    Events card adds them, because the question it answers is "is somebody being
+    turned away"; the trail keeps them distinct, because the question an
+    administrator asks next is "why", and the two answers lead to opposite
+    investigations.
 
     Two things are still genuinely absent, and are counted nowhere because
     nothing writes them:
@@ -222,6 +244,10 @@ def get_audit_stats():
     logins_today = _auth_count(ACTION_LOGIN_SUCCESS, start_of_today)
     failed_logins = _auth_count(ACTION_LOGIN_FAILED)
     failed_logins_today = _auth_count(ACTION_LOGIN_FAILED, start_of_today)
+    blocked_logins = _auth_count(ACTION_LOGIN_BLOCKED)
+    blocked_logins_today = _auth_count(ACTION_LOGIN_BLOCKED, start_of_today)
+    refused_logins = sum(_auth_count(a) for a in REFUSAL_ACTIONS)
+    refused_logins_today = sum(_auth_count(a, start_of_today) for a in REFUSAL_ACTIONS)
     # How many distinct accounts have ever signed in -- not how many exist. An
     # account that has never signed in is absent from audit_logs entirely, which
     # is exactly what makes this figure worth reporting beside the total.
@@ -241,6 +267,15 @@ def get_audit_stats():
         "logins_today": logins_today,
         "failed_logins": failed_logins,
         "failed_logins_today": failed_logins_today,
+        "blocked_logins": blocked_logins,
+        "blocked_logins_today": blocked_logins_today,
+        # What the Security Events card reports: every refusal, whatever its
+        # reason. Summed over REFUSAL_ACTIONS rather than adding the two named
+        # figures above, so a third refusal outcome added later is counted here
+        # the moment it joins that tuple -- the alternative is a total that
+        # quietly stops being one and a card that under-reports without failing.
+        "refused_logins": refused_logins,
+        "refused_logins_today": refused_logins_today,
         "login_accounts": login_accounts,
     }
 
@@ -254,7 +289,10 @@ def get_last_logins():
     Only ACTION_LOGIN_SUCCESS is considered. A refused attempt is not a login,
     and letting one set a "last login" would be the worst possible reading of the
     column -- an account that has never once been signed into would show a time
-    beside it because somebody guessed at its password.
+    beside it because somebody guessed at its password. That holds for the
+    deactivated case too, and matters more there: a blocked attempt can carry the
+    correct password, so counting it would put a fresh "last login" against
+    precisely the account whose access was supposed to have ended.
 
     An account missing from the result has never signed in. That absence is the
     answer, and the caller reports it as such rather than substituting a date.

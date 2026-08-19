@@ -33,6 +33,31 @@ and the address, and it builds its sentence from the *stored* account fields
 (username, full name, role). Nothing an anonymous caller typed reaches the
 audit row at all.
 
+DEACTIVATION IS ENFORCED HERE, AND NOWHERE ELSE IT COULD BE
+------------------------------------------------------------
+users.is_active has existed since the first schema and every other reader in the
+project honoured it -- a deactivated account is kept off the booking dropdown, is
+not texted by a broadcast, and is badged "Deactivated" on User Management under a
+card that reads "Access revoked". This route never asked, so that card was making
+a promise the application did not keep: a revoked account could still sign in with
+its old password and reach every screen its role admits. It is checked now, and
+the check is the difference between a status flag and a revocation.
+
+The order of the three questions below is deliberate. The password is verified
+BEFORE the active flag is consulted, even though a deactivated account is refused
+either way, for two independent reasons:
+
+* Timing. Skipping the hash comparison for deactivated accounts would make those
+  requests measurably faster than every other refusal, which turns the login form
+  into an oracle for which accounts have been switched off. The work is done in
+  both cases so the two look alike from outside.
+* Because the answer is worth recording. "A deactivated account was presented
+  with the CORRECT password" and "a deactivated account was presented with a
+  wrong one" are different events -- the first says a credential someone believed
+  was withdrawn is still live and still in somebody's hands, which may mean that
+  password needs changing wherever else it is used. The entry says which it was.
+  It still never says what the password was.
+
 WHAT IS STILL NOT RECORDED HERE, AND WHY
 -----------------------------------------
 An attempt against a username that does not exist writes nothing. The column
@@ -47,11 +72,20 @@ Signing out is also not recorded. logout() clears the session and writes nothing
 so the figures these entries feed are sign-in counts and not session counts. Both
 absences are stated on the screens that report the counts rather than left to be
 inferred from a number.
+
+One more boundary, stated because it would otherwise be assumed away: the active
+flag is checked when a session STARTS, not on every request afterwards. An
+account deactivated while it is already signed in keeps that session until it is
+cleared. Nothing in the application can deactivate an account today -- there is
+no write path for it, which is why the flag only ever changes by direct database
+edit -- so the window is narrow, but it is real, and closing it would mean a
+lookup on every guarded request rather than a change to this file.
 """
 from flask import Blueprint, flash, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash
 
 from models.audit import (
+    ACTION_LOGIN_BLOCKED,
     ACTION_LOGIN_FAILED,
     ACTION_LOGIN_SUCCESS,
     MODULE_AUTH,
@@ -97,6 +131,51 @@ def _log_sign_in(user, ip_address):
     )
 
 
+def _log_blocked_sign_in(user, ip_address, password_verified):
+    """Record that a deactivated account was refused, and say whether its
+    password still works.
+
+    Its own entry rather than a variant of the refusal below, because an
+    administrator reading the trail is asking two different questions of the two
+    rows. A wrong password on a live account is a typo or a guess. A sign-in
+    attempt on a deactivated one is somebody still holding a credential that was
+    supposed to have been withdrawn -- and if `password_verified` is true, still
+    holding a WORKING one, which is the single most actionable line this trail
+    can produce. That clause is why the password is checked before the flag: the
+    answer is worth having.
+
+    Recording the outcome of the check is not the same as recording the value
+    checked, and the value is not a parameter of this function any more than it
+    is of the one below. `password_verified` is a boolean the caller has already
+    computed.
+    """
+    if user is None:
+        return None
+
+    credential = (
+        "the password supplied was correct, so this credential still works and "
+        "only the account's deactivation stopped it"
+        if password_verified else
+        "the password supplied was also wrong"
+    )
+    return log_action(
+        user_id=user["id"],
+        action=ACTION_LOGIN_BLOCKED,
+        module=MODULE_AUTH,
+        details=(
+            f'Sign-in blocked for account "{user["username"]}" '
+            f'({user["full_name"]}, {user["role"]}), from '
+            f'{_address_phrase(ip_address)}; the account is marked deactivated, '
+            f'so no session was started -- {credential}. The person at the form '
+            "was told only that the credentials were invalid, the same wording a "
+            "wrong password receives, so the refusal reveals nothing about the "
+            "account's status. The value supplied is not recorded anywhere, by "
+            "design"
+        ),
+        ip_address=ip_address,
+    )
+
+
 def _log_refused_sign_in(user, ip_address):
     """Record that a sign-in was refused, and record nothing that was typed.
 
@@ -130,6 +209,25 @@ def _log_refused_sign_in(user, ip_address):
     )
 
 
+# THE ONE RESPONSE EVERY REFUSAL RETURNS.
+# One function rather than the same two lines at each refusal site, because the
+# security property here is that the three outcomes are INDISTINGUISHABLE from
+# the outside -- no such account, wrong password, deactivated account -- and a
+# property that depends on three copies of a string staying equal is a property
+# waiting to be broken by an edit to one of them. A fourth outcome added later
+# gets the identical response by construction rather than by remembering to.
+#
+# In particular there is no "this account has been deactivated" message here, and
+# there must never be one. It would be helpful to the one person who deserves it
+# and a free account-enumeration oracle for everybody else: anyone could sort a
+# list of guessed usernames into real-and-disabled, real-and-live, and fictional,
+# without ever knowing a password. The distinction is recorded in the audit trail,
+# where only a signed-in Admin can read it.
+def _refuse():
+    flash("Invalid security credentials.")
+    return redirect(url_for("auth.login", error="Invalid security credentials."))
+
+
 @auth_bp.route("/")
 def index():
     if session.get("user_id"):
@@ -156,9 +254,24 @@ def login():
             elif user_dict.get("password"):
                 password_verified = user_dict["password"] == password
 
-        # Read once, before either branch, so the successful entry and the
-        # refused one cannot end up describing the address differently.
+        # Read once, before any branch, so entries written by different outcomes
+        # cannot end up describing the address differently.
         ip_address = request.remote_addr
+
+        # Deactivation is checked AFTER the password comparison above and BEFORE
+        # the sign-in below -- see the module note for why that order is load
+        # bearing in both directions. NOT NULL DEFAULT 1 in the schema, so the
+        # bool() is about SQLite handing back an integer rather than about the
+        # value ever being absent.
+        account_deactivated = user is not None and not bool(user["is_active"])
+
+        if account_deactivated:
+            # The correct password is deliberately not enough to get past this.
+            # That is the entire point of the fix: User Management's Deactivated
+            # card says "Access revoked", and until this branch existed the
+            # application did not keep that promise.
+            _log_blocked_sign_in(user, ip_address, password_verified)
+            return _refuse()
 
         if user is not None and password_verified:
             session.clear()
@@ -187,16 +300,9 @@ def login():
                 return redirect(url_for("auth.dashboard"))
 
         # Everything below this point is a refusal: either the username matched
-        # no account, or it matched one and the password did not.
+        # no account, or it matched an active one and the password did not.
         _log_refused_sign_in(user, ip_address)
-
-        # The message stays identical for both, and deliberately says nothing
-        # about which half failed. Distinguishing "no such account" from "wrong
-        # password" would let anyone enumerate the valid usernames from the login
-        # form -- the trail records the difference, the stranger at the form is
-        # not told it.
-        flash("Invalid security credentials.")
-        return redirect(url_for("auth.login", error="Invalid security credentials."))
+        return _refuse()
 
     return render_template("login.html", error=error)
 

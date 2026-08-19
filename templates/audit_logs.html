@@ -164,22 +164,31 @@
           </div>
         </div>
       </div>
-      {#- Failed attempts are the Security Events card rather than a line under
-          Login Events, because the two numbers are read for opposite reasons. A
-          sign-in count answers "is the system in use"; a refusal count answers
-          "is somebody trying to get in", and that question deserves its own card
+      {#- Refusals are the Security Events card rather than a line under Login
+          Events, because the two numbers are read for opposite reasons. A sign-in
+          count answers "is the system in use"; a refusal count answers "is
+          somebody being turned away", and that question deserves its own card
           with its own colour rather than a footnote under a healthy-looking
           total. It is also the only card on this screen whose interesting value
           is a non-zero one, so the trend line changes tone at zero rather than
-          printing the same neutral sentence either way. #}
+          printing the same neutral sentence either way.
+
+          The value is every refusal; the trend names the deactivated ones
+          separately when there are any. Those are the rarer and the more serious
+          of the two -- a credential someone believed was withdrawn, still being
+          presented -- so they are called out rather than folded silently into a
+          total that would read as ordinary mistyping. #}
       <div class="col-md-3 col-sm-6">
-        <div class="stat-card" title="Sign-ins refused against an account that exists, one row each. The password supplied is never recorded. {{ untracked.login_scope }}">
+        <div class="stat-card" title="Sign-ins refused against an account that exists — a credential that did not match, or an account that has been deactivated. The password supplied is never recorded. {{ untracked.login_scope }}">
           <div class="stat-icon" style="background:#FEE2E2;"><span class="material-symbols-outlined" style="color:var(--danger);">gpp_maybe</span></div>
-          <div class="stat-value"{% if stats.failed_logins %} style="color:var(--danger);"{% endif %}>{{ stats.failed_logins }}</div>
+          <div class="stat-value"{% if stats.refused_logins %} style="color:var(--danger);"{% endif %}>{{ stats.refused_logins }}</div>
           <div class="stat-label">Security Events</div>
           <div class="stat-trend" style="color:var(--text-muted);">
-            {%- if stats.failed_logins %}
-            {{ stats.failed_logins_today }} today &middot; refused sign-ins, no lockout is enforced
+            {%- if stats.blocked_logins %}
+            {{ stats.refused_logins_today }} today &middot;
+            {{ stats.blocked_logins }} to deactivated account{{ '' if stats.blocked_logins == 1 else 's' }}
+            {%- elif stats.refused_logins %}
+            {{ stats.refused_logins_today }} today &middot; refused sign-ins, no lockout is enforced
             {%- else %}
             No sign-in has been refused
             {%- endif %}

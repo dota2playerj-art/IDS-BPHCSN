@@ -131,8 +131,12 @@
           <div class="stat-icon" style="background:#F3F4F6;"><span class="material-symbols-outlined" style="color:#4B5563;">person_off</span></div>
           <div class="stat-value">{{ inactive_users }}</div>
           <div class="stat-label">Deactivated</div>
-          <div class="stat-trend" style="color:var(--text-muted);">
-            {% if inactive_users %}Access revoked{% else %}No account has been disabled{% endif %}
+          {#- "Access revoked" was a claim this application did not keep: login
+              never read is_active, so a deactivated account could still sign in
+              with its old password. The login route checks it now, which is what
+              turned this line from a label into a true statement. #}
+          <div class="stat-trend" style="color:var(--text-muted);" title="A deactivated account is refused at the login form even when the password presented is correct, and the attempt is recorded in the audit trail. The person attempting it is told only that the credentials were invalid.">
+            {% if inactive_users %}Access revoked &mdash; refused at sign-in{% else %}No account has been disabled{% endif %}
           </div>
         </div>
       </div>

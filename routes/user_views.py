@@ -94,20 +94,26 @@ UNTRACKED = {
         "column for it, so an account cannot be placed at the main health "
         "center, a purok zone or the dispensary."
     ),
-    # THE LAST CLAUSE HERE HAD GONE FALSE AND IS CORRECTED.
-    # It read "no account is ever locked out -- there is no failed-login counter
-    # to lock one". The first half is still true and the second is not: refused
-    # sign-ins are recorded now, and Audit Logs counts them. What is absent is
-    # not the record but any response to it, which is a different sentence and a
-    # more useful one -- it tells a reader that the number on Screen 12 is for a
-    # person to act on, because nothing else will.
+    # CORRECTED TWICE, AND THE SECOND TIME BECAUSE THE FIX MADE IT FALSE.
+    # It first read "no account is ever locked out -- there is no failed-login
+    # counter to lock one"; refused sign-ins started being recorded, so the
+    # second half went, and the sentence became "nothing acts on that count".
+    #
+    # Then the login route learned to check is_active, and the opening claim went
+    # too: "an account exists and can sign in, or it does not exist" was the
+    # sentence this screen used to describe a two-state world, and there are
+    # three states now. A deactivated account exists and cannot sign in. Leaving
+    # that line would have been this file's own Deactivated card all over again --
+    # a confident description of an access rule the application had stopped
+    # following, on the very screen that shows the flag.
     "invitations": (
-        "There is no invitation or activation flow. An account exists and can "
-        "sign in, or it does not exist. Nothing records an account awaiting "
-        "activation, and no account is ever locked out: refused sign-ins are "
+        "There is no invitation or activation flow. An account exists and is "
+        "either allowed to sign in or deactivated; nothing records one awaiting "
+        "activation. Deactivating is the only thing that closes an account, and "
+        "it is done by hand rather than by the system: refused sign-ins are "
         "recorded in the audit trail -- Screen 12 counts them under Security "
-        "Events -- but nothing in this system acts on that count, so repeated "
-        "failures against an account never close it."
+        "Events -- but nothing acts on that count, so repeated failures against "
+        "an account never close it on their own."
     ),
     "contact": (
         "The users table has email and phone columns, but nothing in the "
@@ -124,12 +130,18 @@ UNTRACKED = {
     # screen quotes the shared one -- two near-identical descriptions of one
     # missing library is exactly the drift that file exists to prevent.
     # Task 4 of the brief: flagged for a decision, deliberately not built.
+    # Still true, and worth one added sentence now that the flag it names is
+    # enforced. What is missing here is the button, not the mechanism -- and a
+    # reader who has just been told access is revoked deserves to know where the
+    # revoking currently happens.
     "write": (
         "Creating, editing and deactivating accounts is not implemented. "
         "Every write here touches authentication -- password hashing, role "
         "assignment, and the ability to revoke a sign-in -- so it is a "
         "deliberate decision rather than a missing button. The three seeded "
-        "accounts are managed in models/users.py."
+        "accounts are managed in models/users.py. Deactivation itself is real "
+        "and enforced at the login form; what is absent is a control on this "
+        "screen to set it, so the flag changes by direct database edit."
     ),
     "reset_password": (
         "Password reset is not implemented. Hashes are written once by "

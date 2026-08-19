@@ -485,7 +485,8 @@
                 <div class="backup-label">Refused sign-in attempts</div>
                 <div class="backup-value"{% if security.refused %} style="color:var(--danger);"{% endif %}>
                   {{ security.refused }}
-                  {%- if security.refused %} <span style="color:var(--text-muted); font-weight:400;">&middot; {{ security.refused_today }} today</span>{% endif %}
+                  {%- if security.refused %} <span style="color:var(--text-muted); font-weight:400;">&middot; {{ security.refused_today }} today
+                    {%- if security.blocked %} &middot; {{ security.blocked }} to a deactivated account{% endif %}</span>{% endif %}
                 </div>
               </div>
               <div class="backup-row">
@@ -511,6 +512,10 @@
                 username that does not exist is not recorded at all: there is no account for
                 the entry to belong to. Signing out is not recorded either, so these are
                 sign-in counts rather than session counts.
+                A deactivated account is refused even when the password presented is
+                correct, and its entry says which it was &mdash; but the person at the login
+                form sees the same message a wrong password gets, so the form cannot be used
+                to discover which accounts exist or which have been switched off.
               </div>
             </div>
 

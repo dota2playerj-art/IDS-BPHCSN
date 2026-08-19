@@ -82,8 +82,13 @@ def settings_context():
         "security": {
             "sign_ins": stats["logins"],
             "sign_ins_today": stats["logins_today"],
-            "refused": stats["failed_logins"],
-            "refused_today": stats["failed_logins_today"],
+            "refused": stats["refused_logins"],
+            "refused_today": stats["refused_logins_today"],
+            # Broken out because this pane is where an administrator is already
+            # reading about access control. A refusal aimed at an account that
+            # has been switched off belongs beside the switch, not only in the
+            # trail.
+            "blocked": stats["blocked_logins"],
             "accounts_signed_in": len(last_logins),
             "total_accounts": len(users),
             "most_recent_name": recent_name,

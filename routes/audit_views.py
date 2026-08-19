@@ -21,6 +21,16 @@ route now writes one entry per successful sign-in and one per sign-in refused
 against an account that exists, so both cards report counts of real rows, and
 "Authentication" is a module the filter above the table can select.
 
+A refusal is written under one of two activity phrases, and the difference is the
+point of keeping them apart. "Refused sign-in attempt" is a credential that did
+not match. "Blocked sign-in to deactivated account" is an account that has been
+switched off, refused whether or not the password was right -- and its entry says
+which, because a correct password against a revoked account is the one line here
+that tells an administrator a withdrawn credential is still live. The Security
+Events card adds the two; the trail keeps them separate. The person at the login
+form is told neither: all three outcomes return one identical message, so the
+form cannot be used to sort guessed usernames into real, disabled and fictional.
+
 What is left absent is narrower, and precise enough to be worth stating rather
 than glossing: an attempt against a username that does not exist writes nothing
 at all (audit_logs.user_id is NOT NULL and foreign-keyed to a real account, so
@@ -39,6 +49,7 @@ and its corollary, which this screen is now the clearest example of, that a
 reason is deleted the moment the gap it describes is closed.
 """
 from models.audit import (
+    ACTION_LOGIN_BLOCKED,
     ACTION_LOGIN_FAILED,
     ACTION_LOGIN_SUCCESS,
     MODULE_AUTH,
@@ -81,10 +92,12 @@ UNTRACKED = {
         "could be attributed to -- what is counted is every refusal aimed at an "
         "account that exists, which is every attempt that could ever have "
         "succeeded. And signing out is not recorded, so these are sign-in counts "
-        "rather than session counts. No account is ever locked out either: this "
-        "system records the attempts and acts on none of them, so a rising "
-        "number here is something for a person to notice, not something the "
-        "application will respond to on its own."
+        "rather than session counts. Nothing here locks an account either: a "
+        "rising number is something for a person to notice, because repeated "
+        "failures against an account never close it on their own. An account can "
+        "be shut off, but only by being marked deactivated -- those refusals are "
+        "counted here too, under their own activity phrase, and a deactivated "
+        "account is refused even when the password presented is correct."
     ),
     "filters": (
         "Filtering by user, activity type or status is not wired. The stored "
@@ -168,6 +181,10 @@ def _split_details(details):
 _ICONS = {
     ACTION_LOGIN_SUCCESS: "login",
     ACTION_LOGIN_FAILED: "gpp_bad",
+    # Distinct from the refusal above for the same reason the action phrase is:
+    # scanning the trail, a revoked credential still being presented must not
+    # look like somebody mistyping their password.
+    ACTION_LOGIN_BLOCKED: "person_off",
 }
 _MODULE_ICONS = {
     MODULE_SMS: "campaign",

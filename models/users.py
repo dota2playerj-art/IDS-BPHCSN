@@ -99,13 +99,35 @@ def get_user_by_username(username):
 
     Swallows OperationalError so a request that arrives before the schema exists
     is treated as a failed login rather than a 500.
+
+    WHY is_active IS IN THIS SELECT LIST
+    ------------------------------------
+    It was not, and that omission was a real hole rather than an untidy query.
+    The column has existed since the first schema (NOT NULL DEFAULT 1), and every
+    other reader in the project honours it: get_clinical_staff() above will not
+    offer a deactivated account on a booking, resolve_recipients() will not text
+    one, and User Management badges it "Deactivated" under a card that says
+    "Access revoked". Login was the one place that never asked -- so the flag
+    meant something everywhere except the single screen where it mattered, and a
+    revoked account could still sign in with its old password and reach every
+    screen its role admits.
+
+    The fix is deliberately split in two. This function's only job is to hand the
+    login route the whole truth about the account; the decision about what to do
+    with it belongs to routes/auth.py, next to the password check and the audit
+    entry, where the refusal is worded and recorded. A model function that
+    silently returned None for a deactivated account would have "fixed" the hole
+    by making the account indistinguishable from one that does not exist -- and
+    the audit trail would then have had nothing to attribute the refusal to,
+    which is exactly the entry an administrator most needs to see.
     """
     conn = get_db()
     user = None
 
     try:
         user = conn.execute(
-            "SELECT id, username, role, full_name, password_hash FROM users WHERE username = ?",
+            "SELECT id, username, role, full_name, password_hash, is_active "
+            "FROM users WHERE username = ?",
             (username,),
         ).fetchone()
     except sqlite3.OperationalError:
