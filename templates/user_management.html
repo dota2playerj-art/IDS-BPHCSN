@@ -136,12 +136,24 @@
           </div>
         </div>
       </div>
+      {#- This card printed a dash and named its own absence until routes/auth.py
+          gained a log_action() call. It is the same card, counting rows that now
+          exist: accounts with a recorded sign-in inside the window
+          routes/user_views.py::RECENT_SIGN_IN_DAYS sets. The trend line states
+          the window, because "recently" is meaningless without it. #}
       <div class="col-md-3 col-sm-6">
-        <div class="stat-card" title="{{ untracked.last_login }}">
+        <div class="stat-card" title="Accounts with a sign-in recorded in the last {{ recent_sign_in_days }} days, counted from the audit trail — the same rows Screen 12's Login Events card counts.">
           <div class="stat-icon" style="background:#DBEAFE;"><span class="material-symbols-outlined" style="color:var(--info);">login</span></div>
-          <div class="stat-value" style="color:var(--text-muted);">&mdash;</div>
+          <div class="stat-value">{{ recent_sign_ins }}</div>
           <div class="stat-label">Signed In Recently</div>
-          <div class="stat-trend" style="color:var(--text-muted); font-weight:500;">Not tracked &mdash; nothing logs sign-in</div>
+          <div class="stat-trend" style="color:var(--text-muted);">
+            {%- if accounts_ever_signed_in %}
+            in the last {{ recent_sign_in_days }} days &middot;
+            {{ accounts_ever_signed_in }} of {{ total_users }} ever signed in
+            {%- else %}
+            No account has signed in yet
+            {%- endif %}
+          </div>
         </div>
       </div>
     </div>
@@ -216,7 +228,14 @@
                     {%- if user.is_active %}<span class="badge-status badge-active">Active</span>
                     {%- else %}<span class="badge-status badge-inactive">Deactivated</span>{% endif %}
                   </td>
-                  <td class="muted-cell" title="{{ untracked.last_login }}">Not tracked</td>
+                  {#- Derived from the audit trail, not from a users column --
+                      see routes/user_views.py. "Never signed in" is a fact about
+                      the account rather than a gap in the system, which is why it
+                      is a sentence here and not an UNTRACKED reason. #}
+                  <td>
+                    {%- if user.last_login_display %}{{ user.last_login_display }}
+                    {%- else %}<span class="muted-cell" title="This account exists and can sign in, but no sign-in has ever been recorded against it.">Never signed in</span>{% endif %}
+                  </td>
                   <td>
                     <div class="d-flex justify-content-end gap-1">
                       <button class="action-icon" type="button" onclick="selectUser(this.closest('tr')); event.stopPropagation();"
@@ -302,7 +321,11 @@
               </div>
               <div class="detail-row">
                 <div class="detail-label">Last Login</div>
-                <div class="detail-value muted" title="{{ untracked.last_login }}">Not tracked</div>
+                {%- if user.last_login_display %}
+                <div class="detail-value" title="The most recent successful sign-in recorded for this account. Every sign-in is kept — Audit Logs holds the full history, filtered to Authentication.">{{ user.last_login_display }}</div>
+                {%- else %}
+                <div class="detail-value muted" title="This account exists and can sign in, but no sign-in has ever been recorded against it.">Never signed in</div>
+                {%- endif %}
               </div>
             </div>
 

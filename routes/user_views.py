@@ -30,6 +30,30 @@ the cell says the detail was never recorded rather than showing a number no one
 entered.
 
 
+LAST LOGIN IS REAL NOW, AND IT DOES NOT COME FROM A COLUMN
+-----------------------------------------------------------
+The note above used to list last login among the columns that "are simply not in
+the table", and that half is still true -- users has no last_login column and has
+not gained one. What changed is that it no longer needs one. routes/auth.py now
+writes an audit entry for every successful sign-in, so the most recent one per
+account is a MAX() over rows that already exist
+(models/audit.py::get_last_logins()).
+
+Deriving it rather than storing it is the better answer here and not merely the
+cheaper one. A last_login column is a single value that can be overwritten, and
+by the time anyone asks "when did this account last sign in, and from where"
+there is nothing left to read. The audit trail keeps every sign-in, so the same
+question is answerable in arbitrary depth, and the roster's column is simply the
+newest of them. It also cannot disagree with Audit Logs' Login Events card: both
+are counting the same rows.
+
+An account that has never signed in is absent from that map, and the cell says so
+rather than falling back to a date. That distinction matters on this screen more
+than anywhere: an account with no sign-in in its history is either newly created
+or unused, and both are things an administrator should be able to see at a
+glance.
+
+
 ACCESS PERMISSIONS ARE READ OFF THE GUARDS
 ------------------------------------------
 The permissions list under each account is not a description of the roles kept
@@ -40,27 +64,50 @@ drift from the enforcement the way a hand-written list would.
 """
 from flask import current_app
 
+from models.audit import get_last_logins
 from models.users import get_all_users
+from utils.dates import day_start_utc, days_ago, display_timestamp, today
 from utils.roles import normalize_role
+
+# How recent "recently" is on the Signed In Recently card, in days, counting
+# today. Seven so the card answers "has this account been used this week", which
+# is the question a roster of a health center's staff is actually asked -- a
+# figure over a longer window would report a team that has left as present.
+RECENT_SIGN_IN_DAYS = 7
 
 # The parts of this screen with no data source, and why. Keyed by the slot on
 # the page so the template can look one up next to the thing it explains.
 UNTRACKED = {
-    "last_login": (
-        "Sign-ins are not recorded. routes/auth.py checks the password and "
-        "starts the session but never writes a row for it, so no account has a "
-        "last-login time to show. Screen 12's Login Events card says the same."
-    ),
+    # THERE IS NO "last_login" ENTRY ANY MORE, AND THAT IS THE POINT.
+    # It said sign-ins are not recorded, and that routes/auth.py never writes a
+    # row for one. That route writes one for every sign-in now, so the column and
+    # the card that quoted this both read real timestamps, and a reason with
+    # nothing quoting it is exactly the drift utils/unavailable.py exists to
+    # prevent. It goes rather than sitting here describing a state the
+    # application has left.
+    #
+    # What replaces it is not a reason at all but a cell that says "Never signed
+    # in" -- which is a fact about the account rather than a gap in the system,
+    # and is why it is written in the template rather than kept here.
     "assignment": (
         "Station and zone assignment is not stored. The users table has no "
         "column for it, so an account cannot be placed at the main health "
         "center, a purok zone or the dispensary."
     ),
+    # THE LAST CLAUSE HERE HAD GONE FALSE AND IS CORRECTED.
+    # It read "no account is ever locked out -- there is no failed-login counter
+    # to lock one". The first half is still true and the second is not: refused
+    # sign-ins are recorded now, and Audit Logs counts them. What is absent is
+    # not the record but any response to it, which is a different sentence and a
+    # more useful one -- it tells a reader that the number on Screen 12 is for a
+    # person to act on, because nothing else will.
     "invitations": (
         "There is no invitation or activation flow. An account exists and can "
         "sign in, or it does not exist. Nothing records an account awaiting "
-        "activation, and no account is ever locked out -- there is no "
-        "failed-login counter to lock one."
+        "activation, and no account is ever locked out: refused sign-ins are "
+        "recorded in the audit trail -- Screen 12 counts them under Security "
+        "Events -- but nothing in this system acts on that count, so repeated "
+        "failures against an account never close it."
     ),
     "contact": (
         "The users table has email and phone columns, but nothing in the "
@@ -156,12 +203,24 @@ def _initials(full_name):
     return (parts[0][0] + parts[-1][0]).upper()
 
 
-def _decorate(user):
-    """One account, plus the presentation the template would otherwise compute."""
+def _decorate(user, last_logins):
+    """One account, plus the presentation the template would otherwise compute.
+
+    `last_logins` is passed in rather than looked up per account: one grouped
+    query for the whole roster, so adding a fourth account costs no extra round
+    trip. A user_id absent from it has never signed in, and both the stored value
+    and its rendering are set to None so the template tests one thing.
+
+    The timestamp is rendered through display_timestamp(), the same filter
+    Account Created two rows above it already uses, so the two cells in one panel
+    cannot disagree about what time it is at the health center. audit_logs
+    .created_at is a UTC CURRENT_TIMESTAMP exactly as users.created_at is.
+    """
     role_class, role_icon = ROLE_STYLES.get(
         normalize_role(user["role"]), ("role-staff", "person")
     )
     contact = user.get("email") or user.get("phone")
+    last_login = last_logins.get(user["id"])
     return {
         **user,
         "initials": _initials(user["full_name"]),
@@ -170,12 +229,27 @@ def _decorate(user):
         "is_active": bool(user["is_active"]),
         "contact": contact,
         "screens": accessible_screens(user["role"]),
+        "last_login": last_login,
+        "last_login_display": display_timestamp(last_login) if last_login else None,
     }
 
 
 def user_management_context():
-    users = [_decorate(user) for user in get_all_users()]
+    last_logins = get_last_logins()
+    users = [_decorate(user, last_logins) for user in get_all_users()]
     active = [user for user in users if user["is_active"]]
+
+    # The boundary for "recently", as the UTC text audit_logs.created_at holds,
+    # so the comparison happens between two values in the same representation --
+    # the same trick every clinic-local date filter in this project uses. Six
+    # days back rather than seven: the window is the start of that day through
+    # now, which is RECENT_SIGN_IN_DAYS calendar days counting today.
+    recent_boundary = day_start_utc(days_ago(RECENT_SIGN_IN_DAYS - 1, today()))
+    recent = [
+        user for user in users
+        if user["last_login"] and str(user["last_login"]) >= recent_boundary
+    ]
+    ever = [user for user in users if user["last_login"]]
 
     return {
         "users": users,
@@ -183,5 +257,8 @@ def user_management_context():
         "active_users": len(active),
         "inactive_users": len(users) - len(active),
         "roles_represented": len({user["role"] for user in users}),
+        "recent_sign_ins": len(recent),
+        "recent_sign_in_days": RECENT_SIGN_IN_DAYS,
+        "accounts_ever_signed_in": len(ever),
         "untracked": UNTRACKED,
     }

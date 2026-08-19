@@ -35,6 +35,12 @@ MODULE_PATIENTS = "Patient Records"
 MODULE_INVENTORY = "Medicine Inventory"
 MODULE_APPOINTMENTS = "Appointment Scheduling"
 MODULE_SMS = "SMS Notifications"
+# Sign-ins and refused sign-ins. Its own module rather than folded into one of
+# the record modules above, because it answers a different question: those say
+# what the record used to say and what it says now, this one says who was let in
+# and who was turned away. Keeping it separate is also what lets the Audit Logs
+# module filter show the authentication trail on its own.
+MODULE_AUTH = "Authentication"
 
 # Activity phrases, in the same voice as the ones on that screen ("Updated
 # patient record", "Updated stock quantity").
@@ -44,6 +50,19 @@ ACTION_CONSULTATION_UPDATED = "Updated consultation record"
 # message itself, who it reached, and whether it was actually transmitted -- an
 # entry that omitted the last of those would read as a send that happened.
 ACTION_SMS_BROADCAST_SENT = "Sent community SMS broadcast"
+# The two authentication outcomes, written from routes/auth.py's login route.
+# Both phrases are stable strings because the counts below select on them: a
+# reworded action would silently stop being counted, so they are constants for
+# the same reason the module names are.
+ACTION_LOGIN_SUCCESS = "Signed in"
+ACTION_LOGIN_FAILED = "Refused sign-in attempt"
+
+# Modules that are not a change to a stored record, and so are excluded from the
+# "Record Updates" figure on the Audit Logs screen. A broadcast is a message that
+# went out; a sign-in is an access event. Neither edits a clinical or stock row,
+# and counting them as record updates would inflate the one figure on that screen
+# that is supposed to answer "how much of the data has been altered".
+NON_RECORD_MODULES = (MODULE_SMS, MODULE_AUTH)
 
 
 def log_action(user_id, action, module=None, details=None, ip_address=None):
@@ -127,15 +146,33 @@ def get_audit_stats():
     `limit`, so totals derived from it would silently start understating once the
     trail outgrew one page.
 
-    WHAT IS DELIBERATELY NOT HERE
-    -----------------------------
-    The screen was designed with "Login Events" and "Security Events" cards.
-    Neither is returned, because neither is written: log_action() is called from
-    the consultation edit path and the SMS broadcast path only, and routes/auth.py
-    logs nothing at all -- no login, no logout, no failed attempt. A count of
-    logins would therefore be a count of zero dressed up as a measurement, which
-    is the one thing this project's reporting rule forbids. The template names the
-    absence instead. See UNTRACKED in routes/audit_views.py.
+    THE TWO LOGIN FIGURES USED TO BE ABSENT, AND NOW ARE NOT
+    --------------------------------------------------------
+    This docstring used to say the screen's "Login Events" and "Security Events"
+    cards returned nothing, because nothing was written: routes/auth.py started a
+    session and logged neither the sign-in, nor the sign-out, nor the refusal. A
+    count of logins would have been a count of zero dressed up as a measurement,
+    which is the one thing this project's reporting rule forbids, so the template
+    named the absence instead.
+
+    That gap is closed. The login route now writes one entry per successful
+    sign-in and one per sign-in refused against an account that exists, so
+    `logins` and `failed_logins` below are counts of real rows and both cards
+    report them.
+
+    Two things are still genuinely absent, and are counted nowhere because
+    nothing writes them:
+
+    * An attempt against a username that does not exist. user_id is NOT NULL and
+      foreign-keyed to a real account, so there is no row such an attempt could be
+      attributed to -- see log_action() above. What `failed_logins` counts is
+      every refusal aimed at an account that exists, which is the only kind that
+      could ever have succeeded.
+    * Signing out. routes/auth.py clears the session and writes nothing, so these
+      are sign-in counts and not session counts.
+
+    Both are stated on the screen beside the figures rather than left to be
+    inferred. See UNTRACKED in routes/audit_views.py.
     """
     start_of_today = day_start_utc(today())
 
@@ -154,14 +191,43 @@ def get_audit_stats():
         """
     ).fetchall()
     # "Record Updates" on the screen means a change to a clinical or stock
-    # record, as opposed to a message sent out -- so it is every module except
-    # SMS rather than a second list that could drift from MODULE_* above.
+    # record, as opposed to a message sent out or an access event -- so it is
+    # every module except the ones NON_RECORD_MODULES names, rather than a second
+    # list that could drift from MODULE_* above. This was "except SMS" until
+    # authentication started writing; leaving it that way would have quietly
+    # counted every sign-in as an edit to somebody's record.
+    exclusions = ", ".join("?" for _ in NON_RECORD_MODULES)
     record_updates = conn.execute(
-        "SELECT COUNT(*) FROM audit_logs WHERE module IS NOT NULL AND module <> ?",
-        (MODULE_SMS,),
+        f"""
+        SELECT COUNT(*) FROM audit_logs
+         WHERE module IS NOT NULL AND module NOT IN ({exclusions})
+        """,
+        NON_RECORD_MODULES,
     ).fetchone()[0]
     actors = conn.execute(
         "SELECT COUNT(DISTINCT user_id) FROM audit_logs"
+    ).fetchone()[0]
+
+    # The two authentication figures, each selected on its own action so a
+    # successful sign-in can never be counted as a refused one or the reverse.
+    def _auth_count(action, since=None):
+        clause = " AND created_at >= ?" if since else ""
+        parameters = [MODULE_AUTH, action] + ([since] if since else [])
+        return conn.execute(
+            f"SELECT COUNT(*) FROM audit_logs WHERE module = ? AND action = ?{clause}",
+            parameters,
+        ).fetchone()[0]
+
+    logins = _auth_count(ACTION_LOGIN_SUCCESS)
+    logins_today = _auth_count(ACTION_LOGIN_SUCCESS, start_of_today)
+    failed_logins = _auth_count(ACTION_LOGIN_FAILED)
+    failed_logins_today = _auth_count(ACTION_LOGIN_FAILED, start_of_today)
+    # How many distinct accounts have ever signed in -- not how many exist. An
+    # account that has never signed in is absent from audit_logs entirely, which
+    # is exactly what makes this figure worth reporting beside the total.
+    login_accounts = conn.execute(
+        "SELECT COUNT(DISTINCT user_id) FROM audit_logs WHERE module = ? AND action = ?",
+        (MODULE_AUTH, ACTION_LOGIN_SUCCESS),
     ).fetchone()[0]
     conn.close()
 
@@ -171,7 +237,43 @@ def get_audit_stats():
         "record_updates": record_updates,
         "distinct_actors": actors,
         "by_module": [dict(row) for row in by_module],
+        "logins": logins,
+        "logins_today": logins_today,
+        "failed_logins": failed_logins,
+        "failed_logins_today": failed_logins_today,
+        "login_accounts": login_accounts,
     }
+
+
+def get_last_logins():
+    """{user_id: the stored timestamp of that account's most recent sign-in}.
+
+    One grouped query rather than one per account, so User Management's roster
+    costs the same whether it lists three accounts or thirty.
+
+    Only ACTION_LOGIN_SUCCESS is considered. A refused attempt is not a login,
+    and letting one set a "last login" would be the worst possible reading of the
+    column -- an account that has never once been signed into would show a time
+    beside it because somebody guessed at its password.
+
+    An account missing from the result has never signed in. That absence is the
+    answer, and the caller reports it as such rather than substituting a date.
+    MAX() over the stored text is a correct maximum because created_at is written
+    by CURRENT_TIMESTAMP in a fixed-width, zero-padded UTC format, so it sorts
+    lexicographically in the same order it sorts chronologically.
+    """
+    conn = get_db()
+    rows = conn.execute(
+        """
+        SELECT user_id, MAX(created_at) AS last_login
+          FROM audit_logs
+         WHERE module = ? AND action = ?
+      GROUP BY user_id
+        """,
+        (MODULE_AUTH, ACTION_LOGIN_SUCCESS),
+    ).fetchall()
+    conn.close()
+    return {row["user_id"]: row["last_login"] for row in rows}
 
 
 def describe_changes(before, after, labels, formatters=None):

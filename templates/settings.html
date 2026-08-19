@@ -120,6 +120,9 @@
       accepting an entry that would be lost on the next page load. The
       configuration that is real lives in <code>config.py</code>, in
       <code>schema.sql</code>, and in the constants each model documents.
+      One block on this screen does read live data &mdash; what the system
+      records about sign-ins, under Security Settings &mdash; and it is marked
+      as such where it sits.
     </div>
 
     <!-- SETTINGS PANEL -->
@@ -428,21 +431,86 @@
                   <label class="field-label">Session Timeout (minutes)</label>
                   <input type="number" class="form-control" value="30">
                 </div>
+                {#- THE HINT UNDER THIS FIELD USED TO PROMISE A LOCKOUT.
+                    It read "Account locks after this many failed attempts",
+                    which was false in both halves: nothing counted the attempts
+                    and nothing locked an account. Half of it is now true --
+                    routes/auth.py records every refused sign-in, and the block
+                    below counts them -- which makes the other half more
+                    dangerous rather than less, because a promise sitting beside
+                    a live number reads as the thing that produced it. So the
+                    hint says what actually happens. #}
                 <div class="col-md-4">
                   <label class="field-label">Login Attempt Limit</label>
                   <input type="number" class="form-control" value="5">
-                  <div class="form-text-hint">Account locks after this many failed attempts</div>
+                  <div class="form-text-hint">Not enforced. No account is ever locked out; failed attempts are recorded and counted, and nothing acts on the count.</div>
                 </div>
               </div>
 
               <div class="subsection-divider"></div>
               <div class="toggle-row">
-                <div><div class="toggle-row-label">Two-Factor Authentication</div><div class="toggle-row-desc">Require a one-time code sent via SMS when logging in</div></div>
+                <div><div class="toggle-row-label">Two-Factor Authentication</div><div class="toggle-row-desc">Require a one-time code sent via SMS when logging in &mdash; not implemented; sign-in is username and password only</div></div>
                 <label class="switch"><input type="checkbox"><span class="slider"></span></label>
               </div>
               <div class="toggle-row">
-                <div><div class="toggle-row-label">Auto Logout on Inactivity</div><div class="toggle-row-desc">Automatically sign users out after the session timeout period</div></div>
+                <div><div class="toggle-row-label">Auto Logout on Inactivity</div><div class="toggle-row-desc">Automatically sign users out after the session timeout period &mdash; not implemented; a session ends when the browser is closed or Logout is used</div></div>
                 <label class="switch"><input type="checkbox" checked><span class="slider"></span></label>
+              </div>
+
+              {#- THE ONE BLOCK ON THIS SCREEN THAT READS REAL DATA.
+                  Outside the disabled fieldset in spirit though not in markup:
+                  it contains no control, only figures. Every setting above it is
+                  a value this system does not store and does not enforce; this
+                  is what it does record about signing in, counted from the same
+                  audit rows Screen 12 counts, so the two screens cannot report
+                  different numbers. See routes/settings_views.py. #}
+              <div class="subsection-divider"></div>
+              <div class="subsection-title"><span class="material-symbols-outlined" style="color:var(--teal-dark); font-size:18px;">fact_check</span>What is actually recorded</div>
+              <div class="scope-note" style="margin-top:0;">
+                None of the controls above is stored or enforced. What the system
+                does hold is a record of every sign-in and every refused sign-in,
+                written by the login route to the audit trail. These figures are
+                live, and are the same rows
+                <a href="{{ url_for('admin.audit_logs', module='Authentication') }}">Audit Logs</a>
+                lists under Authentication.
+              </div>
+              <div class="backup-row">
+                <div class="backup-label">Sign-ins recorded</div>
+                <div class="backup-value">
+                  {{ security.sign_ins }}
+                  {%- if security.sign_ins %} <span style="color:var(--text-muted); font-weight:400;">&middot; {{ security.sign_ins_today }} today</span>{% endif %}
+                </div>
+              </div>
+              <div class="backup-row">
+                <div class="backup-label">Refused sign-in attempts</div>
+                <div class="backup-value"{% if security.refused %} style="color:var(--danger);"{% endif %}>
+                  {{ security.refused }}
+                  {%- if security.refused %} <span style="color:var(--text-muted); font-weight:400;">&middot; {{ security.refused_today }} today</span>{% endif %}
+                </div>
+              </div>
+              <div class="backup-row">
+                <div class="backup-label">Accounts that have signed in</div>
+                <div class="backup-value">{{ security.accounts_signed_in }} of {{ security.total_accounts }}</div>
+              </div>
+              <div class="backup-row">
+                <div class="backup-label">Most recent sign-in</div>
+                {%- if security.most_recent_at %}
+                <div class="backup-value">{{ security.most_recent_at }} <span style="color:var(--text-muted); font-weight:400;">&middot; {{ security.most_recent_name }}</span></div>
+                {%- else %}
+                <div class="backup-value" style="color:var(--text-muted);" title="The trail holds no sign-in yet. This is a real state on a freshly seeded database, not a missing figure.">No sign-in recorded yet</div>
+                {%- endif %}
+              </div>
+              {#- Stated beside the figures rather than left to be inferred: a
+                  refusal aimed at a username that does not exist writes no row,
+                  because audit_logs.user_id is NOT NULL and foreign-keyed to a
+                  real account. And under no circumstance is a supplied password
+                  recorded -- see the module note in routes/auth.py. #}
+              <div class="form-text-hint" style="margin-top:10px;">
+                A refused attempt records the account it was aimed at, the moment and the
+                address &mdash; never the password that was supplied. An attempt against a
+                username that does not exist is not recorded at all: there is no account for
+                the entry to belong to. Signing out is not recorded either, so these are
+                sign-in counts rather than session counts.
               </div>
             </div>
 

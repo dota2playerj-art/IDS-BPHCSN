@@ -103,8 +103,7 @@ DETAIL_COLUMNS = ("#", "When & who", "What was recorded")
 # record* most needs. Named explicitly rather than iterating the dict so a reason
 # added for a screen slot does not silently start appearing in exports.
 STATED_UNTRACKED = (
-    ("Sign-ins and sign-outs", "logins"),
-    ("Security events", "security"),
+    ("The edge of the two sign-in figures", "login_scope"),
     ("Filtering by user, activity type or status", "filters"),
 )
 
@@ -291,8 +290,13 @@ def _untracked_sheet(context):
 
     The last sheet on purpose, and never omitted. A reader who has just been told
     this file is the complete record needs, in the same breath, to know that the
-    record covers two write paths and not the whole system -- otherwise the
-    absence of a login entry reads as nobody having signed in.
+    record covers three write paths and not the whole system -- otherwise the
+    absence of a patient-archive entry reads as nobody having archived a patient.
+
+    Sign-ins used to head this sheet, as the largest thing the trail did not
+    hold. They are in the file now, so what is left of that row is the boundary
+    of what the sign-in entries cover, which is a narrower and more useful
+    sentence. See UNTRACKED in routes/audit_views.py.
     """
     untracked = context["untracked"]
     rows = [
@@ -313,9 +317,9 @@ def _untracked_sheet(context):
         )],
         intro=(
             "The entries in this file are complete for what the system records, "
-            "which is the consultation edit path and the SMS broadcast path. It "
-            "does not record the following, so their absence from the trail is not "
-            "evidence that they did not happen."
+            "which is the consultation edit path, the SMS broadcast path and the "
+            "login route. It does not record the following, so their absence from "
+            "the trail is not evidence that they did not happen."
         ),
     )
 

@@ -127,9 +127,13 @@
     <div class="page-title">Audit Logs</div>
     <div class="page-desc">Complete activity trail of all system actions, logins, and record changes for accountability and compliance.</div>
 
-    <!-- STAT CARDS — the two that can be counted are counted, in
-         models/audit.py::get_audit_stats(); the two with no writer behind them
-         say so rather than printing a number nobody could reproduce. -->
+    <!-- STAT CARDS — all four are counted now, in
+         models/audit.py::get_audit_stats(). The last two printed a dash and
+         named their own absence until routes/auth.py gained a log_action() call;
+         they are the same cards, reading rows that now exist rather than
+         reporting that none did. The fourth still carries a tooltip, but it is
+         no longer a reason for a missing figure -- it is the boundary of a real
+         one, which is a different sentence and is why the key changed name. -->
     <div class="row g-3 mt-1 mb-4">
       <div class="col-md-3 col-sm-6">
         <div class="stat-card">
@@ -150,19 +154,36 @@
         </div>
       </div>
       <div class="col-md-3 col-sm-6">
-        <div class="stat-card" title="{{ untracked.logins }}">
+        <div class="stat-card" title="Successful sign-ins recorded by routes/auth.py, one row each. {{ untracked.login_scope }}">
           <div class="stat-icon" style="background:#DBEAFE;"><span class="material-symbols-outlined" style="color:var(--info);">login</span></div>
-          <div class="stat-value" style="color:var(--text-muted);">&mdash;</div>
+          <div class="stat-value">{{ stats.logins }}</div>
           <div class="stat-label">Login Events</div>
-          <div class="stat-trend" style="color:var(--text-muted); font-weight:500;">Not tracked &mdash; nothing logs sign-in</div>
+          <div class="stat-trend" style="color:var(--text-muted);">
+            {{ stats.logins_today }} today &middot;
+            {{ stats.login_accounts }} account{{ '' if stats.login_accounts == 1 else 's' }} signed in
+          </div>
         </div>
       </div>
+      {#- Failed attempts are the Security Events card rather than a line under
+          Login Events, because the two numbers are read for opposite reasons. A
+          sign-in count answers "is the system in use"; a refusal count answers
+          "is somebody trying to get in", and that question deserves its own card
+          with its own colour rather than a footnote under a healthy-looking
+          total. It is also the only card on this screen whose interesting value
+          is a non-zero one, so the trend line changes tone at zero rather than
+          printing the same neutral sentence either way. #}
       <div class="col-md-3 col-sm-6">
-        <div class="stat-card" title="{{ untracked.security }}">
+        <div class="stat-card" title="Sign-ins refused against an account that exists, one row each. The password supplied is never recorded. {{ untracked.login_scope }}">
           <div class="stat-icon" style="background:#FEE2E2;"><span class="material-symbols-outlined" style="color:var(--danger);">gpp_maybe</span></div>
-          <div class="stat-value" style="color:var(--text-muted);">&mdash;</div>
+          <div class="stat-value"{% if stats.failed_logins %} style="color:var(--danger);"{% endif %}>{{ stats.failed_logins }}</div>
           <div class="stat-label">Security Events</div>
-          <div class="stat-trend" style="color:var(--text-muted); font-weight:500;">Not tracked &mdash; no lockout exists</div>
+          <div class="stat-trend" style="color:var(--text-muted);">
+            {%- if stats.failed_logins %}
+            {{ stats.failed_logins_today }} today &middot; refused sign-ins, no lockout is enforced
+            {%- else %}
+            No sign-in has been refused
+            {%- endif %}
+          </div>
         </div>
       </div>
     </div>
@@ -344,7 +365,7 @@
           <div class="entry-detail" data-detail="{{ entry.id }}"{% if not loop.first %} hidden{% endif %}>
             <div class="detail-header">
               <div class="detail-icon">
-                <span class="material-symbols-outlined" style="color:var(--teal-dark); font-size:22px;">{{ 'campaign' if entry.is_sms else 'edit_note' }}</span>
+                <span class="material-symbols-outlined" style="color:var(--teal-dark); font-size:22px;">{{ entry.icon }}</span>
               </div>
               <div>
                 <div class="detail-title">{{ entry.action }}</div>

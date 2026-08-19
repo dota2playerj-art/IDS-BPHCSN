@@ -53,6 +53,7 @@ from routes.patient_views import (
     process_register_patient,
     register_patient_context,
 )
+from routes.settings_views import settings_context
 from routes.report_export import (
     analytics_pdf,
     analytics_workbook,
@@ -503,4 +504,7 @@ def export_audit_logs_pdf():
 @login_required
 @role_required("Admin")
 def settings():
-    return render_template('settings.html')
+    # A context at last, and a deliberately small one -- see
+    # routes/settings_views.py for why only the Security pane gets real figures
+    # while every other pane on this screen stays a disabled control.
+    return render_template('settings.html', **settings_context())

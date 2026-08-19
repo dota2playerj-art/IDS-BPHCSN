@@ -64,6 +64,24 @@ now working links into the patient's own profile. A shared reason is worth havin
 while something quotes it and not one commit longer, so it was deleted rather
 than left describing screens that no longer ask.
 
+A REASON CAN ALSO BE MOSTLY RIGHT, WHICH IS THE HARDEST CASE
+------------------------------------------------------------
+"settings" was rewritten a second time over a single word. It said nothing on
+that screen is "stored or read". Stored was and is correct; read stopped being
+correct the moment the Security Settings pane began reporting live counts of
+sign-ins from the audit trail. A reason that is 95% true is more dangerous than
+one that is plainly false, because nobody re-reads it -- and this one was the
+sentence telling readers that every figure on the screen was inert, sitting
+directly above the one figure that was not. The lesson this file keeps learning
+is that the reasons have to be re-read whenever anything they describe is built,
+not only when they collapse outright.
+
+The three per-screen reasons that went false in the same change are not here,
+because they are not shared: Audit Logs' "logins" and "security" and User
+Management's "last_login" all lived in their own routes/*_views.py UNTRACKED
+dicts, and were deleted or narrowed there. That split is the point of the
+paragraph below.
+
 Kept apart from the per-screen UNTRACKED dicts in routes/*_views.py on purpose.
 Those answer a different question -- why a *figure* has no source -- and are
 specific to one screen's data. This answers why an *action* cannot be taken,
@@ -225,21 +243,39 @@ UNAVAILABLE = {
     ),
 
     # ---- Whole screens with no data source ---------------------------------
-    # REWRITTEN: "There is no settings table" was false. schema.sql defines one
-    # -- setting_key, setting_value, updated_by, updated_at -- and has since the
-    # first schema. What is true is the half that follows: nothing reads or
+    # REWRITTEN ONCE: "There is no settings table" was false. schema.sql defines
+    # one -- setting_key, setting_value, updated_by, updated_at -- and has since
+    # the first schema. What is true is the half that follows: nothing reads or
     # writes it. Naming the wiring as the gap rather than the table is the same
     # correction medicine_archive needed, and for the same reason: a reason that
     # denies an existing structure sends the next session off to build something
     # that is already there.
+    #
+    # REWRITTEN AGAIN, AND THIS TIME BECAUSE ONE WORD IN IT HAD GONE FALSE.
+    # It opened "Nothing on this screen is stored or read". The first half is
+    # still exactly true -- the settings table is still empty and no route writes
+    # it -- but the second stopped being true when routes/auth.py started
+    # recording sign-ins: the Security Settings pane now reads live counts of
+    # them from the audit trail (routes/settings_views.py). One word wrong in a
+    # shared reason is the whole hazard this file exists for, and it was the
+    # worst word to be wrong here, because this sentence is what tells a reader
+    # that every figure on the screen is inert. A reader who checked the one
+    # block that is live would have found the reason lying about it.
+    #
+    # Note the asymmetry that survives, because it is the real state: nothing on
+    # this screen is *stored*, and exactly one block on it is *read*. The
+    # disabled fieldset over every input is unchanged and still correct.
     "settings": (
-        "Nothing on this screen is stored or read. The settings table exists in "
+        "Nothing typed on this screen is stored. The settings table exists in "
         "schema.sql -- setting_key, setting_value, updated_by, updated_at, ready "
-        "for exactly this -- but no model function and no route touches it, so "
+        "for exactly this -- but no model function and no route writes to it, so "
         "the gap is the wiring rather than the place to put the values. Nothing "
-        "typed here is saved and nothing here is read by the running system: the "
-        "values shown are the defaults the application is actually built with, "
-        "which is why they are shown at all."
+        "entered here is saved, and no setting shown here is read by the running "
+        "system: the values are the defaults the application is actually built "
+        "with, which is why they are shown at all. The one exception is stated "
+        "where it sits -- the Security Settings pane reports live counts of "
+        "sign-ins and refused sign-ins from the audit trail, which are records "
+        "of what happened rather than settings that were chosen."
     ),
     "backup": (
         "Backup and restore are not implemented. The database is a single "
@@ -272,12 +308,18 @@ UNAVAILABLE = {
         "and a connection tested here would be testing the server's environment "
         "rather than anything typed above."
     ),
+    # The last sentence points at Audit Logs for "recorded activity", and that
+    # pointer got better rather than worse: the trail now holds sign-ins as well
+    # as record edits and broadcasts, so a reader sent there for what the system
+    # noticed finds more of it. Nothing here needed correcting -- it is listed in
+    # this comment only because it was checked, and a reason that mentions
+    # another screen's contents is exactly the kind that quietly goes stale.
     "notifications": (
         "There is no notifications table. Nothing in this system writes, "
         "stores or clears a notification, so marking one read or dismissing it "
         "would change only what this browser is showing until the next reload. "
-        "Recorded activity lives on Audit Logs, and community messages on "
-        "SMS Notifications."
+        "Recorded activity lives on Audit Logs -- record edits, SMS broadcasts "
+        "and sign-ins -- and community messages on SMS Notifications."
     ),
     # THERE IS NO "community_reports" ENTRY ANY MORE, AND THAT IS THE POINT.
     # It has been deleted twice over. It first said Community Reports had no

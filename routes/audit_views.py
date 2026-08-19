@@ -6,21 +6,42 @@ and the shape of the screen is one readable thing in one place.
 
 WHAT THIS SCREEN CAN AND CANNOT SHOW
 ------------------------------------
-audit_logs has exactly two writers today -- the consultation edit path in
-routes/consultation_views.py and the broadcast send path in
-routes/broadcast_views.py. Everything they write is shown here in full.
+audit_logs has three writers today: the consultation edit path in
+routes/consultation_views.py, the broadcast send path in
+routes/broadcast_views.py, and the login route in routes/auth.py. Everything
+they write is shown here in full.
 
-Nothing else writes to it. In particular routes/auth.py logs neither logins nor
-logout nor failed attempts, and no patient, inventory or appointment write calls
-log_action() yet. The screen was drawn with cards for "Login Events" and
-"Security Events" and with User / Activity Type / Status filters, none of which
-have anything behind them. Rather than let those render plausible-looking
-numbers, UNTRACKED below names each absence and the template prints the reason.
+THE THIRD WRITER IS NEW, AND IT CHANGED WHAT THIS SCREEN CAN SAY
+-----------------------------------------------------------------
+This note used to read "exactly two writers", and went on to say that
+routes/auth.py logged neither logins nor logout nor failed attempts -- which is
+why the screen's "Login Events" and "Security Events" cards both printed a dash
+and named their own absence. That is no longer the state of the system. The login
+route now writes one entry per successful sign-in and one per sign-in refused
+against an account that exists, so both cards report counts of real rows, and
+"Authentication" is a module the filter above the table can select.
+
+What is left absent is narrower, and precise enough to be worth stating rather
+than glossing: an attempt against a username that does not exist writes nothing
+at all (audit_logs.user_id is NOT NULL and foreign-keyed to a real account, so
+there is no row to attribute one to), and signing out is not recorded. Those two
+are what UNTRACKED["login_scope"] below says, and the Security Events card
+carries it as its own tooltip -- a real figure with its boundary stated beside
+it, rather than a figure left to be read as more than it is.
+
+No patient, inventory or appointment write calls log_action() yet, and the User /
+Activity Type / Status filters the screen was drawn with still have nothing
+behind them.
 
 That is the rule Screen 03's Prenatal card set and Screen 10 follows: a figure
-with no source reports its own absence, because an invented one gets believed.
+with no source reports its own absence, because an invented one gets believed --
+and its corollary, which this screen is now the clearest example of, that a
+reason is deleted the moment the gap it describes is closed.
 """
 from models.audit import (
+    ACTION_LOGIN_FAILED,
+    ACTION_LOGIN_SUCCESS,
+    MODULE_AUTH,
     MODULE_SMS,
     count_audit_logs,
     get_audit_logs,
@@ -36,15 +57,34 @@ PAGE_SIZE = 100
 # The parts of this screen with no data source, and why. Keyed by the slot on the
 # page so the template can look one up next to the thing it explains.
 UNTRACKED = {
-    "logins": (
-        "Login and logout are not recorded. routes/auth.py authenticates and "
-        "starts the session but never calls log_action(), so there is no row to "
-        "count sign-ins, sign-outs or failed attempts against."
-    ),
-    "security": (
-        "Security events are not recorded. There is no failed-login counter and "
-        "no account lockout in the system, so nothing writes the events this "
-        "card was drawn to summarise."
+    # THERE IS NO "logins" ENTRY ANY MORE, AND THAT IS THE POINT.
+    # It said login and logout are not recorded, and that routes/auth.py never
+    # calls log_action() -- true when it was written, and the direct cause of the
+    # dash on the Login Events card. That route now writes an entry for every
+    # sign-in, so the card counts rows instead of quoting this, and a reason with
+    # nothing quoting it is exactly the drift utils/unavailable.py exists to
+    # prevent. It goes rather than sitting here describing a state the
+    # application has left.
+    #
+    # "security" went the same way and was replaced rather than simply deleted.
+    # It claimed security events are not recorded at all; refused sign-ins are
+    # now recorded, so the claim is false. But the card that quoted it would be
+    # overstated if it were left with no caveat at all, because two real gaps
+    # remain inside it. So the reason narrowed to exactly those two, under a name
+    # that says what it now is: not "this figure has no source" but "this figure
+    # has a source and here is its edge".
+    "login_scope": (
+        "Both sign-in figures count real rows, and every one of them is in the "
+        "trail below. Two things sit outside them. An attempt against a username "
+        "that does not exist writes nothing: audit_logs.user_id is NOT NULL and "
+        "foreign-keyed to a real account, so there is no row such an attempt "
+        "could be attributed to -- what is counted is every refusal aimed at an "
+        "account that exists, which is every attempt that could ever have "
+        "succeeded. And signing out is not recorded, so these are sign-in counts "
+        "rather than session counts. No account is ever locked out either: this "
+        "system records the attempts and acts on none of them, so a rising "
+        "number here is something for a person to notice, not something the "
+        "application will respond to on its own."
     ),
     "filters": (
         "Filtering by user, activity type or status is not wired. The stored "
@@ -79,11 +119,17 @@ def _initials(name):
 def _split_details(details):
     """One `details` string -> (lead sentence, field changes, remaining notes).
 
-    models/audit.py writes two shapes into this column and both are handled
+    models/audit.py writes three shapes into this column and all are handled
     without the parser having to know which one it has:
 
       consultation edit  "<context>. N fields changed — Label: a → b; Label: c → d"
       broadcast sent     "<reference> to <audience> (...); <clause>; <clause>"
+      sign-in / refusal  "<who, as what, from where>; <clause>; <clause>"
+
+    The authentication shape needs no special case: it carries no " → " in any
+    clause, so every one of its clauses falls through to `notes` and is shown
+    verbatim, which is exactly right for a sentence that describes an event
+    rather than an edit.
 
     A clause reading "Label: before → after" becomes a before/after pair the
     template can render side by side; anything else is kept verbatim as a note,
@@ -116,6 +162,19 @@ def _split_details(details):
     return lead.strip(), changes, notes
 
 
+# The two authentication outcomes deserve different glyphs from each other, not
+# merely a shared one: a refusal and an admission are the entries most likely to
+# be scanned for rather than read, and they must not look alike in a list.
+_ICONS = {
+    ACTION_LOGIN_SUCCESS: "login",
+    ACTION_LOGIN_FAILED: "gpp_bad",
+}
+_MODULE_ICONS = {
+    MODULE_SMS: "campaign",
+    MODULE_AUTH: "shield_person",
+}
+
+
 def _decorate(entry):
     """One stored row -> the row the table draws, with nothing invented.
 
@@ -139,6 +198,14 @@ def _decorate(entry):
         "changes": changes,
         "notes": notes,
         "is_sms": entry.get("module") == MODULE_SMS,
+        # The glyph the detail panel puts at the top of the entry. Chosen here
+        # rather than in the template so the panel does not have to grow a
+        # conditional per module: an authentication entry showed the edit_note
+        # pencil before this, which read as though signing in had changed a
+        # record.
+        "icon": _ICONS.get(entry.get("action"), _MODULE_ICONS.get(
+            entry.get("module"), "edit_note"
+        )),
     }
 
 
