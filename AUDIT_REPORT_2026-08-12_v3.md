@@ -5,7 +5,7 @@
 other than this report itself.
 **Predecessors:** `AUDIT_REPORT_2026-08-06_v2.md` (project root). The v1 report is **not present in
 the project** — only v2 survives, so v2 is the only baseline this report can be compared against.
-**Authority followed:** `PR0MPT_INSTRUCTION/01`–`10` + `Capstone_Proposal.pdf.pdf`, per the source-of-
+**Authority followed:** `PR0MPT_INSTRUCTION/01`–`10` + `Capstone_Proposal.pdf`, per the source-of-
 truth order in `01_PROJECT_BIBLE.md §Source of Truth Priority`.
 
 ## Method

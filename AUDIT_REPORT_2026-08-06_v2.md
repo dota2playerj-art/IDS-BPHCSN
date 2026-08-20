@@ -13,7 +13,7 @@ The v1 audit ran with **zero governance documents present** and had to judge the
 
 | Document | Present | Version | Read |
 |---|---|---|---|
-| `Capstone_Proposal.pdf.pdf` | ✅ | May 2026, 34 pp. | ✅ full text extracted |
+| `Capstone_Proposal.pdf` | ✅ | May 2026, 34 pp. | ✅ full text extracted |
 | `01_PROJECT_BIBLE.md` | ✅ | **2.0** (corrected) | ✅ |
 | `02_UI_DESIGN_SYSTEM.md` | ✅ | 1.0 | ✅ |
 | `03_SCREEN_SPECIFICATIONS.md` | ✅ | 1.0 | ✅ |
