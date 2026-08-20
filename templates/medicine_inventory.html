@@ -205,7 +205,18 @@
           <button class="filter-btn" type="button" disabled title="{{ unavailable.sort }}"><span class="material-symbols-outlined" style="font-size:18px;">sort</span>Sort</button>
         </div>
         <div class="d-flex align-items-center gap-2">
-          <button class="btn-outline-teal" type="button" disabled title="{{ unavailable.export }}"><span class="material-symbols-outlined" style="font-size:18px;">file_download</span>Export</button>
+{#- EXPORT. Two working links, the same pair every other export in this project
+    offers. They download the whole shelf -- retired items included, badged as
+    such -- and not the list as narrowed on screen: the search box and all three
+    Advanced Filter controls run in the browser, so the server is never told what
+    was chosen. That is the constraint templates/_print.html documents for Patient
+    Records, and it is resolved here the same way: the file's cover sheet states
+    it in a block of its own, and these titles state it before the file is
+    fetched. #}
+          <a class="btn-outline-teal" href="{{ url_for(medicine_inventory_excel_endpoint) }}" download
+             title="Download the full inventory as an Excel workbook — every item on the shelf including retired ones, not the list as filtered on screen"><span class="material-symbols-outlined" style="font-size:18px;">description</span>Export Excel</a>
+          <a class="btn-outline-teal" href="{{ url_for(medicine_inventory_pdf_endpoint) }}" download
+             title="Download the full inventory as a PDF on the health center's letterhead — every item on the shelf including retired ones, not the list as filtered on screen"><span class="material-symbols-outlined" style="font-size:18px;">picture_as_pdf</span>Export PDF</a>
           <a href="{{ url_for(add_edit_medicine_endpoint) }}" class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">add</span>Add Medicine</a>
         </div>
       </div>

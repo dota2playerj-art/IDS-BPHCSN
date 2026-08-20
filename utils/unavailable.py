@@ -15,12 +15,14 @@ also tells the next session what building it would actually take, which
 
 WHY THESE LIVE HERE AND NOT IN EACH TEMPLATE
 --------------------------------------------
-Export is unavailable for one reason across the four screens that still offer
-it, and print for one reason across the screens that have no print layout.
-Written into each template, that is a dozen copies of two sentences, and the
-copies drift -- one screen would end up claiming export was "not yet built"
-while another said it was "planned for a later phase", for the same absent
-library.
+Because one gap is usually several controls' problem, and one sentence written
+into several templates is several sentences a month later. That was the case for
+export across six screens and for print across the screens with no print layout;
+both of those gaps have since closed, and the way they closed is the argument for
+this file rather than against it. When export became real the claim about a
+missing library was in one place, so it was corrected in one place -- and when the
+last screen quoting it was wired, the reason was deleted in one place rather than
+surviving in whichever templates nobody re-read.
 inject_role_context() puts this dict on every render as `unavailable`, so a
 screen states the reason by naming it.
 
@@ -28,28 +30,39 @@ Collecting them also means a reason can be corrected in one place when the
 world changes. When printing was built for Patient Profile and Patient Records,
 the print sentence had to stop saying the project had no print stylesheet; had
 that claim been copied into eight templates, some of them would still be
-saying it. The same thing has now happened to export: Export Excel is real on
-the two report screens, so the shared sentence claiming the project had no
-file-generation library had to go before the screens still quoting it started
-lying about a dependency that is now installed.
+saying it. The same thing then happened to export twice over: first when Export
+Excel became real on the two report screens, so the shared sentence claiming the
+project had no file-generation library had to go before the screens still quoting
+it started lying about a dependency that is now installed -- and then again when
+the last four screens were wired, at which point the sentence had nothing left to
+be true about at all.
 
 A REASON CAN SPLIT, AND THEN GO
 -------------------------------
-"export" used to cover Export Excel and Export PDF together, which was correct
-while neither existed. Excel became real on the report screens and PDF did not,
-so one sentence would have had to be false about one of the two. It split into
-"export" -- the screens that have no export of any kind -- and "export_pdf",
-which the two report screens quoted beside a working Export Excel.
+"export" is the entry that lived this whole arc, and it is now gone. It began
+covering Export Excel and Export PDF together, which was correct while neither
+existed. Excel became real on the report screens and PDF did not, so one sentence
+would have had to be false about one of the two: it split into "export" -- the
+screens with no export of any kind -- and "export_pdf", which the two report
+screens quoted beside a working Export Excel.
 
-"export_pdf" is now gone as well. Export PDF became real on both report screens --
-fpdf2 is a dependency and each screen has its own export.pdf route beside its
-export.xlsx one -- so the two templates that quoted the reason stopped quoting it,
-and a reason with nothing quoting it is exactly the drift this file exists to
-prevent. It went the way "community_reports" did below: deleted once true of
-nothing, rather than left sitting here describing a state the application has
-left. This is the whole life of a shared reason -- born when the gap is real,
-split when the gap is real for one control and not another, deleted when the gap
-closes -- and one file is where all three happen so none of them is missed.
+"export_pdf" went first. Export PDF became real on both report screens -- fpdf2 is
+a dependency and each screen has its own export.pdf route beside its export.xlsx
+one -- so the two templates that quoted the reason stopped quoting it, and a reason
+with nothing quoting it is exactly the drift this file exists to prevent. It went
+the way "community_reports" did below: deleted once true of nothing, rather than
+left sitting here describing a state the application has left.
+
+"export" has now followed it. Patient Records, Medicine Inventory, Appointment
+Scheduling and User Management each download a real spreadsheet and a real PDF
+(routes/roster_export.py), which were the last four screens quoting it. What is
+left behind is one narrower reason, "export_selection", for the one control that
+is still genuinely absent -- the bulk bar's Export on Patient Records, which would
+download the ticked records rather than the register. This is the whole life of a
+shared reason: born when the gap is real, split when the gap is real for one
+control and not another, narrowed when the general case closes and a specific one
+does not, deleted when the last thing quoting it stops. One file is where all four
+happen, so none of them is missed.
 
 A reason can also split because it is aimed at the wrong *scope* rather than
 because it became false. "print" was a sentence about a screen, and it was being
@@ -90,28 +103,52 @@ and the answers are shared.
 
 UNAVAILABLE = {
     # ---- File output --------------------------------------------------------
-    # THIS SENTENCE HAS BEEN REWRITTEN BECAUSE THE WORLD CHANGED, WHICH IS THE
-    # WHOLE REASON THE REASONS LIVE IN ONE FILE.
-    # It used to say export needed two things the project did not have, "a
-    # file-generation library in requirements.txt, and a download route to serve
-    # what it writes". Both now exist -- openpyxl is a dependency and the two
-    # report screens each have an export.xlsx route -- so that claim would be
-    # false on the six screens still quoting it. What is actually missing on
-    # those six is different and is what this now names: nobody has decided what
-    # a spreadsheet of a *roster* should contain.
+    # THERE IS NO "export" ENTRY ANY MORE, AND THAT IS THE POINT.
+    # It has been rewritten once and is now deleted, which is the whole life this
+    # file's docstring describes. It first said export needed a file-generation
+    # library and a download route, and that stopped being true when openpyxl and
+    # fpdf2 landed and the report screens got their export.xlsx and export.pdf.
+    # It was rewritten to name what was actually missing on the six screens still
+    # quoting it: "the decision about what an export of this screen's rows should
+    # hold -- which columns, which rows when the table is filtered, and what a
+    # reader is meant to do with the file."
     #
-    # The two report screens do not quote this any more. Their Export Excel is a
-    # working link, and a control that works carries no reason at all.
-    "export": (
-        "Export is not built for this screen. The machinery exists -- openpyxl "
-        "and fpdf2 are dependencies, and Reports & Analytics and Community "
-        "Reports each download a real spreadsheet and a real PDF of their "
-        "figures -- so what is missing here is not a library or a route. It is "
-        "the decision about what an export of this screen's rows should hold: "
-        "which columns, which rows when the table is filtered, and what a reader "
-        "is meant to do with the file. A report has one obvious answer to that "
-        "and a working list does not, which is why the report screens were taken "
-        "first."
+    # That decision has now been taken, for all four screens that were left
+    # quoting this. Patient Records, Medicine Inventory, Appointment Scheduling
+    # and User Management each download a real spreadsheet and a real PDF -- the
+    # columns are the ones their tables already show, the rows are the whole list
+    # because these screens filter in the browser, and every file's cover sheet
+    # says so outright rather than leaving a reader to assume it holds what was on
+    # screen. See routes/roster_export.py.
+    #
+    # So nothing quotes this any more, and a reason with nothing quoting it is
+    # exactly the drift this file exists to prevent. It goes the way "export_pdf",
+    # "print" and "community_reports" went, rather than sitting here describing a
+    # state the application has left.
+    #
+    # One control that used to quote it is still disabled, and it does not get
+    # this sentence back -- it gets a true one of its own, immediately below. That
+    # is the same split "print" made when a Medicine Inventory row icon needed a
+    # reason about one item rather than about a whole screen.
+
+    # A REASON CAN OUTLIVE ITS PARENT BY BEING NARROWER THAN IT.
+    # The bulk bar on Patient Records offers Export beside Print and Change
+    # Status, and it means something different from the toolbar's Export above
+    # it: the ticked records, not the register. The shared reason would now be
+    # false on this button -- export *is* built for this screen -- so what stops it
+    # is written here instead, and it is neither a library nor a route.
+    "export_selection": (
+        "Exporting only the ticked records is not built. Export in the toolbar "
+        "above is, and downloads the whole register; this button would download "
+        "the selection, and the selection is the part that is missing. It is not "
+        "that the browser cannot send it -- Change Status beside this posts the "
+        "same ticked ids to the server already. It is that every download this "
+        "project serves is a GET at a URL that can be bookmarked, re-fetched and "
+        "read, and a file whose contents are decided by a list of primary keys in "
+        "a query string is none of those things. Print beside this does export a "
+        "selection, because printing prints what is on the page and needs no URL "
+        "to carry it. Until that is settled: export the full roster and delete "
+        "the rows you did not want, which is what a spreadsheet is for."
     ),
     # THERE IS NO "export_pdf" ENTRY ANY MORE, AND THAT IS THE POINT.
     # It said Export PDF was not built while it was not. Export PDF is now real on

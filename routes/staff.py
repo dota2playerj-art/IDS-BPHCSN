@@ -37,6 +37,17 @@ from routes.inventory_views import (
     medicine_inventory_context,
     process_add_edit_medicine,
 )
+from routes.roster_export import (
+    appointment_document,
+    appointment_workbook,
+    excel_response,
+    exported_by,
+    inventory_document,
+    inventory_workbook,
+    patient_roster_document,
+    patient_roster_workbook,
+    pdf_response,
+)
 from routes.patient_views import (
     booking_details,
     booking_query_args,
@@ -71,6 +82,32 @@ def staff_patient_records():
     return render_template('patient_records.html', **patient_records_context())
 
 
+# Export Excel and Export PDF for the roster above. The Administrator's identical
+# exports live in their own blueprint for exactly the reason the two render routes
+# do: each role's URL space and guard stay explicit, and neither role is handed a
+# URL the other's guard admits. Same context, same assembly, same two files --
+# routes/roster_export.py -- so the roster this role downloads and the one the
+# Administrator downloads are the same roster.
+@staff_bp.route('/patient_records/export.xlsx')
+@login_required
+@role_required("Health Staff")
+def staff_export_patient_records_excel():
+    return excel_response(patient_roster_workbook(
+        patient_records_context(),
+        produced_by=exported_by(),
+    ))
+
+
+@staff_bp.route('/patient_records/export.pdf')
+@login_required
+@role_required("Health Staff")
+def staff_export_patient_records_pdf():
+    return pdf_response(patient_roster_document(
+        patient_records_context(),
+        produced_by=exported_by(),
+    ))
+
+
 # POST only, and named apart from the Admin equivalent so the flat endpoint
 # namespace in utils/endpoints.py stays unambiguous. Same guard shape as every
 # other Staff view: a Barangay Official never reaches it.
@@ -98,6 +135,29 @@ def staff_patient_profile(patient_id):
 @role_required("Health Staff")
 def staff_medicine_inventory():
     return render_template('medicine_inventory.html', **medicine_inventory_context())
+
+
+# Export Excel and Export PDF for the item list above. Same guard as the screen,
+# same context, and named apart from the Admin equivalents so the flat endpoint
+# namespace in utils/endpoints.py stays unambiguous.
+@staff_bp.route('/medicine_inventory/export.xlsx')
+@login_required
+@role_required("Health Staff")
+def staff_export_medicine_inventory_excel():
+    return excel_response(inventory_workbook(
+        medicine_inventory_context(),
+        produced_by=exported_by(),
+    ))
+
+
+@staff_bp.route('/medicine_inventory/export.pdf')
+@login_required
+@role_required("Health Staff")
+def staff_export_medicine_inventory_pdf():
+    return pdf_response(inventory_document(
+        medicine_inventory_context(),
+        produced_by=exported_by(),
+    ))
 
 
 # No id in the URL means add mode; an id means edit that item. A successful save
@@ -152,6 +212,29 @@ def staff_appointment_scheduling():
             book_patient_id=request.args.get("book"),
         ),
     )
+
+
+# Export Excel and Export PDF for Screen 08, this role's copies. ?month= is read
+# for the same reason the Administrator's are: it is a real server-side parameter
+# the calendar's arrows submit, so the file holds the month on screen.
+@staff_bp.route('/appointment_scheduling/export.xlsx')
+@login_required
+@role_required("Health Staff")
+def staff_export_appointment_scheduling_excel():
+    return excel_response(appointment_workbook(
+        appointment_scheduling_context(month=request.args.get("month")),
+        produced_by=exported_by(),
+    ))
+
+
+@staff_bp.route('/appointment_scheduling/export.pdf')
+@login_required
+@role_required("Health Staff")
+def staff_export_appointment_scheduling_pdf():
+    return pdf_response(appointment_document(
+        appointment_scheduling_context(month=request.args.get("month")),
+        produced_by=exported_by(),
+    ))
 
 
 # New Appointment: book a future visit. Two paths through one endpoint, because

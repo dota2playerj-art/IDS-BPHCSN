@@ -125,10 +125,14 @@ UNTRACKED = {
         "screen there is nothing to narrow down, so the controls the mockup "
         "drew would have filtered a list that is already complete."
     ),
-    # "export" used to be here. Export is absent for one reason on every screen
-    # that offers it, so the sentence moved to utils/unavailable.py and this
-    # screen quotes the shared one -- two near-identical descriptions of one
-    # missing library is exactly the drift that file exists to prevent.
+    # "export" used to be here, then moved out, and is now gone from where it
+    # moved to. It was a screen-specific sentence; it was replaced by a pointer
+    # at utils/unavailable.py's shared `export`, because two near-identical
+    # descriptions of one missing library is exactly the drift that file exists
+    # to prevent. That shared reason has since been deleted as well -- Export on
+    # this screen is two working links now (routes/roster_export.py), and this
+    # screen's Export button carries no reason at all, because a control that
+    # works does not need one.
     # Task 4 of the brief: flagged for a decision, deliberately not built.
     # Still true, and worth one added sentence now that the flag it names is
     # enforced. What is missing here is the button, not the mechanism -- and a

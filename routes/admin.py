@@ -62,6 +62,16 @@ from routes.report_export import (
     pdf_response,
 )
 from routes.report_views import reports_analytics_context
+from routes.roster_export import (
+    appointment_document,
+    appointment_workbook,
+    inventory_document,
+    inventory_workbook,
+    patient_roster_document,
+    patient_roster_workbook,
+    user_roster_document,
+    user_roster_workbook,
+)
 from routes.user_views import user_management_context
 from utils.security import login_required, role_required
 
@@ -84,6 +94,39 @@ def admin_dashboard():
 @role_required("Admin")
 def patient_records():
     return render_template('patient_records.html', **patient_records_context())
+
+
+# Export Excel and Export PDF for the roster above. Both carry the same guard as
+# the screen they export -- this role and no other -- because the file is the
+# screen's contents, and a download that widened who could read them would be a
+# hole the render route does not have. A Barangay Official has no access to
+# Patient Records at all and bounces off these two exactly as they bounce off the
+# screen.
+#
+# Both read the same patient_records_context() the screen rendered from, so the
+# file cannot disagree with the page it was taken off; routes/roster_export.py
+# assembles it once and renders it as either format. Neither reads the query
+# string, because this screen has no server-side filter to read -- its five
+# controls narrow rows in the browser, and the file says so on its cover rather
+# than pretending otherwise.
+@admin_bp.route('/patient_records/export.xlsx')
+@login_required
+@role_required("Admin")
+def export_patient_records_excel():
+    return excel_response(patient_roster_workbook(
+        patient_records_context(),
+        produced_by=exported_by(),
+    ))
+
+
+@admin_bp.route('/patient_records/export.pdf')
+@login_required
+@role_required("Admin")
+def export_patient_records_pdf():
+    return pdf_response(patient_roster_document(
+        patient_records_context(),
+        produced_by=exported_by(),
+    ))
 
 
 # POST only: this changes records, so there is no URL anyone can navigate to.
@@ -175,6 +218,28 @@ def medicine_inventory():
     return render_template('medicine_inventory.html', **medicine_inventory_context())
 
 
+# Export Excel and Export PDF for the item list above. Same guard as the screen,
+# same context, for the same reasons the roster's two carry them.
+@admin_bp.route('/medicine_inventory/export.xlsx')
+@login_required
+@role_required("Admin")
+def export_medicine_inventory_excel():
+    return excel_response(inventory_workbook(
+        medicine_inventory_context(),
+        produced_by=exported_by(),
+    ))
+
+
+@admin_bp.route('/medicine_inventory/export.pdf')
+@login_required
+@role_required("Admin")
+def export_medicine_inventory_pdf():
+    return pdf_response(inventory_document(
+        medicine_inventory_context(),
+        produced_by=exported_by(),
+    ))
+
+
 # Add mode carries no id; edit mode carries the medicine's id. Same shape as
 # register_patient above -- one view, one template, distinguished by the path.
 #
@@ -230,6 +295,33 @@ def appointment_scheduling():
             book_patient_id=request.args.get("book"),
         ),
     )
+
+
+# Export Excel and Export PDF for Screen 08. Same guard as the screen, and the
+# only one of this task's eight exports that reads the query string: ?month= is a
+# real server-side parameter -- the calendar panel's own arrows submit it -- so the
+# button exports the month the operator is looking at, exactly as Audit Logs'
+# export carries its ?module=. The queue's and the upcoming list's own search and
+# filter controls narrow rows in the browser and cannot come with it; the file's
+# cover sheet says which of the two it is for every control on the screen.
+@admin_bp.route('/appointment_scheduling/export.xlsx')
+@login_required
+@role_required("Admin")
+def export_appointment_scheduling_excel():
+    return excel_response(appointment_workbook(
+        appointment_scheduling_context(month=request.args.get("month")),
+        produced_by=exported_by(),
+    ))
+
+
+@admin_bp.route('/appointment_scheduling/export.pdf')
+@login_required
+@role_required("Admin")
+def export_appointment_scheduling_pdf():
+    return pdf_response(appointment_document(
+        appointment_scheduling_context(month=request.args.get("month")),
+        produced_by=exported_by(),
+    ))
 
 
 # New Appointment: book a future visit. Two paths through one endpoint, because
@@ -459,6 +551,32 @@ def export_reports_analytics_pdf():
 @role_required("Admin")
 def user_management():
     return render_template('user_management.html', **user_management_context())
+
+
+# Export Excel and Export PDF for the account roster above. Admin and no other
+# role, the same guard as the screen -- and the guard matters more here than on
+# any other export in the project, because this file names every account on the
+# system, its role and the screens that role can open. It holds no password and
+# no hash: get_all_users() does not select the column, so there is none in the
+# context to write.
+@admin_bp.route('/user_management/export.xlsx')
+@login_required
+@role_required("Admin")
+def export_user_management_excel():
+    return excel_response(user_roster_workbook(
+        user_management_context(),
+        produced_by=exported_by(),
+    ))
+
+
+@admin_bp.route('/user_management/export.pdf')
+@login_required
+@role_required("Admin")
+def export_user_management_pdf():
+    return pdf_response(user_roster_document(
+        user_management_context(),
+        produced_by=exported_by(),
+    ))
 
 
 # Screen 12. Admin only, unchanged: the trail says who changed what, so the role

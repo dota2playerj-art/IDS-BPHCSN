@@ -57,6 +57,17 @@ def inject_role_context():
             "record_consultation_endpoint": "staff_record_consultation",
             "edit_consultation_endpoint": "staff_edit_consultation",
             "sms_notifications_endpoint": "staff_sms_notifications",
+            # Export Excel and Export PDF on Screens 03, 06 and 08. Named per
+            # role for the same reason every endpoint above is: these three
+            # templates are each rendered by two blueprints, and each role must
+            # be handed the download route its own guard admits. A shared literal
+            # would send one of the two roles to a URL it bounces straight off.
+            "patient_records_excel_endpoint": "staff_export_patient_records_excel",
+            "patient_records_pdf_endpoint": "staff_export_patient_records_pdf",
+            "medicine_inventory_excel_endpoint": "staff_export_medicine_inventory_excel",
+            "medicine_inventory_pdf_endpoint": "staff_export_medicine_inventory_pdf",
+            "appointments_excel_endpoint": "staff_export_appointment_scheduling_excel",
+            "appointments_pdf_endpoint": "staff_export_appointment_scheduling_pdf",
         }
     elif normalized_role == "admin":
         context = {
@@ -92,6 +103,20 @@ def inject_role_context():
             # roles to a URL it bounces straight off.
             "reports_excel_endpoint": "export_reports_analytics_excel",
             "reports_pdf_endpoint": "export_reports_analytics_pdf",
+            # The Administrator's copies of the three shared screens' exports,
+            # plus User Management's, which only this role has at all -- Screen 11
+            # is Admin-only, so the names are absent for the other two and
+            # user_management.html would fail loudly rather than quietly emitting
+            # a URL they cannot open. Same arrangement as community_excel_endpoint
+            # below.
+            "patient_records_excel_endpoint": "export_patient_records_excel",
+            "patient_records_pdf_endpoint": "export_patient_records_pdf",
+            "medicine_inventory_excel_endpoint": "export_medicine_inventory_excel",
+            "medicine_inventory_pdf_endpoint": "export_medicine_inventory_pdf",
+            "appointments_excel_endpoint": "export_appointment_scheduling_excel",
+            "appointments_pdf_endpoint": "export_appointment_scheduling_pdf",
+            "users_excel_endpoint": "export_user_management_excel",
+            "users_pdf_endpoint": "export_user_management_pdf",
         }
     elif normalized_role == "barangay official":
         context = {

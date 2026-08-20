@@ -2,13 +2,19 @@
 
 The mechanics only: sheets, headed tables, wrapped explanatory notes, column
 widths, and the one house style they are all drawn in. What the numbers *are*
-belongs to routes/report_export.py, which is the module that knows about
-consultations and reorder levels; this one would write a workbook of anything.
+belongs to the modules that assemble them -- routes/report_export.py knows about
+consultations, routes/audit_export.py about trail entries, routes/roster_export.py
+about reorder levels and queue positions; this one would write a workbook of
+anything.
 
-Kept apart for the same reason utils/dates.py is: two report screens produce a
-workbook each, and a third would produce a third. A shared writer means every
-export the project ever grows has the same headings, the same freeze row and the
-same way of stating a caveat, rather than each screen inventing its own.
+Kept apart for the same reason utils/dates.py is, and the argument has since been
+settled by events. It read "two report screens produce a workbook each, and a
+third would produce a third"; there are seven now -- the two report screens, the
+audit trail, and the four working lists routes/roster_export.py writes -- and all
+seven have the same headings, the same freeze row and the same way of stating a
+caveat, because none of them contains a line of formatting code. That is what a
+shared writer buys, and it is why an eighth costs a builder function rather than
+a stylesheet.
 
 WHY openpyxl
 ------------

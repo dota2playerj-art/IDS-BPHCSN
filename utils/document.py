@@ -2,19 +2,20 @@
 
 The mechanics only: a paginated document with a running letterhead and footer, a
 section per part, headed tables, wrapped explanatory notes, and the one house
-style they are drawn in. What the numbers *are* belongs to
-routes/report_export.py; this module would lay out a document of anything.
+style they are drawn in. What the numbers *are* belongs to the modules that
+assemble them -- routes/report_export.py, routes/audit_export.py and
+routes/roster_export.py; this module would lay out a document of anything.
 
 WHY THIS IS THE TWIN OF utils/workbook.py
 -----------------------------------------
 workbook.py turns a list of sheet dictionaries into a .xlsx file. This turns the
-*same* list of sheet dictionaries into a .pdf file. report_export.py assembles
-those dictionaries once -- a cover, a summary, a sheet per report section, and a
-"not tracked" sheet -- and hands the identical structure to either writer. A
-figure cannot read one way in the spreadsheet and another on the printout,
-because there is one assembly and two renderers, not two assemblies. That is the
-same rule the rest of the project reports under, carried up one level: not "one
-query, every screen" but "one report, every file".
+*same* list of sheet dictionaries into a .pdf file. An export module assembles
+those dictionaries once -- a cover, the sheets that screen is made of, and a "not
+tracked" sheet -- and hands the identical structure to either writer. A figure
+cannot read one way in the spreadsheet and another on the printout, because there
+is one assembly and two renderers, not two assemblies. That is the same rule the
+rest of the project reports under, carried up one level: not "one query, every
+screen" but "one report, every file".
 
 A `sheet` is {"title", "heading", "intro", "blocks"}. A `block` is the dict
 `table()`/`figures()` build: {"kind", "title", "columns", "rows", "note",
@@ -84,8 +85,26 @@ _WHITE = (255, 255, 255)
 # and in the spreadsheet, and is never written as 0, which would be a claim.
 MISSING = "—"
 
-# A4 portrait, matching templates/_print.html's @page. Margins wide enough to
-# punch and file.
+# A4, matching templates/_print.html's @page. Margins wide enough to punch and
+# file.
+#
+# PORTRAIT IS THE DEFAULT AND LANDSCAPE IS AN ARGUMENT, NOT A SECOND RENDERER.
+# A report is a page of prose and two- or three-column tables and belongs on a
+# portrait sheet, which is what _print.html puts it on. A roster does not: a
+# patient row is eight columns and a stock item is eleven, and eight columns
+# inside A4 portrait's 182mm of usable width leaves each one about 22mm, which is
+# narrow enough to break "PAT-016" across two lines inside its own cell. That is
+# not a table anybody would file.
+#
+# utils/workbook.py already made this exact decision and made it unconditionally:
+# every sheet it writes is set to landscape, fitToWidth 1, "so a sheet sent to a
+# printer from Excel comes out on one page across rather than with its last
+# column on a sheet of its own". This is the same judgement, exposed as a choice
+# rather than forced, because unlike a spreadsheet a PDF has one shape and the
+# report documents genuinely want the other one.
+PORTRAIT = "portrait"
+LANDSCAPE = "landscape"
+
 _MARGIN = 14  # mm
 _BOTTOM_MARGIN = 16  # mm, room for the footer
 
@@ -150,8 +169,9 @@ class _Report(FPDF):
     because a PDF can be split and a loose page still has to say what it is.
     """
 
-    def __init__(self, org, org_sub, doc_title, range_label, footer_left):
-        super().__init__(orientation="portrait", unit="mm", format="A4")
+    def __init__(self, org, org_sub, doc_title, range_label, footer_left,
+                 orientation=PORTRAIT):
+        super().__init__(orientation=orientation, unit="mm", format="A4")
         # The core fonts are written with WinAnsi (cp1252), not the library's
         # default latin-1. cp1252 is the difference between an em dash, a
         # typographic quote and an ellipsis rendering and raising -- the note prose
@@ -215,7 +235,8 @@ class _Report(FPDF):
 # Rendering the shared sheet/block structure
 # ---------------------------------------------------------------------------
 
-def render(sheets, org, org_sub, doc_title, range_label, footer_left):
+def render(sheets, org, org_sub, doc_title, range_label, footer_left,
+           orientation=PORTRAIT):
     """The list of sheet dicts, as the bytes of a real .pdf file.
 
     The first sheet is the cover: its heading is the clinic's name, which already
@@ -224,8 +245,14 @@ def render(sheets, org, org_sub, doc_title, range_label, footer_left):
     Every later sheet is a section with its own ruled title. This is the one place
     the renderer treats a sheet by its position, and it is the same convention
     workbook.py follows: the first sheet is the cover.
+
+    `orientation` is PORTRAIT unless a caller asks otherwise. It changes the page
+    and nothing else -- the same sheets, the same blocks, the same styling, laid
+    out across a wider line -- so a document does not become a different document
+    by being turned sideways. See the constant's own note above for when a caller
+    should ask.
     """
-    pdf = _Report(org, org_sub, doc_title, range_label, footer_left)
+    pdf = _Report(org, org_sub, doc_title, range_label, footer_left, orientation)
     pdf.set_auto_page_break(True, margin=_BOTTOM_MARGIN)
     pdf.add_page()
 

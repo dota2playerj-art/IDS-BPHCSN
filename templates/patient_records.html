@@ -246,7 +246,26 @@
           <button class="filter-btn" type="button" disabled title="{{ unavailable.sort }}"><span class="material-symbols-outlined" style="font-size:18px;">sort</span>Sort</button>
         </div>
         <div class="d-flex align-items-center gap-2">
-          <button class="btn-outline-teal" type="button" disabled title="{{ unavailable.export }}"><span class="material-symbols-outlined" style="font-size:18px;">file_download</span>Export</button>
+{#- EXPORT. Two working links now, in the pair every other export in this project
+    offers: a spreadsheet somebody sorts and hands on, and a PDF somebody files.
+    Both are Excel-and-PDF for the same reason Reports & Analytics and Audit Logs
+    are -- they answer different questions and both get asked of a roster.
+
+    THE ONE THING THEY CANNOT DO, AND THE TITLE SAYS IT
+    ---------------------------------------------------
+    They download the whole register, not the list as narrowed on screen. The
+    search box and all five Advanced Filter controls run in the browser, so the
+    server is never told what was typed or chosen -- the same constraint
+    templates/_print.html documents for this exact table, resolved the same way:
+    stated rather than smuggled across. Print List beside them does honour the
+    narrowing, because printing prints the DOM; a download is a fresh request and
+    arrives without it. The file's cover sheet says so in a block of its own, and
+    these two titles say it before the file is even fetched, so the difference
+    between the two controls is legible from the toolbar. #}
+          <a class="btn-outline-teal" href="{{ url_for(patient_records_excel_endpoint) }}" download
+             title="Download the full patient roster as an Excel workbook — every registered patient, not the list as filtered on screen"><span class="material-symbols-outlined" style="font-size:18px;">description</span>Export Excel</a>
+          <a class="btn-outline-teal" href="{{ url_for(patient_records_pdf_endpoint) }}" download
+             title="Download the full patient roster as a PDF on the health center's letterhead — every registered patient, not the list as filtered on screen"><span class="material-symbols-outlined" style="font-size:18px;">picture_as_pdf</span>Export PDF</a>
 {#- Print the roster. The screen had no whole-list print control before -- the
     only two Print buttons here were the bulk bar's, which needs a selection,
     and the per-row icon -- so printing the list the operator is actually
@@ -334,7 +353,12 @@
       <div class="bulk-bar" id="bulkBar">
         <div class="count"><span id="selCount">0</span> patient record(s) selected</div>
         <div class="bulk-actions">
-          <button type="button" disabled title="{{ unavailable.export }}"><span class="material-symbols-outlined" style="font-size:16px;">file_download</span>Export</button>
+{#- The bulk bar's Export is the one export control on this screen that is still
+    disabled, and it now quotes a reason of its own rather than the shared one.
+    The shared `export` reason said export was not built for this screen; it is,
+    twice, in the toolbar above. What stops *this* button is narrower and is what
+    its tooltip says. #}
+          <button type="button" disabled title="{{ unavailable.export_selection }}"><span class="material-symbols-outlined" style="font-size:16px;">file_download</span>Export</button>
 {#- Prints the ticked records only, which is the one thing the bulk bar is for.
     Same page, same stylesheet as Print List; the difference is a class on the
     table that holds back every row the operator did not tick. #}

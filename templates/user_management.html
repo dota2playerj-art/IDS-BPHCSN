@@ -175,9 +175,24 @@
               </div>
             </div>
             <div class="d-flex align-items-center gap-2">
-              <button class="btn-outline-teal" type="button" disabled title="{{ unavailable.export }}">
-                <span class="material-symbols-outlined" style="font-size:18px;">file_download</span>Export
-              </button>
+              {#- EXPORT. Two working links. This is the one of the four screens
+                  wired in this pass with nothing to narrow -- no search box, no
+                  filter panel, three accounts on one page -- so the file being the
+                  complete roster is not a compromise here, it is simply what the
+                  screen is. Both files carry the access sheet as well as the
+                  roster: the permissions panel on the right is read off each
+                  view's own role_required() guard, and a file naming accounts
+                  without naming what they can reach would be the least useful
+                  possible export of this screen. No password and no hash is in
+                  either file; get_all_users() does not select the column. #}
+              <a class="btn-outline-teal" href="{{ url_for(users_excel_endpoint) }}" download
+                 title="Download every account as an Excel workbook — role, status, last login, and the screens each role can open">
+                <span class="material-symbols-outlined" style="font-size:18px;">description</span>Export Excel
+              </a>
+              <a class="btn-outline-teal" href="{{ url_for(users_pdf_endpoint) }}" download
+                 title="Download every account as a PDF on the health center's letterhead — role, status, last login, and the screens each role can open">
+                <span class="material-symbols-outlined" style="font-size:18px;">picture_as_pdf</span>Export PDF
+              </a>
               <button class="btn-primary-teal" type="button" disabled title="{{ untracked.write }}">
                 <span class="material-symbols-outlined" style="font-size:18px;">person_add</span>Add User
               </button>
