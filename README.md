@@ -42,16 +42,12 @@ from a backup; regenerating produces a comparable dataset, not an identical one.
 
 ## Version control
 
-The first commit has not been made yet — `git` is not installed on the machine
-this project currently lives on. Once it is available:
+The project is under git, with an established history running from the initial
+commit (`Initial commit: IDS-BPHCSN capstone project, all four core objectives
+complete`) through the feature and audit-fix work that followed. `git log
+--oneline` shows it. Nothing needs initialising — just commit as you go.
 
-```
-git init
-git add .
-git commit -m "Initial commit"
-```
-
-After that, the everyday loop is:
+The everyday loop is:
 
 ```
 git status                      # what changed
