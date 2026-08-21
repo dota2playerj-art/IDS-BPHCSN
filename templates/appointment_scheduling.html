@@ -365,11 +365,12 @@
                Every control left in this header moves the calendar, which is
                what a calendar header should do.
 
-               ONE is now literal. The Upcoming empty state briefly kept an
-               inline text link as a sixth-then-second way in; it has since been
-               removed too, and its sentence rewritten so that nothing anywhere
-               on this screen names New Appointment except the button itself and
-               the dialog it opens. -->
+               ONE is now literal, and then some. The Upcoming empty state
+               briefly kept an inline text link as a sixth-then-second way in;
+               it was removed too and its sentence rewritten, and the dialog's
+               own heading has since been reworded to "Schedule Appointment".
+               The button below is now the only thing on this screen, rendered
+               or in prose, that says New Appointment. -->
         </div>
       </div>
 
@@ -1065,7 +1066,27 @@
       <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
         <div class="modal-content" style="border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.12);">
           <div class="modal-header">
-            <h5 class="modal-title" id="bookAppointmentLabel">New Appointment</h5>
+            {#- TITLE WORDING. "New Appointment" was the last thing on this
+                screen repeating that phrase, and a dialog does need to name
+                itself -- an untitled popup is a real regression, not a tidier
+                screen -- so it was reworded rather than removed. The id is
+                untouched because aria-labelledby on the modal points at it.
+
+                "Schedule Appointment" and not "Book Appointment", for two
+                reasons. The submit button below already says Book Appointment,
+                and a header repeating its own button is a wasted line. More
+                importantly the submit is not always that: choosing "new
+                patient" switches it to Continue to Registration, because this
+                dialog can hand off to registration on the way to a booking. A
+                title has to cover both modes, and Schedule does.
+
+                It also matches how the rest of the project speaks -- this is
+                Appointment Scheduling, reached from a Schedule Appointment
+                quick action on the Staff dashboard -- and it keeps the
+                Verb + Noun shape every other dialog here uses: Check In
+                Patient, Reschedule Appointment, Cancel Appointment, Change
+                Patient Status, Confirm Logout. #}
+            <h5 class="modal-title" id="bookAppointmentLabel">Schedule Appointment</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
