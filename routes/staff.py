@@ -162,7 +162,8 @@ def staff_export_medicine_inventory_pdf():
 
 # No id in the URL means add mode; an id means edit that item. A successful save
 # redirects to the list -- inventory has no per-item detail screen the way a
-# patient has patient_profile.
+# patient has patient_profile. It does not need one to be read: the View icon on
+# a Medicine Inventory row expands a read-only panel in place, route-free.
 @staff_bp.route('/add_edit_medicine', methods=["GET", "POST"])
 @staff_bp.route('/add_edit_medicine/<int:medicine_id>', methods=["GET", "POST"])
 @login_required

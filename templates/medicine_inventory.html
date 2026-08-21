@@ -53,6 +53,36 @@
   table.inv-table tbody tr:last-child td{border-bottom:none;}
   .med-name{font-weight:600;}
   .med-generic{color:var(--text-muted); font-size:12.5px;}
+
+  /* FROZEN MEDICINE NAME COLUMN
+     ---------------------------
+     Nine columns do not fit a laptop panel, so #tableWrap scrolls sideways and
+     the Actions column is only reachable by scrolling the name off the left
+     edge -- at which point every row is an anonymous set of numbers and the
+     pencil you are aiming at belongs to no medicine in particular.
+
+     The first cell of each item row is pinned to the wrapper's left edge so it
+     stays put while the rest of the row slides under it. It needs an opaque
+     background of its own (the cells passing beneath would otherwise show
+     through) and a z-index above the unpositioned cells in the same row, and
+     the hover tint has to be repeated here for the same reason.
+
+     Scoped to tr.item-row so it never catches the detail row below, whose one
+     cell spans the whole table and must scroll with it.
+
+     NOTE ON PATIENT RECORDS: this is not a technique copied from there.
+     Patient Records has no frozen column -- its table sits in the same plain
+     overflow-x:auto wrapper and its Full Name column scrolls away too, given a
+     narrow enough panel. Its name simply survives at more widths because its
+     ten columns carry less text than these nine (no stock bar with a 130px
+     floor, no supplier and storage strings). So there was no existing pattern
+     to match; this is the first frozen column in the project. */
+  table.inv-table thead th:first-child,
+  table.inv-table tbody tr.item-row td:first-child{
+    position:sticky; left:0; z-index:2; background:#fff;
+    box-shadow:1px 0 0 var(--border-color);
+  }
+  table.inv-table tbody tr.item-row:hover td:first-child{background:#FAFBFC;}
   .cat-pill{background:var(--teal-light); color:var(--teal-dark); font-size:11.5px; font-weight:600; padding:3px 10px; border-radius:999px; white-space:nowrap;}
 
   .stock-cell{min-width:130px;}
@@ -96,6 +126,23 @@
   }
   .action-icon:hover{background:var(--bg); color:var(--teal-dark);}
   a.action-icon, a.btn-primary-teal{text-decoration:none;}
+
+  /* READ-ONLY DETAIL PANEL
+     ----------------------
+     The same three classes Consultation History's panel is built from
+     (patient_profile.html), with the same values, so the two read-only panels in
+     this project look like one thing rather than two. Divs, not inputs: there is
+     no form element anywhere inside the panel and no endpoint it could post to,
+     so the record cannot be altered from it by any means. */
+  .info-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:20px 28px;}
+  .info-item .info-label{font-size:12px; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:0.03em;}
+  .info-item .info-value{font-size:14.5px; color:var(--text-dark); margin-top:3px;}
+  /* Notes are typed prose and can arrive with line breaks; the rest of the grid
+     is single values, so this is scoped to the cells that ask for it. */
+  .info-item .info-value.info-prose{white-space:pre-wrap;}
+  /* A detail row is structural: it must never take the item rows' hover tint,
+     and it carries no bottom border of its own while collapsed. */
+  table.inv-table tbody tr.detail-row:hover{background:transparent;}
 
   .table-footer{display:flex; align-items:center; justify-content:space-between; padding-top:18px; margin-top:6px; border-top:1px solid var(--border-color); flex-wrap:wrap; gap:12px;}
   .pg-info{font-size:13px; color:var(--text-muted);}
@@ -334,10 +381,72 @@
               <td><span class="badge-status {{ item.status_badge_class }}">{{ item.display_status }}</span>{% if item.is_retired %}<div class="med-generic">{{ item.stock_status }} when retired</div>{% endif %}</td>
               <td>
                 <div class="d-flex justify-content-end gap-1">
-                  <button type="button" class="action-icon" disabled title="{{ unavailable.medicine_detail }}"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button>
+{#- VIEW. The read-only panel below, opened in place -- the treatment
+    Consultation History uses, and for the same complaint: eight stored fields
+    were readable only by opening the form that can also change them. No new
+    route, no new template, and nothing inside the panel that can write. #}
+                  <button type="button" class="action-icon" data-bs-toggle="collapse"
+                          data-bs-target="#itemDetail{{ item.id }}"
+                          aria-expanded="false" aria-controls="itemDetail{{ item.id }}"
+                          title="View {{ item.name }} — read only, nothing here can change the record"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button>
                   <a href="{{ url_for(add_edit_medicine_endpoint, medicine_id=item.id) }}" class="action-icon" title="Edit {{ item.name }}"><span class="material-symbols-outlined" style="font-size:18px;">edit</span></a>
                   <button type="button" class="action-icon" disabled title="{{ unavailable.medicine_print }}"><span class="material-symbols-outlined" style="font-size:18px;">print</span></button>
                   <button type="button" class="action-icon" disabled title="{{ unavailable.medicine_archive }}"><span class="material-symbols-outlined" style="font-size:18px;">archive</span></button>
+                </div>
+              </td>
+            </tr>
+{#- The detail row. Collapsed by default so the table still reads as a shelf at a
+    glance. It holds every column of the inventory_items row: the eight fields
+    that had no reader outside the Add / Edit form -- item code, brand name, date
+    received, batch number, manufacturer, unit cost, storage location and notes --
+    beside the ones the summary row above already shows, so the panel is the whole
+    record rather than a second partial view of it.
+
+    "Not recorded" rather than a blank wherever a nullable field is empty, the way
+    the consultation panel prints it: an empty cell is something a reader can
+    mistake for a zero or for a rendering fault.
+
+    Status is split in two here, which the one-line summary cell above cannot do.
+    Item Status is the lifecycle flag stored on the row; Stock Condition is what
+    the shelf figures work out to. They are the same thing for an active item and
+    they are not for a retired one, and this is the screen with room to say so. #}
+            <tr class="detail-row">
+              <td colspan="9" style="padding:0; border-bottom:1px solid var(--border-color);">
+                <div class="collapse" id="itemDetail{{ item.id }}">
+                  <div style="padding:16px 14px 20px; background:#FAFBFC;">
+                    <div class="info-grid" style="margin-bottom:16px;">
+                      <div class="info-item"><div class="info-label">Item Code</div><div class="info-value">{{ item.item_code or 'Not recorded' }}</div></div>
+                      <div class="info-item"><div class="info-label">Medicine Name</div><div class="info-value">{{ item.name }}</div></div>
+                      <div class="info-item"><div class="info-label">Generic Name</div><div class="info-value">{{ item.generic_name or 'Not recorded' }}</div></div>
+                      <div class="info-item"><div class="info-label">Brand Name</div><div class="info-value">{{ item.brand_name or 'Not recorded' }}</div></div>
+                      <div class="info-item"><div class="info-label">Item Type</div><div class="info-value">{{ item.category or 'Not recorded' }}</div></div>
+                      <div class="info-item"><div class="info-label">Category</div><div class="info-value">{{ item.drug_class or 'Not recorded' }}</div></div>
+                      <div class="info-item"><div class="info-label">Dosage / Form</div><div class="info-value">{{ item.display_dosage or 'Not recorded' }}</div></div>
+                      <div class="info-item"><div class="info-label">Unit of Measure</div><div class="info-value">{{ item.unit or 'Not recorded' }}</div></div>
+                      <div class="info-item"><div class="info-label">Manufacturer</div><div class="info-value">{{ item.manufacturer or 'Not recorded' }}</div></div>
+                      <div class="info-item"><div class="info-label">Supplier</div><div class="info-value">{{ item.supplier or 'Not recorded' }}</div></div>
+                      <div class="info-item"><div class="info-label">Batch Number</div><div class="info-value">{{ item.batch_number or 'Not recorded' }}</div></div>
+                      <div class="info-item"><div class="info-label">Storage Location</div><div class="info-value">{{ item.storage_location or 'Not recorded' }}</div></div>
+                      <div class="info-item"><div class="info-label">Date Received</div><div class="info-value">{{ item.date_received | display_date('Not recorded') }}</div></div>
+                      <div class="info-item"><div class="info-label">Expiration Date</div><div class="info-value">{{ item.expiry_date | display_date('No expiry on file') }}</div></div>
+{#- The stock figures repeated from the row, so the panel can be read on its own
+    without scrolling back up to the cells it was opened from. #}
+                      <div class="info-item"><div class="info-label">Current Stock</div><div class="info-value">{{ "{:,}".format(item.stock_quantity) }} {{ item.unit or '' }}</div></div>
+                      <div class="info-item"><div class="info-label">Reorder Level</div><div class="info-value">{{ "{:,}".format(item.low_stock_threshold) }} {{ item.unit or '' }}</div></div>
+{#- 0 is a real unit cost and None is not, so this tests for None rather than
+    falsiness -- `or` here would print "Not recorded" over a genuine zero. #}
+                      <div class="info-item"><div class="info-label">Unit Cost</div><div class="info-value">{% if item.unit_cost is not none %}&#8369;{{ "{:,.2f}".format(item.unit_cost) }}{% else %}Not recorded{% endif %}</div></div>
+                      <div class="info-item"><div class="info-label">Item Status</div><div class="info-value">{{ item.status or 'Not recorded' }}</div></div>
+                      <div class="info-item"><div class="info-label">Stock Condition</div><div class="info-value">{{ item.stock_status }}</div></div>
+                    </div>
+                    <div class="info-grid">
+                      <div class="info-item" style="grid-column:1/-1;"><div class="info-label">Medicine Description / Notes</div><div class="info-value info-prose">{{ item.notes or 'Not recorded' }}</div></div>
+                    </div>
+                    <div style="font-size:12px; color:var(--text-muted); margin-top:14px; padding-top:12px; border-top:1px dashed var(--border-color);">
+                      Added to inventory {{ item.created_at | display_date }}{% if item.updated_at and item.updated_at != item.created_at %} &middot; last edited {{ item.updated_at | display_date }} — see the audit log for what changed{% endif %}.
+                      This panel is read only; use Edit on the row above to change anything here.
+                    </div>
+                  </div>
                 </div>
               </td>
             </tr>
@@ -438,6 +547,21 @@
       rows.forEach(function(row){
         var hit = matches(row);
         row.hidden = !hit;
+        // Each item row is followed by its own read-only detail row, which is
+        // part of the same record and has to leave with it -- otherwise a
+        // filtered-out medicine leaves an open panel behind, attached to a row
+        // that is no longer on screen.
+        //
+        // Hiding is all this does. It does not reach into the panel to close it,
+        // because Bootstrap owns the collapse's open/closed state and the
+        // button's aria-expanded with it; stripping the class here would leave
+        // the two disagreeing and the next click doing nothing. A panel the
+        // operator opened is therefore still open if a filter takes its row away
+        // and a later one brings it back, which is also what they left it as.
+        var detail = row.nextElementSibling;
+        if(detail && detail.classList.contains('detail-row')){
+          detail.hidden = !hit;
+        }
         if(hit){ shown++; }
       });
       if(counter){

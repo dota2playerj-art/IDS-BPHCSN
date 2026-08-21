@@ -89,6 +89,18 @@ directly above the one figure that was not. The lesson this file keeps learning
 is that the reasons have to be re-read whenever anything they describe is built,
 not only when they collapse outright.
 
+AND A REASON WITH ONLY ONE CITATION GOES THE SAME WAY
+----------------------------------------------------
+Nothing above is special to *shared* reasons. "medicine_detail" was quoted by
+exactly one control -- the View icon on a Medicine Inventory row -- and it was
+true and specific right up until View was built. It said the eight fields it
+named were readable only through the editable form, and named the open
+question: a screen of the item's own, or Consultation History's read-only panel
+expanded in place. The panel was built, the button works, and the sentence was
+deleted in the same commit rather than a later one. A reason outliving its gap
+by even a commit is how this file starts lying, and a single citation is not a
+reason to be gentler about it.
+
 The three per-screen reasons that went false in the same change are not here,
 because they are not shared: Audit Logs' "logins" and "security" and User
 Management's "last_login" all lived in their own routes/*_views.py UNTRACKED
@@ -186,8 +198,10 @@ UNAVAILABLE = {
         "printer, because the patient's record is a page that already exists. A "
         "stock item has no page of its own -- Edit is a form, not a record -- so "
         "there is no equivalent to link to here, and a printed copy of one table "
-        "row is not a document anybody would keep. This waits on the same "
-        "decision the View action does."
+        "row is not a document anybody would keep. View no longer waits on that "
+        "decision -- it was settled by expanding a read-only panel in the row "
+        "rather than by building a page -- and settling it that way is what "
+        "leaves this button with nothing to point at."
     ),
 
     # ---- Table controls -----------------------------------------------------
@@ -214,23 +228,28 @@ UNAVAILABLE = {
     ),
 
     # ---- Records ------------------------------------------------------------
-    # REWRITTEN: the old sentence claimed "everything recorded about it is in
-    # this row", which was false. Eight stored fields -- item code, brand name,
-    # date received, batch number, manufacturer, unit cost, storage location and
-    # notes -- appear in no template but add_edit_medicine.html. Reading any of
-    # them means opening the editable form, which is the exact complaint the
-    # read-only View on Consultation History was built to answer.
-    "medicine_detail": (
-        "There is no read-only detail screen for a stock item, and no route that "
-        "would serve one. The row beside this button does not show everything "
-        "the record holds either: its item code, brand name, date received, "
-        "batch number, manufacturer, unit cost, storage location and notes are "
-        "stored, but appear nowhere except the Add / Edit Medicine form. So "
-        "reading those means opening the form that can also change them. What is "
-        "undecided is whether a stock item should get its own screen, or the "
-        "treatment Consultation History uses -- a read-only panel that expands "
-        "in place, needing no new route or template."
-    ),
+    # THERE IS NO "medicine_detail" ENTRY ANY MORE.
+    # It was rewritten once and is now deleted, which is the arc the module
+    # docstring describes. Its first version claimed "everything recorded about
+    # it is in this row"; that was false, and the rewrite said so plainly --
+    # eight stored fields (item code, brand name, date received, batch number,
+    # manufacturer, unit cost, storage location and notes) appeared in no
+    # template but add_edit_medicine.html, so reading any of them meant opening
+    # the form that can also change them.
+    #
+    # The rewrite also named the one thing left undecided: whether a stock item
+    # should get a screen of its own, or the treatment Consultation History
+    # uses -- a read-only panel that expands in place, needing no new route or
+    # template. That decision has been taken, and it went the second way. The
+    # View icon on a Medicine Inventory row now opens exactly such a panel, built
+    # from the same info-grid classes the consultation panel uses, showing all
+    # eight of those fields beside the ones the row already shows. The route
+    # count is unchanged, because no route was needed.
+    #
+    # So the last control quoting this stopped quoting it, and a reason with
+    # nothing quoting it is exactly the drift this file exists to prevent. It
+    # goes the way "export", "export_pdf", "print" and "community_reports" went,
+    # rather than sitting here describing a gap the application has closed.
     "save_and_another": (
         "Save & Register Another is not implemented. Saving already redirects "
         "to the new patient's profile, which is where the duplicate check and "
@@ -242,8 +261,8 @@ UNAVAILABLE = {
     # REWRITTEN: the old sentence listed "notes" among the fields "already in
     # this row". The Appointment History table on Patient Profile has five
     # columns before its actions -- Date, Time, Purpose, Assigned To, Status --
-    # and notes is not one of them. Same defect medicine_detail had: a list of
-    # fields that quietly included one the screen does not show.
+    # and notes is not one of them. Same defect the deleted "medicine_detail"
+    # had: a list of fields that quietly included one the screen does not show.
     "appointment_detail": (
         "There is no separate view for one appointment. What the booking records "
         "is almost all in this row already -- its date, time, purpose, assigned "

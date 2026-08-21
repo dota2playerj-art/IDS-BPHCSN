@@ -245,7 +245,9 @@ def export_medicine_inventory_pdf():
 #
 # There is no per-item detail screen for inventory the way patient_profile is one
 # for a patient, so a successful save redirects back to the list rather than to a
-# record of its own.
+# record of its own. Reading a stock item in full does not need one: the View
+# icon on a Medicine Inventory row expands a read-only panel in place, which is
+# why that button is no longer disabled and why no route was added for it.
 @admin_bp.route('/add_edit_medicine', methods=["GET", "POST"])
 @admin_bp.route('/add_edit_medicine/<int:medicine_id>', methods=["GET", "POST"])
 @login_required
