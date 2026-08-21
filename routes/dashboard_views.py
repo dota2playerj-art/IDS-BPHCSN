@@ -26,10 +26,12 @@ than the mockup figure that used to sit there -- the rule Screen 03's Prenatal
 card set and Screen 10 follows.
 """
 from models.appointments import (
+    get_active_consultation,
     get_calendar_month,
     get_queue_stats,
     get_todays_appointments,
     get_upcoming_appointments,
+    queue_display_name,
 )
 from models.audit import get_audit_logs, get_audit_stats
 from models.broadcasts import audience_options, get_broadcast_stats
@@ -172,11 +174,37 @@ def dashboard_context():
     inventory_stats = get_inventory_stats()
     upcoming_all = get_upcoming_appointments()
 
+    # THE ONE VISIT IN PROGRESS, FOR THE DASHBOARD SHORTCUT.
+    #
+    # Recording a consultation is reached through Appointment Scheduling, and
+    # that is the right primary route -- the visit belongs to the appointment, so
+    # the appointment is where it starts. What it is not is a good route back
+    # into a consultation already under way: a clinician who navigated away has
+    # to reload the queue and find the row again, mid-visit, with the patient
+    # sitting there.
+    #
+    # So this is a shortcut, not a second way to start one. It only ever names a
+    # consultation the queue has already started, and it disappears the moment
+    # that visit is completed.
+    #
+    # get_active_consultation() is the same call Appointment Scheduling uses to
+    # decide who may start a consultation, and it is deliberately not scoped to
+    # today -- see its docstring. Reusing it means the dashboard and the queue
+    # can never disagree about whether the room is occupied.
+    active = get_active_consultation()
+
     return {
         "clinic_date": reference,
         "patient_stats": patient_stats,
         "queue": queue,
         "queue_stats": queue_stats,
+        # None when nobody is in consultation, which both dashboards render as a
+        # stated "nobody right now" rather than an empty panel.
+        "active_consultation": active,
+        # Named through the one helper the queue and the flash messages use, so
+        # the shortcut cannot spell a patient differently from the row it came
+        # from.
+        "active_consultation_name": queue_display_name(active),
         "upcoming": upcoming_all[:UPCOMING_ROWS],
         "upcoming_count": len(upcoming_all),
         "upcoming_vaccinations": _upcoming_vaccinations(upcoming_all, VACCINATION_ROWS),

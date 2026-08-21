@@ -179,6 +179,62 @@
       </div>
     </div>
 
+
+    <!-- ACTIVE CONSULTATION SHORTCUT
+         ============================
+         A way back INTO a visit already under way, not a second way to start
+         one. Recording a consultation belongs to the appointment it came from,
+         and Appointment Scheduling -> Start Consultation -> Record Consultation
+         stays the route that begins one; that is the standard arrangement and
+         this does not replace it. What it fixes is the return trip: a clinician
+         who navigated away mid-visit had to reload the queue and find the row
+         again with the patient sitting in front of them.
+
+         It can only ever name a consultation the queue has already started, so
+         it cannot be used to bypass the one-at-a-time rule -- it links to the
+         form for the row that is already In Consultation, and nothing else.
+
+         Rendered in both states rather than hidden when idle, which is the
+         pattern the rest of this project follows: the dashboard says what is
+         true right now ("Every child up to date", "Nothing booked beyond
+         today"), and a panel that silently vanishes teaches a reader that the
+         screen is inconsistent rather than that the room is empty. The idle
+         state is one muted line, so it costs a row of the page and no more. -->
+    <div class="panel-card">
+{%- if active_consultation %}
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+        <div>
+          <div class="panel-title">
+            <span class="material-symbols-outlined" style="font-size:18px; vertical-align:-4px; color:var(--teal-dark);">stethoscope</span>
+            In consultation now &middot; {{ active_consultation_name }}
+          </div>
+          <div class="panel-sub">
+            {{ active_consultation.reference }} &middot;
+            {{ active_consultation.appointment_type or 'Consultation' }}
+{%- if active_consultation.arrival_time %} &middot; checked in {{ active_consultation.arrival_time }}{% endif %}
+{%- if active_consultation.assigned_staff %} &middot; {{ active_consultation.assigned_staff }}{% endif %}
+          </div>
+        </div>
+        {#- Straight to the write-up form for THIS appointment -- the same
+            destination, and the same url_for, as the Record Consultation button
+            on the queue row. One form, two ways in, exactly as the Patient
+            Profile's View panel is reached two ways. #}
+        <a href="{{ url_for(record_consultation_endpoint, appointment_id=active_consultation.id) }}"
+           class="btn-primary-teal" style="text-decoration:none;"
+           title="Continue writing up {{ active_consultation_name }}'s consultation">
+          <span class="material-symbols-outlined" style="font-size:18px;">edit_note</span>Continue Consultation
+        </a>
+      </div>
+{%- else %}
+      <div class="panel-title" style="font-size:15px;">No active consultation right now</div>
+      <div class="panel-sub">
+        Nobody is currently being seen. A consultation starts from
+        <a href="{{ url_for(appointment_scheduling_endpoint) }}" style="color:var(--teal-dark); font-weight:600;">Appointment Scheduling</a>,
+        by calling in a patient who has checked in; it will appear here while it is open.
+      </div>
+{%- endif %}
+    </div>
+
     <!-- QUICK ACTIONS -->
     <div class="row g-3 mb-4">
       <div class="col"><a href="{{ url_for(register_patient_endpoint) }}" class="quick-action"><div class="quick-action-icon"><span class="material-symbols-outlined">person_add</span></div>Register Patient</a></div>
