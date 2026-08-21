@@ -36,6 +36,7 @@ from routes.inventory_views import (
     add_edit_medicine_context,
     medicine_inventory_context,
     process_add_edit_medicine,
+    process_archive_medicine,
 )
 from routes.roster_export import (
     appointment_document,
@@ -158,6 +159,17 @@ def staff_export_medicine_inventory_pdf():
         medicine_inventory_context(),
         produced_by=exported_by(),
     ))
+
+
+# POST only, and named apart from the Admin equivalent so the flat endpoint
+# namespace in utils/endpoints.py stays unambiguous -- the same arrangement
+# staff_archive_patients above has.
+@staff_bp.route('/medicine_inventory/archive', methods=["POST"])
+@login_required
+@role_required("Health Staff")
+def staff_archive_medicine():
+    flash(process_archive_medicine(request.form))
+    return redirect(url_for("staff.staff_medicine_inventory"))
 
 
 # No id in the URL means add mode; an id means edit that item. A successful save

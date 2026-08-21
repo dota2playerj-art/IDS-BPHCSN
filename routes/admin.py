@@ -40,6 +40,7 @@ from routes.inventory_views import (
     add_edit_medicine_context,
     medicine_inventory_context,
     process_add_edit_medicine,
+    process_archive_medicine,
 )
 from routes.patient_views import (
     booking_details,
@@ -238,6 +239,17 @@ def export_medicine_inventory_pdf():
         medicine_inventory_context(),
         produced_by=exported_by(),
     ))
+
+
+# POST only, for the same reason archive_patients above is: this changes a
+# record, so there is no URL anyone can navigate to. A Barangay Official is
+# stopped by role_required and lands on their own dashboard.
+@admin_bp.route('/medicine_inventory/archive', methods=["POST"])
+@login_required
+@role_required("Admin")
+def archive_medicine():
+    flash(process_archive_medicine(request.form))
+    return redirect(url_for("admin.medicine_inventory"))
 
 
 # Add mode carries no id; edit mode carries the medicine's id. Same shape as

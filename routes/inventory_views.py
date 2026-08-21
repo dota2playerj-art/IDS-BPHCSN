@@ -16,10 +16,13 @@ from models.inventory import (
     ITEM_CATEGORIES,
     ITEM_STATUSES,
     UNITS,
+    allowed_item_status_transitions,
     create_inventory_item,
     generate_next_item_code,
     get_all_inventory_items,
+    get_inventory_item_by_id,
     get_inventory_stats,
+    set_item_status,
     update_inventory_item,
     validate_inventory_form,
 )
@@ -185,3 +188,72 @@ def process_add_edit_medicine(form_data, item=None):
         return item["id"], None, _save_message(name, changes)
 
     return create_inventory_item(values), None, f"{name} added to inventory."
+
+
+def process_archive_medicine(form_data):
+    """Apply Screen 06's status action. Returns the message to flash.
+
+    The row-level Archive icon posts one item_id and the status it wants, and
+    that is the whole of the form -- Medicine Inventory has no bulk selection
+    bar, so unlike process_archive_patients() there is no second entry point to
+    reconcile and no mixed-status case to refuse.
+
+    Everything else is re-checked here exactly as it is on the patient side,
+    because a POST can be made without ever loading the page:
+
+    * the status arrives as the value of whichever submit button was pressed, so
+      it is validated against ITEM_STATUSES before it reaches the model, which
+      would otherwise raise on the schema's CHECK constraint;
+    * the item's current status is the one on the row just read back out of the
+      database, never the one the page posted, and the requested transition is
+      checked against allowed_item_status_transitions() for that stored status --
+      the dialog offers only legal moves, but it made that decision from a page
+      that may since have gone stale.
+
+    Nothing here decides what "retired" means for the rest of the system. It sets
+    the one status column the Add / Edit Medicine form already sets, and the stat
+    cards, the low-stock alert, both dashboards, the sidebar badge and Reports &
+    Analytics go on reading it through RETIRED_STATUS as they already do.
+    """
+    status = (form_data.get("status") or "").strip()
+    if status not in ITEM_STATUSES:
+        return "Choose a status to set: Mark Active or Mark Inactive."
+
+    raw_id = (form_data.get("item_id") or "").strip()
+    if not raw_id.isdigit():
+        return "Select an inventory item to update."
+
+    item = get_inventory_item_by_id(int(raw_id))
+    if item is None:
+        return "That inventory item could not be found."
+
+    # The status as stored right now, not as the page believed it to be, and the
+    # legal moves re-derived from it. This is the same fetch the name above came
+    # from, so the check costs no extra query.
+    current_status = item["status"]
+    if status == current_status:
+        return f"No change. {item['name']} is already marked {status}."
+    if status not in allowed_item_status_transitions(current_status):
+        return (
+            f"{item['name']} cannot be moved from {current_status} to {status}."
+        )
+
+    if not set_item_status(item["id"], status):
+        return f"No change. {item['name']} is already marked {status}."
+
+    # Retiring is not reactivation, so the two do not share a sentence. The
+    # retention note only belongs on the direction that takes an item out of
+    # service, and it says what actually happens to the figures rather than only
+    # that nothing was deleted.
+    if status == "Active":
+        return (
+            f"{item['name']} returned to service and marked Active. It counts "
+            "towards the stat cards, the low-stock alert and the dashboards "
+            "again."
+        )
+    return (
+        f"{item['name']} retired and marked Inactive. Nothing was deleted — its "
+        "stock figure, batch number and expiry date are unchanged, and it is "
+        "left out of the stat cards, the low-stock alert and the dashboards "
+        "until it is marked Active again."
+    )

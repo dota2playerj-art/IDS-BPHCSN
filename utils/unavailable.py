@@ -67,15 +67,27 @@ happen, so none of them is missed.
 A reason can also split because it is aimed at the wrong *scope* rather than
 because it became false. "print" was a sentence about a screen, and it was being
 quoted by the print icon on a Medicine Inventory row -- a control offering to
-print one item, answered by a paragraph about the sidebar. "medicine_print" now
-says what actually stops that button. Nothing about "print" had gone false; it
-was simply answering a question the control was not asking.
+print one item, answered by a paragraph about the sidebar. "medicine_print" was
+written to say what actually stopped that button. Nothing about "print" had gone
+false; it was simply answering a question the control was not asking.
 
 And then "print" went entirely, which is the other half of this file's rule. Its
 last two citations were the print icons on Appointment Scheduling, and those are
 now working links into the patient's own profile. A shared reason is worth having
 while something quotes it and not one commit longer, so it was deleted rather
 than left describing screens that no longer ask.
+
+A REASON CAN ALSO BE THE ARGUMENT FOR DELETING THE CONTROL
+----------------------------------------------------------
+"medicine_print" then went too, and not because it came true or false. It stayed
+exactly as true as the day it was written -- a stock item has no page of its own,
+and one printed table row is not a document -- and the row's print icon was
+removed on the strength of it. That is the case this file had not met before: a
+reason so specific that reading it back is enough to decide the control should
+not exist, rather than that it is unfinished. The shelf on paper is Export PDF in
+the toolbar, which is built. When a reason turns out to be a verdict, the honest
+outcome is to remove the button and delete the sentence with it, not to leave a
+permanently disabled icon explaining itself forever.
 
 A REASON CAN ALSO BE MOSTLY RIGHT, WHICH IS THE HARDEST CASE
 ------------------------------------------------------------
@@ -180,29 +192,35 @@ UNAVAILABLE = {
     #
     # The screens that print now do so because they include templates/_print.html.
     # A screen that wants a print layout and has not got one writes a true reason
-    # for its own control, which is what "medicine_print" below is.
+    # for its own control. "medicine_print" was that reason for a Medicine
+    # Inventory row, and its tombstone is immediately below -- the control it
+    # explained was removed rather than finished, which is the one outcome this
+    # file's rule leaves implicit.
 
-    # A SHARED REASON CAN ALSO BE THE WRONG *SCOPE*, NOT MERELY WRONG.
-    # The print icon on a Medicine Inventory row used to quote "print" above, and
-    # that sentence is true -- Screen 06 has no print layout -- but it answers a
-    # question about the whole screen while sitting on a control that offers to
-    # print one item. Patient Records' row-level print icon does not print its
-    # row; it opens that patient's own page with ?print=1, because the record is
-    # the page. Medicine Inventory has no per-item page for the equivalent link to
-    # point at, and that -- not the missing screen stylesheet -- is what actually
-    # stops this button. So it says so itself.
-    "medicine_print": (
-        "There is nothing to print one item from. Where printing a single record "
-        "is built, the row does not print itself: the print icon on a Patient "
-        "Records row opens that patient's own page and sends that to the "
-        "printer, because the patient's record is a page that already exists. A "
-        "stock item has no page of its own -- Edit is a form, not a record -- so "
-        "there is no equivalent to link to here, and a printed copy of one table "
-        "row is not a document anybody would keep. View no longer waits on that "
-        "decision -- it was settled by expanding a read-only panel in the row "
-        "rather than by building a page -- and settling it that way is what "
-        "leaves this button with nothing to point at."
-    ),
+    # THERE IS NO "medicine_print" ENTRY ANY MORE, AND IT WENT A THIRD WAY.
+    # Every other deletion in this file happened because the gap closed: the
+    # feature was built and the reason stopped being true. This one was true to
+    # the last line -- a stock item still has no page of its own, and a printed
+    # copy of one table row still is not a document anybody would keep -- and the
+    # button it explained was removed anyway, because that sentence was the
+    # argument against the control existing at all rather than a note on
+    # something worth finishing later.
+    #
+    # A reason this specific is worth re-reading as a verdict, not only as a
+    # tooltip. It said the row has nothing to point at, that Edit is a form
+    # rather than a record, and that View had already settled the "does an item
+    # need a page?" question by expanding a read-only panel in place instead. All
+    # three said the same thing: there is no single-item document here to print.
+    # What the operator actually wants -- the shelf, on paper -- is Export PDF in
+    # the toolbar above, which is built and dates and attributes the file it
+    # produces. Patient Records keeps its print icon because the opposite is true
+    # there: the record *is* a page, and printing it means printing that page.
+    #
+    # So the icon is gone from the row rather than sitting there disabled. This
+    # file's rule is that a control either works or says why it cannot, and a
+    # third case has always been implicit in it: a control that should not be on
+    # the screen is removed, and its reason goes with it. Nothing quotes this any
+    # more, which is the only test that matters here.
 
     # ---- Table controls -----------------------------------------------------
     # THE SECOND SENTENCE HERE IS A CLAIM ABOUT THE TEMPLATES, AND IT WAS ONLY
@@ -271,41 +289,51 @@ UNAVAILABLE = {
         "has no column for; those are shown on Appointment Scheduling, under the "
         "patient's name on the same booking."
     ),
-    # REWRITTEN, AND IT WAS THE FALSEST SENTENCE IN THIS FILE.
-    # It said "retiring a stock item is not implemented" while inventory_items
-    # has carried a status flag since the first schema, and the Add / Edit
-    # Medicine form has offered Active / Inactive on it all along. It also said
-    # patients are archived with "its own confirmation and audit entry" -- the
-    # confirmation dialog is real, but no audit entry is written for a patient
-    # archive either; log_action() is called from two places in this project and
-    # neither is that one. Holding medicines to a bar the feature it cites does
-    # not clear is how a reason ends up arguing against building something for a
-    # standard nothing meets.
-    # And "would take its batch and expiry history with it" described a loss that
-    # could not happen: retiring is an UPDATE, nothing is deleted, and there is no
-    # batch or expiry history to lose -- inventory_items holds one batch number
-    # and one expiry date per row and there is no history table.
-    "medicine_archive": (
-        "The status this would set already exists, and this button is not what "
-        "sets it. An item is Active or Inactive, the Add / Edit Medicine form "
-        "offers both, and an Inactive item is badged Retired in the table below, "
-        "left out of all four cards above it, and left out of every low-stock "
-        "figure in the system. What is missing is only the shortcut: patients "
-        "have a dedicated archive endpoint and a confirmation dialog that names "
-        "the record and offers just the statuses it can legally move to, and "
-        "medicines have neither, so retiring one means opening Edit and changing "
-        "the status there. Nothing is lost by that route -- it is the same "
-        "single field either way."
-    ),
+    # THERE IS NO "medicine_archive" ENTRY ANY MORE, AND THAT IS THE POINT.
+    # It is the entry this file argued with hardest, and it lost twice.
+    #
+    # Its first version said "retiring a stock item is not implemented" while
+    # inventory_items had carried a status flag since the first schema and the
+    # Add / Edit Medicine form had offered Active / Inactive on it all along. It
+    # also held medicines to a bar it claimed patients cleared -- "its own
+    # confirmation and audit entry" -- when no audit entry is written for a
+    # patient archive either, and it warned of losing "batch and expiry history"
+    # that retiring could not touch and that no table holds.
+    #
+    # The rewrite fixed all of that and narrowed the claim to what was genuinely
+    # missing: not the status, which existed and was read everywhere, but the
+    # shortcut -- "patients have a dedicated archive endpoint and a confirmation
+    # dialog that names the record and offers just the statuses it can legally
+    # move to, and medicines have neither". That sentence was exactly right, and
+    # it is also a build order. It has now been carried out.
+    #
+    # Medicine Inventory's Archive icon opens a confirmation dialog that names
+    # the item and its current status and offers only the transition that status
+    # permits (models/inventory.py allowed_item_status_transitions), posting to
+    # its own endpoint per role -- admin.archive_medicine and
+    # staff.staff_archive_medicine -- where process_archive_medicine() re-reads
+    # the stored status and re-derives the legal moves before writing, exactly as
+    # process_archive_patients() does. Both directions work, so a mis-click is a
+    # correctable clerical slip rather than a one-way door.
+    #
+    # And it re-implements nothing: set_item_status() writes the same status
+    # column the Add / Edit Medicine form writes, so RETIRED_STATUS still has one
+    # meaning, and the stat cards, the low-stock alert, both dashboards, the
+    # sidebar badge and Reports & Analytics respect a retirement made this way
+    # the moment it commits, because they were already respecting that column.
+    #
+    # Nothing quotes this any more, so it goes the way "export", "export_pdf",
+    # "print", "medicine_detail" and "community_reports" went, rather than
+    # sitting here describing a gap the application has closed.
 
     # ---- Whole screens with no data source ---------------------------------
     # REWRITTEN ONCE: "There is no settings table" was false. schema.sql defines
     # one -- setting_key, setting_value, updated_by, updated_at -- and has since
     # the first schema. What is true is the half that follows: nothing reads or
     # writes it. Naming the wiring as the gap rather than the table is the same
-    # correction medicine_archive needed, and for the same reason: a reason that
-    # denies an existing structure sends the next session off to build something
-    # that is already there.
+    # correction the deleted "medicine_archive" needed, and for the same reason:
+    # a reason that denies an existing structure sends the next session off to
+    # build something that is already there.
     #
     # REWRITTEN AGAIN, AND THIS TIME BECAUSE ONE WORD IN IT HAD GONE FALSE.
     # It opened "Nothing on this screen is stored or read". The first half is
@@ -348,9 +376,10 @@ UNAVAILABLE = {
     # deliver_announcement_sms() chooses live or simulated per send by reading
     # SEMAPHORE_API_KEY from the environment. Its own docstring is headed
     # "TURNING THIS FEATURE LIVE" and says the feature is complete.
-    # A reason that denies a working integration is the same defect as the one
-    # medicine_archive had, and it was worse here: it was the stated grounds for
-    # disabling a Test Connection button that now has something real to test.
+    # A reason that denies a working integration is the same defect the deleted
+    # "medicine_archive" had, and it was worse here: it was the stated grounds
+    # for disabling a Test Connection button that now has something real to
+    # test.
     "sms_gateway": (
         "There is no API key configured, so there is nothing for these controls "
         "to act on. The integration itself is real and finished -- utils/sms.py "

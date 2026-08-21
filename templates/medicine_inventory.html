@@ -390,8 +390,31 @@
                           aria-expanded="false" aria-controls="itemDetail{{ item.id }}"
                           title="View {{ item.name }} — read only, nothing here can change the record"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button>
                   <a href="{{ url_for(add_edit_medicine_endpoint, medicine_id=item.id) }}" class="action-icon" title="Edit {{ item.name }}"><span class="material-symbols-outlined" style="font-size:18px;">edit</span></a>
-                  <button type="button" class="action-icon" disabled title="{{ unavailable.medicine_print }}"><span class="material-symbols-outlined" style="font-size:18px;">print</span></button>
-                  <button type="button" class="action-icon" disabled title="{{ unavailable.medicine_archive }}"><span class="material-symbols-outlined" style="font-size:18px;">archive</span></button>
+{#- ARCHIVE. The same status action Patient Records' row icon offers, on the
+    same flag the Add / Edit Medicine form already writes: it opens a
+    confirmation dialog listing only the statuses this item may legally move to,
+    and the server re-derives that list from the stored row before writing.
+    Both directions, so retiring the wrong item is a correctable mis-click
+    rather than a trip through the edit form.
+
+    There is no Print icon beside it any more. A printed copy of one stock item
+    was never a document anybody keeps -- unlike a patient's record, which is a
+    page in its own right -- and Export Excel / Export PDF in the toolbar above
+    already produce the inventory document that is actually wanted.
+
+    The glyph is `archive` whichever direction the row can go, which is what
+    Patient Records' equivalent icon does for all three of its statuses: the icon
+    names the dialog, and the dialog names the move. Swapping in `unarchive` for a
+    retired row was tried and reverted -- the icon font here is self-hosted
+    (static/fonts/material-symbols-outlined.woff2, a fixed subset rather than
+    Google's live endpoint), and a ligature that subset does not carry renders as
+    the literal word. Every glyph used below is one this project already ships.
+    The title says which way this particular row will move. #}
+                  <button type="button" class="action-icon"
+                          data-bs-toggle="modal" data-bs-target="#archiveMedicineModal"
+                          data-item-id="{{ item.id }}" data-item-name="{{ item.name }}"
+                          data-item-status="{{ item.status }}"
+                          title="{{ 'Return ' ~ item.name ~ ' to service' if item.is_retired else 'Retire ' ~ item.name }} (currently {{ item.status }})"><span class="material-symbols-outlined" style="font-size:18px;">archive</span></button>
                 </div>
               </td>
             </tr>
@@ -484,6 +507,52 @@
 
 
     </div>
+
+{%- if items %}
+    <!-- ARCHIVE / REACTIVATE CONFIRMATION - the shape Patient Records' status
+         dialog set, unchanged: a centred modal whose submit buttons *are* the
+         statuses, so choosing and confirming are one step rather than two.
+
+         The form is here rather than around the table because #tableWrap scrolls
+         sideways and a frozen first column sits inside it; the dialog's buttons
+         reach it through their form attribute, which is the same reason Patient
+         Records keeps its own form clear of its scroll container.
+
+         Both statuses are in the markup and the dialog hides the one the item
+         already holds as it opens, so an item is never offered the status it is
+         already on. The rule lives in models/inventory.py
+         allowed_item_status_transitions() and is mirrored in the script below
+         only because the choice has to be made in the browser; the server
+         re-derives it from the database before writing anything. -->
+    <form id="archiveMedicineForm" method="post" action="{{ url_for(archive_medicine_endpoint) }}">
+      <input type="hidden" name="item_id" id="archiveItemId" value="">
+    </form>
+
+    <div class="modal fade" id="archiveMedicineModal" tabindex="-1" aria-labelledby="archiveMedicineModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.12);">
+          <div class="modal-header">
+            <h5 class="modal-title" id="archiveMedicineModalLabel">Change Item Status</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p style="margin-bottom:10px;">This changes the item's status only. Nothing is deleted &mdash; the stock figure, batch number and expiry date are kept, and the item stays in this table under the new status.</p>
+            <p style="margin-bottom:10px; font-size:13px; color:var(--text-muted);">A retired item is badged Retired here, left out of all four cards above, and left out of every low-stock figure in the system &mdash; the alert on this screen, both dashboards, the sidebar badge and Reports &amp; Analytics. Marking it Active again restores it everywhere.</p>
+            <p style="margin-bottom:0;">Mark <strong id="archiveMedicineTarget">this item</strong><span id="archiveMedicineCurrent"></span> as:</p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" form="archiveMedicineForm" name="status" value="Inactive" class="btn-primary-teal item-status-option" data-status="Inactive">
+              <span class="material-symbols-outlined" style="font-size:18px;">archive</span>Mark Inactive
+            </button>
+            <button type="submit" form="archiveMedicineForm" name="status" value="Active" class="btn-primary-teal item-status-option" data-status="Active">
+              <span class="material-symbols-outlined" style="font-size:18px;">inventory_2</span>Mark Active
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+{%- endif %}
 {% endblock %}
 
 {% block scripts %}
@@ -503,6 +572,47 @@
   function toggle(id, on){
     var el = document.getElementById(id);
     if(el){ el.classList.toggle('show', on); }
+  }
+
+  // THE STATUS DIALOG NAMES THE ITEM IT WAS OPENED ON
+  //
+  // The row icon carries the item on data-* attributes; this writes the id into
+  // the hidden field the form posts and hides the option matching the status the
+  // item already holds, so Retired is not a dead end -- the same item can be put
+  // back into service from the same dialog.
+  //
+  // Mirrored from models/inventory.py allowed_item_status_transitions() only
+  // because the choice has to be made in the browser. Nothing here is trusted:
+  // process_archive_medicine() re-reads the stored status and re-derives the
+  // legal moves before anything is written.
+  var archiveMedicineModal = document.getElementById('archiveMedicineModal');
+  if(archiveMedicineModal){
+    archiveMedicineModal.addEventListener('show.bs.modal', function(event){
+      var trigger = event.relatedTarget;
+      if(!trigger){ return; }
+      var currentStatus = trigger.dataset.itemStatus || '';
+
+      document.getElementById('archiveItemId').value = trigger.dataset.itemId || '';
+      document.getElementById('archiveMedicineTarget').textContent = trigger.dataset.itemName || 'this item';
+      document.getElementById('archiveMedicineCurrent').textContent =
+        currentStatus ? ' (currently ' + currentStatus + ')' : '';
+
+      // One primary action per dialog: the last button still showing, which the
+      // right-aligned footer puts nearest the operator's eye.
+      var visible = [];
+      Array.prototype.slice.call(
+        archiveMedicineModal.querySelectorAll('.item-status-option')
+      ).forEach(function(button){
+        var offered = button.dataset.status !== currentStatus;
+        button.style.display = offered ? '' : 'none';
+        if(offered){ visible.push(button); }
+      });
+      visible.forEach(function(button, index){
+        var primary = (index === visible.length - 1);
+        button.classList.toggle('btn-primary-teal', primary);
+        button.classList.toggle('btn-outline-teal', !primary);
+      });
+    });
   }
 
   // LIVE NARROWING OVER THE ITEMS ALREADY ON THE PAGE

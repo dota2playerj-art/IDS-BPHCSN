@@ -146,6 +146,34 @@ STATUS_BADGE_CLASS = {
 }
 
 
+def allowed_item_status_transitions(current_status):
+    """The statuses an item currently in current_status may be moved to.
+
+    Every status except the one it already holds, in ITEM_STATUSES order, which
+    on a two-value lifecycle yields exactly the two cases the Archive dialog
+    offers:
+
+        Active   -> Inactive   (retire it)
+        Inactive -> Active     (put it back in service)
+
+    The second direction is deliberate, and it is the one
+    models/patients.py allowed_status_transitions() argues for at length:
+    retiring the wrong row is a mis-click, and a one-way door turns a clerical
+    slip into something only an edit form can undo.
+
+    An unrecognised status (a hand-edited row) yields both, so the dialog still
+    offers a way out rather than presenting no options at all.
+
+    The caller passes the status it read back out of the database, never the one
+    the page posted: the dialog decides what to offer from a page that can be
+    stale, and a POST can be made without loading that page at all. That is the
+    same reason get_patient_statuses() exists on the patient side; here the
+    fresh read is get_inventory_item_by_id(), which the caller already needs for
+    the item's name, so there is no second query for the same row.
+    """
+    return tuple(status for status in ITEM_STATUSES if status != current_status)
+
+
 def _parse_date(value):
     """Read a stored ISO date into a date, or None if it is absent/malformed."""
     if not value:
@@ -745,6 +773,46 @@ def update_inventory_item(item_id, values):
     conn.commit()
     conn.close()
     return changes
+
+
+def set_item_status(item_id, status):
+    """Move one item between Active and Inactive. Returns rows changed.
+
+    This is the whole of the Archive action on Screen 06, and it is deliberately
+    the same shape as set_patient_status(): retiring is an UPDATE of one already
+    existing flag and nothing else. No row is removed, item_code, created_at, the
+    batch number, the expiry date and the stock figure are all untouched, and
+    only updated_at moves alongside the status -- which is why going back to
+    Active restores the item everywhere it was counted before.
+
+    It writes the same column the Add / Edit Medicine form writes, so there is
+    one definition of retired in the system and every figure that already
+    respects RETIRED_STATUS respects this the moment it commits. Nothing here
+    re-implements that logic.
+
+    `AND status != ?` makes the count honest, exactly as it does on patients:
+    SQLite's rowcount reports rows matched, not rows changed, so without it
+    re-retiring an already-Inactive item would claim an update that did not
+    happen and would bump updated_at for a write that changed nothing.
+    """
+    if status not in ITEM_STATUSES:
+        raise ValueError(
+            f"{status!r} is not an item status; expected one of {ITEM_STATUSES}."
+        )
+
+    conn = get_db()
+    cursor = conn.execute(
+        """
+        UPDATE inventory_items
+           SET status = ?, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND status != ?
+        """,
+        (status, int(item_id), status),
+    )
+    conn.commit()
+    affected = cursor.rowcount
+    conn.close()
+    return affected
 
 
 def generate_next_item_code():
