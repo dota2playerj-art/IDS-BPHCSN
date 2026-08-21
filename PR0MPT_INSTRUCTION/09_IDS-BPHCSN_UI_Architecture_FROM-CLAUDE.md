@@ -1,7 +1,7 @@
 # IDS-BPHCSN UI ARCHITECTURE DOCUMENT
 
 Version: 2.0
-Status: Approved. Sections 1, 2, 3, 5, 7 and 8 reconciled against the built system on 2026-08-15; sections 10 and 11 added.
+Status: Approved. Sections 1, 2, 3, 5, 7 and 8 reconciled against the built system on 2026-08-15; section 10 added. Section 11 added 2026-08-21.
 Prepared For: Integrated Digital System for Barangay Poblacion Health Center Services and Community Notifications (IDS-BPHCSN)
 Institution: Northeastern Mindanao Colleges (NEMCO)
 
@@ -383,6 +383,51 @@ So the behaviour now is:
 **`models/immunizations.py::remove_immunizations()` is deliberately left in place and unused**, for that future path to call. It already scopes its DELETE to the consultation that recorded the dose, which is the hard part. Its being unused is not dead code to clean up — it is the groundwork for the correction path, and deleting it would mean rewriting the careful part later.
 
 **If a future session is asked to "add the ability to delete a vaccination record":** that is a real gap, but it is a new deliberate correction path with its own route, its own confirmation, and its own audit entry. It is not a change to Screen 20's edit form.
+
+---
+
+## 11. Design Decision — Why the Administrator Has No Health Programs or Vaccination Campaigns Screen
+
+**This is a deliberate access-control decision, not an unimplemented feature. Do not "fix" it by adding Admin routes to Screens 16 and 17.**
+
+### The question
+
+The Project Bible (`01_PROJECT_BIBLE.md`, "Target Users") lists "Full system access" as the Administrator's first responsibility. Yet Health Programs (Screen 16) and Vaccination Campaigns (Screen 17) are reachable only at `/official/health-programs` and `/official/vaccination-campaigns`, both guarded by `@role_required("Barangay Official")`. An Administrator who navigates there is bounced. Is that a contradiction, or a gap in the build?
+
+### The resolution: it is intentional
+
+Access in this system is scoped to **role function**, not to administrative rank. Screens 16 and 17 exist to serve the Barangay Official's civic and community-outreach function — monitoring public health activity in the barangay. They are not general administrative tools, and the Administrator's job function does not include running barangay outreach.
+
+Critically, **no data is hidden from the Administrator by this scoping.** What is role-scoped is a *presentation*, not a record:
+
+- **Programme memberships are literally the same object.** `health_programs_context()` calls `reports_analytics_context()` and reads its `programs` key — the identical pair (Immunization, Senior Citizen) that Reports & Analytics prints. The two screens cannot report different memberships, because there is only one list.
+- **Immunisation coverage comes from one function.** Both Screen 17 and Reports & Analytics print `models.immunizations.get_immunization_coverage()`. Same call, same figures.
+- **One aggregate is genuinely only on Screen 17**, and it should be stated rather than glossed: the per-dose DOH EPI schedule table from `get_dose_coverage()`. Reports & Analytics does not render it.
+- **But its underlying records are more visible to the Administrator, not less.** Every dose behind that table is readable per-patient on the Patient Profile immunisation panel — a screen the Barangay Official cannot open at all, because they hold no patient-record access. At record level the Administrator's visibility is a strict superset of the Barangay Official's. What differs is one aggregated civic view, not the clinical data underneath it.
+
+So "the Administrator cannot see this data" is not true. "The Administrator does not get the Barangay Official's outreach dashboard" is true, and is the intent.
+
+### The standard this follows
+
+**Least privilege (general enterprise RBAC).** Access is granted by the duties a role actually performs, not by seniority. Granting a screen simply because its holder outranks the intended user is the textbook violation — it widens the blast radius of a compromised account with no functional gain. Cf. NIST SP 800-53 AC-6 (Least Privilege) and the role-based access control model in NIST SP 800-162.
+
+**HIPAA Minimum Necessary Standard (healthcare-specific).** 45 CFR §164.502(b) and §164.514(d) require a covered entity to limit access to protected health information to the minimum necessary for the purpose. §164.514(d)(2)(i) is explicit about the mechanism: the entity must **identify the persons or classes of persons in its workforce who need access to PHI to carry out their duties, and the category of PHI needed for each**. That is a job-function test, not a rank test. A blanket "administrators get everything" default is a widely-noted compliance weakness in HHS guidance and industry practice precisely because it substitutes seniority for the required duty analysis.
+
+**The treatment exception does not rescue the opposite argument.** §164.502(b)(2)(i) exempts disclosures to, and requests by, a health care provider **for treatment** from the minimum necessary requirement — a clinician treating a patient is not to be throttled. That exception is inapplicable here: Screens 16 and 17 are administrative and reporting surfaces reporting aggregate community statistics, not direct patient-treatment access. Nothing on either screen is consulted to treat a patient. The clinical screens that *are* used in treatment — Patient Records, Patient Profile, Record Consultation — are open to the Administrator and to Health Center Staff, which is where that exception properly applies and where this system already applies it.
+
+### Reconciling this with "Full system access" in the Project Bible
+
+"Full system access" in `01_PROJECT_BIBLE.md` should be read as it is read in real EHR and enterprise systems, and as this build implements it:
+
+1. **Full oversight and data visibility** — the Administrator can see the state of the whole system, achieved through Reports & Analytics, both dashboards, and Audit Logs. No figure in the system is invisible to them.
+2. **Full access to every screen within the Administrator's own operational scope** — clinical records, inventory, scheduling, user management, settings and the audit trail. There is no screen in that scope an Administrator is refused.
+3. **Not** literal reachability of every role-specific URL regardless of function. No production EHR grants the system administrator the community-health-worker's outreach console on the strength of the job title; it grants oversight of the data that console reports on.
+
+Read that way there is no contradiction. The Administrator has full oversight *of* barangay programme and immunisation activity — via Reports & Analytics — without holding the Barangay Official's screens. Rank confers oversight; function confers the screen.
+
+### If a future session is asked to "give Admin access to Health Programs"
+
+Treat it as an access-control change requiring an approved revision of this document, not a routing fix. The technical change is trivial — two blueprint routes and two context-map entries. The reason not to make it is recorded above, and the correct answer to "the Administrator wants to see programme figures" is that they already can, on Screen 10.
 
 ---
 
