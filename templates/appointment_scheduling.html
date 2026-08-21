@@ -254,18 +254,6 @@
   .pagination .page-link:hover{background-color:var(--teal-light); color:var(--teal-dark); border-color:var(--teal-light);}
   .pagination .page-item.disabled .page-link{color:#C7CBD1; background:#fff;}
 
-  /* A control that reads as part of a sentence. Used once, in the Upcoming
-     empty state, so the words naming the action can BE the action without
-     putting a second prominent button on a screen that was just consolidated
-     down to one. It is a real <button> rather than an <a href="#"> because it
-     performs an action rather than going anywhere, which is also what keeps it
-     reachable by keyboard and announced correctly. */
-  .link-inline{
-    background:none; border:none; padding:0; font:inherit; font-weight:600;
-    color:var(--teal-dark); text-decoration:underline; cursor:pointer;
-  }
-  .link-inline:hover{color:var(--teal);}
-
   .empty-state{display:none; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:64px 24px;}
   .empty-state.show{display:flex;}
   .empty-state .icon-circle{
@@ -370,12 +358,18 @@
                This screen carried five of them -- this one, the queue toolbar,
                both empty states and the upcoming toolbar -- all opening the same
                dialog. Five identical primary buttons is five competing primary
-               actions, which is the same as none. The one that survives is in
-               the queue toolbar beside Check In Patient, because that pairing is
-               the actual decision a desk makes: Check In is for somebody
-               standing here now, New Appointment is for a day that has not come
-               yet. Every control left in this header moves the calendar, which
-               is what a calendar header should do. -->
+               actions, which is the same as none. Exactly one survives, in the
+               queue toolbar beside Check In Patient, because that pairing is the
+               actual decision a desk makes: Check In is for somebody standing
+               here now, New Appointment is for a day that has not come yet.
+               Every control left in this header moves the calendar, which is
+               what a calendar header should do.
+
+               ONE is now literal. The Upcoming empty state briefly kept an
+               inline text link as a sixth-then-second way in; it has since been
+               removed too, and its sentence rewritten so that nothing anywhere
+               on this screen names New Appointment except the button itself and
+               the dialog it opens. -->
         </div>
       </div>
 
@@ -444,8 +438,11 @@
               </div>
             </div>
 {%- else %}
+            {#- Also a statement rather than an instruction, for the same reason
+                the Upcoming empty state below is. This one named the control in
+                bold from a sidebar panel that does not contain it. #}
             <div class="reminder-empty">
-              Nothing booked beyond today. Use <strong>New Appointment</strong> to schedule a future visit.
+              Nothing booked beyond today.
             </div>
 {%- endfor %}
           </div>
@@ -727,8 +724,10 @@
         <!-- One action, and it is the one this empty state's own sentence names:
              "Use Check In Patient when the first patient arrives." A second
              button offering a different action was never what an empty queue is
-             asking for, and New Appointment is a scroll away in the toolbar
-             above. -->
+             asking for. This empty state may name Check In Patient because Check
+             In Patient is the button directly above it; that is the test the
+             other two empty states failed, and why their prose no longer names
+             a control at all. -->
         <div class="d-flex gap-2">
           <button class="btn-primary-teal" data-bs-toggle="modal" data-bs-target="#checkInModal"><span class="material-symbols-outlined" style="font-size:18px;">how_to_reg</span>Check In Patient</button>
         </div>
@@ -902,18 +901,23 @@
           <span class="material-symbols-outlined" style="font-size:34px; color:var(--teal-dark);">event_upcoming</span>
         </div>
         <h5>No future appointments booked</h5>
-        {#- THE ONE PLACE A SECOND WAY IN IS EARNED, AND IT IS NOT A BUTTON.
-            This empty state is the bottom of a long page, and its whole purpose
-            is to offer the action that resolves it -- prose telling a reader to
-            use a control that is scrolled off the screen would be prose telling
-            them to go and find it. So the words that already name the action are
-            the action. It opens the same dialog the toolbar button does; it is
-            styled as a link rather than a button so the screen still has exactly
-            one prominent New Appointment control, which was the whole point of
-            consolidating them. #}
-        <p>Nothing is scheduled beyond today. Book one with
-          <button type="button" class="link-inline" data-bs-toggle="modal" data-bs-target="#bookAppointmentModal">New Appointment</button>
-          — it will appear here, and can be checked in from the queue above on the day itself.</p>
+        {#- STATES WHAT IS TRUE; DOES NOT ISSUE AN INSTRUCTION.
+            This carried an inline control opening the booking dialog, so that
+            the words naming the action were the action. That control is gone --
+            the screen now has exactly one New Appointment affordance, the
+            toolbar button -- and the sentence went with it rather than being
+            left behind pointing at nothing.
+
+            Deleting a control and keeping the prose that names it is the worse
+            half of the change on its own: a reader told to "book one with New
+            Appointment" hunts the panel for a New Appointment that is not in
+            it. So this now reports the state and says what fills it, in the
+            passive shape the other empty states in this project use ("Nothing
+            has been recorded for this patient. Diagnoses entered during
+            consultations will appear here." -- patient_profile.html). Both
+            facts a reader actually needs survive: bookings land here, and they
+            are checked in from the queue on the day. Neither names a button. #}
+        <p>Nothing is scheduled beyond today. Appointments booked for a future date appear here, and can be checked in from the queue above on the day itself.</p>
       </div>
 {%- endif %}
     </div>
