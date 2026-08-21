@@ -1,7 +1,7 @@
 # IDS-BPHCSN UI ARCHITECTURE DOCUMENT
 
 Version: 2.0
-Status: Approved. Sections 1, 2, 3, 5, 7 and 8 reconciled against the built system on 2026-08-15; section 10 added. Section 11 added 2026-08-21.
+Status: Approved. Sections 1, 2, 3, 5, 7 and 8 reconciled against the built system on 2026-08-15 and re-checked on 2026-08-21; section 10 added. Sections 11, 12 and 13 added 2026-08-21.
 Prepared For: Integrated Digital System for Barangay Poblacion Health Center Services and Community Notifications (IDS-BPHCSN)
 Institution: Northeastern Mindanao Colleges (NEMCO)
 
@@ -30,7 +30,7 @@ All future UI generation and frontend development must follow this document unle
 
 **The system has 20 screens.** Screens 1–15 were the original inventory; screens 16–20 were built afterwards and are added here in Version 2.0.
 
-`templates/` holds 21 `.html` files. `base.html` is the shared layout — sidebar, header, content region — and is not a screen. The other 20 files are the 20 screens below, one file each.
+`templates/` holds 23 `.html` files, of which three are not screens: `base.html` is the shared layout — sidebar, header, content region — and `_print.html` and `_chart_table.html` are partials included by the screens that print and the screens that render a chart's underlying figures as a table. The other 20 files are the 20 screens below, one file each.
 
 The **Primary Role(s)** column is not a description kept in step by hand. It is the set of roles each view's own `role_required()` guard admits, read off `utils/security.py` and confirmed against the live `url_map` by `routes/user_views.py::accessible_screens()` — the same function that prints the permission list on Screen 11. If this column and the code ever disagree, the code is right and this table is stale.
 
@@ -45,19 +45,21 @@ The **Primary Role(s)** column is not a description kept in step by hand. It is 
 | 7 | Add/Edit Medicine | `add_edit_medicine.html` | Administrator, Health Center Staff | Create or update a medicine record's details and stock. |
 | 8 | Appointment Scheduling | `appointment_scheduling.html` | Administrator, Health Center Staff | Manage the appointment calendar, walk-in queue, and the live consultation queue. |
 | 9 | SMS Notifications | `sms_notifications.html` | Administrator, Health Center Staff, Barangay Official | Compose, send, and record SMS broadcasts to a real recipient audience. Specified as "Community Notifications" in `03_SCREEN_SPECIFICATIONS.md`; same screen. |
-| 10 | Reports & Analytics | `reports_analytics.html` | Administrator, Barangay Official | Consultation, inventory, registration, and immunisation reporting. Export is not implemented. |
+| 10 | Reports & Analytics | `reports_analytics.html` | Administrator, Barangay Official | Consultation, inventory, registration, and immunisation reporting, over a selectable date range. Export Excel, Export PDF and Print are all built. |
 | 11 | User Management | `user_management.html` | Administrator only | List every account that can sign in, with the screens each role's guards admit it to. Account writes are not implemented — an open scope decision. |
 | 12 | Audit Logs | `audit_logs.html` | Administrator only | Monitor and filter recorded system activity by user, date, and action. |
-| 13 | Settings | `settings.html` | Administrator only | Configuration screen. Presentation only — no context is passed and nothing is read or written. |
+| 13 | Settings | `settings.html` | Administrator only | Configuration screen. Nothing typed here is stored — the `settings` table is empty and no route writes it, so every input sits in a disabled fieldset. One block is live: the Security pane reports sign-in counts read from the audit trail. |
 | 14 | Health Center Staff Dashboard | `staff_dashboard.html` | Health Center Staff | Operational overview scoped to staff duties — no admin modules. |
 | 15 | Barangay Official Dashboard | `official_dashboard.html` | Barangay Official | Community-facing overview — no patient, inventory, or user data. |
 | 16 | Health Programs | `health_programs.html` | Barangay Official | Programme membership, derived from patient records. Programmes with no source in the schema report their own absence. |
 | 17 | Vaccination Campaigns | `vaccination_campaigns.html` | Barangay Official | Immunisation coverage against the DOH EPI schedule. The reporting unit is the scheduled dose, not a named campaign. |
-| 18 | Community Reports | `community_reports.html` | Barangay Official | Community-level health summary. Presentation only — no context is passed. |
+| 18 | Community Reports | `community_reports.html` | Barangay Official | Community-level health summary, built from `reports_analytics_context()` so it cannot report the barangay differently from Screen 10. Exports a real spreadsheet and PDF. |
 | 19 | Notifications | `notifications.html` | Barangay Official | Notification centre. Presentation only — there is no notifications table. |
 | 20 | Record / Edit Consultation | `record_consultation.html` | Administrator, Health Center Staff | Write up the clinical record of a visit, and edit one already recorded. Two modes of one template and one context builder. See §10. |
 
-Screens 13, 18 and 19 are built as UI and are not backed by data. They are listed here as screens because they exist, are routed, and are reachable from a sidebar — not as delivered features. Nothing on them should be quoted as a system output.
+**One screen is not backed by data: 19, Notifications.** It is rendered as `render_template('notifications.html')` with no context, because there is no `notifications` table. Nothing on it should be quoted as a system output; recorded activity lives on Screen 12.
+
+Screen 13 is the partial case and is stated as one rather than lumped in above: its Security pane is live and everything else on it is a disabled fieldset. Screen 18 was in this sentence until 2026-08-21 and is now fully data-driven, as are 15, 16 and 17 — every Barangay Official screen takes a context from `routes/official_views.py`, and each derives its figures from `reports_analytics_context()` rather than counting anything itself.
 
 ---
 
@@ -168,10 +170,10 @@ Login
                                                  → (Save → patient profile,
                                                     queue entry Completed)
    → SMS Notifications → (Compose → Send → History)
-   → Reports & Analytics → (View; export is not implemented)
+   → Reports & Analytics → (View over a date range; Export Excel / Export PDF / Print)
    → User Management → (View roster and derived permissions; writes not implemented)
    → Audit Logs → (Filter by user/date/action)
-   → Settings → (Presentation only)
+   → Settings → (Security pane live; every other pane disabled, nothing stored)
  → Logout
 ```
 
@@ -199,9 +201,9 @@ Login
    → SMS Notifications → (Compose → Send → History)
    → Health Programs → (View membership and untracked notices)
    → Vaccination Campaigns → (View per-dose EPI coverage)
-   → Community Reports → (Presentation only)
+   → Community Reports → (View; Export Excel / Export PDF)
    → Reports & Analytics → (View)
-   → Notifications → (Presentation only)
+   → Notifications → (Presentation only — the one screen with no data source)
  → Logout
 ```
 
@@ -236,7 +238,7 @@ Every screen — regardless of role — must be built from the same four regions
 | **Advanced Filter** | Patient Records, Medicine Inventory, Audit Logs, Appointment Scheduling |
 | **Buttons** (Primary/Secondary/Danger/Success, Bootstrap-styled, 12px radius) | Every screen — form submissions, table actions, modals |
 | **Forms** (48px input height, 12px radius, label-above, Bootstrap validation) | Register Patient, Add/Edit Medicine, Appointment scheduling form, Record / Edit Consultation, SMS composer, Login. *(Settings and User Management carry form markup but no working form — see §1.)* |
-| **Modals** | Add/Edit Medicine (quick edit), Patient status change, Cancel/Reschedule appointment, Add Appointment. *(There is no Reset Password modal — password reset is not implemented.)* |
+| **Modals** | Schedule Appointment (booking), Check In Patient, Cancel appointment, Reschedule appointment, Change Patient Status, Change Item Status (Medicine Inventory archive — see §12), Compose Broadcast, Confirm Logout. Every one of them follows the shape Patient Records' status dialog set: centred, 16px radius, header / body / footer, and where there is a choice to make the submit buttons *are* the choices. *(There is no Reset Password modal — password reset is not implemented.)* |
 | **Pagination** | Patient Records, Medicine Inventory, User Management, Audit Logs tables |
 | **Status Badges** (Success/Warning/Danger/Info/Neutral, 999px radius) | Patient status, medicine stock status, appointment status, user status, notification delivery status |
 | **Alerts/Toasts** | Low-stock warnings, save/update confirmations, failed SMS send notices |
@@ -286,10 +288,10 @@ Every screen — regardless of role — must be built from the same four regions
 | Record / Edit Consultation | Form (vitals + clinical record), Card (sectioned: patient banner / vitals / record / immunisations / follow-up), Checkbox group (EPI doses), Badge (dose status: Completed / Due Now / Upcoming / Overdue), Alert (validation) |
 | Health Programs | Card, Table (programme membership), Badge, Alert (untracked notice) |
 | Vaccination Campaigns | Card, Table (per-dose coverage), Chart (Chart.js donuts), Badge, Alert (untracked notice) |
-| Community Reports | Card, Chart (Chart.js), Table — presentation only, no data source |
-| Notifications | List Group, Badge, Nav Pills (category filter) — presentation only, no data source |
+| Community Reports | Card, Chart (Chart.js), Table, Button Group (export) — data-driven from `reports_analytics_context()` |
+| Notifications | List Group, Badge, Nav Pills (category filter) — presentation only, no data source. The only screen still in this position. |
 | Reports & Analytics | Card, Chart (via Chart.js/D3, not native Bootstrap), Table, Button Group (export), Nav Tabs (report type switch) |
-| User Management | Table, Modal (add user/reset password), Badge (status), Dropdown (role filter), Button |
+| User Management | Table, Badge (status), Dropdown (role filter), Button. *(The add-user and reset-password controls are present and disabled — see §1.)* |
 | Audit Logs | Table, Dropdown (filters: user/date/action), Pagination |
 | Settings | Nav Tabs/Pills (sections), Form, Accordion, Button |
 
@@ -428,6 +430,110 @@ Read that way there is no contradiction. The Administrator has full oversight *o
 ### If a future session is asked to "give Admin access to Health Programs"
 
 Treat it as an access-control change requiring an approved revision of this document, not a routing fix. The technical change is trivial — two blueprint routes and two context-map entries. The reason not to make it is recorded above, and the correct answer to "the Administrator wants to see programme figures" is that they already can, on Screen 10.
+
+---
+
+## 12. Design Decision — Medicine Inventory's Row Actions
+
+**Read this before adding a control back to a Medicine Inventory row.** Two of the four actions
+that row once offered were resolved in opposite directions, because the reasons behind them said
+opposite things.
+
+### Archive reuses Patient Records' status pattern exactly
+
+Archiving a stock item is a status change, and this project already had a proven shape for one, so
+Screen 06 borrowed it rather than inventing a second:
+
+- A confirmation dialog that names the item and its current status, and offers **only** the
+  transitions that status permits. The rule lives in
+  `models/inventory.py::allowed_item_status_transitions()` and is mirrored in the dialog's script
+  only because the choice has to be made in the browser.
+- The server re-derives the legal moves from the **stored** status before writing, never from what
+  the page posted — the dialog decided what to offer from a page that may since have gone stale,
+  and a POST can arrive without the page ever having been opened.
+- **Both directions.** Active → Inactive retires an item; Inactive → Active puts it back. A
+  one-way door turns a mis-click into something only the edit form can undo, which is the same
+  argument `models/patients.py::allowed_status_transitions()` makes for reactivating a patient.
+
+Nothing about "retired" is re-implemented. `set_item_status()` writes the same status column the
+Add/Edit Medicine form already writes, so `RETIRED_STATUS` keeps one meaning and every figure that
+already respected it — the four stat cards, the low-stock alert, both dashboards, the sidebar
+badge and Reports & Analytics — respects a retirement made this way the moment it commits, with
+none of them touched. Retiring is an UPDATE of one flag: no row is removed, and the stock figure,
+batch number, expiry date and identifiers are unchanged, which is why marking it Active again
+restores it everywhere.
+
+### Print was removed, and removal was the finished outcome
+
+The per-row print icon is gone. It is not disabled and it is not pending.
+
+`utils/unavailable.py` carried a reason for it — a stock item has no page of its own, Edit is a
+form rather than a record, and a printed copy of one table row is not a document anybody keeps —
+and that reason stayed **true to the last line**. Read back, it is not a note about something
+unfinished; it is the argument that the control should not exist. Patient Records keeps its print
+icon for the opposite reason: a patient's record *is* a page, so printing it means printing that
+page. The inventory document a reader actually wants is Export PDF in the toolbar, which is built.
+
+This is a third outcome that the project's disabled-control rule leaves implicit. A control either
+works, or it is visibly disabled and says why — **or it should not be on the screen at all, in
+which case it is removed and its reason is deleted with it.**
+
+---
+
+## 13. Design Decision — One Booking Control, and a Way Back Into a Consultation
+
+### Appointment Scheduling has exactly one New Appointment control
+
+It had five, all opening the same dialog: the calendar header, the queue toolbar, the queue empty
+state, the upcoming toolbar and the upcoming empty state. Five identical primary buttons is five
+competing primary actions, which is the same as none.
+
+The survivor is in the **queue toolbar, beside Check In Patient**, because that pairing is the
+decision a desk actually makes: Check In is for somebody standing there now, New Appointment
+commits to a day that has not come yet. It is deliberately styled as the *secondary* button of
+that pair — Check In Patient remains the screen's single primary action, and promoting both would
+recreate the problem the consolidation solved.
+
+**The empty-state prose was rewritten, not just stripped of its buttons.** Deleting a control and
+keeping the sentence that names it is the worse half of the change on its own: a reader told to
+"book one with New Appointment" hunts a panel for a control that is not in it. The two affected
+empty states now report state and say what fills it, in the passive shape used elsewhere in this
+project ("Nothing has been recorded for this patient. Diagnoses entered during consultations will
+appear here."). The queue's empty state still names Check In Patient, and that is not the same
+thing — that button is directly above it. **Naming a control the reader is standing next to is
+help; naming one they must go and find is not.**
+
+The dialog is titled **"Schedule Appointment"**, not "New Appointment" and not "Book Appointment".
+Its submit button already reads Book Appointment, and more importantly that submit is not always
+Book: choosing the new-patient mode switches it to "Continue to Registration", because the dialog
+can hand off to Register Patient on the way to a booking. A title has to cover both modes.
+"Schedule" also matches the screen's own name and the Verb + Noun shape every other dialog here
+uses.
+
+### The dashboards offer a way back into a consultation, not a second way to start one
+
+**A separate sidebar module for Consultation was considered and rejected.** Appointment Scheduling
+→ Start Consultation → Record Consultation is the standard arrangement — the visit belongs to the
+appointment, so the appointment is where it begins — and a standalone Consultation destination is
+incoherent anyway, because a consultation only exists tied to one active patient.
+
+What was genuinely missing is the **return trip**: a clinician who navigated away mid-visit had to
+reload the queue and find the row again with the patient sitting in front of them. So both
+dashboards carry a panel that names whoever is currently In Consultation and links straight to
+that appointment's write-up form.
+
+Three properties keep it a shortcut rather than a second entry point:
+
+- It reads `get_active_consultation()` — the same call Appointment Scheduling uses to decide who
+  may start a consultation, and deliberately not scoped to today — so the dashboard and the queue
+  can never disagree about whether the room is occupied.
+- It can only ever name a visit the queue has **already** started. It cannot begin one, and it
+  cannot bypass the one-at-a-time rule.
+- It contains no form and posts nothing.
+
+Idle, it states "No active consultation right now" and points at Appointment Scheduling rather
+than vanishing — the honesty pattern the rest of the dashboard already follows. A panel that
+silently disappears teaches a reader that the screen is inconsistent, not that the room is empty.
 
 ---
 

@@ -807,9 +807,11 @@ Date Selector
 
 Implementation Status
 
-Presentation only. `routes/official.py::community_reports()` renders the template with no context, and every figure on the screen is written into the markup.
+**Built and data-driven, as of 21 August 2026.** This entry previously read "Presentation only… every figure on the screen is written into the markup", and that has not been true since the screen was wired. `routes/official.py::community_reports()` passes `community_reports_context(args=request.args)`.
 
-This screen has not been reconciled against real data the way Screens 16 and 17 were. Until it is, nothing on it should be quoted as a system output.
+Every figure comes from `reports_analytics_context()` rather than being counted here, which matters more on this screen than on any other: Community Reports is the screen a barangay official reads a number off and puts in front of somebody, and a figure here that disagreed with Reports & Analytics would be two reports of one barangay wearing one name. The date selector is wired to the same range parser Screen 10 uses.
+
+Export Excel and Export PDF are both real (`routes/report_export.py`), and Print works. Figures the schema cannot establish are reported as absent rather than invented.
 
 ---
 
@@ -1036,49 +1038,150 @@ Consistency is more important than visual variety.
 
 # Reconciliation With The Built System
 
-Added in Version 2.0. Checked against the code on 2026-08-15.
+Added in Version 2.0. **Re-checked against the code on 21 August 2026, and substantially rewritten
+on that date** — most of what this section previously reported as unbuilt has since been built, and
+a reconciliation section that under-reports the system is as misleading as one that over-reports
+it. Screens 01 to 20 above are left exactly as approved; this section records only where the built
+system differs from them.
 
-Screens 01 to 15 above are left exactly as approved. This section records where the built system differs from them, so a reader can tell a design intention from a delivered feature without opening the code. Nothing here revises the specification; each item is either a deliberate decision or an unbuilt item.
+The system has **20 screens**. `templates/` holds 23 `.html` files, of which three are not screens:
+`base.html` (the shared layout) and the `_print.html` and `_chart_table.html` partials.
 
 ## Specified but not built
 
-Screen 01 — "Locked session after multiple failed attempts."
+**Screen 01 — "Locked session after multiple failed attempts."**
 
-Not implemented. `routes/auth.py` checks the password and starts the session; there is no failed-attempt counter and no lockout, so no account can be locked out. Sign-ins are not recorded either, which is why Screen 11 has no last-login time and Screen 12's Login Events card reports the same absence.
+Still not implemented. There is no failed-attempt counter, so no account can be locked out by
+repeated guessing. What *is* implemented, and should not be confused with it, is deactivation:
+`routes/auth.py` refuses a deactivated account and writes an audit entry recording whether the
+password supplied still worked — the most actionable line the trail can produce. "Remember Me" is
+also not built. "Show Password" **is** now built (`login.html`, a working `aria-pressed` toggle).
 
-Screen 03 — "Export", "Print". Screen 06 — "Print Inventory". Screen 10 — "Export PDF", "Export Excel", "Print Report".
+**Screen 09 — "Save Draft", "Schedule".**
 
-Export and print are not implemented anywhere in this project. No screen writes a CSV, an Excel file or a PDF, and no print handler is bound. The controls exist in the markup and are decorative. Screen 10 states this beside its toolbar, and its "Recent Generated Reports" table reports that no export history is recorded. Screen 06 carries an Export button and a per-row print icon, both unwired.
+Not built. The compose dialog offers Cancel and Send Broadcast only, so neither appears as a dead
+control.
 
-Screen 10 — report type and date-range selectors.
+**Screen 11 — "Add User", "Reset Password", "Disable", "Enable", "Delete".**
 
-Decorative. The figures shown always cover the whole registered roster; filtering is not wired.
+Not implemented, and deliberately so rather than overlooked. Every write on that screen touches
+authentication — password hashing, role assignment, and the ability to revoke a sign-in — so it is
+an open scope decision for the team. The buttons are present and disabled, each stating why.
 
-Screen 11 — "Last Login" column, "Add User", "Reset Password", "Disable", "Enable", "Delete".
+**Column sorting, on every list screen that offers the control.**
 
-Not implemented, and deliberately so rather than overlooked. Every write on that screen touches authentication — password hashing, role assignment, and the ability to revoke a sign-in — so it is an open scope decision for the team. The buttons are present and disabled, each stating why. The three accounts are managed in `models/users.py`. Last Login has no column behind it, per the Screen 01 note above.
+Not implemented. Rows arrive in the order the query returns them, and each screen now states that
+order beside its table. See the `sort` reason in `utils/unavailable.py`.
 
-Screen 13 — Settings, all sections including Backup and Restore.
+**Paging.**
 
-Presentation only. `routes/admin.py::settings()` renders the template with no context, and nothing on the screen reads or writes configuration. Backup and Restore do nothing. The project's real backup practice is a manual dated archive kept outside the repository.
+Not implemented and not needed: every row the query returns is already on the page. The page
+numbers that used to sit in these footers were markup counting a roster the system does not hold.
 
-Screens 18 and 19 — Community Reports, Notifications.
+**Screen 03 — Export of a ticked selection**, from the bulk bar.
 
-Presentation only, as recorded in their entries above.
+Not built. Export of the full register is (see below); exporting just the selection is the part
+that is missing, because every download in this project is a bookmarkable GET and a file whose
+contents are decided by a list of primary keys in a query string is not that.
 
-## Built beyond this specification
+**Screen 13 — Settings: everything except the Security pane.**
 
-Immunisation tracking against the DOH EPI schedule. Recorded on Screen 20, reported on Screens 17 and 10, shown on the Patient Profile's Vaccination Records tab and on the dashboards. See `09_IDS-BPHCSN_UI_Architecture_FROM-CLAUDE.md` §9 for the scope note.
+Nothing typed on that screen is stored. The `settings` table exists in `schema.sql` and is empty,
+and no route writes to it, so every input sits inside a disabled fieldset. Backup and Restore do
+nothing; the project's real backup practice is a manual dated copy of `app.db` taken outside the
+application. The SMS gateway controls are disabled for a different reason — the integration in
+`utils/sms.py` is real and finished, and what is absent is a configured `SEMAPHORE_API_KEY`.
 
-The consultation View action, and the add-only immunisation rule on Screen 20's edit mode. See `09_IDS-BPHCSN_UI_Architecture_FROM-CLAUDE.md` §10.
+**Screen 19 — Notifications.**
+
+The one screen in the system rendered with no context at all
+(`render_template('notifications.html')`), because there is no `notifications` table. Nothing on
+it should be quoted as a system output. Recorded activity lives on Screen 12.
+
+## Built since this specification was written
+
+**Export is real, on seven screens, in two formats each.**
+
+This section previously stated that "Export and print are not implemented anywhere in this
+project" and that the controls were decorative. That is no longer true of any of them. Patient
+Records, Medicine Inventory, Appointment Scheduling, User Management, Audit Logs, Reports &
+Analytics and Community Reports each serve a real `.xlsx` and a real `.pdf` at their own route.
+Each file carries a cover sheet naming its scope, and each states that it holds the full list
+rather than the list as filtered on screen, because these screens filter in the browser and the
+server never sees those filters. See `routes/roster_export.py`, `routes/report_export.py` and
+`routes/audit_export.py`.
+
+**Print is real** on the screens that include `templates/_print.html`, Reports & Analytics among
+them. Printing a single patient from a Patient Records row opens that patient's profile with
+`?print=1`, because the record *is* a page.
+
+**Screen 10 — report type and date range are wired.** `reports_analytics_context()` takes the
+request's query string and passes the range through to the same model functions the default view
+uses, so a generated report and the default view are one code path with different dates.
+
+**Screen 11 — Last Login is real**, and so is the permission list. The roster is the live `users`
+table, each role's screen list is derived from the actual `role_required()` guards on the live
+`url_map`, and Last Login is read from the audit trail. The seven invented staff rows are gone.
+
+**Screen 12 — the trail is read, not just written.** Audit Logs reads real entries, filters them
+by module, and exports them.
+
+**Screen 06 — View and Archive are real; Print was removed.**
+
+- **View** opens a read-only panel in the row, showing the eight stored fields that previously had
+  no reader outside the editable form.
+- **Archive** opens a confirmation dialog offering only the transitions the item's stored status
+  permits, and the server re-derives that list from the database before writing. It works in both
+  directions, so retiring the wrong item is a correctable mis-click. It writes the same status
+  column the Add/Edit form writes, so the stat cards, the low-stock alert, both dashboards, the
+  sidebar badge and Reports & Analytics all respect a retirement the moment it commits.
+- **"Print Inventory" per row was removed rather than built**, and this is a deliberate decision
+  rather than an outstanding gap. A stock item has no page of its own and a printed copy of one
+  table row is not a document anybody keeps — unlike a patient's record, which is a page in its own
+  right. The inventory document a reader actually wants is Export PDF in the toolbar, which is
+  built. See `09_IDS-BPHCSN_UI_Architecture_FROM-CLAUDE.md` §12.
+
+**Screen 08 — one New Appointment button, not five.** The screen carried five controls opening the
+same booking dialog; four were removed and the empty-state prose that named them was rewritten to
+report state instead of issuing instructions. The survivor sits in the queue toolbar beside Check
+In Patient. The dialog itself is titled "Schedule Appointment". See §13 of the architecture
+document.
+
+**Screens 02 and 14 — a Continue Consultation shortcut.** Both dashboards name whoever is
+currently In Consultation and link straight to that appointment's write-up form, or state that
+nobody is. It cannot start a consultation and cannot bypass the one-at-a-time rule. See §13.
+
+**Immunisation tracking against the DOH EPI schedule.** Recorded on Screen 20, reported on Screens
+17 and 10, shown on the Patient Profile's Vaccination Records tab and on the dashboards. See
+`09_IDS-BPHCSN_UI_Architecture_FROM-CLAUDE.md` §9.
+
+**The consultation View action, and the add-only immunisation rule** on Screen 20's edit mode.
+See `09_IDS-BPHCSN_UI_Architecture_FROM-CLAUDE.md` §10.
+
+**Sign-in recording.** `routes/auth.py` records sign-ins, sign-outs, refused attempts and blocked
+attempts on deactivated accounts. This is what put a real figure behind Screen 11's Last Login,
+Screen 12's Login Events card and Screen 13's Security pane.
+
+**Screens 15 to 18 are data-driven.** The Barangay Official Dashboard, Health Programs,
+Vaccination Campaigns and Community Reports each take a context built in
+`routes/official_views.py`, and each derives its figures from `reports_analytics_context()` rather
+than counting anything itself — so no two of them can report the same barangay differently. Where
+the schema cannot establish something these screens were drawn to show (six of the eight
+programmes, and the campaign concept itself), the screen reports that absence rather than
+inventing a number.
 
 ## Retired
 
-Community Announcements. It was never a feature — a static template with no model and no create, edit or delete route. Screen 09, SMS Notifications, is the single real community-notification mechanism and covers the same Proposal requirement with a stored record of what was sent. See `09_IDS-BPHCSN_UI_Architecture_FROM-CLAUDE.md` §1.1.
+Community Announcements. It was never a feature — a static template with no model and no create,
+edit or delete route. Screen 09, SMS Notifications, is the single real community-notification
+mechanism and covers the same Proposal requirement with a stored record of what was sent. See
+`09_IDS-BPHCSN_UI_Architecture_FROM-CLAUDE.md` §1.1.
 
 ## Naming
 
-Screen 09 is specified above as "Community Notifications". It is built and referred to throughout the code and UI as "SMS Notifications" (`sms_notifications.html`, `sms_broadcasts`). They are the same screen.
+Screen 09 is specified above as "Community Notifications". It is built and referred to throughout
+the code and UI as "SMS Notifications" (`sms_notifications.html`, `sms_broadcasts`). They are the
+same screen.
 
 ## Screen numbering drift inside code comments
 

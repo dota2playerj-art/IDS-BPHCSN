@@ -673,6 +673,12 @@ Backup project files.
 
 Keep previous versions.
 
+**Status of the last two mitigations, checked 21 August 2026.** "Keep previous versions" is
+implemented: the project is under git with 27 commits, so every previous version is recoverable
+and "Version Conflicts" is mitigated rather than merely listed. "Backup project files" remains a
+manual practice — a dated copy of `app.db` taken outside the application — because `app.db` is
+git-ignored and is still the only copy of the demonstration data. See Known Gaps below.
+
 ---
 
 # File Management
@@ -695,45 +701,105 @@ Archive old versions.
 
 ---
 
-# Known Gaps — as of 13 August 2026
+# Known Gaps — as of 21 August 2026
 
 Recorded here so that anyone reading this roadmap before a demo knows what is not finished. A gap
 that is stated is defensible; a gap that is discovered is not.
 
-Screens still rendering hard-coded content
+**This section was rewritten on 21 August 2026 and every claim in it was re-checked against the
+code on that date.** The previous version described the system as it stood on 13 August and had
+gone badly out of date — it reported nine screens as decorative, denied that the project was under
+version control, and denied that a README existed. All three were false by the time anyone would
+have read them. What follows is what is actually true now; the corrected claims are listed at the
+end of this section so the drift itself is on the record.
 
-- User Management — the `users` table holds 3 accounts; the screen shows 7 fixed rows
-- Audit Logs — real entries are being written, but the screen does not read them yet
-- Settings — the `settings` table exists and is empty; nothing reads or writes it
-- Barangay Official Dashboard, Community Announcements, Health Programs, Vaccination Campaigns,
-  Community Reports, Notifications — presentation only
+## Screens not backed by data
 
-Features named in the specifications that are not built
+**One.** Notifications (Screen 19) is rendered by `routes/official.py::notifications()` as
+`render_template('notifications.html')` with no context at all, and there is no `notifications`
+table for it to read. It is the only screen in the system in that position.
 
-- Screen 01: "Remember Me", "Show Password", and account lockout after repeated failed logins
-- Screen 09: "Save Draft" and "Schedule" for SMS broadcasts
-- Screen 10: Print, Export to Excel and Export to PDF on Reports & Analytics
-- Search, sort, filter and export controls on most list screens are present but not wired
+Settings (Screen 13) is a partial case and is stated separately rather than counted above.
+`settings()` now passes `settings_context()`, and the Security Settings pane reports live sign-in
+and refused-sign-in counts read from the audit trail. Every other pane on the screen is a disabled
+fieldset: the `settings` table exists in `schema.sql` and is empty, and no route writes to it. So
+nothing typed on that screen is stored, and exactly one block on it is read.
 
-Engineering practice
+Every other screen is driven by real queries. The Barangay Official's screens — Health Programs,
+Vaccination Campaigns, Community Reports and the Official Dashboard — each take a context built in
+`routes/official_views.py`, and each of them derives its figures from
+`reports_analytics_context()` rather than counting anything itself, so they cannot disagree with
+Reports & Analytics about the same barangay.
 
-- The project is NOT under version control. A `.gitignore` exists but there is no repository, so
-  there is no history and no rollback. `app.db` is the only copy of all demonstration data.
-  Risk Management below names "Version Conflicts" as a risk and "Keep previous versions" as the
-  mitigation; that mitigation is currently unimplemented.
-- No README.md, although 04_DEVELOPMENT_GUIDE.md lists one. There is no single document telling a
-  reader how to run the system, which accounts to log in with, or in what order the migrations run.
-- Templates carry inline `<style>` and `<script>` blocks. 04_DEVELOPMENT_GUIDE.md asks for
-  separate CSS and JS files; this is a consistent, long-standing deviation from that standard.
-- No `tests/`, no `static/images/`, no `instance/` directory.
+## Features named in the specifications that are not built
 
-Documentation debt
+- Screen 01: **"Remember Me"** and **account lockout after repeated failed sign-ins**. Neither is
+  built, and neither is rendered as a dead control. Note that account *deactivation* is enforced
+  and audited — `routes/auth.py::_log_blocked_sign_in()` refuses a deactivated account and records
+  whether the password supplied still worked — but that is a different mechanism from a
+  failed-attempt counter. ("Show Password" is now built: `login.html` carries a working
+  `aria-pressed` eye toggle.)
+- Screen 09: **"Save Draft"** and **"Schedule"** for SMS broadcasts. Not built; the compose dialog
+  offers Cancel and Send Broadcast only, so neither appears as a dead button.
+- Screen 11: **account writes** — Add User, Reset Password, Disable, Enable, Delete. Present and
+  disabled, each stating why, because every one of them touches authentication. This is an open
+  scope decision for the team rather than an oversight.
+- **Column sorting** on the list screens. The rows arrive in the order the query returns them and
+  each screen states that order in its footer. This is the `sort` reason in `utils/unavailable.py`,
+  quoted by Patient Records, Medicine Inventory and Appointment Scheduling.
+- **Paging**. Every row the query returns is already on the page, so there is no second page; the
+  `pagination` reason says so on the two screens that used to show page numbers.
+- **Exporting only a ticked selection** on Patient Records' bulk bar (`export_selection`). Export
+  of the full register is built; exporting a selection is not.
+- **Backup and Restore** on Settings, and the **SMS gateway** controls on the same screen. The SMS
+  integration itself is real — `utils/sms.py` posts to Semaphore and every send checks
+  `SEMAPHORE_API_KEY` — so what is missing there is a configured key, not the feature.
 
-- 03_SCREEN_SPECIFICATIONS.md still describes 15 screens. The system has 21. Immunization
-  tracking, the Record Consultation screen, the walk-in queue, advance booking with conflict
-  detection, the cancel/reschedule/no-show closures, the single-consultation invariant, SMS
-  broadcast persistence and audit logging are all built and none of them are documented there.
-- 09_IDS-BPHCSN_UI_Architecture_FROM-CLAUDE.md §1 also still lists 15 screens.
+## Engineering practice
+
+- **Templates carry inline `<style>` and `<script>` blocks.** 17 of the 23 files in `templates/`
+  do. `04_DEVELOPMENT_GUIDE.md` asks for separate CSS and JS files; `static/css/` and `static/js/`
+  hold only vendor assets (Bootstrap, Chart.js, and the self-hosted Inter and Material Symbols
+  fonts). This is a consistent, long-standing deviation from that standard and is the largest
+  outstanding one.
+- **No `tests/` directory.** Verification in this project is done by writing a throwaway script
+  per task that exercises the routes end-to-end against an independent `sqlite3` connection and
+  then deleting it. That has caught real defects, but it leaves nothing runnable behind, so a
+  reviewer cannot re-run the suite that verified a change.
+- **No `static/images/` and no `instance/` directory.**
+- **`app.db` is git-ignored and is the only copy of the demonstration data.** Losing it loses every
+  patient, appointment and stock row the demo runs on. The mitigation is a manual dated copy taken
+  outside the application.
+
+## Documentation debt — closed 21 August 2026
+
+This subsection previously recorded that `03_SCREEN_SPECIFICATIONS.md` described 15 screens while
+the system had 21, and that `09_IDS-BPHCSN_UI_Architecture_FROM-CLAUDE.md` §1 also listed 15. Both
+are now current and both were re-checked on 21 August 2026:
+
+- The system has **20 screens**. `templates/` holds 23 `.html` files; three are not screens
+  (`base.html`, the shared layout, plus the `_print.html` and `_chart_table.html` partials).
+- `03_SCREEN_SPECIFICATIONS.md` documents Screens 01–20 and carries a
+  "Reconciliation With The Built System" section, updated in the same pass as this one.
+- `09_IDS-BPHCSN_UI_Architecture_FROM-CLAUDE.md` §1 lists the same 20.
+
+## What this section used to claim, and why it was wrong
+
+Left here deliberately. The point of a Known Gaps section is that a reader can trust it, and the
+way it loses that trust is by being written once and never re-read while the system moves past it.
+
+| Previous claim | Actual state on 21 August 2026 |
+|---|---|
+| "The project is NOT under version control… there is no history and no rollback." | 27 commits on `master`, from the initial commit to `a46ee83`. |
+| "No README.md, although 04_DEVELOPMENT_GUIDE.md lists one." | `README.md` exists, and states how to run the system, the three roles, and the migration order. |
+| Nine screens listed as hard-coded or presentation-only. | One (Notifications). Settings is partly live. The other seven named are all data-driven. |
+| "User Management — the `users` table holds 3 accounts; the screen shows 7 fixed rows." | The screen lists the real roster and derives each role's permissions from the live `url_map`. Only the account *writes* are still disabled. |
+| "Audit Logs — real entries are being written, but the screen does not read them yet." | Screen 12 reads the trail through `get_audit_logs()`, filters it by module, and exports it. |
+| "Settings — nothing reads or writes it." | Nothing *writes* it. The Security pane *reads* live sign-in counts from the audit trail. |
+| "Screen 10: Print, Export to Excel and Export to PDF… not built." | All three are built. Seven screens have real `.xlsx` and `.pdf` download routes — Patient Records, Medicine Inventory, Appointment Scheduling, User Management, Audit Logs, Reports & Analytics and Community Reports; see `routes/roster_export.py`, `report_export.py` and `audit_export.py`. |
+| "Export and print… the controls exist in the markup and are decorative." | No export control in this project is decorative. |
+| "Search, sort, filter and export controls on most list screens are present but not wired." | Search and filter are wired on every list screen; export is built. **Sort genuinely is not**, and is the only one of the four still true. |
+| "Sign-ins are not recorded." | `routes/auth.py` records sign-ins, sign-outs, refusals and blocked attempts. Screen 11 shows a real Last Login and Screen 12's Login Events card is live. |
 
 ---
 
