@@ -301,8 +301,33 @@ def display_timestamp(value, fallback=MISSING):
     return f"{local.strftime('%b %d, %Y')} · {local.strftime('%I:%M %p').lstrip('0')}"
 
 
+def clock_time(value=None, fallback=MISSING):
+    """A moment at the health center -> '4:21 PM'.
+
+    The time of day on its own, for the one place that wants it without a date
+    beside it: the header pill, which reports when the page in front of you was
+    built and sits two inches from the full date the screen already prints.
+    display_timestamp() above is the general case and renders both.
+
+    An aware datetime is converted to clinic time first, so this cannot print a
+    UTC hour with a Manila label. A naive one is assumed to be clinic-local
+    already, which is what now() hands back.
+    """
+    if value is None:
+        value = now()
+    if isinstance(value, datetime):
+        local = value.astimezone(CLINIC_TIMEZONE) if value.tzinfo else value
+    else:
+        local = to_clinic_time(value)
+    if local is None:
+        return fallback
+    # %I zero-pads the hour on every platform; the lstrip is what turns 04 into 4.
+    return local.strftime("%I:%M %p").lstrip("0")
+
+
 def register_date_filters(app):
     app.jinja_env.filters["display_date"] = display_date
     app.jinja_env.filters["long_date"] = long_date
     app.jinja_env.filters["full_date"] = full_date
     app.jinja_env.filters["display_timestamp"] = display_timestamp
+    app.jinja_env.filters["clock_time"] = clock_time

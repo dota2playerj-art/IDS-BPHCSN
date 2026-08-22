@@ -67,17 +67,33 @@
     display:flex; align-items:center; justify-content:space-between; padding:0 32px;
     position:sticky; top:0; z-index:50;
   }
+  /* The header search is a real form now, so this is an input wrapper rather
+     than a block of muted text -- same construction as .toolbar-search at the
+     bottom of this file, which is the box it hands its term to. */
   .search-box{
     background:var(--bg); border:1px solid var(--border-color); border-radius:12px;
     padding:9px 14px; display:flex; align-items:center; gap:8px; width:340px; color:var(--text-muted); font-size:14px;
+    margin:0;
   }
+  .search-box:focus-within{border-color:var(--teal);}
+  .search-box input{border:none; background:transparent; outline:none; width:100%; font-size:14px; color:var(--text-dark); padding:0;}
+  .search-box input::placeholder{color:var(--text-muted);}
+  .search-box button{border:none; background:transparent; padding:0; color:var(--text-muted); display:flex; align-items:center;}
+  .search-box button:hover{color:var(--teal-dark);}
   .header-right{display:flex; align-items:center; gap:14px;}
+  /* The header's "loaded at" pill. Unchanged in shape from the status pill it
+     replaces; what it says, and why, is at the pill itself. */
   .sync-pill{
     display:flex; align-items:center; gap:6px; background:var(--bg); border:1px solid var(--border-color);
     border-radius:999px; padding:6px 12px; font-size:13px; color:var(--text-muted);
   }
-  .bell-btn{ position:relative; width:40px; height:40px; border-radius:12px; background:var(--bg); display:flex; align-items:center; justify-content:center; color:var(--text-muted);}
-  .bell-btn .dot{position:absolute; top:8px; right:9px; width:7px; height:7px; background:var(--danger); border-radius:50%;}
+  /* Worn by an <a> now rather than a bare <div>, and only on the one role whose
+     menu holds a Notifications screen -- so it needs the anchor reset Bootstrap's
+     reboot would otherwise underline it with. The red .dot that used to sit on
+     top of this is gone; there is no unread count in this system to put in it. */
+  .bell-btn{ width:40px; height:40px; border-radius:12px; background:var(--bg); display:flex; align-items:center; justify-content:center; color:var(--text-muted); text-decoration:none;}
+  .bell-btn:hover{color:var(--teal-dark);}
+  .bell-btn.active{background:var(--teal-light); color:var(--teal-dark);}
   .profile-chip{display:flex; align-items:center; gap:10px; cursor:pointer;}
   .profile-chip .avatar{width:38px;height:38px;border-radius:50%;background:var(--teal-light);color:var(--teal-dark);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;}
   .profile-chip .nm{font-size:13px;font-weight:600; color:var(--text-dark); line-height:1.1;}
@@ -250,13 +266,66 @@
 
   <!-- HEADER -->
   <div class="topheader">
-    <div class="search-box">
-      <span class="material-symbols-outlined" style="font-size:18px;">search</span>
-      Search patient name or ID...
-    </div>
+{#- GLOBAL PATIENT SEARCH. It was a <div> holding the words "Search patient name
+    or ID..." -- not an input, inside no form, wired to nothing -- on all 21
+    screens. It is a form now, and it deliberately introduces no matching rule of
+    its own: it submits `search` to Patient Records, whose toolbar box has
+    matched patient id / name / contact number / address as a lower-cased
+    substring since that screen was built. One rule, in one place, so the header
+    and the screen it lands on cannot disagree about what a term matches.
+
+    Only the two roles that hold Patient Records get the box at all.
+    09_UI_Architecture section 2 keeps the Barangay Official out of patient data
+    entirely, which is why patient_records_endpoint is simply absent for that
+    role in inject_role_context() -- so this is not a hidden control that a typed
+    URL would still reach, it is a control that has no destination to be given.
+    The empty div keeps the header's two ends where they are. #}
+{%- if patient_records_endpoint is defined %}
+    <form class="search-box" method="get" action="{{ url_for(patient_records_endpoint) }}" role="search">
+      <button type="submit" aria-label="Search the patient register" title="Search the patient register by name, patient ID, contact number or address">
+        <span class="material-symbols-outlined" style="font-size:18px;">search</span>
+      </button>
+      <input type="text" name="search" maxlength="{{ header_search_max }}"
+             placeholder="Search patient name, ID or contact..." aria-label="Search patient name, ID or contact">
+    </form>
+{%- else %}
+    <div></div>
+{%- endif %}
     <div class="header-right">
-      <div class="sync-pill"><span class="material-symbols-outlined" style="font-size:16px;">sync</span>Synced just now</div>
-      <div class="bell-btn"><span class="material-symbols-outlined">notifications</span><span class="dot" id="headerBellDot"></span></div>
+{#- WAS "Synced just now", on every screen, always. Nothing in this application
+    syncs: there is one SQLite file, no background job, no second store and
+    nothing to reconcile against, so the pill was asserting a state the system
+    has no way to be in -- and asserting the most reassuring version of it.
+
+    What is true, and is worth a reader knowing, is the thing the pill was
+    faking: how current what you are looking at is. Every screen here is built
+    from the database at request time and no figure on it moves afterwards (the
+    responses are sent no-store for that reason), so the honest answer is the
+    moment this page was rendered. Reload and it changes, which is what makes it
+    checkable rather than another sentence to take on trust. #}
+      <div class="sync-pill" title="This page was built from the database at {{ rendered_at | clock_time }} on {{ clinic_today | full_date }}. Nothing on it updates until you reload it — this system has no background sync.">
+        <span class="material-symbols-outlined" style="font-size:16px;">schedule</span>Loaded {{ rendered_at | clock_time }}
+      </div>
+{#- WAS a <div> with a red dot on it, on every screen and for every role, opening
+    nothing. Two separate claims, and they are answered separately.
+
+    The dot claimed unread items. There is no notifications table and nothing
+    writes one -- see unavailable.notifications -- so there was no count behind
+    it and there is none to put back. It is gone rather than zeroed, for the same
+    reason the sidebar's "5" badge went: a zero badge reads as an alert that is
+    not there.
+
+    The bell itself is only shown where it has somewhere to go. The Barangay
+    Official has a Notifications screen in the menu and this links to it. The
+    Administrator and Health Center Staff have no such screen at any URL, so
+    their header simply has no bell -- there is nothing to disable and explain,
+    because there is no destination to explain the absence of. #}
+{%- if current_role == 'barangay official' %}
+      <a class="bell-btn{% if active_nav == 'notifications' %} active{% endif %}" href="{{ url_for('notifications') }}"
+         title="Open Notifications. This system stores no notifications, so there is no unread count — the screen says what it can show instead.">
+        <span class="material-symbols-outlined">notifications</span>
+      </a>
+{%- endif %}
       <div class="dropdown">
       <div class="profile-chip" role="button" id="profileDropdown" data-bs-toggle="dropdown" aria-expanded="false">
 

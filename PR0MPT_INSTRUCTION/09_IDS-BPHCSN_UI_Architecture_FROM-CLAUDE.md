@@ -220,11 +220,27 @@ Every screen — regardless of role — must be built from the same four regions
 | Region | Spec | Behavior |
 |--------|------|----------|
 | **Sidebar** | 280px fixed width, left, teal `#169B92` background, white text/icons | **Identical structure app-wide.** Only the *menu items* change per role (see Section 2) — never the styling, icon set, active/hover treatment, or position. |
-| **Header** | 80px fixed height, white background | **Identical across all screens.** Contains: search bar, sync status, notification bell, user avatar + role label + dropdown. Never redesigned per screen. |
+| **Header** | 80px fixed height, white background | **Identical across all screens a role can reach.** Contains: global patient search, a "Loaded HH:MM" pill, the notification bell, and the user avatar + role label + dropdown. Never redesigned per screen — but two of the four are scoped to the role, on the same grounds §2 scopes the sidebar, and the detail is below this table. |
 | **Main Content Area** | Fluid, Bootstrap 12-column grid, `#F5F7FA` background | **The only region that changes.** Houses the screen-specific cards, tables, forms, and charts defined in the Screen Specifications. |
 | **Footer** | No persistent footer bar observed in approved UI; system status/version info is anchored at the bottom of the sidebar instead (e.g., "System Online," version number) | Retain this sidebar-footer pattern — do not introduce a separate horizontal page footer, to stay consistent with the approved Dashboard. |
 
 **Rule:** If a new screen appears to require a layout change to sidebar or header, that is a signal to stop and flag it — per the Design System, these two regions must never be redesigned.
+
+### 4.1 What the header actually holds, per role
+
+The header was drawn with four elements and shipped with three of them wired to
+nothing: a `<div>` reading "Search patient name or ID...", a pill reading "Synced
+just now", and a bell with a red dot. All three appeared on all 21 screens for
+all three roles. They are now the following, and the rule above is unchanged —
+the header is still never redesigned *per screen*. What varies is per **role**,
+which is the same axis §2 already scopes the sidebar on.
+
+| Element | Administrator | Health Center Staff | Barangay Official | Notes |
+|---|---|---|---|---|
+| **Global patient search** | Yes | Yes | **Absent** | A real form. It submits `search` to that role's Patient Records URL and introduces no matching rule of its own — Patient Records' toolbar box has matched patient ID / name / contact number / address as a lower-cased substring since that screen was built, and it is what runs the term. The Barangay Official has no Patient Records (§2), so there is no destination to give the box; `patient_records_endpoint` is simply absent for that role and the header renders nothing. |
+| **"Loaded HH:MM" pill** | Yes | Yes | Yes | Was "Synced just now". Nothing in this system syncs: one SQLite file, no background job, no second store. What it prints instead is the moment the page was rendered, from `utils.dates.now()` — the same clock every date on the screen comes from. Reload and it changes, which is what makes it checkable. |
+| **Notification bell** | **Absent** | **Absent** | Yes | Links to the Barangay Official's Notifications screen, which is the only role that has one at any URL. The other two have no such screen, so their header has no bell — there is nothing to disable and explain. |
+| **Red unread dot** | — | — | — | Removed for every role. There is no notifications table and nothing writes one, so there was no count behind it. Removed rather than zeroed, for the same reason the sidebar's hard-coded "5" badge went: a zero badge reads as an alert that is not there. |
 
 ---
 
@@ -234,7 +250,7 @@ Every screen — regardless of role — must be built from the same four regions
 |-----------|-----------|
 | **Dashboard/Overview Cards** (white, 16px radius, soft shadow, 24px padding) | All three dashboards, Reports summary tiles |
 | **Data Table** (rounded, white, soft shadow, alternating row hover, status badges, action buttons, search/filter/sort/pagination) | Patient Records, Medicine Inventory, Appointment Scheduling, User Management, Audit Logs, Reports (tabular sections) |
-| **Search Bar** | Header (global patient/ID search), Patient Records, Medicine Inventory tables |
+| **Search Bar** | Header (global patient search — Administrator and Health Center Staff only; it submits to Patient Records and that screen's own filter does the matching), Patient Records, Medicine Inventory tables |
 | **Advanced Filter** | Patient Records, Medicine Inventory, Audit Logs, Appointment Scheduling |
 | **Buttons** (Primary/Secondary/Danger/Success, Bootstrap-styled, 12px radius) | Every screen — form submissions, table actions, modals |
 | **Forms** (48px input height, 12px radius, label-above, Bootstrap validation) | Register Patient, Add/Edit Medicine, Appointment scheduling form, Record / Edit Consultation, SMS composer, Login. *(Settings and User Management carry form markup but no working form — see §1.)* |
@@ -534,6 +550,100 @@ Three properties keep it a shortcut rather than a second entry point:
 Idle, it states "No active consultation right now" and points at Appointment Scheduling rather
 than vanishing — the honesty pattern the rest of the dashboard already follows. A panel that
 silently disappears teaches a reader that the screen is inconsistent, not that the room is empty.
+
+---
+
+## 14. Design Decision — The Three Header Elements, Answered Three Different Ways
+
+The header carried a search box, a status pill and a notification bell on all 21 screens for all
+three roles, and none of the three did anything. They were raised together, and the useful part of
+the finding is that they were **not the same kind of problem** — one was an unbuilt feature worth
+building, one was a false claim, and one was a control whose destination existed for exactly one
+role. Three defects, three different correct answers.
+
+### The search box was an unbuilt feature, so it was built
+
+It was a `<div>` containing the words "Search patient name or ID..." — not an `<input>`, inside no
+`<form>`, wired to nothing. But finding a patient quickly from wherever you happen to be is a real
+need in a clinic, and Patient Records had already solved the matching half of it: a lower-cased
+substring test against patient ID, full name, contact number and address, with the matchable text
+written into each row's `data-search` by the server.
+
+So the header does not search. It **submits**, and the screen that already knows how to match does
+the matching:
+
+```
+header form  ──GET ?search=term──▶  /…/patient_records  ──▶  value="term" in #patientSearch
+                                                        ──▶  applyFilters() on load
+```
+
+One rule, in one place. The count line, the empty state and Print List's "filtered by" note all
+follow from that single pass, because they always did. Nothing on the server filters the roster:
+the screen renders every registered patient and narrows them in the browser, which gives the same
+answer a re-query would because there is no unseen page a match could hide on. Filtering
+server-side *as well* would mean two matching rules for one box, and the day they disagreed the
+screen would be showing a count it could not justify. The exports are untouched and still download
+the whole register, exactly as their titles and cover sheets already say.
+
+**The Barangay Official gets no search box at all.** §2 keeps that role out of patient data
+entirely, so `patient_records_endpoint` is absent for it in `inject_role_context()` and the header
+renders nothing there. This is worth stating precisely: it is not a control hidden from a role that
+could still reach the data by typing a URL — the guards refuse `/admin/patient_records` and
+`/staff/patient_records` for that role independently. It is a control with no destination to be
+given.
+
+### The pill was a false claim, so it now states something checkable
+
+"Synced just now" was static text. Nothing in this application syncs — there is one SQLite file, no
+background job, no second store and nothing to reconcile against — so the pill was asserting a
+state the system has no mechanism to be in, and asserting the most reassuring version of it.
+
+The honest replacement is the thing it was faking: how current what you are looking at is. Every
+screen is built from the database at request time and no figure on it moves afterwards (responses
+are sent `no-store` for that reason), so the pill prints the moment the page was rendered —
+"Loaded 4:34 PM" — from `utils.dates.now()`, the one source of "now" in the application and the
+same clock the dates on the screen come from. Its tooltip says outright that nothing updates until
+you reload and that there is no background sync.
+
+Reload it and the time changes. That is the whole point: the old pill asked to be believed, and
+this one can be checked.
+
+### The bell had a destination for one role, and none for the other two
+
+This is the element the investigation actually turned on, and it corrected an assumption worth
+recording.
+
+**The Barangay Official's Notifications screen is real and reachable, but it is not a working
+inbox.** It renders at `/official/notifications`, it is in that role's sidebar, and it returns 200
+— and its entire content is a statement that this system stores no notifications, with the two
+things it *can* point at (SMS Notifications, Vaccination Campaigns) linked from it. That is a
+legitimate screen under this project's rules and it stays. It is simply not a source of alerts, and
+anything wired to it must not imply that it is.
+
+So:
+
+- **Barangay Official** — the bell links to that screen. It is a real destination this role already
+  holds, and the bell is a second door onto a sidebar item, which is what a header bell normally is.
+  Its tooltip states that the system stores no notifications, so the control does not promise more
+  than the page behind it delivers, and it takes an `active` state on the screen it points at like
+  every other navigation control here.
+- **Administrator and Health Center Staff** — no bell. Neither role has a Notifications screen at
+  any URL, and both are refused `/official/notifications` by its guard. There is no destination, so
+  there is nothing for a disabled-with-a-reason control to explain the absence of; the honest
+  outcome is that the element is not there. This is the third case
+  `utils/unavailable.py` already documents: *a control that should not be on the screen is removed,
+  and its reason goes with it.*
+- **The red dot is gone for every role.** There is no notifications table and nothing writes one, so
+  there was never a count behind it. It was removed rather than set to zero, for the reason the
+  sidebar's hard-coded "5" badge was removed: a zero badge reads as an alert that is not there.
+
+### Why this does not violate "the header is never redesigned"
+
+§4's rule is that the header is never redesigned **per screen**, and it is not: every screen a role
+can reach shows that role the same header. What varies is per **role** — which is the axis §2
+already scopes the sidebar on, and for the same reason. A role that cannot open Patient Records has
+no use for a box that only leads there, and a role with no Notifications screen has nowhere for a
+bell to go.
 
 ---
 

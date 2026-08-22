@@ -2,10 +2,16 @@
 from flask import session
 
 from models.inventory import get_low_stock_alert
-from utils.dates import today
+from utils.dates import now, today
 from utils.roles import normalize_role
 from utils.security import get_current_user
 from utils.unavailable import UNAVAILABLE
+
+
+# Longest search term the header box accepts and Patient Records will honour.
+# It exists so a hand-typed URL cannot put a kilobyte of query string into the
+# screen's search input; nothing in the register is anywhere near this long.
+HEADER_SEARCH_MAX = 100
 
 
 def _initials(name):
@@ -153,6 +159,19 @@ def inject_role_context():
     # through the full_date filter, so there is one date and one place it comes
     # from -- utils.dates.today(), the same clock expiry, ages and the queue use.
     context["clinic_today"] = today()
+
+    # When this page was built, for the header pill that used to read "Synced
+    # just now". Taken here rather than in each route because the pill lives in
+    # base.html and every screen extends it, and taken from utils.dates.now() --
+    # the one source of "now" in the application -- so the pill and the dates the
+    # screen prints beside it are read off the same clock. See base.html for why
+    # the render moment is the honest answer to what the old pill was claiming.
+    context["rendered_at"] = now()
+
+    # The header search box's own cap, matched to what Patient Records will do
+    # with the term. Kept next to the box's other constants rather than in the
+    # template so the form's maxlength and the server's truncation are one number.
+    context["header_search_max"] = HEADER_SEARCH_MAX
 
     # The signed-in account's own name, when there is one. The sidebar labels
     # above are per-role defaults from before authentication carried a real user;

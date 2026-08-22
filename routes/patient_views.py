@@ -31,6 +31,7 @@ from models.patients import (
     update_patient,
     validate_patient_form,
 )
+from utils.context import HEADER_SEARCH_MAX
 
 # Bulk status changes are restricted to a selection that is already all on the
 # same status. The alternative -- offering the union of every selected patient's
@@ -165,13 +166,36 @@ def _filter_options(patients):
     }
 
 
-def patient_records_context():
-    """Everything Screen 03 renders: the roster and the four stat cards."""
+def patient_records_context(search=""):
+    """Everything Screen 03 renders: the roster and the four stat cards.
+
+    `search` is a term arriving from the header's global search box, and it is
+    the whole of what that box does. It is NOT applied here: this screen renders
+    every registered patient and narrows them in the browser -- the search box
+    and all five Advanced Filter controls run over the rendered rows, which gives
+    the same answer a re-query would because there is no unseen page a match
+    could be hiding on. Filtering the roster server-side as well would mean two
+    matching rules for one box, and the moment they disagreed the screen would be
+    showing a count it could not justify.
+
+    So the term is handed to the template, which puts it in the toolbar's own
+    search input, and the rule that already lives there does the matching. The
+    counter, the empty state and Print List's "filtered by" line all follow from
+    that one pass for free. The exports are untouched and still download the
+    whole register, which their titles and cover sheets already say outright.
+
+    Truncated rather than rejected: a term nobody can type is a hand-made URL,
+    and the honest response to one is to search for the first hundred characters
+    of it, not to error. Length is the only thing checked -- the matching is a
+    substring test against text the server wrote, so there is nothing to escape
+    here that Jinja does not escape on the way out.
+    """
     patients = get_all_patients()
     return {
         "patients": patients,
         "stats": get_patient_stats(),
         "filter_options": _filter_options(patients),
+        "search_term": (search or "").strip()[:HEADER_SEARCH_MAX],
     }
 
 

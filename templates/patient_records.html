@@ -238,7 +238,13 @@
         <div class="d-flex align-items-center gap-2 flex-wrap">
           <div class="toolbar-search">
             <span class="material-symbols-outlined" style="font-size:18px;">search</span>
-            <input type="text" id="patientSearch" placeholder="Search by patient name, patient ID, or contact number">
+            {#- value= is the term the header's global search box submitted, if
+                this screen was opened from it. Nothing else about this input
+                changes: the same box, the same live filter, the same rule. The
+                header does not match anything itself -- it hands the term here
+                and this is what runs it, so a search started from any screen in
+                the app narrows the roster exactly as one typed in place does. #}
+            <input type="text" id="patientSearch" value="{{ search_term }}" placeholder="Search by patient name, patient ID, or contact number">
           </div>
           <button class="filter-btn" id="filterToggleBtn" onclick="toggleFilterPanel()">
             <span class="material-symbols-outlined" style="font-size:18px;">filter_list</span>Advanced Filter
@@ -844,5 +850,13 @@
     [fSex, fStatus, fVisit, fAgeMin, fAgeMax].forEach(function(control){
       control.addEventListener('change', applyFilters);
     });
+
+    // A term arriving from the header's global search box is in the input above
+    // but has not been run yet -- nothing has typed into it. One pass now is what
+    // makes the landing page show the narrowed roster rather than the whole
+    // register with a term sitting unapplied in the box. It is the same
+    // applyFilters() every keystroke calls, so the count line, the empty state
+    // and Print List's "filtered by" line are all correct from the first paint.
+    if(search.value.trim()){ applyFilters(); }
   })();
 </script>{% endblock %}

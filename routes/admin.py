@@ -94,7 +94,14 @@ def admin_dashboard():
 @login_required
 @role_required("Admin")
 def patient_records():
-    return render_template('patient_records.html', **patient_records_context())
+    """Screen 03. `?search=` is the header's global search box arriving here --
+    it is the only thing that box does, and this route is where it lands for
+    this role. The term is not matched here; see patient_records_context() for
+    why the screen's own toolbar filter is what runs it."""
+    return render_template(
+        'patient_records.html',
+        **patient_records_context(search=request.args.get('search', '')),
+    )
 
 
 # Export Excel and Export PDF for the roster above. Both carry the same guard as
