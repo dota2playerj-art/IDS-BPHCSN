@@ -249,7 +249,35 @@
           <button class="filter-btn" id="filterToggleBtn" onclick="toggleFilterPanel()">
             <span class="material-symbols-outlined" style="font-size:18px;">filter_list</span>Advanced Filter
           </button>
-          <button class="filter-btn" type="button" disabled title="{{ unavailable.sort }}"><span class="material-symbols-outlined" style="font-size:18px;">sort</span>Sort</button>
+{#- SORT. Built, for the same four-column reason Patient Records' is: every
+    column offered is one this table already shows and the row already carries a
+    comparable key for.
+
+    Category, Dosage / Form and Supplier are not offered -- Category and Supplier
+    are what the Advanced Filter narrows by, and an order over them is a grouping
+    nobody reads a shelf in. Reorder Level is not offered either: on its own it
+    sorts by how big each item's threshold happens to be, which says nothing about
+    the shelf; the question behind it is "what is running out", and Status answers
+    that properly because stock_status() has already weighed each item's stock
+    against its own reorder level. #}
+          <div class="sort-wrap">
+            <button class="filter-btn" type="button" id="sortToggleBtn" onclick="toggleSortMenu()"
+                    aria-haspopup="true" aria-expanded="false" aria-controls="sortMenu">
+              <span class="material-symbols-outlined" style="font-size:18px;">sort</span><span id="sortBtnLabel">Sort</span>
+            </button>
+            <div class="sort-menu" id="sortMenu" role="menu" aria-labelledby="sortToggleBtn">
+              <div class="sort-menu-label">Sort inventory by</div>
+              <button type="button" class="sort-option" role="menuitem" data-sort-key="name">Medicine Name<span class="dir"></span></button>
+              <button type="button" class="sort-option" role="menuitem" data-sort-key="stock">Current Stock<span class="dir"></span></button>
+              <button type="button" class="sort-option" role="menuitem" data-sort-key="expiry">Expiration Date<span class="dir"></span></button>
+              <button type="button" class="sort-option" role="menuitem" data-sort-key="status">Status<span class="dir"></span></button>
+              <div class="sort-menu-hint">
+                Choosing the column already in use reverses it. Sorting reorders the
+                whole shelf, so it keeps whatever the search box and Advanced Filter
+                are currently showing &mdash; including whether retired items are among them.
+              </div>
+            </div>
+          </div>
         </div>
         <div class="d-flex align-items-center gap-2">
 {#- EXPORT. Two working links, the same pair every other export in this project
@@ -344,7 +372,7 @@
               <th style="text-align:right;">Actions</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody id="invTableBody">
 {%- for item in items %}
             {#- What the toolbar matches on, written by the server in the item's
                 stored form. data-category mirrors the expression the Category
@@ -358,7 +386,27 @@
                     dropdown. Patient Records filters its Inactive and Deceased
                     records through its one Status control in exactly this way. #}
                 data-status="{{ (item.display_status or '') | lower }}"
-                data-expiry="{{ item.expiry_date or '' }}">
+                data-expiry="{{ item.expiry_date or '' }}"
+                {#- SORT KEYS, written by the server in comparable form exactly as
+                    the filter keys above are.
+
+                    data-sort-name is the name get_all_inventory_items() already
+                    orders by (ORDER BY name COLLATE NOCASE), so "Medicine name,
+                    A-Z" is the order the page arrives in.
+
+                    data-stock is the raw quantity, not the "1,234 tablet" the
+                    cell prints -- a thousands separator would sort 1,000 below
+                    200 as text, and the unit is not a number at all.
+
+                    data-status-rank is STATUS_SORT_ORDER, which is stock_status()'s
+                    own urgency ladder; see models/inventory.py.
+
+                    data-expiry above already holds the ISO date and is reused
+                    rather than duplicated: the expiry filter and the expiry sort
+                    are asking about the same field, so they read the same one. #}
+                data-sort-name="{{ (item.name or '') | lower }}"
+                data-stock="{{ item.stock_quantity if item.stock_quantity is not none else '' }}"
+                data-status-rank="{{ item.status_rank if item.status_rank is not none else '' }}">
               <td><div class="med-name">{{ item.name }}</div><div class="med-generic">{{ item.generic_name or item.category }}</div></td>
               <td><span class="cat-pill">{{ item.drug_class or item.category }}</span></td>
               <td>{{ item.display_dosage or '—' }}</td>
@@ -499,8 +547,11 @@
       <div class="table-footer" id="tableFooter">
         <div class="pg-info" id="itemCount" data-retired="{{ stats.retired_count }}">Showing all {{ items|length }} inventory item{{ '' if items|length == 1 else 's' }}{% if stats.retired_count %}, including {{ stats.retired_count }} retired{% endif %}</div>
         {#- Stated for the same reason Patient Records now states it, and kept out
-            of #itemCount because applyFilters() rewrites that line. #}
-        <div class="pg-info">Sorted by medicine name, A&ndash;Z</div>
+            of #itemCount because applyFilters() rewrites that line. It was the
+            fixed words "Sorted by medicine name, A-Z", which stayed true only
+            while nothing could change the order; now that Sort works it is
+            written from the same state the button and the menu read. #}
+        <div class="pg-info" id="sortSummary">Sorted by medicine name, A&ndash;Z</div>
         <div class="pg-info" title="{{ unavailable.pagination }}">Single page</div>
       </div>
 {%- endif %}
@@ -556,6 +607,9 @@
 {% endblock %}
 
 {% block scripts %}
+{#- The shared column-sort comparator, the same file Patient Records loads. Only
+    the column list below is this screen's own. #}
+<script src="{{ url_for('static', filename='js/table-sort.js') }}"></script>
 <script>
   function toggleFilterPanel(){
     var panel = document.getElementById('filterPanel');
@@ -704,5 +758,93 @@
     [fCat, fStatus, fExpiry].forEach(function(control){
       control.addEventListener('change', applyFilters);
     });
+  })();
+
+  // COLUMN SORT
+  //
+  // The comparator is static/js/table-sort.js, shared with Patient Records; this
+  // is this screen's column list and its menu wiring.
+  //
+  // THE ONE THING THIS TABLE NEEDS THAT PATIENT RECORDS DOES NOT
+  // ------------------------------------------------------------
+  // A record here is two rows, not one: every item row is followed by its own
+  // read-only detail row, which applyFilters() above already hides and shows in
+  // step with its parent. Reordering the item rows alone would leave every panel
+  // attached to whichever medicine happened to land above it -- so the companion
+  // below hands each item row's detail row to the sorter, which moves the pair
+  // together. Because the elements are moved rather than rebuilt, a panel the
+  // operator had open is still open, and still on the same medicine, afterwards.
+  var toggleSortMenu;
+  (function(){
+    var button  = document.getElementById('sortToggleBtn');
+    var menu    = document.getElementById('sortMenu');
+    var label   = document.getElementById('sortBtnLabel');
+    var summary = document.getElementById('sortSummary');
+    var tbody   = document.getElementById('invTableBody');
+
+    // An empty inventory renders no table and no toolbar row.
+    if(!button || !menu || !tbody){ return; }
+
+    var sorter = IDSTableSort.create({
+      tbody: tbody,
+      rowSelector: 'tr.item-row',
+      companion: function(row){
+        var detail = row.nextElementSibling;
+        return (detail && detail.classList.contains('detail-row')) ? detail : null;
+      },
+      columns: [
+        { key: 'name',   label: 'medicine name',   attr: 'data-sort-name',   type: 'text',
+          asc: 'A–Z',       desc: 'Z–A' },
+        // Opens lowest-first: a stock sort is asked "what is nearly gone", not
+        // "what is there most of".
+        { key: 'stock',  label: 'current stock',   attr: 'data-stock',       type: 'number',
+          asc: 'lowest first',   desc: 'highest first' },
+        // Soonest-first for the same reason, and the reason blanks sort last is
+        // this exact column: "what do I use up next" must not open on a page of
+        // items with no expiry date on file. See static/js/table-sort.js.
+        { key: 'expiry', label: 'expiration date', attr: 'data-expiry',      type: 'date',
+          asc: 'soonest first',  desc: 'latest first' },
+        { key: 'status', label: 'status',          attr: 'data-status-rank', type: 'number',
+          asc: 'most urgent first', desc: 'least urgent first' }
+      ],
+      // The order get_all_inventory_items() already returned the rows in.
+      initial: { key: 'name', direction: 'asc' },
+      onChange: function(state){
+        label.textContent = 'Sort: ' + state.label.replace(/^./, function(c){ return c.toUpperCase(); })
+                          + ' (' + state.directionLabel + ')';
+        if(summary){
+          summary.textContent = 'Sorted by ' + state.label + ', ' + state.directionLabel;
+        }
+        Array.prototype.forEach.call(menu.querySelectorAll('.sort-option'), function(option){
+          var active = option.dataset.sortKey === state.key;
+          option.classList.toggle('active', active);
+          option.setAttribute('aria-current', active ? 'true' : 'false');
+          option.querySelector('.dir').textContent = active ? state.directionLabel : '';
+        });
+      }
+    });
+
+    toggleSortMenu = function(){
+      var open = menu.classList.toggle('show');
+      button.classList.toggle('open', open);
+      button.setAttribute('aria-expanded', open ? 'true' : 'false');
+    };
+
+    menu.addEventListener('click', function(event){
+      var option = event.target.closest('.sort-option');
+      if(!option){ return; }
+      sorter.sortBy(option.dataset.sortKey);
+    });
+
+    document.addEventListener('click', function(event){
+      if(!menu.classList.contains('show')){ return; }
+      if(button.contains(event.target) || menu.contains(event.target)){ return; }
+      toggleSortMenu();
+    });
+    document.addEventListener('keydown', function(event){
+      if(event.key === 'Escape' && menu.classList.contains('show')){ toggleSortMenu(); }
+    });
+
+    sorter.announce();
   })();
 </script>{% endblock %}

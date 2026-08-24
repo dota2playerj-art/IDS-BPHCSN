@@ -188,6 +188,46 @@
   }
   .toolbar-search input{border:none; background:transparent; outline:none; width:100%; font-size:13.5px; color:var(--text-dark);}
   .toolbar-search input::placeholder{color:var(--text-muted); font-size:13px;}
+
+  /* SORT CONTROL - the button, and the little menu it opens.
+     Shared here rather than copied into Patient Records and Medicine Inventory
+     for the same reason static/js/table-sort.js is one file: both screens carry
+     this control, and two stylesheets drifting apart is how one screen ends up
+     with a differently-shaped menu nobody meant to change. Each screen still
+     writes its own column list; only the chrome is here.
+
+     The direction is spelled out in words on the active option and on the button
+     itself. The icon font this project ships is a fixed subset, so a glyph it
+     does not carry renders as its own literal name -- see the note on `unarchive`
+     in medicine_inventory.html -- and the one thing on this control that must
+     never be ambiguous is not left resting on a ligature. */
+  .sort-wrap{position:relative;}
+  .sort-menu{
+    display:none; position:absolute; top:calc(100% + 6px); left:0; z-index:20; min-width:260px;
+    background:#fff; border:1px solid var(--border-color); border-radius:12px; padding:6px;
+    box-shadow:0 6px 20px rgba(0,0,0,0.10);
+  }
+  .sort-menu.show{display:block;}
+  .sort-menu-label{
+    font-size:11px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase;
+    color:var(--text-muted); padding:8px 10px 6px;
+  }
+  .sort-option{
+    display:flex; align-items:center; justify-content:space-between; gap:14px; width:100%;
+    background:transparent; border:none; border-radius:8px; padding:9px 10px;
+    font-size:13.5px; font-weight:500; color:var(--text-dark); text-align:left;
+  }
+  .sort-option:hover{background:var(--bg);}
+  .sort-option .dir{font-size:12px; color:var(--text-muted); font-weight:600; white-space:nowrap;}
+  .sort-option.active{background:var(--teal-light); color:var(--teal-dark); font-weight:700;}
+  .sort-option.active .dir{color:var(--teal-dark);}
+  /* The hint under the menu says what a second click does, because a control
+     whose second click means something different should say so before it is
+     clicked rather than after. */
+  .sort-menu-hint{
+    font-size:11.5px; color:var(--text-muted); line-height:1.45;
+    padding:8px 10px 4px; margin-top:4px; border-top:1px solid var(--border-color);
+  }
 {% block styles %}{% endblock %}</style>
 </head>
 <body>

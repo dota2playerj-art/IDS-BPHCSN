@@ -249,7 +249,38 @@
           <button class="filter-btn" id="filterToggleBtn" onclick="toggleFilterPanel()">
             <span class="material-symbols-outlined" style="font-size:18px;">filter_list</span>Advanced Filter
           </button>
-          <button class="filter-btn" type="button" disabled title="{{ unavailable.sort }}"><span class="material-symbols-outlined" style="font-size:18px;">sort</span>Sort</button>
+{#- SORT. It was disabled, and its reason said column sorting "is not
+    implemented ... a menu that was never built". The menu is built. Four columns
+    are offered and each is one the table already shows and the row already
+    carries a comparable key for; nothing here sorts by a value the operator
+    cannot see in front of them.
+
+    Address and Contact Number are deliberately not offered: sorting a roster by
+    a free-text address groups nothing useful (there is no purok in the field --
+    Advanced Filter's own note says so), and a phone number has no order anybody
+    reads a patient list in. Patient ID is not offered either, because it is
+    assigned in registration order and "sort by Patient ID" is "sort by when they
+    registered" wearing a misleading label -- Last Visit answers the question
+    somebody would actually be asking. Gender has three values and is a filter,
+    not an order. #}
+          <div class="sort-wrap">
+            <button class="filter-btn" type="button" id="sortToggleBtn" onclick="toggleSortMenu()"
+                    aria-haspopup="true" aria-expanded="false" aria-controls="sortMenu">
+              <span class="material-symbols-outlined" style="font-size:18px;">sort</span><span id="sortBtnLabel">Sort</span>
+            </button>
+            <div class="sort-menu" id="sortMenu" role="menu" aria-labelledby="sortToggleBtn">
+              <div class="sort-menu-label">Sort patients by</div>
+              <button type="button" class="sort-option" role="menuitem" data-sort-key="name">Name<span class="dir"></span></button>
+              <button type="button" class="sort-option" role="menuitem" data-sort-key="age">Age<span class="dir"></span></button>
+              <button type="button" class="sort-option" role="menuitem" data-sort-key="visit">Last Visit<span class="dir"></span></button>
+              <button type="button" class="sort-option" role="menuitem" data-sort-key="status">Status<span class="dir"></span></button>
+              <div class="sort-menu-hint">
+                Choosing the column already in use reverses it. Sorting reorders the
+                whole roster, so it keeps whatever the search box and Advanced Filter
+                are currently showing.
+              </div>
+            </div>
+          </div>
         </div>
         <div class="d-flex align-items-center gap-2">
 {#- EXPORT. Two working links now, in the pair every other export in this project
@@ -404,6 +435,29 @@
                 data-sex="{{ (patient.sex or '') | lower }}"
                 data-status="{{ (patient.status or '') | lower }}"
                 data-age="{{ patient.age if patient.age is not none else '' }}"
+                {#- SORT KEYS. Written by the server in comparable form, the way
+                    the filter keys above already are -- the browser derives
+                    nothing and re-formats nothing.
+
+                    data-sort-name is surname then forename, which is the order
+                    get_all_patients() already returns (ORDER BY last_name,
+                    first_name), so "Name, A-Z" is the order the page arrives in
+                    and the first paint has nothing to reorder.
+
+                    data-age-years is the NUMBER, not the Age column's text.
+                    patient.age is a display string and reads "2 months, 23 days"
+                    for an infant; comparing that would sort a two-month-old
+                    between a two-year-old and a three-year-old. age_years is what
+                    the model keeps for exactly this reason.
+
+                    data-status-rank is PATIENT_STATUSES' own order, so Active /
+                    Inactive / Deceased sorts in the order the rest of the system
+                    already lists those statuses in rather than alphabetically,
+                    which would put Deceased second. #}
+                data-sort-name="{{ ((patient.last_name or '') ~ ' ' ~ (patient.first_name or '')) | lower }}"
+                data-age-years="{{ patient.age_years if patient.age_years is not none else '' }}"
+                data-visit="{{ patient.last_visit or '' }}"
+                data-status-rank="{{ patient.status_rank if patient.status_rank is not none else '' }}"
                 data-visited="{{ 'visited' if patient.last_visit else 'never' }}">
               <td><input type="checkbox" class="form-check-input row-check" name="patient_ids" value="{{ patient.id }}" data-status="{{ patient.status }}" onclick="updateSelection()" aria-label="Select {{ patient.full_name }}"></td>
               <td class="pat-id">{{ patient.patient_id }}</td>
@@ -466,19 +520,19 @@
 {%- if patients %}
       <div class="table-footer" id="tableFooter">
         <div class="pg-info" id="patientCount">Showing all {{ patients|length }} registered patient{{ '' if patients|length == 1 else 's' }}</div>
-        {#- The order the rows arrive in, stated where a reader is already looking
-            to find out what they are looking at. The Sort control beside the
-            search box is disabled and its reason says the rows come in the order
-            the query returns them "which each screen states beside its table" --
-            which was true of Appointment Scheduling's queue and of neither of the
-            two alphabetical rosters. Rather than split one accurate sentence into
-            three, the two screens it was wrong about now say their order, and the
-            shared reason becomes true everywhere it is quoted.
+        {#- The order the rows are actually in, stated where a reader is already
+            looking to find out what they are looking at.
 
-            It is a separate element from the count on purpose: applyFilters()
-            rewrites #patientCount as the roster narrows, and the ordering does not
-            change when it does. #}
-        <div class="pg-info">Sorted by surname, A&ndash;Z</div>
+            This line used to be the fixed words "Sorted by surname, A-Z", which
+            was true only because nothing could change the order. Now that the
+            Sort control works, a fixed sentence here would be the first thing to
+            go false -- so it is written from the same state the button and the
+            menu read, and all three change together or not at all.
+
+            It stays a separate element from the count: applyFilters() rewrites
+            #patientCount as the roster narrows, and the ordering does not change
+            when it does. #}
+        <div class="pg-info" id="sortSummary">Sorted by name, A&ndash;Z</div>
         <div class="pg-info" title="{{ unavailable.pagination }}">Single page</div>
       </div>
 {%- endif %}
@@ -534,6 +588,9 @@
 {% endblock %}
 
 {% block scripts %}
+{#- The shared column-sort comparator. One file, because Medicine Inventory's
+    Sort control is the same control over a different set of columns. #}
+<script src="{{ url_for('static', filename='js/table-sort.js') }}"></script>
 <script>
   function toggleFilterPanel(){
     var panel = document.getElementById('filterPanel');
@@ -797,7 +854,13 @@
       var min = parseInt(fAgeMin.value, 10);
       var max = parseInt(fAgeMax.value, 10);
       if(!isNaN(min) || !isNaN(max)){
-        var age = parseInt(row.dataset.age, 10);
+        // data-ageYears, not data-age. The latter is the Age column's display
+        // string and reads "2 months, 23 days" for an infant, which parseInt
+        // truncates to 2 -- so an age bound of 1-5 was matching two-month-olds as
+        // though they were two years old. The number has always been on the model
+        // as age_years; the row carries it now because the Sort control needs the
+        // same value, and the bound reads it for the same reason sorting does.
+        var age = parseInt(row.dataset.ageYears, 10);
         if(isNaN(age)){ return false; }
         if(!isNaN(min) && age < min){ return false; }
         if(!isNaN(max) && age > max){ return false; }
@@ -858,5 +921,91 @@
     // applyFilters() every keystroke calls, so the count line, the empty state
     // and Print List's "filtered by" line are all correct from the first paint.
     if(search.value.trim()){ applyFilters(); }
+  })();
+
+  // COLUMN SORT
+  //
+  // The comparator lives in static/js/table-sort.js because Medicine Inventory
+  // needs the identical one; what is here is this screen's own column list and
+  // the wiring for its menu. See that file for why blanks always sort last and
+  // why sorting and filtering never touch each other.
+  var toggleSortMenu;
+  (function(){
+    var button  = document.getElementById('sortToggleBtn');
+    var menu    = document.getElementById('sortMenu');
+    var label   = document.getElementById('sortBtnLabel');
+    var summary = document.getElementById('sortSummary');
+    var tbody   = document.getElementById('tableBody');
+
+    // With no patients at all there is no table, no footer and no toolbar row.
+    if(!button || !menu || !tbody){ return; }
+
+    var sorter = IDSTableSort.create({
+      tbody: tbody,
+      rowSelector: 'tr.patient-row',
+      // asc/desc are the words each direction is described in. They are per
+      // column because "A-Z" means nothing on a date and "Oldest first" means
+      // nothing on a surname, and this is the text the operator actually reads.
+      columns: [
+        { key: 'name',   label: 'name',       attr: 'data-sort-name',   type: 'text',
+          asc: 'A–Z',        desc: 'Z–A' },
+        { key: 'age',    label: 'age',        attr: 'data-age-years',   type: 'number',
+          asc: 'youngest first',  desc: 'oldest first' },
+        // Opens newest-first: "who have I seen recently" is the question a Last
+        // Visit sort gets asked, and it is also the direction that puts the
+        // never-visited at the bottom next to the blanks they already sort with.
+        { key: 'visit',  label: 'last visit', attr: 'data-visit',       type: 'date',
+          asc: 'earliest first',  desc: 'most recent first', initialDirection: 'desc' },
+        { key: 'status', label: 'status',     attr: 'data-status-rank', type: 'number',
+          asc: 'active first',    desc: 'deceased first' }
+      ],
+      // The order get_all_patients() already returned the rows in.
+      initial: { key: 'name', direction: 'asc' },
+      onChange: function(state){
+        label.textContent = 'Sort: ' + state.label.replace(/^./, function(c){ return c.toUpperCase(); })
+                          + ' (' + state.directionLabel + ')';
+        if(summary){
+          summary.textContent = 'Sorted by ' + state.label + ', ' + state.directionLabel;
+        }
+        Array.prototype.forEach.call(menu.querySelectorAll('.sort-option'), function(option){
+          var active = option.dataset.sortKey === state.key;
+          option.classList.toggle('active', active);
+          option.setAttribute('aria-current', active ? 'true' : 'false');
+          // Only the column in use states a direction. Showing one on every row
+          // would read as four sorts being applied at once.
+          option.querySelector('.dir').textContent = active ? state.directionLabel : '';
+        });
+      }
+    });
+
+    toggleSortMenu = function(){
+      var open = menu.classList.toggle('show');
+      button.classList.toggle('open', open);
+      button.setAttribute('aria-expanded', open ? 'true' : 'false');
+    };
+
+    menu.addEventListener('click', function(event){
+      var option = event.target.closest('.sort-option');
+      if(!option){ return; }
+      sorter.sortBy(option.dataset.sortKey);
+      // The menu stays open so the direction can be reversed with a second click
+      // without reopening it, which is the whole reason the hint above says a
+      // repeat click reverses.
+    });
+
+    // Click anywhere else closes it, the one behaviour a menu is expected to have
+    // that the Advanced Filter panel does not need (that panel is inline and
+    // pushes the table down; this one floats over it).
+    document.addEventListener('click', function(event){
+      if(!menu.classList.contains('show')){ return; }
+      if(button.contains(event.target) || menu.contains(event.target)){ return; }
+      toggleSortMenu();
+    });
+    document.addEventListener('keydown', function(event){
+      if(event.key === 'Escape' && menu.classList.contains('show')){ toggleSortMenu(); }
+    });
+
+    // Label the order the server already sent, without reordering anything.
+    sorter.announce();
   })();
 </script>{% endblock %}

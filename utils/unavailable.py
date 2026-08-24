@@ -223,20 +223,46 @@ UNAVAILABLE = {
     # more, which is the only test that matters here.
 
     # ---- Table controls -----------------------------------------------------
-    # THE SECOND SENTENCE HERE IS A CLAIM ABOUT THE TEMPLATES, AND IT WAS ONLY
-    # TRUE OF ONE OF THE THREE SCREENS THAT QUOTE IT.
-    # Appointment Scheduling's queue has always said "in arrival order, patients
-    # in consultation first". Patient Records and Medicine Inventory stated no
-    # order anywhere, though both are alphabetical -- ORDER BY last_name and
-    # ORDER BY name COLLATE NOCASE. Rather than split one correct sentence into
-    # three per-screen ones, the two screens were given the line they were
-    # missing, so the claim below is now true wherever it is quoted. If a fourth
-    # screen ever quotes this, it owes its reader the same sentence in its footer.
+    # NARROWED, BECAUSE THE GENERAL CASE CLOSED AND ONE SPECIFIC CASE DID NOT.
+    # This is the arc "export" lived and the module docstring describes, happening
+    # again: the sentence was written when nothing in the project could sort, it
+    # was quoted by three screens, and two of them can sort now.
+    #
+    # Patient Records and Medicine Inventory have real Sort controls -- four
+    # columns each, over the rows already rendered, composing with the search box
+    # and the Advanced Filter rather than resetting them (static/js/table-sort.js,
+    # one comparator shared by both). So the old wording had gone false in every
+    # part at once: "column sorting is not implemented" is wrong, "the rows arrive
+    # in the order the query returns them" is wrong the moment somebody sorts,
+    # and "a menu that was never built" is wrong because the menu exists and those
+    # two screens open it.
+    #
+    # The third screen still quoting this is Appointment Scheduling, and what
+    # stops it is not the missing menu -- the menu is now sitting in a shared file
+    # it could load in an afternoon. What stops it is that its queue's order is
+    # already the answer to a question, and re-sorting it would throw that answer
+    # away. So the reason below stops describing an unbuilt feature and starts
+    # describing a screen, which is what it should have been about all along.
+    #
+    # It also names where sorting DOES work. A reader who has just used Sort on
+    # Patient Records and then finds it disabled here is owed the difference
+    # between the two screens, not a blanket claim they can already disprove.
+    #
+    # If Appointment Scheduling's Upcoming Appointments panel ever gets its own
+    # Sort control, this reason does not cover it: that panel is a list of future
+    # bookings with no queue position, and the argument below does not apply to it.
     "sort": (
-        "Column sorting is not implemented. The rows arrive in the order the "
-        "query returns them, which each screen states beside its table. A "
-        "sort control also has to say what it sorts by, and this one never "
-        "did -- it is a menu that was never built, not a setting that was lost."
+        "This queue is not sortable, and that is deliberate rather than "
+        "unfinished. Its order is already a clinical answer: whoever is in "
+        "consultation now, then whoever is waiting, then the not-yet-arrived, "
+        "then everything already resolved -- ties broken by arrival time, exactly "
+        "as the line above the table says. That order tells the desk who may be "
+        "brought in next, and re-sorting it by name or by booked time would "
+        "discard the one thing this list is for while still looking like a "
+        "working queue. Sorting is built where it means something: Patient "
+        "Records and Medicine Inventory each sort by four of their columns, "
+        "because a roster and a shelf have no inherent order and any of several "
+        "are useful. A queue has exactly one."
     ),
     "pagination": (
         "Paging is not implemented. Every row the query returns is already on "

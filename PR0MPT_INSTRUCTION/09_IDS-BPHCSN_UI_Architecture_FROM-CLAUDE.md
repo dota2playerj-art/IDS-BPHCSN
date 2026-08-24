@@ -280,7 +280,7 @@ which is the same axis §2 already scopes the sidebar on.
 | **Icons** | Material Symbols Outlined exclusively. Never mix icon libraries. Consistent sizing throughout. |
 | **Card Style** | White background, 16px radius, soft shadow, 24px padding. Cards never touch — maintain consistent gutter. |
 | **Form Style** | 48px input height, 12px radius, label above input, light-gray placeholder text, teal border on focus, Bootstrap validation styling (no custom validation UI). |
-| **Table Style** | Rounded (16px), white, soft shadow, alternating row hover, status badges in dedicated column, action icons in dedicated column, search/filter/sort/pagination present on every data table. |
+| **Table Style** | Rounded (16px), white, soft shadow, alternating row hover, status badges in dedicated column, action icons in dedicated column. Search and filter are present on every data table; **sort** is present where more than one order is useful (Patient Records, Medicine Inventory) and deliberately absent where the query's order is itself the answer (Appointment Scheduling's queue) — see §15. **Pagination is not present on any table**: every row the query returns is already on the page. |
 | **Button Style** | Primary = filled teal/white text; Secondary = white/teal border; Danger = red; Success = green. All rounded 12px, Bootstrap-based. |
 | **Border Radius** | Cards 16px · Buttons 12px · Inputs 12px · Badges 999px · Tables 16px. No exceptions. |
 | **Shadows** | Subtle/soft only — never dramatic or heavy drop shadows. |
@@ -644,6 +644,85 @@ can reach shows that role the same header. What varies is per **role** — which
 already scopes the sidebar on, and for the same reason. A role that cannot open Patient Records has
 no use for a box that only leads there, and a role with no Notifications screen has nowhere for a
 bell to go.
+
+---
+
+## 15. Design Decision — Sort Is Built on Two Screens and Refused on a Third
+
+Three screens carried a Sort button and all three were disabled behind one shared reason. Two of
+them now sort for real. The third still does not, and the interesting half of this decision is why
+that is not an unfinished job.
+
+### What each screen sorts by, and why those columns
+
+| Screen | Sortable | Not offered, and why |
+|---|---|---|
+| **Patient Records** | Name (A–Z, default), Age, Last Visit, Status | *Address* is one free-text field with no purok in it, so an order over it groups nothing. *Contact Number* has no order anybody reads a roster in. *Patient ID* is assigned in registration order, so "sort by Patient ID" is "sort by when they registered" under a misleading label — Last Visit answers the question actually being asked. *Gender* has three values and is a filter, not an order. |
+| **Medicine Inventory** | Medicine Name (A–Z, default), Current Stock, Expiration Date, Status | *Category* and *Supplier* are what Advanced Filter narrows by. *Reorder Level* on its own sorts by how large each item's threshold happens to be, which says nothing about the shelf; the question behind it is "what is running out", and Status answers that properly because `stock_status()` has already weighed each item's stock against its own reorder level. |
+
+Every column offered is one the table already shows, and every one is compared on a value the
+server wrote into the row as a `data-*` attribute — the arrangement the filters on these screens
+already use. The browser derives nothing and re-formats nothing.
+
+Two of those keys are worth naming because the obvious choice would have been wrong:
+
+- **Age** sorts on `age_years`, the number, not on the Age column's text. That text reads
+  "2 months, 23 days" for an infant, and comparing it would file a two-month-old between a
+  two-year-old and a three-year-old. (The Advanced Filter's age bounds had this defect already and
+  were reading the display string; they now read the same number the sort does.)
+- **Status** sorts on a declared rank, not alphabetically. Patients use `PATIENT_STATUSES` order —
+  Active, Inactive, Deceased — because alphabetical would read Active, Deceased, Inactive and put
+  the most final of the three in the middle. Medicine uses `STATUS_SORT_ORDER`, which is
+  `stock_status()`'s own urgency ladder, so "sort by status" groups the shelf the same way the badge
+  already decides what to call each item.
+
+### Sorting and filtering never touch each other
+
+Sort reorders rows. Search and filter decide which rows are visible. Neither reads the other's
+state, which is what makes them compose: sorting a filtered list keeps the filter, and filtering a
+sorted list keeps the sort. Hidden rows are reordered too, so clearing a filter afterwards reveals
+the rest already in the same order — which is what "the list is sorted by name" ought to mean.
+
+Blanks sort last in **both** directions, deliberately. A patient with no recorded visit and a
+medicine with no expiry date are absences, not extreme values: "soonest expiry first" must not open
+on a page of items that have no expiry at all, and reversing must not then bury them.
+
+### One comparator, two screens
+
+`static/js/table-sort.js` is the whole sorting rule and both screens load it; each supplies only its
+own column list. Two hand-written copies of a comparator is two chances for one screen to sort
+blanks to the top while the other sorts them to the bottom, and nobody would notice until somebody
+compared the two screens. This is the argument `utils/unavailable.py` makes for its shared reasons,
+applied to behaviour.
+
+Medicine Inventory needs one thing Patient Records does not, and it is the part that broke first
+when this was built: a record there is **two** rows, an item row followed by its own read-only
+detail row. The sorter takes a `companion` for that, and resolves every companion *before* moving
+any row — `appendChild()` relocates rather than copies, so asking "what follows this row?" halfway
+through a rebuild returns the neighbouring record's panel. Every detail row would end up under the
+wrong medicine.
+
+### Why Appointment Scheduling still refuses
+
+Its queue is already ordered by an answer: whoever is in consultation now, then whoever is waiting,
+then the not-yet-arrived, then everything resolved, ties broken by arrival time (`_STATUS_RANK` in
+`models/appointments.py`). That order tells the desk who may be brought in next. Re-sorting it by
+name or by booked time would throw that away while still looking like a working queue.
+
+So the shared `sort` reason was **narrowed rather than deleted** — the arc `utils/unavailable.py`
+documents for `export`, happening again. It stopped describing an unbuilt feature and started
+describing a screen, and it now names the two screens where sorting *is* built, because a reader who
+has just used Sort on Patient Records and then finds it disabled here is owed the difference between
+the two screens rather than a blanket claim they can already disprove.
+
+A roster and a shelf have no inherent order and several are useful. A queue has exactly one.
+
+### The order in force is never a fixed sentence again
+
+Both screens used to end with hard-coded words — "Sorted by surname, A–Z", "Sorted by medicine
+name, A–Z" — which were true only because nothing could change the order. They are now written from
+the same state the Sort button and the menu read, so all three change together or not at all. That
+line was the first thing that would have gone false the moment this feature shipped.
 
 ---
 

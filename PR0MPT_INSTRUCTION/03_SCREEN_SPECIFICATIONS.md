@@ -1068,10 +1068,19 @@ Not implemented, and deliberately so rather than overlooked. Every write on that
 authentication — password hashing, role assignment, and the ability to revoke a sign-in — so it is
 an open scope decision for the team. The buttons are present and disabled, each stating why.
 
-**Column sorting, on every list screen that offers the control.**
+**Column sorting — built on Screens 03 and 06; deliberately absent on Screen 08.**
 
-Not implemented. Rows arrive in the order the query returns them, and each screen now states that
-order beside its table. See the `sort` reason in `utils/unavailable.py`.
+Patient Records sorts by Name, Age, Last Visit and Status; Medicine Inventory sorts by Medicine
+Name, Current Stock, Expiration Date and Status. Both run over the rows already rendered, the way
+their search boxes and Advanced Filter panels do, so sorting composes with a narrowed list instead
+of resetting it. One comparator serves both (`static/js/table-sort.js`); each screen supplies only
+its own column list. The order in force is named on the Sort button, on the chosen option, and in
+the line beside the table, all three written from one state.
+
+Appointment Scheduling's Sort stays disabled, and its reason changed from "not implemented" to
+what actually stops it: the queue is already in the order that answers who may be brought in next
+— in consultation, then waiting, then not yet arrived, then resolved — and re-sorting it would
+discard the one thing that list is for. See the `sort` reason in `utils/unavailable.py`.
 
 **Paging.**
 

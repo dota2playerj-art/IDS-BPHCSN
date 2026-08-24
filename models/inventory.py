@@ -146,6 +146,42 @@ STATUS_BADGE_CLASS = {
 }
 
 
+# Screen 06's Sort control, Status column. The order is stock_status()'s own
+# resolution order -- the sequence its docstring lays out and its `if` ladder
+# walks, most urgent first -- so "sort by status" groups the shelf the same way
+# the badge already decides what to call each item. Sorting these alphabetically
+# would open on Critical and bury Out of Stock between Near Expiry and In Stock,
+# which is the opposite of what a pharmacist opens this screen to find.
+#
+# "Retired" is not a stock condition and stock_status() never returns it, so it
+# is not in that ladder; it goes last here because an item nobody is restocking
+# is the least urgent thing on the shelf, which is the same judgement in_service()
+# already makes when it keeps retired items out of the low-stock alert.
+STATUS_SORT_ORDER = (
+    "Out of Stock",
+    "Expired",
+    "Expires Today",
+    "Critical",
+    "Low Stock",
+    "Near Expiry",
+    "In Stock",
+    "Retired",
+)
+
+
+def status_rank(display_status):
+    """Where a status sits in STATUS_SORT_ORDER, or None if it is not one.
+
+    None rather than a large number on purpose: the sort holds unknown values at
+    the bottom in both directions, and a status this module does not recognise is
+    exactly that -- an absence of a known rank, not a very unurgent item.
+    """
+    return (
+        STATUS_SORT_ORDER.index(display_status)
+        if display_status in STATUS_SORT_ORDER else None
+    )
+
+
 def allowed_item_status_transitions(current_status):
     """The statuses an item currently in current_status may be moved to.
 
@@ -306,6 +342,11 @@ def _to_item(row, on_date=None):
     item["status_badge_class"] = STATUS_BADGE_CLASS.get(
         item["display_status"], "badge-instock"
     )
+    # For Screen 06's Sort control; see STATUS_SORT_ORDER above. Ranked on
+    # display_status rather than stock_status so the sort groups by what the
+    # Status column actually shows -- a retired item sorts as Retired, which is
+    # what its badge says and what the Status filter beside it matches on.
+    item["status_rank"] = status_rank(item["display_status"])
     item["stock_percent"] = percent
     item["stock_fill_class"] = fill_class
     item["days_until_expiry"] = days_until_expiry(item.get("expiry_date"), on_date)

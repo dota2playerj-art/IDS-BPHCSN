@@ -263,6 +263,17 @@ def _to_patient(row):
     patient["status_badge_class"] = STATUS_BADGE_CLASS.get(
         patient.get("status"), "badge-inactive"
     )
+    # Where this status sits in PATIENT_STATUSES, for Screen 03's Sort control.
+    # Sorting the Status column alphabetically would read Active, Deceased,
+    # Inactive -- which is not an order anybody thinks of these three in, and puts
+    # the most final of them in the middle. PATIENT_STATUSES is already the order
+    # the rest of the system lists them in (the status dialog offers transitions
+    # in it, allowed_status_transitions() walks it), so the sort reuses that one
+    # declared order instead of inventing a second one in a template.
+    patient["status_rank"] = (
+        PATIENT_STATUSES.index(patient["status"])
+        if patient.get("status") in PATIENT_STATUSES else None
+    )
     patient["medical_conditions_list"] = parse_list_field(patient.get("medical_conditions"))
     patient["allergies_list"] = parse_list_field(patient.get("allergies"))
     return patient
