@@ -50,6 +50,7 @@ from routes.patient_views import (
     check_in_requested,
     patient_profile_context,
     patient_records_context,
+    patient_selection_context,
     process_archive_patients,
     process_register_patient,
     register_patient_context,
@@ -70,6 +71,8 @@ from routes.roster_export import (
     inventory_workbook,
     patient_roster_document,
     patient_roster_workbook,
+    patient_selection_document,
+    patient_selection_workbook,
     user_roster_document,
     user_roster_workbook,
 )
@@ -133,6 +136,52 @@ def export_patient_records_excel():
 def export_patient_records_pdf():
     return pdf_response(patient_roster_document(
         patient_records_context(),
+        produced_by=exported_by(),
+    ))
+
+
+# Export Excel and Export PDF for the *selection*, from the bulk bar under the
+# toolbar. POST, and the only two exports in this project that are: the two GET
+# routes above answer "the whole register", which is a question with a stable
+# answer and therefore a bookmarkable URL, and these answer "these eleven records
+# somebody ticked", which is not. The ids arrive as the same patient_ids
+# checkboxes the archive endpoint below already reads, from the same form on the
+# same page -- see routes/patient_views.selected_patient_ids() for the one rule
+# that reads them.
+#
+# Same guard as the roster exports, for the same reason: the file is the screen's
+# contents, and a download that widened who could read them would be a hole the
+# render route does not have. Nothing is written, so there is no CSRF-shaped
+# hazard here beyond the one every POST on this screen already carries; the guard
+# is what keeps the rows in.
+#
+# An empty or unusable selection redirects back with a flash rather than serving
+# a workbook with no rows in it. A file that says "0 records" is a file somebody
+# has to open to discover was pointless.
+@admin_bp.route('/patient_records/export-selection.xlsx', methods=["POST"])
+@login_required
+@role_required("Admin")
+def export_patient_selection_excel():
+    context = patient_selection_context(request.form)
+    if context is None:
+        flash("Select at least one patient record to export.")
+        return redirect(url_for("admin.patient_records"))
+    return excel_response(patient_selection_workbook(
+        context,
+        produced_by=exported_by(),
+    ))
+
+
+@admin_bp.route('/patient_records/export-selection.pdf', methods=["POST"])
+@login_required
+@role_required("Admin")
+def export_patient_selection_pdf():
+    context = patient_selection_context(request.form)
+    if context is None:
+        flash("Select at least one patient record to export.")
+        return redirect(url_for("admin.patient_records"))
+    return pdf_response(patient_selection_document(
+        context,
         produced_by=exported_by(),
     ))
 

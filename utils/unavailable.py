@@ -53,16 +53,45 @@ with nothing quoting it is exactly the drift this file exists to prevent. It wen
 the way "community_reports" did below: deleted once true of nothing, rather than
 left sitting here describing a state the application has left.
 
-"export" has now followed it. Patient Records, Medicine Inventory, Appointment
+"export" then followed it. Patient Records, Medicine Inventory, Appointment
 Scheduling and User Management each download a real spreadsheet and a real PDF
-(routes/roster_export.py), which were the last four screens quoting it. What is
-left behind is one narrower reason, "export_selection", for the one control that
-is still genuinely absent -- the bulk bar's Export on Patient Records, which would
-download the ticked records rather than the register. This is the whole life of a
-shared reason: born when the gap is real, split when the gap is real for one
+(routes/roster_export.py), which were the last four screens quoting it. What it
+left behind was one narrower reason, "export_selection", for the one control
+still genuinely absent -- the bulk bar's Export on Patient Records, which would
+download the ticked records rather than the register.
+
+And that one has now gone too, which finishes the arc. This is the whole life of
+a shared reason: born when the gap is real, split when the gap is real for one
 control and not another, narrowed when the general case closes and a specific one
 does not, deleted when the last thing quoting it stops. One file is where all four
 happen, so none of them is missed.
+
+A REASON CAN ALSO BE THE SPECIFICATION FOR CLOSING ITSELF
+---------------------------------------------------------
+"export_selection" is worth one more paragraph, because of how it went. It did
+not collapse the way "export" did, when a dependency landed and made it false. It
+was true when written and it was precise: it said the obstacle was not the
+browser -- "Change Status beside this posts the same ticked ids to the server
+already" -- but the URL, because every download this project serves is a
+bookmarkable GET and a file whose contents are a list of primary keys in a query
+string is not bookmarkable, not readable and stale the moment the page is.
+
+Every clause of that was correct, and read once more it is a build order rather
+than a refusal. The premise it rested on -- that a download must be a GET -- was
+the one thing in it nobody had examined, and it does not survive examination for
+this control. A bookmarkable URL is the right property for an export that answers
+"the whole register", because that question has the same answer tomorrow. It is
+the wrong property for one that answers "these eleven records somebody ticked",
+because there is no stable thing to bookmark. So the bulk bar's two Export
+buttons submit the form the checkboxes already belong to, by POST, with a
+formaction pointing at an export route instead of the archive one; the ids arrive
+the same way Change Status's already do, and routes/roster_export.py assembles
+them through the same machinery the full roster uses.
+
+The lesson is the one this file keeps re-learning from the other direction. A
+reason specific enough to name what it is waiting for is a reason somebody can
+act on -- and the thing worth re-reading in it is not the gap it describes but
+the assumption it takes for granted.
 
 A reason can also split because it is aimed at the wrong *scope* rather than
 because it became false. "print" was a sentence about a screen, and it was being
@@ -155,25 +184,31 @@ UNAVAILABLE = {
     # is the same split "print" made when a Medicine Inventory row icon needed a
     # reason about one item rather than about a whole screen.
 
-    # A REASON CAN OUTLIVE ITS PARENT BY BEING NARROWER THAN IT.
-    # The bulk bar on Patient Records offers Export beside Print and Change
-    # Status, and it means something different from the toolbar's Export above
-    # it: the ticked records, not the register. The shared reason would now be
-    # false on this button -- export *is* built for this screen -- so what stops it
-    # is written here instead, and it is neither a library nor a route.
-    "export_selection": (
-        "Exporting only the ticked records is not built. Export in the toolbar "
-        "above is, and downloads the whole register; this button would download "
-        "the selection, and the selection is the part that is missing. It is not "
-        "that the browser cannot send it -- Change Status beside this posts the "
-        "same ticked ids to the server already. It is that every download this "
-        "project serves is a GET at a URL that can be bookmarked, re-fetched and "
-        "read, and a file whose contents are decided by a list of primary keys in "
-        "a query string is none of those things. Print beside this does export a "
-        "selection, because printing prints what is on the page and needs no URL "
-        "to carry it. Until that is settled: export the full roster and delete "
-        "the rows you did not want, which is what a spreadsheet is for."
-    ),
+    # THERE IS NO "export_selection" ENTRY ANY MORE, AND THAT IS THE POINT.
+    # It was written when "export" was deleted, to be the one true thing left to
+    # say about the one control still disabled on Patient Records: the bulk bar's
+    # Export, which meant the ticked records rather than the register. It
+    # outlived its parent by being narrower than it, exactly as this file's
+    # docstring describes -- and it has now gone the same way, because the
+    # control it explained works.
+    #
+    # It is the only reason in this file's history that was deleted by being
+    # *followed* rather than by going false. It named the obstacle exactly and
+    # cleared the browser of blame; what it got wrong was a premise it never
+    # stated as one, that a download has to be a bookmarkable GET. The bulk bar
+    # now has two Export buttons, Excel and PDF to match the toolbar's pair, and
+    # they submit the checkboxes by POST to their own routes -- the same
+    # patient_ids Change Status beside them has always posted, assembled by
+    # routes/roster_export.py through the same machinery the full roster uses and
+    # covered by a cover sheet that says "a selection, not the register" where
+    # the roster's says the opposite.
+    #
+    # Nothing quotes this any more, and a reason with nothing quoting it is
+    # exactly the drift this file exists to prevent. It goes the way "export",
+    # "export_pdf", "print", "medicine_detail" and "community_reports" went. The
+    # full argument is in the docstring above, because it is the most useful
+    # thing this file has learned: the part of a reason worth re-reading is the
+    # assumption it takes for granted.
     # THERE IS NO "export_pdf" ENTRY ANY MORE, AND THAT IS THE POINT.
     # It said Export PDF was not built while it was not. Export PDF is now real on
     # both report screens -- fpdf2 is a dependency and each screen has its own

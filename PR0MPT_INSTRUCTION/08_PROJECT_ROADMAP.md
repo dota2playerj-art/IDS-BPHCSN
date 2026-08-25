@@ -54,7 +54,7 @@ What that figure means, stated plainly so it can be defended:
 
 All four core objectives from the approved Proposal are built and working against real stored
 data — Patient Records, Medicine Inventory, Appointment Scheduling with Community Notifications,
-and Reports & Analytics. Role-based access control is enforced across all 76 guarded routes for
+and Reports & Analytics. Role-based access control is enforced across all 80 guarded routes for
 all three roles with no gaps. The database holds 10 tables with 12 indexes and passes integrity and
 foreign-key checks.
 
@@ -229,7 +229,7 @@ Tasks
   03_SCREEN_SPECIFICATIONS.md Screen 01 lists it; "Remember Me" and "Show Password" are also
   still outstanding on that screen.
 
-☑ Role Management — `login_required` and `role_required` decorators on all 76 guarded routes, verified
+☑ Role Management — `login_required` and `role_required` decorators on all 80 guarded routes, verified
   with no gaps for Admin, Health Staff, Barangay Official and anonymous visitors. The Health
   Staff read-only restriction on SMS is enforced structurally: no send endpoint exists in the
   staff blueprint at all.
@@ -340,11 +340,11 @@ Tasks
 ☑ Session Management — login, logout, session clearing, and a no-store cache header on every
   authenticated response
 
-☑ User Roles — verified across all 76 guarded routes under all four identities with zero gaps.
-  The application exposes 79 URL rules beyond static files; 76 of them are guarded (75 under
+☑ User Roles — verified across all 80 guarded routes under all four identities with zero gaps.
+  The application exposes 83 URL rules beyond static files; 80 of them are guarded (79 under
   `role_required`, plus `/dashboard` under `login_required`) and three are deliberately open
-  (`/`, `/login`, `/logout`). The last sweep ran all 76 guarded rules under each of the four
-  identities -- 304 checks -- and found no leak.
+  (`/`, `/login`, `/logout`). The last sweep ran all 80 guarded rules under each of the four
+  identities -- 320 checks -- and found no leak.
 
 ☐ Wire the Audit Logs screen — the query and the data already exist; only the route context and
   the template loop remain (carried forward from Phase 4)
@@ -379,8 +379,8 @@ Testing Types
   results are written up in the audit reports. The most recent pre-review sweep exercised all
   four core objectives end to end (register/view/edit a patient, add a medicine and move its
   stock through every alert tier, book and check in an appointment, send a broadcast), ran the
-  full 304-check route × role matrix, drove the mid-session deactivation case through its whole
-  eight-step lifecycle, and confirmed all 22 export routes return valid `.xlsx` and `.pdf` files.
+  full 320-check route × role matrix, drove the mid-session deactivation case through its whole
+  eight-step lifecycle, and confirmed all 26 export routes return valid `.xlsx` and `.pdf` files.
 
   The distinction that matters: these checks are **scripted but not committed**. They are written
   fresh each session, run once, and discarded, so they prove the system worked at that moment but
@@ -784,8 +784,6 @@ Reports & Analytics about the same barangay.
   This is the `sort` reason in `utils/unavailable.py`, now quoted by that one screen.
 - **Paging**. Every row the query returns is already on the page, so there is no second page; the
   `pagination` reason says so on the two screens that used to show page numbers.
-- **Exporting only a ticked selection** on Patient Records' bulk bar (`export_selection`). Export
-  of the full register is built; exporting a selection is not.
 - **Backup and Restore** on Settings, and the **SMS gateway** controls on the same screen. The SMS
   integration itself is real — `utils/sms.py` posts to Semaphore and every send checks
   `SEMAPHORE_API_KEY` — so what is missing there is a configured key, not the feature.
@@ -837,6 +835,7 @@ way it loses that trust is by being written once and never re-read while the sys
 | "Screen 10: Print, Export to Excel and Export to PDF… not built." | All three are built. Seven screens have real `.xlsx` and `.pdf` download routes — Patient Records, Medicine Inventory, Appointment Scheduling, User Management, Audit Logs, Reports & Analytics and Community Reports; see `routes/roster_export.py`, `report_export.py` and `audit_export.py`. |
 | "Export and print… the controls exist in the markup and are decorative." | No export control in this project is decorative. |
 | "Search, sort, filter and export controls on most list screens are present but not wired." | All four are wired. Search, filter and export are built on every list screen; **sort** is built on Patient Records and Medicine Inventory, and is deliberately refused on Appointment Scheduling's queue, whose order is itself the answer. None of the four is still true as written. |
+| "Exporting only a ticked selection on Patient Records' bulk bar (`export_selection`)… is not [built]." | Built. The bulk bar carries Export Excel and Export PDF, which submit the ticked `patient_ids` by POST to `export-selection.xlsx` / `.pdf` per role and are assembled by `routes/roster_export.py` through the same machinery the full roster uses. They are the only exports in the project that are not GETs, because a selection has no stable URL to bookmark; the cover sheet says "a selection, not the register" where the roster's says the opposite. The `export_selection` reason is retired. |
 | "Sign-ins are not recorded." | `routes/auth.py` records successful sign-ins, refused attempts and attempts blocked on a deactivated account; `utils/security.py` records a session ended because its account was deactivated mid-visit. **Sign-outs are not recorded** — `logout()` clears the session and writes nothing — so these are sign-in counts rather than session counts. Screen 11 shows a real Last Login and Screen 12's Login Events card is live. |
 
 ---

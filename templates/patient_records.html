@@ -390,12 +390,44 @@
       <div class="bulk-bar" id="bulkBar">
         <div class="count"><span id="selCount">0</span> patient record(s) selected</div>
         <div class="bulk-actions">
-{#- The bulk bar's Export is the one export control on this screen that is still
-    disabled, and it now quotes a reason of its own rather than the shared one.
-    The shared `export` reason said export was not built for this screen; it is,
-    twice, in the toolbar above. What stops *this* button is narrower and is what
-    its tooltip says. #}
-          <button type="button" disabled title="{{ unavailable.export_selection }}"><span class="material-symbols-outlined" style="font-size:16px;">file_download</span>Export</button>
+{#- EXPORT THE SELECTION. This was the last disabled control on Screen 03, and
+    the reason it quoted said the browser could not carry a selection to a
+    download. That was never the true obstacle and the reason said so itself, in
+    the same breath: Change Status beside this posts the same ticked ids already.
+    What it actually objected to was putting those ids in a *URL*, on the grounds
+    that every download this project serves is a bookmarkable GET.
+
+    So these two are not GETs, and they are the only exports here that are not.
+    They are submit buttons on the form the checkboxes already belong to, with a
+    formaction sending it to an export route instead of the archive one -- no new
+    form, no JavaScript, and no second idea of what "the selection" is. The
+    server reads the same patient_ids field routes/patient_views.py already reads
+    for Change Status.
+
+    A bookmarkable URL is the right property for the toolbar's exports, which
+    answer "the whole register" -- a question whose answer is the same tomorrow.
+    It is the wrong property for this one. There is no stable thing to bookmark
+    in "the eleven records somebody ticked", and pretending otherwise is what
+    would have made the ids-in-a-query-string version dishonest rather than
+    merely ugly.
+
+    ONE BUTTON BECAME TWO, TO MATCH THE TOOLBAR
+    -------------------------------------------
+    The disabled control was a single Export. A working one has to choose a
+    format, and this project's answer to that everywhere else is the pair in the
+    toolbar directly above: a spreadsheet somebody sorts and hands on, a PDF
+    somebody files. Offering the same two here, in the same order and with the
+    same icons, means the bulk bar reads as the toolbar narrowed to a selection
+    rather than as a third kind of export.
+
+    Neither carries `download`: that attribute is for links, and the attachment
+    header the server sets is what makes these download. The page stays put. #}
+          <button type="submit" formmethod="post"
+                  formaction="{{ url_for(patient_selection_excel_endpoint) }}"
+                  title="Download only the selected patient records as an Excel workbook"><span class="material-symbols-outlined" style="font-size:16px;">description</span>Export Excel</button>
+          <button type="submit" formmethod="post"
+                  formaction="{{ url_for(patient_selection_pdf_endpoint) }}"
+                  title="Download only the selected patient records as a PDF on the health center's letterhead"><span class="material-symbols-outlined" style="font-size:16px;">picture_as_pdf</span>Export PDF</button>
 {#- Prints the ticked records only, which is the one thing the bulk bar is for.
     Same page, same stylesheet as Print List; the difference is a class on the
     table that holds back every row the operator did not tick. #}

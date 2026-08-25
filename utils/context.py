@@ -71,6 +71,11 @@ def inject_role_context():
             # would send one of the two roles to a URL it bounces straight off.
             "patient_records_excel_endpoint": "staff_export_patient_records_excel",
             "patient_records_pdf_endpoint": "staff_export_patient_records_pdf",
+            # The bulk bar's pair on Screen 03, which post the ticked ids rather
+            # than fetching the register. Named per role like every endpoint
+            # above, and for the same reason.
+            "patient_selection_excel_endpoint": "staff_export_patient_selection_excel",
+            "patient_selection_pdf_endpoint": "staff_export_patient_selection_pdf",
             "medicine_inventory_excel_endpoint": "staff_export_medicine_inventory_excel",
             "medicine_inventory_pdf_endpoint": "staff_export_medicine_inventory_pdf",
             "appointments_excel_endpoint": "staff_export_appointment_scheduling_excel",
@@ -119,6 +124,8 @@ def inject_role_context():
             # below.
             "patient_records_excel_endpoint": "export_patient_records_excel",
             "patient_records_pdf_endpoint": "export_patient_records_pdf",
+            "patient_selection_excel_endpoint": "export_patient_selection_excel",
+            "patient_selection_pdf_endpoint": "export_patient_selection_pdf",
             "medicine_inventory_excel_endpoint": "export_medicine_inventory_excel",
             "medicine_inventory_pdf_endpoint": "export_medicine_inventory_pdf",
             "appointments_excel_endpoint": "export_appointment_scheduling_excel",

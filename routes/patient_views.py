@@ -199,6 +199,79 @@ def patient_records_context(search=""):
     }
 
 
+# The bulk bar's field name, and the one rule for reading it. Both of the things
+# that bar does -- Change Status and, now, Export -- post the same checkboxes to
+# the server, so both resolve them the same way: digits only, duplicates dropped,
+# order preserved. Written once here rather than twice, because two copies of
+# "what counts as a submitted id" is how one of them ends up accepting something
+# the other rejects.
+SELECTION_FIELD = "patient_ids"
+
+
+def selected_patient_ids(values):
+    """Submitted checkbox values as a clean list of ints, in submitted order.
+
+    Everything arriving from a form is a claim, and a POST can be made without
+    ever loading the page. Non-numeric values are dropped rather than raising --
+    there is no legitimate way for one to be sent, and the caller's "select at
+    least one" message is the right answer to a request that ends up with none.
+    """
+    cleaned = [str(value).strip() for value in values]
+    cleaned = [value for value in cleaned if value.isdigit()]
+    return [int(value) for value in dict.fromkeys(cleaned)]
+
+
+def patient_selection_context(form_data):
+    """The ticked records only, for the bulk bar's Export. None if nothing valid.
+
+    WHY THIS FILTERS THE ROSTER RATHER THAN QUERYING FOR THE SELECTION
+    -----------------------------------------------------------------
+    It reads patient_records_context() -- the same builder Screen 03 rendered
+    from and the same one the full-roster export reads -- and keeps the rows
+    whose id was ticked. It does not go back to the database with a WHERE id IN
+    (...), and that is the point: a second query is a second chance for the
+    exported row to disagree with the row the operator was looking at when they
+    ticked it. This project's rule is one query per screen, and a selection is
+    not a different screen.
+
+    It also inherits the roster's order for free. get_all_patients() returns
+    surname order, so the file lists the selection in the same order the table
+    did -- not in whatever order the browser happened to submit the boxes, which
+    is DOM order today and would silently become click order if the markup ever
+    changed.
+
+    WHAT IT REPORTS BACK, AND WHY IT COUNTS TWICE
+    ---------------------------------------------
+    `requested` is how many ids were submitted; len(`patients`) is how many of
+    them the register still holds. Those two are equal in ordinary use and the
+    difference is not a filter: archiving a patient does not remove them from the
+    roster, so a record cannot drop out of this file by being retired. What can
+    make them differ is a submitted id the register has no row for -- a hand-made
+    POST, or a page open across a migration that renumbered something. The cover
+    sheet states both figures and explains the gap when there is one, because a
+    file that quietly holds four rows for a five-record selection is the exact
+    failure this project's cover sheets exist to prevent.
+
+    Returns None when nothing usable was submitted, so the route can flash and
+    redirect rather than serve an empty workbook.
+    """
+    ids = selected_patient_ids(form_data.getlist(SELECTION_FIELD))
+    if not ids:
+        return None
+
+    context = patient_records_context()
+    wanted = set(ids)
+    selected = [p for p in context["patients"] if p["id"] in wanted]
+    if not selected:
+        return None
+
+    return {
+        "patients": selected,
+        "requested": len(ids),
+        "total_registered": len(context["patients"]),
+    }
+
+
 def process_archive_patients(form_data):
     """Apply Screen 03's status action. Returns the message to flash.
 
@@ -224,10 +297,9 @@ def process_archive_patients(form_data):
         return "Choose a status to set: Mark Active, Mark Inactive or Mark Deceased."
 
     single = (form_data.get("single_patient_id") or "").strip()
-    submitted = [single] if single else form_data.getlist("patient_ids")
+    submitted = [single] if single else form_data.getlist(SELECTION_FIELD)
 
-    ids = [str(value).strip() for value in submitted if str(value).strip().isdigit()]
-    ids = [int(value) for value in dict.fromkeys(ids)]
+    ids = selected_patient_ids(submitted)
     if not ids:
         return "Select at least one patient record to update."
 

@@ -1097,12 +1097,6 @@ discard the one thing that list is for. See the `sort` reason in `utils/unavaila
 Not implemented and not needed: every row the query returns is already on the page. The page
 numbers that used to sit in these footers were markup counting a roster the system does not hold.
 
-**Screen 03 — Export of a ticked selection**, from the bulk bar.
-
-Not built. Export of the full register is (see below); exporting just the selection is the part
-that is missing, because every download in this project is a bookmarkable GET and a file whose
-contents are decided by a list of primary keys in a query string is not that.
-
 **Screen 13 — Settings: everything except the Security pane.**
 
 Nothing typed on that screen is stored. The `settings` table exists in `schema.sql` and is empty,
@@ -1118,6 +1112,25 @@ The one screen in the system rendered with no context at all
 it should be quoted as a system output. Recorded activity lives on Screen 12.
 
 ## Built since this specification was written
+
+**Screen 03 — export of a ticked selection, from the bulk bar.**
+
+This section previously listed this as not built, on the grounds that every download in this
+project is a bookmarkable GET and a file whose contents are decided by a list of primary keys in
+a query string is not that. Every clause of that was true; the premise underneath it was the
+part worth re-reading. A bookmarkable URL is the right property for an export that answers "the
+whole register" and the wrong one for an export that answers "these eleven records somebody
+ticked", because the second has nothing stable to bookmark.
+
+So the bulk bar now carries Export Excel and Export PDF, and they are the only two exports in the
+project that are not GETs. They are submit buttons on the form the row checkboxes already belong
+to, with a `formaction` sending it to an export route instead of the archive one — the same
+`patient_ids` Change Status beside them has always posted, read by one rule in
+`routes/patient_views.py`. The file itself is assembled by `routes/roster_export.py` through the
+same cover / rows / Not Tracked machinery the full roster uses, and its cover states "a selection,
+not the register" in the row where the roster's states the opposite, alongside how many records
+were ticked, how many were found and how many are on the register. The `export_selection` reason
+in `utils/unavailable.py` is retired.
 
 **Export is real, on seven screens, in two formats each.**
 

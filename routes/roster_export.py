@@ -1,4 +1,4 @@
-"""Export Excel and Export PDF, for the four working lists.
+"""Export Excel and Export PDF, for the four working lists -- and for one selection.
 
 Patient Records (Screen 03), Medicine Inventory (Screen 06), Appointment
 Scheduling (Screen 08) and User Management (Screen 11) each carried a disabled
@@ -56,9 +56,9 @@ The resolutions available were three, and two of them are worse:
     has one of, for four screens, and the two copies drift the moment either is
     touched. It is also explicitly out of scope for this task.
   * Post the visible row ids up with the request. That works, and it is what a
-    selection export would have to do, but for a *filter* it means the file's
-    contents are decided by a list of primary keys in a URL -- unreadable,
-    unbookmarkable, and silently wrong the moment the page is stale.
+    selection export has to do, but for a *filter* it means the file's contents
+    are decided by a list of primary keys rather than by the rule that chose
+    them -- unbookmarkable, and silently wrong the moment the page is stale.
   * Export the whole list and say so plainly, in the one place a reader of the
     file will see before they read a number.
 
@@ -68,6 +68,24 @@ block naming the controls that were not applied, by name, per screen -- Patient
 Records has five, Medicine Inventory three, Appointment Scheduling five -- and
 states the row count so a reader can check the file against the screen's own
 footer.
+
+AND THE ONE FILE THAT IS NOT A WHOLE LIST
+-----------------------------------------
+There is a sixth export here, and it breaks the rule above on purpose: Patient
+Records' bulk bar downloads the records that were ticked. The second bullet
+rejects deciding a file by a list of primary keys, and that rejection was about a
+*filter* -- a rule that has a better representation than the ids it matched. A
+selection has no rule behind it. The ids are the request rather than a stale copy
+of its answer, so posting them is the only faithful thing to do with one, and the
+POST that carries them is the same one Change Status already makes from the same
+checkboxes.
+
+So the two live side by side and the covers keep them apart. Five files say "the
+complete list, not the filtered view" in the first row of "What this file
+covers"; the sixth says "a selection, not the register" in the same row of the
+same block, names the toolbar's exports as the ones that hold everything, and
+states how many records were ticked beside how many were found. _cover_sheet()
+takes that row as a parameter for exactly this reason -- see FULL_LIST_SCOPE.
 
 WHAT IS DELIBERATELY IN EVERY FILE
 ----------------------------------
@@ -210,7 +228,7 @@ USER_STATED_UNTRACKED = (
 
 
 # ---------------------------------------------------------------------------
-# The eight entry points
+# The ten entry points -- two formats each, for four rosters and one selection
 # ---------------------------------------------------------------------------
 
 def patient_roster_workbook(context, produced_by=""):
@@ -221,6 +239,16 @@ def patient_roster_workbook(context, produced_by=""):
 def patient_roster_document(context, produced_by=""):
     """Patient Records (Screen 03) as a PDF document: bytes and a filename."""
     return _document(_patient_export(context, produced_by), produced_by)
+
+
+def patient_selection_workbook(context, produced_by=""):
+    """The ticked patient records (Screen 03's bulk bar) as a workbook."""
+    return _workbook(_patient_selection_export(context, produced_by))
+
+
+def patient_selection_document(context, produced_by=""):
+    """The same ticked records as a PDF document: bytes and a filename."""
+    return _document(_patient_selection_export(context, produced_by), produced_by)
 
 
 def inventory_workbook(context, produced_by=""):
@@ -314,19 +342,34 @@ def _assemble(doc_title, scope_label, stem, cover, sheets, untracked):
 
 
 # ---------------------------------------------------------------------------
-# The cover and the notes, shared by all four
+# The cover and the notes, shared by every export in this file
 # ---------------------------------------------------------------------------
 
-def _cover_sheet(screen, subtitle, produced_by, detail, controls, index, intro):
+# The first line of every cover's "What this file covers" block: what decided
+# which rows are in the file. Five of the six exports this module builds are the
+# whole of a list and say so; the sixth is a selection and says that instead.
+# Both are one row in one table on one cover, so a reader looks in the same place
+# either way and cannot mistake one file for the other.
+FULL_LIST_SCOPE = ("The complete list, not the filtered view", FILTER_SCOPE_NOTE)
+
+
+def _cover_sheet(screen, subtitle, produced_by, detail, controls, index, intro,
+                 scope=FULL_LIST_SCOPE):
     """What this file is, what it covers, and what narrowing it did not carry.
 
     A list of records with no provenance is the spreadsheet version of the
     unlabelled printout templates/_print.html's letterhead exists to prevent. This
     names the health center, the screen, how many rows are in the file, who took
     it off the system and when -- and then, because this is the point on which a
-    reader is most likely to be misled, states in a block of its own that the file
-    is the complete list, and names the controls on the screen that were not
+    reader is most likely to be misled, states in a block of its own what decided
+    the file's contents, and names the controls on the screen that were not
     applied to it.
+
+    `scope` is that statement, as a (point, meaning) pair. It defaults to the
+    full-list claim every roster export makes; the selection export overrides it,
+    because for that one file the default sentence would be false in every clause
+    -- and a cover whose most important paragraph is wrong is worse than a file
+    with no cover at all.
     """
     stamped = now()
     rows = [
@@ -344,7 +387,7 @@ def _cover_sheet(screen, subtitle, produced_by, detail, controls, index, intro):
             "What this file covers",
             ("Point", "What it means"),
             [
-                ["The complete list, not the filtered view", FILTER_SCOPE_NOTE],
+                list(scope),
                 *controls,
             ],
         ),
@@ -429,13 +472,26 @@ PATIENT_COLUMNS = (
 )
 
 
-def _patient_export(context, produced_by):
-    """Screen 03 as a cover, the roster, its four figures, and the notes."""
-    patients = context["patients"]
-    stats = context["stats"]
-    total = len(patients)
+# What a patient row means, stated wherever one is tabulated. Both patient
+# exports write the same eight columns from the same records, so they say the
+# same thing about them -- the argument _cover_sheet() makes about the scope
+# note, applied to the columns underneath it.
+PATIENT_ROW_NOTE = (
+    "Sorted by surname, A–Z, the order Screen 03's table states in its own "
+    "footer. Age is the age today, computed from the stored birth date; Last "
+    "Visit is the most recent recorded consultation, not a stored field."
+)
 
-    rows = [
+
+def _patient_rows(patients):
+    """Patient records as PATIENT_COLUMNS rows.
+
+    One function, because the full roster and a ticked selection are the same
+    eight columns read off the same dictionaries. Two copies of this would be two
+    chances for a column to be added to one file and forgotten in the other,
+    which is the reason PATIENT_COLUMNS is a single tuple in the first place.
+    """
+    return [
         [
             _value(patient.get("patient_id")),
             _value(patient.get("full_name")),
@@ -453,16 +509,22 @@ def _patient_export(context, produced_by):
         for patient in patients
     ]
 
+
+def _patient_export(context, produced_by):
+    """Screen 03 as a cover, the roster, its four figures, and the notes."""
+    patients = context["patients"]
+    stats = context["stats"]
+    total = len(patients)
+
+    rows = _patient_rows(patients)
+
     roster = sheet(
         "Patient Roster",
         [table(
             f"Every registered patient — {_count_label(total, 'record')}",
             PATIENT_COLUMNS,
             rows,
-            note=("Sorted by surname, A–Z, the order Screen 03's table states in "
-                  "its own footer. Age is the age today, computed from the stored "
-                  "birth date; Last Visit is the most recent recorded "
-                  "consultation, not a stored field."),
+            note=PATIENT_ROW_NOTE,
             empty="No patients are registered.",
         )],
         heading="Patient Roster",
@@ -534,6 +596,173 @@ def _patient_export(context, produced_by):
         _stem("Patient Records", "Full roster"),
         cover,
         [roster, summary],
+        notes,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Screen 03 -- the bulk bar's selection
+# ---------------------------------------------------------------------------
+
+# WHY THIS EXPORT EXISTS BESIDE THE ROSTER ONE
+# --------------------------------------------
+# The module docstring above argues that a *filter* must not decide a file's
+# contents through a list of primary keys, and that argument still stands. A
+# selection is the opposite case, and the difference is the whole justification
+# for this builder.
+#
+# A filter is a rule -- "everyone over 60" -- and the honest way to carry a rule
+# to the server is to send the rule. Sending the ids it happened to match instead
+# is a copy of the answer that goes stale the moment the register changes, which
+# is why the roster export refuses to do it and says so on its cover.
+#
+# A selection is not a rule. It is a set of records a person picked one at a time
+# and there is nothing else it could be sent as: "the four patients due for
+# follow-up that the desk ticked on Tuesday" has no query behind it. The ids ARE
+# the request, so posting them is exact rather than approximate, and the file is
+# complete by definition -- it holds every record that was asked for, or names on
+# its cover the ones that had gone.
+#
+# What it costs is the property the roster exports keep: the request is not a
+# bookmarkable URL, because there is nothing stable to bookmark. That is stated
+# on the cover rather than glossed, in the same block the roster exports use to
+# say they hold the whole list.
+
+# The one thing this file cannot tell a reader, and one the roster export's notes
+# do not cover: why these records and not others. It goes first on the Not
+# Tracked sheet, ahead of the four the roster shares, because it is the question
+# somebody holding a list of eleven patients will actually ask.
+SELECTION_UNTRACKED = (
+    (
+        "Why these records were selected",
+        "The selection was made by ticking rows on Screen 03 and nothing stores "
+        "it. There is no saved cohort, no shared list and no reason field behind "
+        "it, so this file is a snapshot of one operator's choice at one moment "
+        "and cannot be reproduced from the system afterwards. If the grounds "
+        "matter -- follow-up due, a campaign, a barangay request -- they have to "
+        "be written down beside the file.",
+    ),
+    *PATIENT_UNTRACKED,
+)
+
+
+def _patient_selection_export(context, produced_by):
+    """The ticked records as a cover, one sheet of rows, and the notes.
+
+    Deliberately three sheets rather than the roster export's four: there is no
+    Roster Summary here. Those four figures are counts over the whole register --
+    total registered, new this month, new in 30 days, senior share -- and not one
+    of them is a fact about a selection. Reproducing them beside eleven rows
+    would put "Total registered patients: 118" on a file that holds eleven, which
+    is the single most likely way a reader of this file could be misled. The
+    register's size is on the cover instead, where it reads as context for the
+    selection rather than as a figure about it.
+
+    Everything else is the roster export's, unchanged: the same eight columns
+    from _patient_rows(), the same note under them, the same cover builder, the
+    same Not Tracked sheet and the same two renderers.
+    """
+    patients = context["patients"]
+    total = len(patients)
+    requested = context["requested"]
+    registered = context["total_registered"]
+
+    # Selected on a page that has since gone stale. Nothing in this system
+    # deletes a patient, so this is close to unreachable -- but "close to" is not
+    # "never", and a file quietly holding four rows for a five-record selection
+    # is exactly what a cover sheet is for.
+    missing = requested - total
+
+    listing = sheet(
+        "Selected Patients",
+        [table(
+            f"The records selected on Screen 03 — {_count_label(total, 'record')}",
+            PATIENT_COLUMNS,
+            _patient_rows(patients),
+            note=PATIENT_ROW_NOTE,
+            empty="No selected record could be found.",
+        )],
+        heading="Selected Patients",
+        intro=(
+            f"{_count_label(total, 'patient')} selected from the "
+            f"{_count_label(registered, 'patient')} on the register, as of "
+            f"{long_date(today())}. These are the records that were ticked on "
+            "Screen 03 and no others; a patient missing from this list was not "
+            "selected, rather than filtered out."
+        ),
+    )
+
+    detail = [
+        ("Patients in this file", total),
+        ("Selected on screen", requested),
+        ("On the register at the time", registered),
+    ]
+    if missing:
+        detail.append((
+            "Selected but not found",
+            f"{missing} — see 'What this file covers'",
+        ))
+
+    controls = [[
+        "It is a selection, so no filter applies to it",
+        "The search box and the Advanced Filter panel decide which rows are on "
+        "screen to be ticked, and this file is the ticked rows. Whatever was "
+        "typed or chosen before the selection was made is therefore already "
+        "reflected in it; it is neither applied again here nor recorded "
+        "anywhere, so this file cannot say what was on screen at the time.",
+    ]]
+    if missing:
+        controls.append([
+            "Some selected records were not found",
+            f"{requested} records were selected and {total} were found, so "
+            f"{missing} could not be included: the register has no row for them. "
+            "Retiring a patient does not do this -- an Inactive or Deceased "
+            "record is still on the roster and would still be in this file -- so "
+            "reload Screen 03 and select again if the full set is needed.",
+        ])
+
+    cover = _cover_sheet(
+        "Patient Records (Screen 03)",
+        "Selected patients",
+        produced_by,
+        detail=detail,
+        scope=(
+            "A selection, not the register",
+            "This file holds only the patient records that were ticked on Screen "
+            "03 before Export was pressed. It is NOT the full roster -- the "
+            "toolbar's own Export Excel and Export PDF are, and they download "
+            "every registered patient. It is not the result of a saved search "
+            "either: the selection was made by hand, one row at a time, and "
+            "nothing stores it, so this file cannot be regenerated by re-running "
+            "anything. The count above is the whole of what is here.",
+        ),
+        controls=controls,
+        index=[
+            ["Selected Patients", "The ticked records, surname order."],
+        ],
+        intro=(
+            f"{_count_label(total, 'selected patient record')}, taken off the "
+            f"system on {now().strftime('%B %d, %Y')}. It is a snapshot of those "
+            "records as they stand today, not a record of a period, and not the "
+            "register."
+        ),
+    )
+
+    notes = _untracked_sheet(
+        SELECTION_UNTRACKED,
+        "These records are complete for what the system stores about a patient's "
+        "identity, contact and status -- the same eight columns the full roster "
+        "export carries. They are not medical records: a patient's "
+        "consultations, immunisations and appointments are on their own profile "
+        "screen. The following are not stored at all.",
+    )
+
+    return _assemble(
+        "Patient Records — Selected Patients",
+        f"Selection · {_count_label(total, 'patient')} of {registered} registered",
+        _stem("Patient Records", f"Selected patients ({total})"),
+        cover,
+        [listing],
         notes,
     )
 
@@ -1180,6 +1409,8 @@ __all__ = [
     "inventory_workbook",
     "patient_roster_document",
     "patient_roster_workbook",
+    "patient_selection_document",
+    "patient_selection_workbook",
     "pdf_response",
     "user_roster_document",
     "user_roster_workbook",
