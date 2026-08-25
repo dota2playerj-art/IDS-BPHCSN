@@ -1177,9 +1177,11 @@ nobody is. It cannot start a consultation and cannot bypass the one-at-a-time ru
 **The consultation View action, and the add-only immunisation rule** on Screen 20's edit mode.
 See `09_IDS-BPHCSN_UI_Architecture_FROM-CLAUDE.md` §10.
 
-**Sign-in recording.** `routes/auth.py` records sign-ins, sign-outs, refused attempts and blocked
-attempts on deactivated accounts. This is what put a real figure behind Screen 11's Last Login,
-Screen 12's Login Events card and Screen 13's Security pane.
+**Sign-in recording.** `routes/auth.py` records successful sign-ins, refused attempts and attempts
+blocked on a deactivated account; `utils/security.py` records a session ended because its account
+was deactivated mid-visit. Signing out is **not** recorded — `logout()` clears the session and
+writes nothing — so these are sign-in counts rather than session counts. This is what put a real
+figure behind Screen 11's Last Login, Screen 12's Login Events card and Screen 13's Security pane.
 
 **Screens 15 to 18 are data-driven.** The Barangay Official Dashboard, Health Programs,
 Vaccination Campaigns and Community Reports each take a context built in

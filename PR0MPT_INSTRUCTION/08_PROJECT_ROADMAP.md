@@ -54,8 +54,8 @@ What that figure means, stated plainly so it can be defended:
 
 All four core objectives from the approved Proposal are built and working against real stored
 data — Patient Records, Medicine Inventory, Appointment Scheduling with Community Notifications,
-and Reports & Analytics. Role-based access control is enforced across all 56 routes for all three
-roles with no gaps. The database holds 11 tables with 13 indexes and passes integrity and
+and Reports & Analytics. Role-based access control is enforced across all 76 guarded routes for
+all three roles with no gaps. The database holds 10 tables with 12 indexes and passes integrity and
 foreign-key checks.
 
 The remaining 25–30% is concentrated in four places, none of which is a core objective:
@@ -229,7 +229,7 @@ Tasks
   03_SCREEN_SPECIFICATIONS.md Screen 01 lists it; "Remember Me" and "Show Password" are also
   still outstanding on that screen.
 
-☑ Role Management — `login_required` and `role_required` decorators on all 56 routes, verified
+☑ Role Management — `login_required` and `role_required` decorators on all 76 guarded routes, verified
   with no gaps for Admin, Health Staff, Barangay Official and anonymous visitors. The Health
   Staff read-only restriction on SMS is enforced structurally: no send endpoint exists in the
   staff blueprint at all.
@@ -275,7 +275,7 @@ Completed
 
 Tasks
 
-☑ Create SQLite Database — `schema.sql` plus 7 migration scripts. 11 tables, 13 named indexes.
+☑ Create SQLite Database — `schema.sql` plus 8 migration scripts. 10 tables, 12 named indexes.
 
 ☑ Create Users Table — 3 seeded accounts, one per role, with a CHECK constraint on role
 
@@ -288,14 +288,22 @@ Tasks
 ☑ Create Appointments Table — extended by migration with the queue statuses
   (Waiting, In Consultation), the walk-in flag and the check-in timestamp
 
-☑ Create Audit Logs — `audit_logs`, written on consultation edits and SMS broadcast sends
+☑ Create Audit Logs — `audit_logs`, written on consultation edits, SMS broadcast sends, and
+  authentication events. Six distinct actions are recorded, in four groups: consultation edits;
+  SMS broadcasts; sign-ins (successful, refused, and blocked on a deactivated account); and
+  sessions ended because the account was deactivated mid-visit. Signing out is deliberately not
+  recorded, so these are sign-in counts rather than session counts.
 
 ☑ Additional tables not in the original list — `consultations`, `immunizations`,
-  `sms_broadcasts`, `sms_broadcast_recipients`, `settings`, `schedule_logs`
+  `sms_broadcasts`, `sms_broadcast_recipients`, `settings`. A sixth, `schedule_logs`, was created
+  and has since been dropped by `migrate_drop_schedule_logs.py`: it was declared to back
+  Community Announcements, that screen was retired as a feature that never existed, and nothing
+  else ever read the table. This is why the counts above read 10 tables and 12 indexes rather
+  than the 11 and 13 recorded earlier in this document's history.
 
 ☑ Testing — `PRAGMA integrity_check` returns ok and `PRAGMA foreign_key_check` reports zero
   violations. A database built fresh from `schema.sql` was diffed against a fully-migrated one:
-  all 11 tables, all columns, all 13 indexes and all foreign keys match, with a single
+  all 10 tables, all columns, all 12 indexes and all foreign keys match, with a single
   deliberate, documented difference (`consultations.updated_at` is nullable on the migrated path,
   because SQLite will not accept a non-constant default in ADD COLUMN).
 
@@ -332,7 +340,11 @@ Tasks
 ☑ Session Management — login, logout, session clearing, and a no-store cache header on every
   authenticated response
 
-☑ User Roles — verified across all 56 routes under all four identities with zero gaps
+☑ User Roles — verified across all 76 guarded routes under all four identities with zero gaps.
+  The application exposes 79 URL rules beyond static files; 76 of them are guarded (75 under
+  `role_required`, plus `/dashboard` under `login_required`) and three are deliberately open
+  (`/`, `/login`, `/logout`). The last sweep ran all 76 guarded rules under each of the four
+  identities -- 304 checks -- and found no leak.
 
 ☐ Wire the Audit Logs screen — the query and the data already exist; only the route context and
   the template loop remain (carried forward from Phase 4)
@@ -356,15 +368,31 @@ Not Started as a formal phase — ad-hoc verification has been performed and rec
 
 Testing Types
 
-☐ Functional Testing — no test suite exists. There is no `tests/` directory and no `test_*.py`
-  file anywhere in the project. Individual flows have been exercised by hand and the results
-  written up in the audit reports, but nothing is repeatable or automated.
+☐ Functional Testing — **no automated test suite exists.** There is no `tests/` directory, no
+  `test_*.py` file, and no pytest or unittest dependency anywhere in the project. This is stated
+  plainly here because it is the kind of gap a reviewer should be told about rather than left to
+  discover.
+
+  What *has* been done is substantial and should not be mistaken for nothing. Verification is
+  performed by driving the real application through Flask's test client — genuine GET and POST
+  requests to the same endpoints a browser uses, against a copy of the live database — and the
+  results are written up in the audit reports. The most recent pre-review sweep exercised all
+  four core objectives end to end (register/view/edit a patient, add a medicine and move its
+  stock through every alert tier, book and check in an appointment, send a broadcast), ran the
+  full 304-check route × role matrix, drove the mid-session deactivation case through its whole
+  eight-step lifecycle, and confirmed all 22 export routes return valid `.xlsx` and `.pdf` files.
+
+  The distinction that matters: these checks are **scripted but not committed**. They are written
+  fresh each session, run once, and discarded, so they prove the system worked at that moment but
+  cannot be re-run on demand by someone else or in CI. Converting them into a committed suite is
+  the outstanding work, and it is a conversion rather than a start from nothing.
 
 ☐ UI Testing — not performed on real devices or across browsers
 
 ☑ Database Testing — integrity and foreign-key checks pass; the fresh-install vs migrated
-  comparison described in Phase 5 was carried out and recorded; all 7 migrations were re-run
-  against a copy of the live database and 6 of 7 are cleanly idempotent
+  comparison described in Phase 5 was carried out and recorded; all 8 migrations were re-run
+  against a copy of the live database and 7 of 8 are cleanly idempotent (the eighth,
+  `migrate_drop_schedule_logs.py`, is a `DROP TABLE IF EXISTS` and is a no-op on re-run)
 
 ☐ User Acceptance Testing — not performed with barangay health center staff
 
@@ -504,7 +532,7 @@ Database Completed
 
 Status
 
-Completed — 11 tables, 13 indexes, 7 migrations, integrity and foreign-key checks passing
+Completed — 10 tables, 12 indexes, 8 migrations, integrity and foreign-key checks passing
 
 ---
 
@@ -735,18 +763,25 @@ Reports & Analytics about the same barangay.
 
 - Screen 01: **"Remember Me"** and **account lockout after repeated failed sign-ins**. Neither is
   built, and neither is rendered as a dead control. Note that account *deactivation* is enforced
-  and audited — `routes/auth.py::_log_blocked_sign_in()` refuses a deactivated account and records
-  whether the password supplied still worked — but that is a different mechanism from a
-  failed-attempt counter. ("Show Password" is now built: `login.html` carries a working
-  `aria-pressed` eye toggle.)
+  and audited in two places — `routes/auth.py::_log_blocked_sign_in()` refuses a deactivated
+  account at the login form and records whether the password supplied still worked, and
+  `utils/security.py` re-reads the account on every guarded request, so an account deactivated
+  *while its holder is signed in* loses that session on its next click rather than at logout.
+  Both are a different mechanism from a failed-attempt counter. ("Show Password" is now built:
+  `login.html` carries a working `aria-pressed` eye toggle.)
 - Screen 09: **"Save Draft"** and **"Schedule"** for SMS broadcasts. Not built; the compose dialog
   offers Cancel and Send Broadcast only, so neither appears as a dead button.
 - Screen 11: **account writes** — Add User, Reset Password, Disable, Enable, Delete. Present and
   disabled, each stating why, because every one of them touches authentication. This is an open
   scope decision for the team rather than an oversight.
-- **Column sorting** on the list screens. The rows arrive in the order the query returns them and
-  each screen states that order in its footer. This is the `sort` reason in `utils/unavailable.py`,
-  quoted by Patient Records, Medicine Inventory and Appointment Scheduling.
+- **Column sorting on Appointment Scheduling's queue**, and only there. Sorting itself is built:
+  Patient Records sorts by Name, Age, Last Visit and Status, and Medicine Inventory by Medicine
+  Name, Current Stock, Expiration Date and Status, over the rendered rows and composing with each
+  screen's search box and Advanced Filter (`static/js/table-sort.js`, one comparator shared by
+  both). The queue is the one table that refuses, and it refuses by argument rather than for want
+  of the control: its order is already a clinical answer — in consultation, then waiting, then
+  not yet arrived, then resolved — and re-sorting it would discard the one thing that list is for.
+  This is the `sort` reason in `utils/unavailable.py`, now quoted by that one screen.
 - **Paging**. Every row the query returns is already on the page, so there is no second page; the
   `pagination` reason says so on the two screens that used to show page numbers.
 - **Exporting only a ticked selection** on Patient Records' bulk bar (`export_selection`). Export
@@ -759,8 +794,11 @@ Reports & Analytics about the same barangay.
 
 - **Templates carry inline `<style>` and `<script>` blocks.** 17 of the 23 files in `templates/`
   do. `04_DEVELOPMENT_GUIDE.md` asks for separate CSS and JS files; `static/css/` and `static/js/`
-  hold only vendor assets (Bootstrap, Chart.js, and the self-hosted Inter and Material Symbols
-  fonts). This is a consistent, long-standing deviation from that standard and is the largest
+  are still almost entirely vendor assets (Bootstrap, Chart.js, and the self-hosted Inter and
+  Material Symbols fonts). The one exception is `static/js/table-sort.js`, the shared sort
+  comparator written for Patient Records and Medicine Inventory — the project's first piece of
+  first-party JavaScript in a file of its own, and the shape the rest of this debt would be paid
+  off in. This is a consistent, long-standing deviation from that standard and is the largest
   outstanding one.
 - **No `tests/` directory.** Verification in this project is done by writing a throwaway script
   per task that exercises the routes end-to-end against an independent `sqlite3` connection and
@@ -798,8 +836,8 @@ way it loses that trust is by being written once and never re-read while the sys
 | "Settings — nothing reads or writes it." | Nothing *writes* it. The Security pane *reads* live sign-in counts from the audit trail. |
 | "Screen 10: Print, Export to Excel and Export to PDF… not built." | All three are built. Seven screens have real `.xlsx` and `.pdf` download routes — Patient Records, Medicine Inventory, Appointment Scheduling, User Management, Audit Logs, Reports & Analytics and Community Reports; see `routes/roster_export.py`, `report_export.py` and `audit_export.py`. |
 | "Export and print… the controls exist in the markup and are decorative." | No export control in this project is decorative. |
-| "Search, sort, filter and export controls on most list screens are present but not wired." | Search and filter are wired on every list screen; export is built. **Sort genuinely is not**, and is the only one of the four still true. |
-| "Sign-ins are not recorded." | `routes/auth.py` records sign-ins, sign-outs, refusals and blocked attempts. Screen 11 shows a real Last Login and Screen 12's Login Events card is live. |
+| "Search, sort, filter and export controls on most list screens are present but not wired." | All four are wired. Search, filter and export are built on every list screen; **sort** is built on Patient Records and Medicine Inventory, and is deliberately refused on Appointment Scheduling's queue, whose order is itself the answer. None of the four is still true as written. |
+| "Sign-ins are not recorded." | `routes/auth.py` records successful sign-ins, refused attempts and attempts blocked on a deactivated account; `utils/security.py` records a session ended because its account was deactivated mid-visit. **Sign-outs are not recorded** — `logout()` clears the session and writes nothing — so these are sign-in counts rather than session counts. Screen 11 shows a real Last Login and Screen 12's Login Events card is live. |
 
 ---
 

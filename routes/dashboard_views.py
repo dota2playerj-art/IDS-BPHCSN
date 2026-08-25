@@ -84,10 +84,17 @@ UNTRACKED = {
         "store who wrote them, but registrations, check-ins and stock edits do "
         "not, so a weekly total for one worker cannot be assembled."
     ),
-    "consultation_status": (
-        "A consultation has no status of its own. The visit it belongs to "
-        "carries the outcome, on Appointment Scheduling."
-    ),
+    # THERE IS NO "consultation_status" ENTRY ANY MORE, AND THAT IS THE POINT.
+    # It said a consultation has no status of its own and pointed at the visit
+    # on Appointment Scheduling for the outcome. Nothing quotes it. The Status
+    # column on the Recent Consultations table prints "Recorded" -- which is a
+    # fact about the row rather than a gap in the system: a consultation that is
+    # in this table is one that was written up, and that is all the column ever
+    # claimed. So the cell states it in the template, the way user_views.py's
+    # "Never signed in" does, and the reason that used to be quoted beside it
+    # goes rather than sitting here explaining an absence the screen no longer
+    # has. A reason with nothing quoting it is exactly the drift
+    # utils/unavailable.py exists to prevent.
 }
 
 

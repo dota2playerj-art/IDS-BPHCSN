@@ -120,11 +120,19 @@ UNTRACKED = {
         "application writes to them and they are empty for every account. "
         "Contact details were never captured, so there is none to show."
     ),
-    "search": (
-        "Searching and filtering are not wired. With three accounts on one "
-        "screen there is nothing to narrow down, so the controls the mockup "
-        "drew would have filtered a list that is already complete."
-    ),
+    # THERE IS NO "search" ENTRY ANY MORE, AND THAT IS THE POINT.
+    # It said searching and filtering are not wired, and that three accounts on
+    # one screen leave nothing to narrow down. Both halves were true, and the
+    # second is why the controls themselves went: the search box, the five-role
+    # Advanced Filter and the "Showing 1-7 of 18 users" pager were removed from
+    # user_management.html rather than left disabled with this sentence hung off
+    # them, because a control that would filter an already-complete list is not
+    # a gap to explain but a control that should not be drawn. What stands in
+    # their place is a Jinja comment recording what the mockup carried and why
+    # none of it survived.
+    #
+    # With nothing rendering it, the reason is drift waiting to happen -- the
+    # same call made for "last_login" above -- so it goes with them.
     # "export" used to be here, then moved out, and is now gone from where it
     # moved to. It was a screen-specific sentence; it was replaced by a pointer
     # at utils/unavailable.py's shared `export`, because two near-identical
