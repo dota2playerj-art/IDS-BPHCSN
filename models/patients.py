@@ -28,9 +28,21 @@ CIVIL_STATUSES = ("Single", "Married", "Widowed", "Separated", "Minor")
 SEXES = ("Female", "Male")
 MUNICIPALITIES = ("San Francisco", "Bunawan", "Rosario")
 PROVINCES = ("Agusan del Sur", "Surigao del Sur", "Davao de Oro")
-EMERGENCY_RELATIONSHIPS = ("Mother", "Father", "Spouse", "Sibling", "Guardian", "Other")
+EMERGENCY_RELATIONSHIPS = (
+    "Mother", "Father", "Spouse", "Son/Daughter", "Sibling", "Grandchild",
+    "Guardian", "Other",
+)
 # "Unknown" is the form's placeholder choice and is stored as NULL, not as text.
-BLOOD_TYPES = ("Unknown", "O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-")
+# The "(Rh unknown)" entries record a patient who knows their ABO group but was
+# never told their Rh factor. A bare "O" is deliberately absent: every person is
+# either O+ or O-, so storing "O" would assert a blood type that does not exist.
+BLOOD_TYPES = (
+    "Unknown",
+    "O+", "O-", "O (Rh unknown)",
+    "A+", "A-", "A (Rh unknown)",
+    "B+", "B-", "B (Rh unknown)",
+    "AB+", "AB-", "AB (Rh unknown)",
+)
 CONDITION_OPTIONS = ("Hypertension", "Diabetes", "Asthma", "Tuberculosis")
 ALLERGY_OPTIONS = ("Penicillin", "Sulfa Drugs", "Seafood")
 
