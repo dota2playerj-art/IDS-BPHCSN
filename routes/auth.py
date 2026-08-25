@@ -73,15 +73,25 @@ so the figures these entries feed are sign-in counts and not session counts. Bot
 absences are stated on the screens that report the counts rather than left to be
 inferred from a number.
 
-One more boundary, stated because it would otherwise be assumed away: the active
-flag is checked when a session STARTS, not on every request afterwards. An
-account deactivated while it is already signed in keeps that session until it is
-cleared. Nothing in the application can deactivate an account today -- there is
-no write path for it, which is why the flag only ever changes by direct database
-edit -- so the window is narrow, but it is real, and closing it would mean a
-lookup on every guarded request rather than a change to this file.
+One more boundary used to be stated here, and it has since been closed rather
+than narrowed. The active flag was checked when a session STARTED and not on any
+request afterwards, so an account deactivated while it was already signed in kept
+that session until its holder chose to log out. This note said closing it "would
+mean a lookup on every guarded request rather than a change to this file", and
+that is exactly where the fix went: utils/security.py now re-reads the account on
+every guarded request and clears the session the moment the flag reads false, at
+no extra database cost -- see that module's header for why it is cheaper than
+what it replaced. This file is unchanged by it apart from the note you are
+reading and the refusal function below, which moved so both callers could share
+one copy of it.
+
+What that leaves is a much smaller boundary, and it is a property of sessions
+rather than of this file: a revocation takes effect on the deactivated holder's
+NEXT guarded request, not at the instant an administrator sets the flag. There is
+no push, and a browser sitting on an already-rendered page has already been sent
+that page. The window is one click long.
 """
-from flask import Blueprint, flash, redirect, render_template, request, session, url_for
+from flask import Blueprint, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash
 
 from models.audit import (
@@ -93,7 +103,7 @@ from models.audit import (
 )
 from models.users import get_user_by_username
 from utils.roles import normalize_role
-from utils.security import get_current_user, login_required
+from utils.security import get_current_user, login_required, refuse_credentials
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -209,23 +219,31 @@ def _log_refused_sign_in(user, ip_address):
     )
 
 
-# THE ONE RESPONSE EVERY REFUSAL RETURNS.
+# THE ONE RESPONSE EVERY REFUSAL RETURNS -- AND IT NOW LIVES IN utils/security.py.
 # One function rather than the same two lines at each refusal site, because the
-# security property here is that the three outcomes are INDISTINGUISHABLE from
-# the outside -- no such account, wrong password, deactivated account -- and a
-# property that depends on three copies of a string staying equal is a property
-# waiting to be broken by an edit to one of them. A fourth outcome added later
-# gets the identical response by construction rather than by remembering to.
+# security property here is that the outcomes are INDISTINGUISHABLE from the
+# outside -- no such account, wrong password, deactivated account -- and a
+# property that depends on copies of a string staying equal is a property waiting
+# to be broken by an edit to one of them. This comment used to end "a fourth
+# outcome added later gets the identical response by construction rather than by
+# remembering to", and that outcome has now arrived: a session revoked
+# mid-visit, because the per-request check in utils/security.py found the account
+# deactivated after the session had already started.
 #
-# In particular there is no "this account has been deactivated" message here, and
-# there must never be one. It would be helpful to the one person who deserves it
-# and a free account-enumeration oracle for everybody else: anyone could sort a
-# list of guessed usernames into real-and-disabled, real-and-live, and fictional,
-# without ever knowing a password. The distinction is recorded in the audit trail,
-# where only a signed-in Admin can read it.
-def _refuse():
-    flash("Invalid security credentials.")
-    return redirect(url_for("auth.login", error="Invalid security credentials."))
+# That refusal cannot be raised from this module -- utils/security.py is imported
+# BY routes, not the other way round -- so the function moved down to where both
+# callers can reach it, and this name is now an alias for the moved one. Nothing
+# about the response changed. What changed is that "by construction" is now
+# literally true: the second caller returns the same response because it calls
+# the same function, not because somebody copied the string correctly.
+#
+# In particular there is still no "this account has been deactivated" message,
+# and there must never be one. It would be helpful to the one person who deserves
+# it and a free account-enumeration oracle for everybody else: anyone could sort
+# a list of guessed usernames into real-and-disabled, real-and-live, and
+# fictional, without ever knowing a password. The distinction is recorded in the
+# audit trail, where only a signed-in Admin can read it.
+_refuse = refuse_credentials
 
 
 @auth_bp.route("/")

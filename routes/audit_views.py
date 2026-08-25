@@ -52,6 +52,7 @@ from models.audit import (
     ACTION_LOGIN_BLOCKED,
     ACTION_LOGIN_FAILED,
     ACTION_LOGIN_SUCCESS,
+    ACTION_SESSION_REVOKED,
     MODULE_AUTH,
     MODULE_SMS,
     count_audit_logs,
@@ -185,6 +186,13 @@ _ICONS = {
     # scanning the trail, a revoked credential still being presented must not
     # look like somebody mistyping their password.
     ACTION_LOGIN_BLOCKED: "person_off",
+    # And distinct again from that one. `person_off` is somebody being turned
+    # away at the door; this is a session that was already inside being cut off,
+    # so the glyph is a severed link rather than a barred person. Verified
+    # present in static/fonts/material-symbols-outlined.woff2 -- that file is a
+    # fixed subset and a ligature it does not carry renders as its own literal
+    # name, which is the failure mode medicine_inventory.html documents.
+    ACTION_SESSION_REVOKED: "link_off",
 }
 _MODULE_ICONS = {
     MODULE_SMS: "campaign",

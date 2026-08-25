@@ -64,10 +64,42 @@ ACTION_LOGIN_FAILED = "Refused sign-in attempt"
 # entry on this screen that tells an administrator a credential they thought they
 # had withdrawn is still in someone's hands and still being used.
 ACTION_LOGIN_BLOCKED = "Blocked sign-in to deactivated account"
+# A fourth phrase, and the first one that is not about the login form at all.
+# The three above are written when somebody presents credentials. This one is
+# written when a session that was already open is ended underneath its holder,
+# because the account it belongs to has been deactivated since it started --
+# utils/security.py checks the flag on every guarded request, so a revocation
+# takes effect at the next click rather than at the next sign-in.
+#
+# IT IS ITS OWN PHRASE FOR THE SAME REASON ACTION_LOGIN_BLOCKED IS.
+# Folding it into that one would be the more tempting shortcut, because both
+# sentences are about a deactivated account -- and it would make the trail lie in
+# a way nobody would catch by reading it. "Blocked sign-in" says a credential was
+# presented at the form and refused. Here nothing was presented: somebody was
+# already inside, and the door was closed behind them. An administrator chasing
+# "who is still trying to use the account I switched off" would read the second
+# as the first and conclude the credential is still in circulation.
+ACTION_SESSION_REVOKED = "Ended session on deactivated account"
 
 # Every action that means somebody was turned away at the login form. Grouped so
 # the Security Events figure counts refusals rather than one particular kind of
 # refusal -- adding a fourth outcome later must not silently shrink that number.
+#
+# ACTION_SESSION_REVOKED IS DELIBERATELY NOT IN THIS GROUP, AND THAT IS A CLAIM
+# ABOUT TWO SCREENS RATHER THAN A PREFERENCE.
+# The comment above says "at the login form", and both screens reading this
+# figure say the same in their own words: Audit Logs' Security Events card is
+# titled "Sign-ins refused against an account that exists", and Settings labels
+# the number "Refused sign-in attempts". A revoked session is not a sign-in
+# attempt. Adding it here would leave two visible labels describing a total that
+# no longer matches them -- which is the precise failure utils/unavailable.py's
+# docstring calls the hardest kind, a figure that is mostly right.
+#
+# The entry is not hidden by that. It is written under MODULE_AUTH like the other
+# three, so it appears in the trail and under the screen's Authentication filter;
+# it is only kept out of a total whose name would stop being true. If a future
+# session wants these counted, the honest change is a card of their own, not a
+# quiet addition to this tuple.
 REFUSAL_ACTIONS = (ACTION_LOGIN_FAILED, ACTION_LOGIN_BLOCKED)
 
 # Modules that are not a change to a stored record, and so are excluded from the

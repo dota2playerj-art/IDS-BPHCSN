@@ -1052,10 +1052,20 @@ The system has **20 screens**. `templates/` holds 23 `.html` files, of which thr
 **Screen 01 — "Locked session after multiple failed attempts."**
 
 Still not implemented. There is no failed-attempt counter, so no account can be locked out by
-repeated guessing. What *is* implemented, and should not be confused with it, is deactivation:
-`routes/auth.py` refuses a deactivated account and writes an audit entry recording whether the
-password supplied still worked — the most actionable line the trail can produce. "Remember Me" is
-also not built. "Show Password" **is** now built (`login.html`, a working `aria-pressed` toggle).
+repeated guessing. What *is* implemented, and should not be confused with it, is deactivation, and
+it now holds at **both** ends of a session:
+
+- at the login form, `routes/auth.py` refuses a deactivated account and writes an audit entry
+  recording whether the password supplied still worked — the most actionable line the trail can
+  produce;
+- and on every guarded request, `utils/security.py` re-reads the account and clears the session the
+  moment `is_active` reads false, so an account deactivated *while its holder is signed in* loses
+  access at their next click rather than at their next sign-in. That entry is its own phrase,
+  "Ended session on deactivated account", because nobody presented a credential — see §16 of the
+  UI Architecture document.
+
+"Remember Me" is also not built. "Show Password" **is** now built (`login.html`, a working
+`aria-pressed` toggle).
 
 **Screen 09 — "Save Draft", "Schedule".**
 

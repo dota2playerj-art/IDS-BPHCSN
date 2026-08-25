@@ -726,6 +726,109 @@ line was the first thing that would have gone false the moment this feature ship
 
 ---
 
+## 16. Design Decision — Deactivation Now Holds on Every Request, and Costs Less Than It Did
+
+`users.is_active` was consulted exactly once in an account's life: at the login form. An account
+deactivated while its holder was signed in kept working until they chose to log out, which could be
+days. `routes/auth.py` named this gap in its own module note and said closing it "would mean a
+lookup on every guarded request rather than a change to this file". That is where the fix went.
+
+### What a guarded request asks now
+
+All 75 `@role_required` routes and the one `@login_required`-only route (`/dashboard`) run the same
+three questions through one function, `_signed_in_account()` in `utils/security.py`:
+
+| # | Question | Failure |
+|---|---|---|
+| 1 | Is there a session at all? | redirect to `/login` — unchanged, the anonymous case |
+| 2 | Does the account still exist? | clear the session, refuse; no audit row, because there is no account to attribute one to |
+| 3 | Is the account still active? | clear the session, refuse, **and** write an audit entry |
+
+One function rather than a check in each decorator, so `login_required` and `role_required` cannot
+come to disagree about what a valid session is — which they would, the first time one of them was
+edited. Note that `login_required` previously asked only question 1 and never read the account at
+all; it now asks all three.
+
+The revocation takes effect on the holder's **next guarded request**. There is no push, and a
+browser already showing a rendered page has already been sent it. The window is one click long, and
+that is now the whole of the remaining boundary.
+
+### Why this is cheaper than what it replaced
+
+The obvious worry about a per-request account check is the query it adds to 76 routes. It adds none.
+It removes one. Measured on this database, with the pre-change code run from a git worktree:
+
+| | account lookups per request | database work |
+|---|---|---|
+| before (no check at all) | **2** | baseline |
+| the naive way to add the check | **3** | one cycle more |
+| what was built | **1** | one cycle *less* |
+
+Two lookups were already happening, from two places that did not know about each other:
+`role_required()` read the account row, and then `inject_role_context()` read the same row again on
+every render. `database.connection.get_db()` opens a **new** SQLite connection per call and closes
+it after, so those were two full connect / query / close cycles. Measured over 9 rounds of 400
+calls, one cycle costs **~0.54–0.64 ms** on this database against **~0.027 ms** for the `SELECT`
+alone on an open connection — so about 95% of a lookup is the connection, not the read.
+
+The saving is therefore about half a millisecond of database work per authenticated request. That
+is deliberately stated as *the lookup removed* rather than as a faster page: end-to-end request
+timing on a laptop is dominated by noise, and repeated runs of the same nine screens disagreed by
+tens of milliseconds in **both** directions. The lookup count is exact and reproducible; the wall
+clock is not, so no claim is made from it.
+
+`get_current_user()` now caches the row on `flask.g` for the life of the request. The three call
+sites collapse to one lookup, and the `is_active` test reads a column on a row the request had
+already fetched — it issues no query of its own and can issue none.
+
+The lookup itself was never the expensive part: the `users` table holds three rows and the plan is
+`SEARCH users USING INTEGER PRIMARY KEY (rowid=?)`, a primary-key hit rather than a scan.
+
+Caching on `g` and not for longer is deliberate. A cache outliving the request would need an
+invalidation rule when an account changes, and getting that wrong is precisely how a deactivation
+check comes to pass a stale row — the defect this change exists to close. One request, one read, no
+invalidation rule to get wrong.
+
+### The refusal reveals nothing, by construction rather than by copying
+
+`routes/auth.py`'s comment on its one refusal response said a fourth outcome added later "gets the
+identical response by construction rather than by remembering to". This is that fourth outcome, so
+the function moved to `utils/security.py` — which routes import, not the reverse — and both callers
+now return the same response because they call the same function.
+
+So a revoked session sees exactly what a wrong password sees: *"Invalid security credentials."* and
+a redirect to `/login`. There is still nowhere in the application that says an account has been
+deactivated. At the login form that wording would be an account-enumeration oracle; here it would be
+the same sentence reachable by anyone holding a stolen session cookie. The distinction lives in the
+audit trail, where only a signed-in Admin can read it.
+
+### Its audit entry is a fourth phrase, and is deliberately outside the refusal count
+
+`ACTION_SESSION_REVOKED` — "Ended session on deactivated account" — is its own phrase rather than a
+reuse of `ACTION_LOGIN_BLOCKED`. Folding them together is the tempting shortcut, and it would make
+the trail lie in a way nobody would catch by reading it: "Blocked sign-in" says a credential was
+presented at the form and refused, whereas here nothing was presented — somebody was already inside
+and the door closed behind them. An administrator asking "who is still trying to use the account I
+switched off" would read the second as the first.
+
+It is **not** added to `REFUSAL_ACTIONS`. That tuple feeds two visible figures whose labels say what
+they count: Audit Logs' Security Events card is titled "Sign-ins refused against an account that
+exists", and Settings labels the number "Refused sign-in attempts". A revoked session is not a
+sign-in attempt, and adding it would leave two labels describing a total that no longer matches
+them. The entry is still written under `MODULE_AUTH`, so it appears in the trail and under the
+screen's Authentication filter; it is only kept out of a total whose name would stop being true. If
+these are ever worth counting, the honest change is a card of their own.
+
+### One entry per revocation, not one per click
+
+Worth stating because a per-request check is exactly the shape of thing that fills a table. It does
+not, and the reason is structural rather than a rate limit: the session is cleared in the same
+breath as the entry is written, so the request after it carries no `user_id`, fails question 1, and
+never reaches the logging path. A revoked holder writes one row and then looks like an anonymous
+visitor. This was verified live rather than reasoned about — see the commit.
+
+---
+
 End of UI Architecture Document
 
 Status: Approved
