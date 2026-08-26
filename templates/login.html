@@ -221,8 +221,10 @@
     font-size:10.5px; font-weight:700; letter-spacing:0.12em; color:#B0B6BE; text-transform:uppercase; white-space:nowrap;
   }
 
+  /* One claim wide now rather than four across -- see the panel itself for
+     which three went and why. Centred rather than left in a 4-column track. */
   .security-grid{
-    display:grid; grid-template-columns:repeat(4,1fr); gap:8px; text-align:center;
+    display:flex; justify-content:center; text-align:center;
   }
   .security-item-icon{
     width:44px; height:44px; border-radius:50%;
@@ -380,22 +382,37 @@
 
         <div class="security-divider"><span>Security</span></div>
 
+{#- WAS four items across: "Encrypted Connection" (wifi), "Role-Based Access"
+    (key), "Secure Auth" (shield) and "Trusted Gov System" (seal). Three are
+    gone, for three different reasons.
+
+    "Encrypted Connection" was false. This application is served by app.run()
+    over plain HTTP at 127.0.0.1:5001 -- no ssl_context in app.py, no TLS
+    setting in config.py -- so the password typed into the field directly above
+    this panel travels in cleartext. It stated the opposite of what happens, on
+    the screen where the claim matters most.
+
+    "Secure Auth" named no mechanism, so there was nothing a reader could go and
+    check. What is real here is narrower than the label: passwords are stored as
+    werkzeug hashes and never in plaintext, and a deactivated account is refused
+    even when the password is right. Both are about storage and about who is let
+    in -- not about the sign-in being secure. Against that, SECRET_KEY falls back
+    to a literal in config.py, so the session cookie this form issues is signed
+    with a value anyone reading this repository already has. "Secure" was not a
+    thing the system had earned the right to assert.
+
+    "Trusted Gov System" claimed an accreditation. Nothing in this codebase, its
+    schema or its documentation records a licence, an endorsement or a
+    registration of any kind. There was no such designation to point at.
+
+    "Role-Based Access" stays, alone, because it is the one a reader can verify:
+    every route behind this form carries @role_required, and an account that
+    reaches a screen its role does not admit is redirected away rather than
+    served. #}
         <div class="security-grid">
-          <div class="security-item">
-            <div class="security-item-icon"><span class="material-symbols-outlined">wifi</span></div>
-            <div class="security-item-label">Encrypted<br>Connection</div>
-          </div>
-          <div class="security-item">
+          <div class="security-item" title="Every screen behind this form is guarded by a role check. An account is served only the screens its role admits; anything else redirects away.">
             <div class="security-item-icon"><span class="material-symbols-outlined">key</span></div>
             <div class="security-item-label">Role-Based<br>Access</div>
-          </div>
-          <div class="security-item">
-            <div class="security-item-icon"><span class="material-symbols-outlined">shield</span></div>
-            <div class="security-item-label">Secure<br>Auth</div>
-          </div>
-          <div class="security-item">
-            <div class="security-item-icon"><span class="material-symbols-outlined">account_balance</span></div>
-            <div class="security-item-label">Trusted Gov<br>System</div>
           </div>
         </div>
 

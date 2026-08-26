@@ -60,7 +60,6 @@
   .key-toggle-btn{position:absolute; right:10px; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--text-muted); cursor:pointer;}
 
   .status-pill{display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600; padding:5px 12px; border-radius:999px;}
-  .status-connected{background:#DCFCE7; color:#15803D;}
   /* Not configured is not a fault -- the feature works and records history
      without a key -- so it is grey rather than red. */
   .status-unconfigured{background:#F3F4F6; color:#4B5563;}
@@ -623,12 +622,14 @@
                     <option>2 years</option>
                   </select>
                 </div>
-                <div class="col-md-6">
-                  <label class="field-label">Cache Status</label>
-                  <div style="padding-top:11px;">
-                    <span class="status-pill status-connected"><span class="status-dot-sm"></span>Healthy &middot; 42 MB</span>
-                  </div>
-                </div>
+{#- WAS a "Cache Status" field reading "Healthy - 42 MB" on a green pill. The
+    figure was mockup residue, like the API key that used to sit on this screen,
+    but the field was worse than an invented number: there is no cache here to
+    have a status at all. Pages are sent no-store and every figure is read from
+    the database on each request -- which is what the disabled Clear Cache
+    button below already tells anyone who hovers it. Removed rather than marked
+    "Not tracked", because that wording belongs to things this system has and
+    does not record; an application cache is not one of them. #}
               </div>
 
               <button type="button" class="btn-ghost-ids" disabled title="{{ unavailable.settings }} There is also no application cache to clear: pages are served with no-store and every figure is read from the database on each request."><span class="material-symbols-outlined" style="font-size:18px;">cleaning_services</span>Clear Cache</button>

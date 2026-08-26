@@ -58,7 +58,6 @@
   .sidebar-nav .badge-count{margin-left:auto; background:rgba(255,255,255,0.25); color:#fff; font-size:11px; font-weight:600; padding:1px 8px; border-radius:999px;}
   .sidebar-nav a.active .badge-count{background:var(--teal-light); color:var(--teal-dark);}
   .sidebar-footer{margin-top:auto; padding:16px 20px; font-size:12px; color:rgba(255,255,255,0.7); border-top:1px solid rgba(255,255,255,0.15);}
-  .sidebar-footer .status-dot{width:8px;height:8px;border-radius:50%;background:#4ADE80; display:inline-block; margin-right:6px;}
 
   /* HEADER - frozen, identical to every approved screen */
   .main-wrap{margin-left:280px;}
@@ -295,8 +294,18 @@
   </ul>
 {% endif %}
   <div class="sidebar-footer">
-    <div><span class="status-dot"></span>System Online</div>
-    <div style="margin-top:4px;">Version 1.0.0 &middot; DOH-Licensed</div>
+{#- WAS a green dot and "System Online" here, on every screen and for every
+    role. Nothing set either one: the dot was a fixed colour and the words were
+    fixed text, so there was no second state it could ever have shown.
+
+    Nor is there an honest version to put back. What sits behind this
+    application is a local SQLite file, not a service that can be up or down,
+    and every screen carrying this sidebar is built from reads against that file
+    before the template renders -- so were it unreachable, the request would
+    have failed and this page would not be here to carry the indicator. A light
+    that is green whenever you can see it tells a reader nothing that seeing the
+    screen did not already tell them. #}
+    <div>Version 1.0.0 &middot; DOH-Licensed</div>
     <div>&copy; 2026 Brgy. Poblacion HC</div>
   </div>
 </aside>
