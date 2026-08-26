@@ -22,11 +22,11 @@ Philippines
 
 Province
 
-(Use the province stated in the approved capstone proposal.)
+Surigao del Norte
 
 Municipality
 
-(Use the municipality stated in the approved capstone proposal.)
+San Francisco (formerly Anao-Aon)
 
 Barangay
 
@@ -35,6 +35,20 @@ Barangay Poblacion
 Health Center
 
 Barangay Poblacion Health Center
+
+Nearest City
+
+Surigao City, approximately 12 km east
+
+## Why these two values are stated here and not cited
+
+Province and Municipality above read, until 2026-08-26, "(Use the province stated in the approved capstone proposal.)" and the equivalent for Municipality. Those placeholders were never resolved, and the document they point at cannot resolve them: **the approved Capstone Proposal names no municipality and no province anywhere.** This was confirmed by extracting the full text of `Capstone_Proposal.pdf` — all 34 pages decoded — which contains zero occurrences of "Agusan", "San Francisco", "del Sur" or "del Norte". Its only geographic string is "Surigao City", on the title page, as the address of Northeastern Mindanao Colleges. The Proposal refers throughout to "Barangay Poblacion Health Center" and nothing more specific.
+
+An unresolved placeholder pointing at a document that cannot answer it is how a wrong value gets invented, and that is precisely what happened. "San Francisco, Agusan del Sur" — a real municipality, but in the wrong province about 150 km away — was invented in `models/patients.py`, became the closed list the Register Patient form offered, and was written into eleven real patient records before anyone noticed. The full account is Section 17 of `09_IDS-BPHCSN_UI_Architecture_FROM-CLAUDE.md`.
+
+The values above are therefore **stated outright rather than cited.** They are the real-world location of the health center, confirmed by the project team and formally approved by the Barangay Poblacion captain on a signed form. For location, this document is the authority: it defers to nothing, and no future session should ever need to infer, guess, or reconstruct these values from anywhere else.
+
+Note also that this municipality has **eleven barangays, and exactly one Poblacion** — not numbered barangays. "Barangay Poblacion" is a complete and unambiguous name here.
 
 ---
 

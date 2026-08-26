@@ -1,7 +1,7 @@
 # IDS-BPHCSN UI ARCHITECTURE DOCUMENT
 
 Version: 2.0
-Status: Approved. Sections 1, 2, 3, 5, 7 and 8 reconciled against the built system on 2026-08-15 and re-checked on 2026-08-21; section 10 added. Sections 11, 12 and 13 added 2026-08-21.
+Status: Approved. Sections 1, 2, 3, 5, 7 and 8 reconciled against the built system on 2026-08-15 and re-checked on 2026-08-21; section 10 added. Sections 11, 12 and 13 added 2026-08-21. Section 17 added 2026-08-26.
 Prepared For: Integrated Digital System for Barangay Poblacion Health Center Services and Community Notifications (IDS-BPHCSN)
 Institution: Northeastern Mindanao Colleges (NEMCO)
 
@@ -826,6 +826,87 @@ not, and the reason is structural rather than a rate limit: the session is clear
 breath as the entry is written, so the request after it carries no `user_id`, fails question 1, and
 never reaches the logging path. A revoked holder writes one row and then looks like an anonymous
 visitor. This was verified live rather than reasoned about — see the commit.
+
+---
+
+## 17. Correction — The Health Center's Location Was Wrong, and Was Invented Here
+
+Every location string in this project said **San Francisco, Agusan del Sur**. The health center is
+in **Barangay Poblacion, San Francisco (formerly Anao-Aon), Surigao del Norte** — a different
+municipality in a different province, about 12 km from Surigao City, ZIP 8401, area code 086.
+
+This is recorded here rather than quietly fixed because the interesting part is not the wrong value.
+It is that the wrong value had no source, and the system's own structure then spread it into real
+patient records.
+
+### Where it came from: a placeholder nobody resolved
+
+`06_DESIGN_CONTENT_LIBRARY.md` §Project Location listed Province and Municipality as
+"(Use the province stated in the approved capstone proposal.)" — a deferral to a document that
+cannot answer it. The full text of `Capstone_Proposal.pdf` was extracted, all 34 pages: it names
+no municipality and no province anywhere, and its only geographic string is "Surigao City" on the
+title page, as the college's address.
+
+So the governance layer said "look it up", the document it pointed at was silent, and somebody
+filled the gap with a plausible guess. There is a real San Francisco in Agusan del Sur; it is simply
+not this one. Nothing in `01`–`10` ever stated the wrong value — the audit found zero occurrences of
+"Agusan" in any governance document. It was invented in `models/patients.py` and spread outward from
+there. `utils/dates.py` then cited `01_PROJECT_BIBLE.md` as its authority for the wrong location,
+which the Bible had never said.
+
+### How it surfaced: through use, not review
+
+Nobody caught it by reading the code. It surfaced when real patients were registered.
+
+`MUNICIPALITIES` and `PROVINCES` in `models/patients.py` are a **closed list** —
+`validate_patient_form()` rejects anything not in them, which is normally the right design and is
+why the form and the validator cannot drift apart. But the list on offer was
+`("Agusan del Sur", "Surigao del Sur", "Davao de Oro")`. Whoever registered these patients reached
+for "Surigao", found only *del Sur*, and took it. Seven real records ended up on the wrong side of a
+province boundary, and those seven are the clearest evidence in the whole database of what was
+actually meant. Two more were filed under "Bunawan", an Agusan del Sur municipality nowhere near
+here, for the same reason: no correct answer was offered.
+
+The lesson worth keeping is about closed lists. They are the right pattern, and this project should
+keep using them — but a closed list is an assertion about the world, and a wrong one does not fail
+loudly. It quietly records the nearest wrong answer and looks like clean data forever after.
+
+### How it was corrected
+
+Two commits, both structural-first so that no correction could orphan the data it was correcting.
+
+**`14452ce`** — the core. `MUNICIPALITIES` became San Francisco plus the three LGUs it shares a land
+border with (Surigao City, Malimono, Sison); `PROVINCES` became Surigao del Norte, keeping Surigao
+del Sur because it genuinely adjoins and dropping Agusan del Sur and Davao de Oro, which border
+neither. The ZIP example moved 8501 → 8401 and Settings' area code 085 → 086. Correcting the lists
+alone would have orphaned the eleven stored records holding the old values — their Edit form would
+have rendered a blank province and refused to save — so `migrate_correct_patient_location.py`
+repaired all eleven in the same change. The fifteen patients with no municipality or province were
+deliberately left alone: NULL is incomplete, not wrong, and inventing an address for them would have
+been fabricating clinical data.
+
+**`5050bf8`** — the leftovers. Settings' Province, Complete Address and Institution;
+`populate_records.py`'s infant seed and three inventory supplier strings, plus
+`migrate_correct_supplier_location.py` for the three live rows a reseed would not have touched
+(`INSERT OR IGNORE`); and the login page's "San Francisco, Philippines", which was ambiguous against
+the American city rather than wrong.
+
+Both migrations follow the pattern already established in this project: idempotent, before and after
+spelled out per row so the change is reviewable in the commit without running anything, and a
+refusal to touch a row matching neither state. Both were run against a labelled backup of `app.db`
+taken first and verified by a full-database diff afterwards — 21 intended cells in the first, 3 in
+the second, and nothing else in any table moved. No `audit_logs` row was written for either:
+`log_action()` refuses entries it cannot attribute, and a migration has no author to name.
+
+### What is true now
+
+Barangay Poblacion, San Francisco (formerly Anao-Aon), Surigao del Norte. ZIP 8401. Area code 086.
+Surigao City ~12 km east. The municipality has eleven barangays and exactly one Poblacion — not
+numbered barangays.
+
+`06_DESIGN_CONTENT_LIBRARY.md` §Project Location now **states** these outright instead of deferring,
+and says why. That is the actual fix. Every other change in these two commits was cleanup; the
+placeholder was the defect.
 
 ---
 
