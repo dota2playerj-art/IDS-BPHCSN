@@ -7,10 +7,18 @@ CURRENT_TIMESTAMP columns). The screens display them as 'Jul 07, 2026' or
 
 WHY THE TIMEZONE IS HARDCODED
 -----------------------------
-01_PROJECT_BIBLE.md scopes this system to one barangay health center in San
-Francisco, Agusan del Sur. There is one site, one set of opening hours, and one
-answer to "what is today" -- so "today" is deliberately fixed to Asia/Manila
-here rather than being made configurable or derived from the server clock.
+This system serves one barangay health center: Barangay Poblacion Health Center
+in San Francisco (formerly Anao-Aon), Surigao del Norte. There is one site, one
+set of opening hours, and one answer to "what is today" -- so "today" is
+deliberately fixed to Asia/Manila here rather than being made configurable or
+derived from the server clock.
+
+(This paragraph used to cite 01_PROJECT_BIBLE.md for "San Francisco, Agusan del
+Sur". Both halves were wrong: the Bible states no province anywhere, and neither
+does the approved Capstone Proposal. The citation is dropped rather than
+repointed, because no governance document fixes the location -- the barangay,
+the municipality and the province are facts about the deployment, and this
+comment now states them as such.)
 
 That is a decision, not an oversight:
 

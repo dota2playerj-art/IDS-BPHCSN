@@ -11,6 +11,11 @@ __pycache__/
 # three of those ARE tracked and the database itself is not. See README.md for
 # how to rebuild it after a fresh clone.
 app.db
+# Point-in-time copies taken before a migration that rewrites existing rows.
+# They are kept on the machine as the recovery path for that migration, and are
+# excluded here for the same reason app.db is -- plus they hold real patient
+# records, which do not belong in version control at all.
+app.db.PRETASK_BACKUP_*
 # SQLite's sidecar files. They exist only while a connection is open, and a
 # committed one would be a half-written transaction.
 app.db-journal

@@ -316,7 +316,7 @@
           </div>
           <div class="col-md-4">
             <label class="field-label">Zip Code</label>
-            <input type="text" class="form-control{% if errors.zip_code %} is-invalid{% endif %}" name="zip_code" value="{{ form.zip_code or '' }}" placeholder="e.g., 8501">
+            <input type="text" class="form-control{% if errors.zip_code %} is-invalid{% endif %}" name="zip_code" value="{{ form.zip_code or '' }}" placeholder="e.g., 8401">
             {%- if errors.zip_code %}<div class="invalid-feedback d-block">{{ errors.zip_code }}</div>{% endif %}
           </div>
         </div>

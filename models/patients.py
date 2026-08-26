@@ -26,8 +26,27 @@ from utils.phone import is_valid_ph_mobile, to_local_ph_mobile
 # cannot accept a value the form never offered, and the two cannot drift apart.
 CIVIL_STATUSES = ("Single", "Married", "Widowed", "Separated", "Minor")
 SEXES = ("Female", "Male")
-MUNICIPALITIES = ("San Francisco", "Bunawan", "Rosario")
-PROVINCES = ("Agusan del Sur", "Surigao del Sur", "Davao de Oro")
+# The health center is in Barangay Poblacion, San Francisco (formerly Anao-Aon),
+# Surigao del Norte -- a coastal municipality of 11 barangays, Surigao City about
+# 12 km to the east. San Francisco is listed first because it is where nearly
+# every patient lives; the other three are the LGUs it actually shares a land
+# border with (Surigao City east, Malimono and Sison south -- the Bohol Sea is
+# north and the Surigao Strait west, so there are no others). A patient who
+# walked in from farther away than that is rare enough to belong in a
+# conversation about the record, not in a list that invites a wrong pick.
+#
+# These previously read ("San Francisco", "Bunawan", "Rosario") and
+# ("Agusan del Sur", "Surigao del Sur", "Davao de Oro") -- Agusan del Sur
+# municipalities and provinces around a *different* San Francisco, ~150 km away
+# in the wrong province. Nothing in the approved Capstone Proposal ever named a
+# province; the value was invented here and then spread into real records. See
+# migrate_correct_patient_location.py, which repaired the eleven it reached.
+MUNICIPALITIES = ("San Francisco", "Surigao City", "Malimono", "Sison")
+# Surigao del Norte is the province the health center is in. Surigao del Sur is
+# kept because it genuinely adjoins Surigao del Norte to the south, so a patient
+# really can live there -- unlike Agusan del Sur and Davao de Oro, which border
+# neither and were only ever artefacts of the wrong municipality.
+PROVINCES = ("Surigao del Norte", "Surigao del Sur")
 EMERGENCY_RELATIONSHIPS = (
     "Mother", "Father", "Spouse", "Son/Daughter", "Sibling", "Grandchild",
     "Guardian", "Other",
@@ -328,7 +347,7 @@ def get_patient_stats():
     """Counts behind the four stat cards on Screen 03.
 
     The windows are clinic-local: "this month" means the month it is in San
-    Francisco, Agusan del Sur, not wherever the server happens to be. They are
+    Francisco, Surigao del Norte, not wherever the server happens to be. They are
     built in Python via utils.dates and converted to UTC instants before being
     compared, because created_at is written by SQLite's CURRENT_TIMESTAMP and is
     therefore UTC. Both sides of every comparison are then the same instant
@@ -537,7 +556,7 @@ def get_registration_trend(months=6, end=None, start=None):
     The window boundaries are built in Python and converted to UTC instants
     before being compared, for the reason get_patient_stats() spells out:
     created_at is written by SQLite's CURRENT_TIMESTAMP and is therefore UTC,
-    while "August" means August in San Francisco, Agusan del Sur.
+    while "August" means August in San Francisco, Surigao del Norte.
 
     Months with no registrations are returned as zeros rather than omitted --
     a trend line that skipped its empty months would compress the gap and read
@@ -705,7 +724,7 @@ def validate_patient_form(values):
 
     zip_code = (values.get("zip_code") or "").strip()
     if zip_code and not (zip_code.isdigit() and len(zip_code) == 4):
-        errors["zip_code"] = "Zip code must be 4 digits, e.g. 8501."
+        errors["zip_code"] = "Zip code must be 4 digits, e.g. 8401."
 
     return errors
 
