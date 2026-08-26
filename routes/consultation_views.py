@@ -47,6 +47,19 @@ from models.consultations import (
     update_consultation,
     validate_consultation_form,
 )
+from models.general_vaccinations import (
+    COMMON_VACCINES,
+    MAX_NAME_LENGTH,
+    OTHER_KEY,
+    OTHER_NAME_FIELD,
+    VACCINE_FIELD,
+    dose_field,
+    get_general_vaccinations_for_consultation,
+    parse_general_vaccinations,
+    record_general_vaccinations,
+    vaccination_label,
+)
+from models.general_vaccinations import FIELD_LABELS as GENERAL_VACCINE_LABELS
 from models.immunizations import (
     dose_label,
     get_immunization_status,
@@ -140,8 +153,78 @@ def _immunization_context(patient, consultation, visit_date, ticked=None):
     return status
 
 
+def _general_vaccination_context(consultation, submitted=None):
+    """The "Other Vaccinations Given" section's state for this visit.
+
+    Deliberately much thinner than _immunization_context(). That one has to
+    resolve a whole national schedule against a child's birthday and grade every
+    dose in it; this one has no schedule to resolve, so it offers a short list of
+    tick boxes, a free-text row for anything not on it, and the rows already
+    recorded at this visit shown as fact.
+
+    Already-recorded rows are LOCKED, exactly as a recorded EPI dose is, and for
+    the reason models/immunizations.py gives: an absent checkbox is not evidence
+    that a vaccination never happened. A partial POST, a script-rebuilt form or a
+    serialiser that drops unchecked inputs all produce one, and none of them mean
+    "erase this". So this section, like the EPI section, is add-only -- a
+    vaccination that happened, happened.
+
+    `submitted` carries the operator's selection back through a validation
+    bounce, so a rejected save does not throw away what they had ticked or typed.
+    """
+    recorded = get_general_vaccinations_for_consultation(
+        consultation["id"] if consultation else None
+    )
+    ticked = set(submitted.get("ticked", ())) if submitted else set()
+    doses = submitted.get("doses", {}) if submitted else {}
+
+    rows = [
+        {
+            "key": key,
+            "name": name,
+            "protects": protects,
+            "dose_field": dose_field(key),
+            "checked": key in ticked,
+            "dose_value": doses.get(key, ""),
+        }
+        for key, name, protects in COMMON_VACCINES
+    ]
+    rows.append({
+        "key": OTHER_KEY,
+        "name": "Other vaccine",
+        "protects": "Anything not listed above — name it on the right",
+        "dose_field": dose_field(OTHER_KEY),
+        "checked": OTHER_KEY in ticked,
+        "dose_value": doses.get(OTHER_KEY, ""),
+        "is_other": True,
+    })
+
+    return {
+        "rows": rows,
+        "recorded": recorded,
+        "vaccine_field": VACCINE_FIELD,
+        "other_name_field": OTHER_NAME_FIELD,
+        "other_name_value": (submitted or {}).get("other_name", ""),
+        "max_name_length": MAX_NAME_LENGTH,
+    }
+
+
+def _submitted_general_vaccinations(form_data):
+    """What the operator had ticked and typed, for replay through a bounce."""
+    return {
+        "ticked": (form_data.getlist(VACCINE_FIELD)
+                   if hasattr(form_data, "getlist") else []),
+        "other_name": (form_data.get(OTHER_NAME_FIELD) or "").strip(),
+        "doses": {
+            key: (form_data.get(dose_field(key)) or "").strip()
+            for key in [row[0] for row in COMMON_VACCINES] + [OTHER_KEY]
+        },
+    }
+
+
 def consultation_form_context(patient, appointment=None, consultation=None,
-                              form=None, errors=None, ticked=None):
+                              form=None, errors=None, ticked=None,
+                              general_submitted=None):
     """Everything the Record / Edit Consultation screen renders.
 
     `consultation` set means edit mode: the template switches its wording, shows
@@ -167,7 +250,12 @@ def consultation_form_context(patient, appointment=None, consultation=None,
         "errors": errors or {},
         "age_context": age_context,
         "visit_date": visit_date,
-        "field_labels": FIELD_LABELS,
+        # Merged rather than reaching into models.consultations.FIELD_LABELS:
+        # the error summary prints field_labels.get(field, field) and would
+        # otherwise show a raw field name for a general-vaccination error. The
+        # consultation's own label map is left exactly as it was, so the audit
+        # trail still describes only the fields it describes.
+        "field_labels": dict(FIELD_LABELS, **GENERAL_VACCINE_LABELS),
         # (field, label, unit, low, high, whole) -- the form prints the unit in
         # each field's hint and the range in its out-of-range message, from the
         # same tuples the validator checks against.
@@ -181,6 +269,13 @@ def consultation_form_context(patient, appointment=None, consultation=None,
             if age_context["is_pediatric"] else None
         ),
         "immunization_field": IMMUNIZATION_FIELD,
+        # Offered for every patient, with no age guard at all -- that is the
+        # whole point of the section. An adult receiving a hepatitis B dose had
+        # nowhere to be recorded before it existed, and a child can have both
+        # this and their EPI doses at the same visit.
+        "general_vaccination": _general_vaccination_context(
+            consultation, general_submitted
+        ),
     }
 
 
@@ -261,11 +356,19 @@ def process_record_consultation(appointment_id, form_data, user_id):
     ticked = form_data.getlist(IMMUNIZATION_FIELD) if age_context["is_pediatric"] else []
     dose_keys = parse_dose_keys(ticked)
 
+    # No age guard here, deliberately: a general vaccination is a record that a
+    # vaccine was given, which is true of a patient of any age. The EPI doses
+    # above are gated because the schedule they are graded against only covers
+    # the under-five cohort; there is no schedule here to be outside of.
+    general_entries, general_errors = parse_general_vaccinations(form_data)
+    general_submitted = _submitted_general_vaccinations(form_data)
+
     errors = validate_consultation_form(values, age_context)
+    errors.update(general_errors)
     if errors:
         return None, consultation_form_context(
             patient, appointment=appointment, form=values, errors=errors,
-            ticked=set(ticked),
+            ticked=set(ticked), general_submitted=general_submitted,
         ), (
             f"{len(errors)} field{'s' if len(errors) != 1 else ''} need attention. "
             "Nothing has been saved yet."
@@ -284,6 +387,17 @@ def process_record_consultation(appointment_id, form_data, user_id):
     given = record_immunizations(
         patient_id=patient["id"],
         dose_keys=dose_keys,
+        administered_by=user_id,
+        date_administered=context["visit_date"],
+        consultation_id=consultation_id,
+    )
+
+    # Same visit date, same author, same consultation anchor -- a separate table,
+    # not a separate event. A child can receive both at one visit and both are
+    # written here.
+    general_given = record_general_vaccinations(
+        patient_id=patient["id"],
+        entries=general_entries,
         administered_by=user_id,
         date_administered=context["visit_date"],
         consultation_id=consultation_id,
@@ -316,6 +430,13 @@ def process_record_consultation(appointment_id, form_data, user_id):
                 )
                 + "."
             )
+    if general_given:
+        message += (
+            " {} other vaccination{} recorded: ".format(
+                len(general_given), "s" if len(general_given) != 1 else "")
+            + ", ".join(_general_labels(general_given)) + "."
+        )
+
     if outcome == "completed":
         stats = get_queue_stats()
         message += " Their visit is now marked Completed."
@@ -389,12 +510,55 @@ def _apply_immunization_edit(patient, consultation_id, consultation, ticked,
     return added, []
 
 
-def _describe_dose_changes(added, removed):
-    """The immunisation half of an audit line. Returns (summary, changed_labels).
+def _general_labels(entries):
+    """['Hepatitis B', 'Rabies dose 3'] for a list of stored entries."""
+    return [vaccination_label(entry["vaccine_name"], entry["dose_number"])
+            for entry in entries]
+
+
+def _apply_general_vaccination_edit(patient, consultation_id, consultation,
+                                    entries, user_id):
+    """Record any newly ticked general vaccinations for this visit. Add-only.
+
+    Returns the entries actually stored.
+
+    Add-only for exactly the reason _apply_immunization_edit() is: a vaccination
+    on file is a record that the patient was vaccinated, and the absence of a
+    checkbox in a submission is not evidence that it never happened. Rows already
+    recorded against this visit are rendered as locked fact rather than as
+    checkboxes, so no submission -- however it was produced -- can remove one.
+
+    There is no removal function in models/general_vaccinations.py at all, which
+    is a step further than the EPI module goes: that one keeps
+    remove_immunizations() in place, unused, for the deliberate correction path
+    that would one day call it. Nothing here needs a head start on a path that
+    does not exist yet, and an unused DELETE is a thing that can be called by
+    mistake.
+
+    Rows whose vaccine and date already match something on file are absorbed by
+    the table's UNIQUE constraint rather than duplicated, so re-saving an edit
+    without changing this section adds nothing and reports nothing changed.
+    """
+    return record_general_vaccinations(
+        patient_id=patient["id"],
+        entries=entries,
+        administered_by=user_id,
+        date_administered=consultation["consultation_date"],
+        consultation_id=consultation_id,
+    )
+
+
+def _describe_dose_changes(added, removed, general_added=()):
+    """The vaccination half of an audit line. Returns (summary, changed_labels).
 
     Named in full rather than counted -- "2 immunisations changed" would tell a
     later reader nothing about which child got what, which is the whole reason
     the entry exists.
+
+    EPI doses and other vaccinations are reported as two separate phrases rather
+    than pooled into one count, so an entry read months later still says which
+    kind of record moved -- a scheduled infant dose and an adult booster are not
+    interchangeable facts.
     """
     parts, changed = [], []
     if added:
@@ -409,6 +573,11 @@ def _describe_dose_changes(added, removed):
             + ", ".join(dose_label(code, dose) for code, dose in removed)
         )
         changed.append("immunisations removed")
+    if general_added:
+        parts.append(
+            "Other vaccinations added: " + ", ".join(_general_labels(general_added))
+        )
+        changed.append("other vaccinations added")
     return "; ".join(parts), changed
 
 
@@ -435,11 +604,15 @@ def process_edit_consultation(consultation_id, form_data, user_id, ip_address=No
     # Judge a follow-up date against the visit it belongs to, not against today.
     values["_consultation_date"] = before["consultation_date"]
     ticked = form_data.getlist(IMMUNIZATION_FIELD) if age_context["is_pediatric"] else []
+    general_entries, general_errors = parse_general_vaccinations(form_data)
+    general_submitted = _submitted_general_vaccinations(form_data)
 
     errors = validate_consultation_form(values, age_context)
+    errors.update(general_errors)
     if errors:
         return None, consultation_form_context(
             patient, consultation=before, form=values, errors=errors, ticked=set(ticked),
+            general_submitted=general_submitted,
         ), (
             f"{len(errors)} field{'s' if len(errors) != 1 else ''} need attention. "
             "Your changes have not been saved."
@@ -455,12 +628,15 @@ def process_edit_consultation(consultation_id, form_data, user_id, ip_address=No
     added, removed = _apply_immunization_edit(
         patient, consultation_id, before, ticked, user_id, age_context
     )
+    general_added = _apply_general_vaccination_edit(
+        patient, consultation_id, before, general_entries, user_id
+    )
 
     after = get_consultation_by_id(consultation_id)
     summary, changed = describe_changes(
         before, after, FIELD_LABELS, formatters=AUDIT_FORMATTERS
     )
-    dose_summary, dose_changed = _describe_dose_changes(added, removed)
+    dose_summary, dose_changed = _describe_dose_changes(added, removed, general_added)
     if dose_summary:
         summary = f"{summary}; {dose_summary}" if summary else dose_summary
     changed = list(changed) + dose_changed

@@ -8,6 +8,7 @@ own redirect target.
 """
 from models.appointments import get_appointments_for_patient, get_next_appointment_for_patient
 from models.consultations import get_consultations_for_patient
+from models.general_vaccinations import get_general_vaccinations_for_patient
 from models.immunizations import dose_label, get_immunization_status
 from models.patients import (
     ALLERGY_OPTIONS,
@@ -426,6 +427,11 @@ def patient_profile_context(patient_id):
     immunization = get_immunization_status(patient)
     show_immunizations = immunization["applicable"] or bool(immunization["records"])
 
+    # Read unconditionally and for every patient: unlike the EPI schedule there
+    # is no cohort this is or is not "applicable" to. A row exists or it does
+    # not, and the tab says so either way.
+    general_vaccinations = get_general_vaccinations_for_patient(patient_id)
+
     return {
         "patient": patient,
         "consultations": get_consultations_for_patient(patient_id),
@@ -434,7 +440,36 @@ def patient_profile_context(patient_id):
         "immunization": immunization,
         "show_immunizations": show_immunizations,
         "doses_by_consultation": _doses_by_consultation(immunization["records"]),
+        "general_vaccinations": general_vaccinations,
+        # The Immunization Record tab is worth opening if either half has
+        # anything in it -- and the tab's badge, which counts outstanding EPI
+        # doses, deliberately does not count these: nothing here is outstanding,
+        # because nothing here is graded.
+        "general_vaccinations_by_consultation": _general_by_consultation(
+            general_vaccinations
+        ),
     }
+
+
+def _general_by_consultation(records):
+    """{consultation_id: [vaccination, ...]} for the View panel on a history row.
+
+    Built from the list the Immunization tab has already read rather than by
+    asking the database again -- exactly what _doses_by_consultation() does for
+    the EPI doses, and for the same reason: the records carry their
+    consultation_id, so the grouping is free.
+
+    A vaccination recorded against no consultation is skipped here; it belongs to
+    no visit, so no visit's panel should claim it. It stays on the Immunization
+    tab, which is the record of what the patient has had.
+    """
+    grouped = {}
+    for record in records:
+        consultation_id = record.get("consultation_id")
+        if not consultation_id:
+            continue
+        grouped.setdefault(consultation_id, []).append(record)
+    return grouped
 
 
 def _doses_by_consultation(records):

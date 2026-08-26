@@ -92,6 +92,22 @@
   .pediatric-card .section-icon .material-symbols-outlined{color:#1D4ED8;}
   .cohort-note{font-size:12.5px; color:var(--text-muted); margin-top:14px; padding-top:14px; border-top:1px dashed var(--border-color);}
 
+  /* OTHER VACCINATIONS — deliberately NOT wearing .pediatric-card. That card is
+     blue-tinted precisely to say "this appeared because of the patient's age";
+     this section appears for every patient of every age, so it takes the plain
+     panel treatment with the form's ordinary teal icon. The two read as
+     different kinds of thing side by side, which is the point: one is graded
+     against a national schedule, the other is a record of what was given. */
+  .general-vaccine-card .section-icon{background:var(--teal-light);}
+  .general-vaccine-card .section-icon .material-symbols-outlined{color:var(--teal-dark);}
+  .vaccine-other-input{max-width:300px;}
+  .dose-input{width:84px;}
+  .recorded-vaccine{
+    display:flex; align-items:center; gap:8px; padding:9px 12px; border-radius:10px;
+    background:#F0FDF4; border:1px solid #BBF7D0; color:#166534; font-size:13px; margin-bottom:8px;
+  }
+  .recorded-vaccine .material-symbols-outlined{font-size:18px;}
+
   /* FOOTER ACTION BAR */
   .form-actions{
     background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:18px 24px;
@@ -430,6 +446,114 @@
       </div>
 {%- endif %}
 {%- endif %}
+
+      <!-- OTHER VACCINATIONS GIVEN — outside the is_pediatric guard above, on
+           purpose and unconditionally.
+
+           The section above records doses of the DOH EPI infant schedule and
+           grades the child against it, so it is rightly shown only to the cohort
+           that schedule covers. The consequence was that a vaccine given to
+           anyone else — an adult's hepatitis B dose, a traveller's rabies course,
+           a senior's flu shot — had nowhere in this system to be written down at
+           all. That is what this records, and it records nothing else: no due
+           date, no status, no overdue. There is no single official adult
+           immunisation schedule in the Philippines to measure against, so a
+           status here would be invented rather than clinical.
+
+           A patient can have both. An infant may receive their scheduled
+           Pentavalent above and a travel-related vaccine here at the same visit,
+           and both are written against this consultation. -->
+      <div class="panel-card general-vaccine-card">
+        <div class="section-head">
+          <div class="section-icon"><span class="material-symbols-outlined">syringe</span></div>
+          <div>
+            <div class="section-title">Other Vaccinations Given</div>
+            <div class="section-sub">
+              Any patient, any age &middot; recorded as given, not measured against a schedule
+            </div>
+          </div>
+        </div>
+
+{%- if general_vaccination.recorded %}
+        <!-- Already on file for this visit. Shown as fact rather than as ticked
+             checkboxes, exactly as a recorded EPI dose is: an absent checkbox in
+             a submission is not evidence that a vaccination never happened, so
+             this section is add-only too. -->
+        <div style="margin-bottom:16px;">
+          <div style="font-size:12.5px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.03em; margin-bottom:8px;">Recorded at this visit</div>
+{%- for record in general_vaccination.recorded %}
+          <div class="recorded-vaccine">
+            <span class="material-symbols-outlined">task_alt</span>
+            <span><strong style="display:inline;">{{ record.label }}</strong> &middot; {{ record.date_administered | display_date }}{% if record.administered_by_name %} &middot; {{ record.administered_by_name }}{% endif %}</span>
+          </div>
+{%- endfor %}
+        </div>
+{%- endif %}
+
+        <div style="overflow-x:auto;">
+          <table class="appt-table" style="width:100%; border-collapse:separate; border-spacing:0; font-size:13.5px;">
+            <thead>
+              <tr>
+                <th style="width:44px;">Give</th>
+                <th>Vaccine</th>
+                <th>Protects against</th>
+                <th style="width:190px;">Dose no. <span style="text-transform:none; font-weight:500;">(optional)</span></th>
+              </tr>
+            </thead>
+            <tbody>
+{%- for row in general_vaccination.rows %}
+              <tr>
+                <td>
+                  <input type="checkbox" class="form-check-input" name="{{ general_vaccination.vaccine_field }}"
+                         value="{{ row.key }}" id="gv-{{ row.key }}"{% if row.checked %} checked{% endif %}
+                         aria-label="Record {{ row.name }} as given at this visit">
+                </td>
+                <td>
+{%- if row.is_other %}
+                  <label for="gv-{{ row.key }}" style="font-weight:600; cursor:pointer; display:block; margin-bottom:6px;">{{ row.name }}</label>
+                  <input type="text" class="form-control vaccine-other-input{% if errors.get(general_vaccination.other_name_field) %} is-invalid{% endif %}"
+                         name="{{ general_vaccination.other_name_field }}"
+                         value="{{ general_vaccination.other_name_value }}"
+                         maxlength="{{ general_vaccination.max_name_length }}"
+                         placeholder="Name the vaccine"
+                         aria-label="Name of the other vaccine given">
+{%- if errors.get(general_vaccination.other_name_field) %}
+                  <div class="invalid-feedback d-block">{{ errors.get(general_vaccination.other_name_field) }}</div>
+{%- endif %}
+{%- else %}
+                  <label for="gv-{{ row.key }}" style="font-weight:600; cursor:pointer;">{{ row.name }}</label>
+{%- endif %}
+                </td>
+                <td class="reason-text">{{ row.protects }}</td>
+                <td>
+                  <input type="text" inputmode="numeric" class="form-control dose-input{% if errors.get(row.dose_field) %} is-invalid{% endif %}"
+                         name="{{ row.dose_field }}" value="{{ row.dose_value }}"
+                         maxlength="2" placeholder="&mdash;"
+                         aria-label="Dose number for {{ row.name }}, optional">
+{%- if errors.get(row.dose_field) %}
+                  <div class="invalid-feedback d-block">{{ errors.get(row.dose_field) }}</div>
+{%- endif %}
+                </td>
+              </tr>
+{%- endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="cohort-note">
+          Leave every box unticked if no vaccination was given. What is ticked is recorded
+          against this consultation and dated {{ visit_date | display_date }}, and appears on
+          {{ patient.first_name }}'s profile under Other Vaccinations.
+          A dose number is only worth filling in where the vaccine actually has one &mdash;
+          a rabies course, say. Most do not, and an invented number is worse than a blank.
+          Nothing here is graded due or overdue: this is a record of what was given, not a
+          schedule.
+{%- if consultation %}
+          A vaccination already on file for this visit is shown above as fact and cannot be
+          removed here &mdash; the same rule the immunisation record follows.
+{%- endif %}
+        </div>
+      </div>
 
       <!-- ASSESSMENT AND PLAN -->
       <div class="panel-card">

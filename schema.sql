@@ -208,6 +208,51 @@ CREATE TABLE immunizations (
     FOREIGN KEY (administered_by) REFERENCES users(id) ON DELETE RESTRICT
 );
 
+-- One row per vaccination given outside the EPI schedule -- to a patient of any
+-- age, including adults. Separate from `immunizations` on purpose, and the
+-- separation is the feature.
+--
+-- `immunizations` exists to answer "is this child on the DOH EPI schedule?", so
+-- everything reading it is scoped to the under-five cohort that schedule
+-- describes. This table answers only "was this vaccine given?", which is true of
+-- any patient at any age, and it carries no schedule column of any kind -- no due
+-- date, no status, no grace period. There is no single official adult
+-- immunisation schedule in the Philippines to evaluate against, so a due/overdue
+-- reading here would be invented precision rather than a clinical fact. That is
+-- the split HL7 FHIR draws between Immunization and ImmunizationRecommendation.
+--
+-- vaccine_name holds the name itself, not a code, because nothing looks these
+-- rows up: the entry form's list is an explicitly non-exhaustive convenience
+-- ending in a free-text row, and a code for a vaccine nobody anticipated would
+-- have to be invented at the point of typing. The EPI table stores a code for
+-- the opposite reason -- EPI_SCHEDULE finds records by it.
+--
+-- dose_number is nullable, unlike the EPI table's. Most of these have no fixed
+-- dose count, and requiring a number would force a health worker to invent one.
+--
+-- UNIQUE (patient_id, vaccine_name, date_administered) rather than the EPI
+-- table's UNIQUE across dose numbers. Influenza is one shot every year for life
+-- and a Td booster a decade later is a new dose, not a duplicate, so a
+-- dose-spanning constraint would refuse real events. The same vaccine to the
+-- same patient on the same day is still one event however often the form is
+-- submitted, which is what the date makes true.
+--
+-- The three foreign keys match `immunizations` exactly, for the same reasons.
+CREATE TABLE general_vaccinations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    patient_id INTEGER NOT NULL,
+    consultation_id INTEGER,
+    vaccine_name TEXT NOT NULL,
+    dose_number INTEGER,
+    date_administered TEXT NOT NULL,
+    administered_by INTEGER NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (patient_id, vaccine_name, date_administered),
+    FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
+    FOREIGN KEY (consultation_id) REFERENCES consultations(id) ON DELETE SET NULL,
+    FOREIGN KEY (administered_by) REFERENCES users(id) ON DELETE RESTRICT
+);
+
 CREATE TABLE audit_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
@@ -309,6 +354,10 @@ CREATE INDEX idx_appointments_queue ON appointments(appointment_date, status, ch
 -- consultation form reads back what was given during one visit.
 CREATE INDEX idx_immunizations_patient ON immunizations(patient_id, date_administered);
 CREATE INDEX idx_immunizations_consultation ON immunizations(consultation_id);
+-- The Patient Profile reads one patient's non-EPI vaccination history, newest
+-- first; the consultation form reads back what was given during one visit.
+CREATE INDEX idx_general_vaccinations_patient ON general_vaccinations(patient_id, date_administered);
+CREATE INDEX idx_general_vaccinations_consultation ON general_vaccinations(consultation_id);
 CREATE INDEX idx_audit_logs_user ON audit_logs(user_id, created_at);
 -- The history table is one page of broadcasts, newest first.
 CREATE INDEX idx_sms_broadcasts_sent_at ON sms_broadcasts(sent_at, id);

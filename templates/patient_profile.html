@@ -530,6 +530,25 @@
 {%- endfor %}
                         </div>
 {%- endif %}
+{#- The same for vaccinations outside the EPI schedule. Listed under their own
+    heading rather than pooled with the doses above: one list is the DOH infant
+    schedule and the other explicitly is not, and a panel that ran them together
+    would suggest a scheduled dose and a flu shot are the same kind of record.
+    Grouped in patient_views._general_by_consultation() from the list the
+    Immunization tab has already read, so this too costs no extra query. #}
+{%- set visit_vaccinations = general_vaccinations_by_consultation.get(consultation.id) %}
+{%- if visit_vaccinations %}
+                        <div style="margin-top:16px; padding-top:14px; border-top:1px solid var(--border-color);">
+                          <div class="info-label" style="margin-bottom:8px;">Other Vaccinations Given at This Visit</div>
+{%- for record in visit_vaccinations %}
+                          <div style="font-size:13px; color:var(--text-dark); padding:5px 0;">
+                            <span class="material-symbols-outlined" style="font-size:15px; vertical-align:-2px; color:var(--teal-dark);">syringe</span>
+                            {{ record.label }}
+                            <span style="color:var(--text-muted);">&middot; {{ record.date_administered | display_date }} &middot; by {{ record.administered_by_name }}</span>
+                          </div>
+{%- endfor %}
+                        </div>
+{%- endif %}
                         <div style="font-size:12px; color:var(--text-muted); margin-top:14px; padding-top:12px; border-top:1px dashed var(--border-color);">
                           Recorded by {{ consultation.recorded_by_name }} on {{ consultation.created_at | display_date }}.
 {%- if consultation.was_edited %} Last edited {{ consultation.updated_at | display_date }} — see the audit log for what changed.{% endif %}
@@ -579,11 +598,18 @@
              older patient who has doses on file — ageing out of the programme
              does not delete a medical record. -->
         <div class="tab-pane fade" id="tab-vaccine">
-          {#- "If applicable" is already decided by show_immunizations: for a
-              patient outside the programme with no doses on file this pane
-              prints the one sentence saying so, which is itself a clinical
-              fact worth having on the record. #}
+          {#- This tab holds two different kinds of record, and the split is
+              the point. The DOH EPI half below is a schedule the patient is
+              graded against, and it only exists for the cohort that schedule
+              covers -- show_immunizations decides that, exactly as it always
+              has. The Other Vaccinations half is a plain history of what was
+              given, applies to every patient of every age, and is graded
+              against nothing at all.
+
+              The pane is worth rendering if either half has anything in it. The
+              empty state at the bottom is reached only when neither does. #}
           <h2 class="print-only print-section-title">Immunization Record</h2>
+{%- if show_immunizations or general_vaccinations %}
 {%- if show_immunizations %}
           <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
             <div>
@@ -691,12 +717,88 @@
 {%- endif %}
           </div>
 {%- else %}
+          <!-- Reached when the patient has other vaccinations on file but no EPI
+               record at all -- the ordinary case for an adult. Saying so in a
+               line is better than leaving the reader to wonder whether the
+               schedule was checked: it was, and it does not apply. -->
+          <div style="border-radius:12px; border:1px solid var(--border-color); background:var(--bg); color:var(--text-muted); padding:14px 16px; font-size:13px; display:flex; gap:12px; align-items:flex-start;">
+            <span class="material-symbols-outlined" style="font-size:20px; margin-top:1px;">info</span>
+            <div>
+              <strong style="display:block; margin-bottom:2px; color:var(--text-dark);">No DOH EPI record</strong>
+              The Expanded Program on Immunization schedule covers children under {{ immunization.pediatric_age_years }}, and {{ patient.first_name }} has no doses from it on file.
+            </div>
+          </div>
+{%- endif %}
+
+          <!-- OTHER VACCINATIONS - the second half of this tab, for every
+               patient of every age.
+
+               Kept in the same tab as the EPI schedule because a clinician
+               asking "what has this patient had?" is asking one question, and
+               splitting the answer across two tabs would mean it is only ever
+               half read. Kept visually separate within it because the two are
+               not the same kind of fact: everything above is measured against a
+               national schedule and carries a due date and a status, and
+               everything below is measured against nothing and carries neither.
+               There is no adult immunisation schedule in the Philippines to
+               grade these against, so this list offers no status column rather
+               than an invented one. -->
+          <div style="margin-top:28px; padding-top:24px; border-top:2px solid var(--border-color);">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+              <div>
+                <div style="font-size:15px; font-weight:600; color:var(--text-dark);">Other Vaccinations</div>
+                <div style="font-size:12.5px; color:var(--text-muted); margin-top:2px;">
+{%- if general_vaccinations %}
+                  {{ general_vaccinations | length }} vaccination{{ '' if general_vaccinations | length == 1 else 's' }} on file outside the EPI schedule &middot; recorded as given, not graded against a schedule
+{%- else %}
+                  Vaccinations given outside the DOH EPI schedule &mdash; any patient, any age
+{%- endif %}
+                </div>
+              </div>
+            </div>
+
+{%- if general_vaccinations %}
+            <div style="overflow-x:auto;">
+              <table class="history-table">
+                <thead>
+                  <tr>
+                    <th>Vaccine</th>
+                    <th>Dose No.</th>
+                    <th>Date Given</th>
+                    <th>Administered By</th>
+                  </tr>
+                </thead>
+                <tbody>
+{%- for record in general_vaccinations %}
+                  <tr>
+                    <td style="font-weight:600;">{{ record.vaccine_name }}</td>
+                    <td>{{ record.dose_number if record.dose_number else '&mdash;' | safe }}</td>
+                    <td>{{ record.date_administered | display_date }}</td>
+                    <td>{{ record.administered_by_name }}</td>
+                  </tr>
+{%- endfor %}
+                </tbody>
+              </table>
+            </div>
+            <div style="font-size:12px; color:var(--text-muted); margin-top:16px; padding-top:12px; border-top:1px dashed var(--border-color);">
+              Recorded during a consultation, most recent first. Nothing in this list is due or
+              overdue: no single official adult immunisation schedule exists to measure against,
+              so none is claimed. A blank dose number means the vaccine has no fixed dose count.
+            </div>
+{%- else %}
+            <div style="border-radius:12px; border:1px dashed var(--border-color); background:var(--bg); color:var(--text-muted); padding:16px; font-size:13px;">
+              None on file. A vaccination given outside the EPI schedule &mdash; a tetanus booster,
+              a flu shot, a rabies course &mdash; is recorded on the consultation form and appears here.
+            </div>
+{%- endif %}
+          </div>
+{%- else %}
           <div class="empty-state">
             <div class="icon-circle">
               <span class="material-symbols-outlined" style="font-size:30px; color:var(--teal-dark);">vaccines</span>
             </div>
-            <h5>No immunization record</h5>
-            <p>The DOH Expanded Program on Immunization schedule covers children under {{ immunization.pediatric_age_years }}, and this patient has no doses on file. Immunizations recorded during a consultation appear here.</p>
+            <h5>No vaccination record</h5>
+            <p>The DOH Expanded Program on Immunization schedule covers children under {{ immunization.pediatric_age_years }}, and this patient has no doses from it on file. No other vaccinations have been recorded either. Anything given during a consultation appears here.</p>
           </div>
 {%- endif %}
         </div>
