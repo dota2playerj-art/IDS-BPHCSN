@@ -638,13 +638,38 @@
             <!-- ABOUT SYSTEM -->
             <div class="tab-pane fade" id="pane-about">
               <div class="section-title">About System</div>
-              <div class="section-sub">Version, licensing, and institution information</div>
+              <div class="section-sub">Version and institution information</div>
 
               <div class="about-item"><div class="about-label">System Name</div><div class="about-value">IDS-BPHCSN</div></div>
               <div class="about-item"><div class="about-label">System Version</div><div class="about-value">1.0.0</div></div>
-              <div class="about-item"><div class="about-label">Database Version</div><div class="about-value">PostgreSQL 15.4</div></div>
-              <div class="about-item"><div class="about-label">Last Update</div><div class="about-value">Jul 01, 2026</div></div>
-              <div class="about-item"><div class="about-label">License Status</div><div class="about-value">DOH-Licensed</div></div>
+{#- WAS "PostgreSQL 15.4", "Jul 01, 2026" and "DOH-Licensed" on these three
+    rows. Each was wrong in its own way.
+
+    The database line named a database this project has never used. There is one
+    store here and it is SQLite: database/connection.py opens config.DATABASE
+    with sqlite3, and app.db begins with the bytes "SQLite format 3". It now
+    reports the SQLite the running interpreter is linked against, read on each
+    load, so it cannot go stale the way a typed-in version already had.
+
+    "Last Update" was an invented date. Nothing in this system records when it
+    was last changed -- no update mechanism, no deployment stamp, no version
+    history in the schema -- and the repository's git log, which does know, is
+    not something the running application should be reaching into. The row says
+    that instead of a date nobody checked.
+
+    "License Status" is gone rather than answered. No licence, accreditation or
+    endorsement is recorded anywhere in this codebase, its schema or its
+    documentation; the project's own audit report already listed this claim as
+    decorative, and "Trusted Gov System" left the login screen for the same
+    absence. A row reading "Not licensed" would imply a licence was expected and
+    missing -- there is simply no licensing to report, so the row goes, and so
+    does the word in the heading above it. #}
+              <div class="about-item" title="Read from the interpreter serving this page rather than typed in. This system keeps its records in a single SQLite file -- see database/connection.py.">
+                <div class="about-label">Database</div><div class="about-value">SQLite {{ system.sqlite_version }}</div>
+              </div>
+              <div class="about-item" title="Nothing records when this system was last updated: there is no update mechanism, no deployment timestamp and no version history in the schema.">
+                <div class="about-label">Last Update</div><div class="about-value">Not tracked</div>
+              </div>
               <div class="about-item"><div class="about-label">Developer</div><div class="about-value">BSIT Capstone Development Team</div></div>
               <div class="about-item"><div class="about-label">Institution</div><div class="about-value">San Francisco, Surigao del Norte</div></div>
               <div class="about-item"><div class="about-label">Deployed For</div><div class="about-value">Barangay Poblacion Health Center</div></div>

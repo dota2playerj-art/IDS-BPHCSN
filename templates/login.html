@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>IDS-BPHCSN | Secure Login</title>
+<title>IDS-BPHCSN | Sign In</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <!-- login.html deliberately does not extend base.html, so it carries its own copy of the
      self-hosted asset links. Keep these in step with base.html. -->
@@ -323,11 +323,18 @@
     <div style="width:100%; max-width:472px;">
 
       <div class="login-card">
+{#- WAS "Secure Login", under a verified_user shield, and in the page title.
+    The panel lower down this card carried the specific versions of that claim
+    -- an encrypted connection, secure auth -- and they went because they were
+    false or had nothing to check them against. The heading made the same claim
+    in one word and the shield-with-a-tick made it again without any, so both
+    follow. What this card does is take a username and a password, which is
+    what it says now. #}
         <div class="login-card-header">
           <div class="login-icon-circle">
-            <span class="material-symbols-outlined" style="color:var(--teal-dark);">verified_user</span>
+            <span class="material-symbols-outlined" style="color:var(--teal-dark);">login</span>
           </div>
-          <div class="login-title">Secure Login</div>
+          <div class="login-title">Sign In</div>
         </div>
 
         <div class="login-desc">Sign in using your authorized account to access the IDS-BPHCSN healthcare management system.</div>

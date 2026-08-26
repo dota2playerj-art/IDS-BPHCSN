@@ -30,12 +30,31 @@ features, not unwired displays, and inventing storage for them is a different an
 much larger task than the one that closed the sign-in gap.
 
 
+AND WHY THERE IS NOW A SECOND KEY
+---------------------------------
+`system`, read by the About System pane, which said "PostgreSQL 15.4". This
+project has never used PostgreSQL: database/connection.py opens the file named
+by config.DATABASE with sqlite3, and that file begins with the bytes "SQLite
+format 3". The pane was naming a database the system does not have.
+
+It is read live rather than corrected to a fixed string. A hard-coded "SQLite
+3.50.4" would be true on the machine it was typed on and quietly wrong on the
+next one, which is how the PostgreSQL line got there in the first place;
+sqlite3.sqlite_version is whatever the interpreter serving the request is
+actually linked against, so it cannot drift out of step with the thing it
+describes. This is not the disabled-input problem the section above refuses:
+nothing in the About pane is a control, and the version is a fact about the
+running system rather than a figure sitting under a dead field.
+
+
 WHERE THE FIGURES COME FROM
 ---------------------------
 models/audit.py, the same two functions Audit Logs and User Management read, so
 this screen cannot report a different number of sign-ins from the screen whose
 job it is to report them. Nothing is counted locally here.
 """
+import sqlite3
+
 from models.audit import get_audit_stats, get_last_logins
 from models.users import get_all_users
 from utils.dates import display_timestamp
@@ -68,10 +87,11 @@ def _most_recent_sign_in(last_logins, users):
 def settings_context():
     """Everything Screen 13 renders beyond the shared role context.
 
-    One key, `security`. Adding more would mean this file had started reporting
-    figures for panes whose controls are still disabled, and a screen that shows
-    a live number under a dead input is the exact confusion the disabled fieldset
-    was built to avoid.
+    Two keys. `security` is the sign-in trail; `system` is the database the
+    request is being served from. Neither sits under a disabled control -- a
+    live number beneath a dead input is the confusion the disabled fieldset
+    exists to avoid, and adding figures for the panes that do still have dead
+    inputs would be wrong for exactly that reason.
     """
     stats = get_audit_stats()
     users = get_all_users()
@@ -93,5 +113,11 @@ def settings_context():
             "total_accounts": len(users),
             "most_recent_name": recent_name,
             "most_recent_at": recent_stamp,
-        }
+        },
+        "system": {
+            # Not the sqlite3 module's own version: this is the SQLite library
+            # the interpreter is linked against, which is what actually stores
+            # the rows every other figure on this screen was counted from.
+            "sqlite_version": sqlite3.sqlite_version,
+        },
     }
