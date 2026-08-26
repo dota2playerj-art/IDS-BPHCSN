@@ -52,8 +52,12 @@ from routes.patient_views import (
     patient_records_context,
     patient_selection_context,
     process_archive_patients,
+    address_prefill_args,
+    address_prefill_form,
     process_register_patient,
     register_patient_context,
+    registered_patient_name,
+    save_and_register_another_requested,
 )
 from routes.settings_views import settings_context
 from routes.report_export import (
@@ -253,6 +257,27 @@ def register_patient(patient_id=None):
                     )
                 )
                 return redirect(url_for("admin.appointment_scheduling"))
+            # Save & Register Another. The record is saved -- the branch above
+            # only runs on a row id returned by the very same
+            # process_register_patient() the ordinary Save calls -- so what is
+            # left is where to put the operator. At a community health drive the
+            # answer is a fresh form, because the next person is already waiting.
+            #
+            # The address rides along on the query string and nothing else does.
+            # Everyone registered in one sitting is from the same purok, so that
+            # is the retyping worth removing; a name, a birth date or a blood
+            # type carried into the next registration would be a wrong value
+            # sitting in a field that looks filled in, which is the one failure
+            # this must not have.
+            if patient is None and save_and_register_another_requested(request.form):
+                name = registered_patient_name(request.form)
+                flash(
+                    f"{name} registered successfully. The form below is ready for "
+                    "the next patient, with the address kept."
+                )
+                return redirect(url_for(
+                    "admin.register_patient", **address_prefill_args(request.form)
+                ))
             flash("Patient details updated." if patient else "Patient registered successfully.")
             return redirect(url_for("admin.patient_profile", patient_id=saved_id))
         return render_template('register_patient.html', **context)
@@ -261,6 +286,10 @@ def register_patient(patient_id=None):
         'register_patient.html',
         **register_patient_context(
             patient=patient,
+            # Blank on an ordinary open. Set only when Save & Register Another
+            # has just redirected here, and then it holds the address fields and
+            # nothing else, so every other field renders exactly as blank.
+            form=address_prefill_form(request.args) if patient is None else None,
             check_in=check_in_requested(request.args),
             check_in_reason_text=check_in_reason(request.args),
             booking=booking_details(request.args) if booking_requested(request.args) else None,

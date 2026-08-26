@@ -449,9 +449,19 @@
 {%- if not patient %}
           <button type="reset" class="btn-ghost-ids"><span class="material-symbols-outlined" style="font-size:18px;">restart_alt</span>Reset</button>
 {%- endif %}
-          {%- if not patient and not check_in and not booking %}
-          <button type="button" class="btn-outline-teal" disabled title="{{ unavailable.save_and_another }}"><span class="material-symbols-outlined" style="font-size:18px;">person_add</span>Save &amp; Register Another</button>
-          {%- endif %}
+          {#- Save & Register Another. Plain add mode only: check-in and booking
+              were opened to reach a specific destination -- today's queue, the
+              appointment -- and edit mode is not registering anybody, so on
+              those three there is nothing for a second destination to mean.
+
+              A real submit, not a second form: it carries name/value the way
+              Patient Records' status buttons do, so it posts every field beside
+              it through the identical route, the identical validate_patient_form()
+              and the identical duplicate check. All the route does differently is
+              send the operator back here afterwards instead of to the profile. #}
+{%- if not patient and not check_in and not booking %}
+          <button type="submit" name="{{ save_action_field }}" value="{{ save_and_register_another }}" class="btn-outline-teal"><span class="material-symbols-outlined" style="font-size:18px;">person_add</span>Save &amp; Register Another</button>
+{%- endif %}
           <button type="submit" class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">{% if check_in %}how_to_reg{% elif booking %}event_available{% else %}save{% endif %}</span>{% if patient %}Save Changes{% elif check_in %}Save &amp; Check In{% elif booking %}Save &amp; Book Appointment{% else %}Save Patient Record{% endif %}</button>
         </div>
       </div>

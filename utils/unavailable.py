@@ -329,14 +329,21 @@ UNAVAILABLE = {
     # nothing quoting it is exactly the drift this file exists to prevent. It
     # goes the way "export", "export_pdf", "print" and "community_reports" went,
     # rather than sitting here describing a gap the application has closed.
-    "save_and_another": (
-        "Save & Register Another is not implemented. Saving already redirects "
-        "to the new patient's profile, which is where the duplicate check and "
-        "the check-in and booking hand-offs land; returning to a blank form "
-        "instead is a second outcome for the registration POST, and that write "
-        "path is not being changed for a convenience shortcut. Use Register "
-        "Patient again from the sidebar."
-    ),
+    # THERE IS NO "save_and_another" ENTRY ANY MORE, for the same reason.
+    # It said Save & Register Another was not implemented because returning to a
+    # blank form "is a second outcome for the registration POST, and that write
+    # path is not being changed for a convenience shortcut". The button is now
+    # built, and the sentence's own objection is what shaped it: the write path
+    # was not changed. The button is a plain submit on the same form, posting to
+    # the same route, through the same validate_patient_form() and the same
+    # duplicate check, and the flag it carries is read only after that has
+    # returned a saved row id. The one thing it changes is the redirect, and a
+    # destination is not a write path.
+    #
+    # It was built because the reason above measured the cost in the wrong place.
+    # "Use Register Patient again from the sidebar" is a fair answer for one
+    # registration; at a community health drive, where staff register a queue of
+    # people back to back from one desk, it is a detour taken once per person.
     # REWRITTEN: the old sentence listed "notes" among the fields "already in
     # this row". The Appointment History table on Patient Profile has five
     # columns before its actions -- Date, Time, Purpose, Assigned To, Status --

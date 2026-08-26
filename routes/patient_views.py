@@ -135,6 +135,89 @@ def booking_query_args(values):
     return args
 
 
+# Save & Register Another. The submit button carries this name/value pair, the
+# shape this project already uses wherever one form has more than one action --
+# Patient Records' status buttons and Appointment Scheduling's queue buttons both
+# post a plain <button name=... value=...> and let the route read which one was
+# pressed.
+#
+# WHY THIS IS A DESTINATION AND NOTHING ELSE
+# ------------------------------------------
+# The registration POST is one write path and stays one. This flag is read only
+# *after* process_register_patient() has already returned a saved row id, so the
+# validation, the duplicate warning and the insert are byte-for-byte the ones the
+# ordinary Save runs -- there is no second, looser save. What the flag changes is
+# where the operator is put afterwards: back on a fresh Register Patient form
+# instead of on the new patient's profile.
+#
+# It exists for the community health drives the centre runs, where staff sit and
+# register a queue of people back to back. Every one of those registrations
+# currently ends on a profile nobody asked to see, and the way back to the form
+# is the sidebar.
+SAVE_ACTION_FIELD = "save_action"
+SAVE_AND_REGISTER_ANOTHER = "register_another"
+
+
+def save_and_register_another_requested(form_data):
+    """True when this submit came from the Save & Register Another button."""
+    return (form_data.get(SAVE_ACTION_FIELD) or "").strip() == SAVE_AND_REGISTER_ANOTHER
+
+
+# The address fields the fresh form keeps. Everybody registered in one sitting at
+# a health drive is from the same purok, so re-typing the address for each of them
+# is the whole cost the button is meant to remove; everything else on the form is
+# unique to a person and must arrive blank. Barangay is not here because it is not
+# a field: it is fixed to this centre and rendered disabled, never submitted.
+ADDRESS_PREFILL_FIELDS = ("address", "municipality", "province", "zip_code")
+
+
+def address_prefill_args(form_data):
+    """The just-used address rendered as the query string the fresh form opens with.
+
+    Carried in the URL rather than the session because the redirect is the only
+    thing between the two, and a query string is visible: the operator can see
+    what was kept, and clearing it is a matter of opening Register Patient from
+    the sidebar instead.
+    """
+    args = {}
+    for field in ADDRESS_PREFILL_FIELDS:
+        value = (form_data.get(field) or "").strip()
+        if value:
+            args[field] = value
+    return args
+
+
+def address_prefill_form(args):
+    """A form dict holding only the carried address, for the fresh form's GET.
+
+    Every other key is absent, and the template reads an absent key exactly as it
+    reads a blank one -- so name, birth date, sex, civil status, blood type,
+    conditions, allergies and the emergency contact all render as they do on a
+    form opened with nothing at all.
+    """
+    values = {}
+    for field in ADDRESS_PREFILL_FIELDS:
+        value = (args.get(field) or "").strip()
+        if value:
+            values[field] = value
+    return values or None
+
+
+def registered_patient_name(form_data):
+    """The name just saved, for the flash the fresh form lands with.
+
+    Read off the submitted form rather than the stored row: these are the values
+    that were validated and inserted, and the flash's job is to confirm to the
+    operator which person they have just finished, before the fields they typed
+    disappear.
+    """
+    parts = [
+        (form_data.get(field) or "").strip()
+        for field in ("first_name", "middle_name", "last_name")
+    ]
+    return " ".join(part for part in parts if part)
+
+
 # Handed to the template so every <select>, radio and chip is rendered from the
 # same tuples the validator checks against.
 FORM_OPTIONS = {
@@ -465,6 +548,10 @@ def register_patient_context(form=None, errors=None, duplicates=None,
         "check_in_flag_field": CHECK_IN_FLAG_FIELD,
         "check_in_reason_field": CHECK_IN_REASON_FIELD,
         "check_in_reason_max": CHECK_IN_REASON_MAX,
+        # Save & Register Another's name/value, so the button and the route read
+        # the same two strings and cannot drift out of agreement.
+        "save_action_field": SAVE_ACTION_FIELD,
+        "save_and_register_another": SAVE_AND_REGISTER_ANOTHER,
         # Same mechanism again for the advance-booking path. `booking` is what
         # the notice at the top of the form reads; `booking_hidden` is the
         # name/value pairs that carry it to the next submit.
