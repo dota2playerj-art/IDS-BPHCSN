@@ -1102,12 +1102,27 @@
   // put the flash message about a corrected dose above a tab that does not show
   // the dose. Reuses the same URLSearchParams read the print flag above uses,
   // and Bootstrap's own Tab API rather than a second way of switching panes.
-  (function(){
+  //
+  // IT WAITS FOR DOMContentLoaded, AND THAT IS THE WHOLE POINT OF THE WRAPPER.
+  // base.html renders its scripts block BEFORE it loads bootstrap.bundle.min.js,
+  // so at the moment this file's inline script is parsed `window.bootstrap` does
+  // not exist yet. This ran as a bare IIFE at first and its own `window.bootstrap`
+  // guard was therefore always false: it failed silently on every load, and the
+  // tab never opened. Nothing threw and nothing appeared in the console, which is
+  // exactly why the defect survived a suite that checked the rendered HTML --
+  // the markup was right and only the timing was wrong.
+  //
+  // DOMContentLoaded is the correct wait rather than a polling retry: the
+  // Bootstrap tag is an ordinary parser-inserted <script src>, so it is fetched
+  // and executed before that event fires. By the time this callback runs the
+  // library is guaranteed present. The guard below stays anyway -- it is now a
+  // real assertion about a library that should be there, not a silent skip.
+  document.addEventListener('DOMContentLoaded', function(){
     var wanted = new URLSearchParams(window.location.search).get('tab');
     if(!wanted){ return; }
     var trigger = document.querySelector('#profileTabs [data-bs-target="#tab-' + wanted + '"]');
     if(trigger && window.bootstrap && bootstrap.Tab){ new bootstrap.Tab(trigger).show(); }
-  })();
+  });
 
   // THE CORRECT DIALOG.
   //
