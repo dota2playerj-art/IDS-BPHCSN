@@ -225,13 +225,16 @@
     margin-bottom:4px;
   }
 
-  /* Medicine History is left out on purpose. There is no dispensing table yet,
-     so that tab is an empty state saying so -- true on screen, where it tells
-     the operator where the feature stands, and pure noise on a clinical record
-     that is going into a folder. The tabs that print are the five the record
-     actually holds: personal, medical, consultations, immunisations,
-     appointments. */
-  #tab-medicine{display:none !important;}
+  /* Medicine History used to be left out here, because there was no dispensing
+     table and the tab was an empty state saying so -- true on screen, where it
+     told the operator where the feature stood, and pure noise on a clinical
+     record going into a folder.
+
+     It now holds real records, and what a printed patient file most needs
+     alongside the diagnoses is what the patient was actually given for them. So
+     it prints, and the six tabs the record holds are the six that print. Its
+     table carries no control column, so it needs none of the column-hiding
+     rules below. */
 
   /* The two history tables carry a control column each. The chevron column
      opens a detail row and the Actions column edits the record -- neither
@@ -410,10 +413,15 @@
       </div>
       <div class="col-md-3 col-sm-6">
         <div class="stat-card">
+{#- Was "Active Prescriptions — Not tracked". The card is now real, but it is
+    deliberately not headed with the old label: this system records that medicine
+    was handed over, not a course with a duration, so "active" is a fact it does
+    not hold and the card would have had to invent it. It counts what is actually
+    on file instead. #}
           <div class="stat-icon" style="background:#FEF3C7;"><span class="material-symbols-outlined" style="color:var(--warning);">pill</span></div>
-          <div class="stat-value">Not tracked</div>
-          <div class="stat-label">Active Prescriptions</div>
-          <div class="stat-trend" style="color:var(--text-muted);">Medicine dispensing not yet recorded</div>
+          <div class="stat-value">{{ dispensing | length }}</div>
+          <div class="stat-label">Medicines Dispensed</div>
+          <div class="stat-trend" style="color:var(--text-muted);">{{ dispensing[0].label ~ ', ' ~ (dispensing[0].date_dispensed | display_date) if dispensing else 'Nothing dispensed yet' }}</div>
         </div>
       </div>
       <div class="col-md-3 col-sm-6">
@@ -651,6 +659,27 @@
 {%- endfor %}
                         </div>
 {%- endif %}
+{#- And the medicine actually handed over at this visit. Worth its own block
+    beside the two above rather than being left to the Treatment Plan text
+    directly under it: that field is what the clinician *wrote*, in prose, and
+    this is what the system *did* — units that came off Medicine Inventory,
+    named and counted. The two answer different questions and a reader comparing
+    them is a reader doing something useful. Grouped in
+    patient_views._dispensing_by_consultation() from the list the Medicine
+    History tab has already read, so this costs no extra query either. #}
+{%- set visit_medicines = dispensing_by_consultation.get(consultation.id) %}
+{%- if visit_medicines %}
+                        <div style="margin-top:16px; padding-top:14px; border-top:1px solid var(--border-color);">
+                          <div class="info-label" style="margin-bottom:8px;">Medicine Dispensed at This Visit</div>
+{%- for record in visit_medicines %}
+                          <div style="font-size:13px; color:var(--text-dark); padding:5px 0;">
+                            <span class="material-symbols-outlined" style="font-size:15px; vertical-align:-2px; color:var(--warning);">pill</span>
+                            {{ record.label }}
+                            <span style="color:var(--text-muted);">&middot; {{ record.date_dispensed | display_date }} &middot; by {{ record.dispensed_by_name }}</span>
+                          </div>
+{%- endfor %}
+                        </div>
+{%- endif %}
                         <div style="font-size:12px; color:var(--text-muted); margin-top:14px; padding-top:12px; border-top:1px dashed var(--border-color);">
                           Recorded by {{ consultation.recorded_by_name }} on {{ consultation.created_at | display_date }}.
 {%- if consultation.was_edited %} Last edited {{ consultation.updated_at | display_date }} — see the audit log for what changed.{% endif %}
@@ -674,17 +703,83 @@
 {%- endif %}
         </div>
 
-        <!-- MEDICINE HISTORY -->
-        <!-- No dispensing table exists yet, so there is nothing to read. The
-             inventory_logs / dispensing table arrives with Objective 2. -->
+{#- MEDICINE HISTORY — everything this patient has actually been given from the
+    health center's stock.
+
+    Until medicine_dispensing existed this tab was an empty state saying
+    dispensing was not recorded, and that was true: nothing took a unit off a
+    shelf and said who it went to. Every row below is now one issue recorded
+    during a consultation, which is the only way one can be created — see
+    models/dispensing.py for why dispensing is anchored to the encounter that
+    justified it.
+
+    There is no status column and no "active prescription" here, deliberately.
+    This system records that medicine was handed over; it does not record a
+    course of treatment with a duration, so whether a patient is still taking
+    something is not a fact it holds. A status column would have to invent one.
+
+    A Jinja comment rather than an HTML one, unlike the rest of this template:
+    the others describe what is on the page and shipping them is fine, and this
+    one restates a claim that is no longer true. #}
         <div class="tab-pane fade" id="tab-medicine">
+          <h2 class="print-only print-section-title">Medicine History</h2>
+{%- if dispensing %}
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+            <div>
+              <div style="font-size:15px; font-weight:600; color:var(--text-dark);">Medicine Dispensed</div>
+              <div style="font-size:12.5px; color:var(--text-muted); margin-top:2px;">
+                {{ dispensing | length }} issue{{ '' if dispensing | length == 1 else 's' }} on file
+                &middot; {{ dispensed_units }} unit{{ '' if dispensed_units == 1 else 's' }} in total
+                &middot; most recent first
+              </div>
+            </div>
+          </div>
+
+          <div style="overflow-x:auto;">
+            <table class="history-table">
+              <thead>
+                <tr>
+                  <th>Medicine</th>
+                  <th>Quantity</th>
+                  <th>Date Dispensed</th>
+                  <th>For (Diagnosis)</th>
+                  <th>Dispensed By</th>
+                </tr>
+              </thead>
+              <tbody>
+{%- for record in dispensing %}
+                <tr>
+{#- The name stored on the dispensing row, not the inventory row's name today.
+    Editing a stock item can rename it, and a clinical record says what was
+    actually handed over at the time. #}
+                  <td style="font-weight:600;">{{ record.medicine_name }}</td>
+                  <td>{{ record.quantity_text }}</td>
+                  <td>{{ record.date_dispensed | display_date }}</td>
+{#- The visit this was given during. Blank only if that consultation record was
+    later removed — the medicine was still handed over, which is why the column
+    is ON DELETE SET NULL rather than cascading. #}
+                  <td>{{ record.consultation_diagnosis or '—' }}</td>
+                  <td>{{ record.dispensed_by_name }}</td>
+                </tr>
+{%- endfor %}
+              </tbody>
+            </table>
+          </div>
+          <div style="font-size:12px; color:var(--text-muted); margin-top:16px; padding-top:12px; border-top:1px dashed var(--border-color);">
+            Every issue was recorded during a consultation and came off Medicine Inventory
+            at the moment it was saved. Nothing here is a prescription with a course or a
+            refill date &mdash; this system records what was given, not what is still being
+            taken, so no such status is claimed.
+          </div>
+{%- else %}
           <div class="empty-state">
             <div class="icon-circle">
               <span class="material-symbols-outlined" style="font-size:30px; color:var(--teal-dark);">pill</span>
             </div>
-            <h5>No medicine records yet</h5>
-            <p>Medicine dispensing is not recorded yet. Once it is, everything issued to this patient will appear here.</p>
+            <h5>No medicine dispensed yet</h5>
+            <p>Nothing has been issued to this patient from the health center's stock. Medicine given during a consultation is recorded on the Record Consultation form and appears here.</p>
           </div>
+{%- endif %}
         </div>
 
         <!-- IMMUNIZATION RECORD — the child's standing against the DOH Expanded

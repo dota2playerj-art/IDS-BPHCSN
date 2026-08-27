@@ -92,9 +92,9 @@ WHAT IS DELIBERATELY IN EVERY FILE
 A "Not Tracked" sheet, last, exactly as report_export.py and audit_export.py put
 one on theirs. A roster leaving the building is the copy where an unexplained
 blank does the most damage, and each of these four screens has real absences: no
-patient write is recorded in the audit trail, no dispensing history exists behind
-a stock level, no appointment write is recorded either, and User Management's own
-UNTRACKED dict names five more. Where the screen already holds the wording -- User
+patient write is recorded in the audit trail, a stock level carries no movement
+column beside it, no appointment write is recorded either, and User Management's
+own UNTRACKED dict names five more. Where the screen already holds the wording -- User
 Management's does -- it is quoted rather than rewritten, so the file and the
 screen say the same thing in the same words.
 """
@@ -153,21 +153,39 @@ PATIENT_UNTRACKED = (
     ),
 )
 
-# Screen 06. "dispensing" is the same absence routes/report_views.UNTRACKED names
-# for the inventory section of Reports & Analytics; the wording is aligned with it
-# deliberately, because it is one fact about one table.
+# Screen 06. The first entry here used to be "Medicine dispensing", saying that
+# inventory_items holds a stock level with no per-issue history and that units
+# dispensed could not be recovered -- the same absence
+# routes/report_views.UNTRACKED named, worded to match it because it was one fact
+# about one table.
+#
+# That fact changed. medicine_dispensing records every issue, and Reports &
+# Analytics reports units dispensed over a range from it. So the entry could not
+# stay as written; a "Not Tracked" sheet claiming an absence that has been filled
+# is worse than one that says nothing, because it is the copy that leaves the
+# building and it would be believed.
+#
+# It is corrected rather than deleted, because what it was warning the reader
+# about is still true of *this file*: a stock export is a position, not a
+# movement record, and restocking in particular is still not recorded as a
+# movement anywhere at all.
 INVENTORY_UNTRACKED = (
     (
-        "Medicine dispensing",
-        "inventory_items holds the current stock level only, with no per-issue "
-        "history, so units dispensed cannot be recovered from it. The Current "
-        "Stock column is the shelf as it stands, not a movement record.",
+        "Stock movement, in this file",
+        "Medicine dispensed to a patient is recorded -- see Medicine Dispensed on "
+        "Reports & Analytics, which reports units issued over a date range. This "
+        "file is not that report: the Current Stock column is the shelf as it "
+        "stands today, with no movement column beside it. Restocking is not "
+        "recorded as a movement at all; an item's stock figure is raised by "
+        "editing it through Add / Edit Medicine, which overwrites the number.",
     ),
     (
         "Who changed a stock level, and when",
         "The audit trail does not record inventory writes. An item's stock figure "
         "can be corrected through Add / Edit Medicine and nothing keeps a note of "
-        "it, so this file is the position now with no history behind it.",
+        "it, so this file is the position now with no history behind it. "
+        "Dispensing is the one exception and is not in this file: it moves stock "
+        "down through a recorded, dated row of its own.",
     ),
     (
         "Batch history",

@@ -47,6 +47,19 @@ from models.consultations import (
     update_consultation,
     validate_consultation_form,
 )
+from models.dispensing import (
+    DISPENSE_ROWS,
+    QUANTITY_RANGE,
+    check_dispensing,
+    dispensable_items,
+    dispensing_label,
+    get_dispensing_for_consultation,
+    item_field,
+    parse_dispensing,
+    quantity_field,
+    record_dispensing,
+)
+from models.dispensing import FIELD_LABELS as DISPENSING_LABELS
 from models.general_vaccinations import (
     COMMON_VACCINES,
     MAX_NAME_LENGTH,
@@ -209,6 +222,66 @@ def _general_vaccination_context(consultation, submitted=None):
     }
 
 
+def _dispensing_context(consultation, submitted=None):
+    """The "Medicines Dispensed" section's state for this visit.
+
+    Thinner again than the two vaccination sections above it, because there is no
+    list to offer and no schedule to resolve: the choices are whatever is
+    actually on the shelf today, which models.dispensing.dispensable_items()
+    decides from the live inventory. What the section adds instead is a stock
+    figure beside every option, so the operator sees the ceiling before they hit
+    it rather than after.
+
+    Rows already dispensed at this visit are shown as LOCKED FACT, for the reason
+    the immunisation and vaccination sections give and one more of its own. The
+    shared reason: an absent form field is not evidence that something never
+    happened, and a partial or script-rebuilt POST produces one. The extra reason
+    here: un-recording a dispensing would have to put units back on the shelf, and
+    a stock increase with no supplier, no batch and no expiry date behind it is
+    not a restock -- it is a hole in the inventory that looks like one. So this
+    section is add-only too, and models/dispensing.py contains no DELETE at all.
+
+    `submitted` carries the operator's lines back through a validation bounce, so
+    a rejected save does not throw away what they had chosen and typed.
+    """
+    recorded = get_dispensing_for_consultation(
+        consultation["id"] if consultation else None
+    )
+    values = submitted or {}
+    low, high = QUANTITY_RANGE
+
+    return {
+        "options": dispensable_items(),
+        "rows": [
+            {
+                "index": index,
+                "item_field": item_field(index),
+                "quantity_field": quantity_field(index),
+                "item_value": values.get(item_field(index), ""),
+                "quantity_value": values.get(quantity_field(index), ""),
+            }
+            for index in range(DISPENSE_ROWS)
+        ],
+        "recorded": recorded,
+        "min_quantity": low,
+        "max_quantity": high,
+    }
+
+
+def _submitted_dispensing(form_data):
+    """What the operator had chosen and typed, for replay through a bounce."""
+    values = {}
+    for index in range(DISPENSE_ROWS):
+        for field in (item_field(index), quantity_field(index)):
+            values[field] = (form_data.get(field) or "").strip()
+    return values
+
+
+def _dispensing_labels(records):
+    """['Paracetamol — 20 tablets'] for a list of stored dispensing rows."""
+    return [dispensing_label(record) for record in records]
+
+
 def _submitted_general_vaccinations(form_data):
     """What the operator had ticked and typed, for replay through a bounce."""
     return {
@@ -224,7 +297,7 @@ def _submitted_general_vaccinations(form_data):
 
 def consultation_form_context(patient, appointment=None, consultation=None,
                               form=None, errors=None, ticked=None,
-                              general_submitted=None):
+                              general_submitted=None, dispensing_submitted=None):
     """Everything the Record / Edit Consultation screen renders.
 
     `consultation` set means edit mode: the template switches its wording, shows
@@ -255,7 +328,8 @@ def consultation_form_context(patient, appointment=None, consultation=None,
         # otherwise show a raw field name for a general-vaccination error. The
         # consultation's own label map is left exactly as it was, so the audit
         # trail still describes only the fields it describes.
-        "field_labels": dict(FIELD_LABELS, **GENERAL_VACCINE_LABELS),
+        "field_labels": dict(FIELD_LABELS, **GENERAL_VACCINE_LABELS,
+                             **DISPENSING_LABELS),
         # (field, label, unit, low, high, whole) -- the form prints the unit in
         # each field's hint and the range in its out-of-range message, from the
         # same tuples the validator checks against.
@@ -276,6 +350,11 @@ def consultation_form_context(patient, appointment=None, consultation=None,
         "general_vaccination": _general_vaccination_context(
             consultation, general_submitted
         ),
+        # Offered for every patient at every age, like the section above and
+        # unlike the EPI one -- there is no cohort a medicine belongs to. What
+        # narrows this section is the shelf, not the patient: the options are the
+        # in-service, unexpired, in-stock medicines and nothing else.
+        "dispensing": _dispensing_context(consultation, dispensing_submitted),
     }
 
 
@@ -363,12 +442,25 @@ def process_record_consultation(appointment_id, form_data, user_id):
     general_entries, general_errors = parse_general_vaccinations(form_data)
     general_submitted = _submitted_general_vaccinations(form_data)
 
+    # No age guard here either. What limits dispensing is the shelf, not the
+    # patient. The two hard blocks -- insufficient stock and expired medicine --
+    # are asked *before* the consultation is written, so a refusal comes back as
+    # a form with the reason under the line rather than as a saved record with a
+    # failure notice attached to it. models/dispensing.py asks them again inside
+    # the write transaction, and that is the pair that actually governs.
+    dispense_entries, dispense_errors = parse_dispensing(form_data)
+    dispense_submitted = _submitted_dispensing(form_data)
+    if not dispense_errors:
+        dispense_errors = check_dispensing(dispense_entries)
+
     errors = validate_consultation_form(values, age_context)
     errors.update(general_errors)
+    errors.update(dispense_errors)
     if errors:
         return None, consultation_form_context(
             patient, appointment=appointment, form=values, errors=errors,
             ticked=set(ticked), general_submitted=general_submitted,
+            dispensing_submitted=dispense_submitted,
         ), (
             f"{len(errors)} field{'s' if len(errors) != 1 else ''} need attention. "
             "Nothing has been saved yet."
@@ -400,6 +492,20 @@ def process_record_consultation(appointment_id, form_data, user_id):
         entries=general_entries,
         administered_by=user_id,
         date_administered=context["visit_date"],
+        consultation_id=consultation_id,
+    )
+
+    # Same visit date, same author, same consultation anchor as the two
+    # vaccination writes above -- and, unlike them, this one also moves the
+    # shelf. Each row inserted here decrements its medicine's stock_quantity in
+    # the same transaction, so Medicine Inventory, both dashboards' low-stock
+    # cards and the sidebar badge all reflect the issue on their next render
+    # without any of them being touched by this feature.
+    dispensed, dispense_failures = record_dispensing(
+        patient_id=patient["id"],
+        entries=dispense_entries,
+        dispensed_by=user_id,
+        date_dispensed=context["visit_date"],
         consultation_id=consultation_id,
     )
 
@@ -436,6 +542,7 @@ def process_record_consultation(appointment_id, form_data, user_id):
                 len(general_given), "s" if len(general_given) != 1 else "")
             + ", ".join(_general_labels(general_given)) + "."
         )
+    message += _dispensing_message(dispensed, dispense_failures)
 
     if outcome == "completed":
         stats = get_queue_stats()
@@ -455,6 +562,49 @@ def process_record_consultation(appointment_id, form_data, user_id):
         )
 
     return patient["id"], None, message
+
+
+def _dispensing_message(dispensed, failures):
+    """What to add to the save's flash message about the medicine given.
+
+    Two things it deliberately says that a bare count would not.
+
+    The stock left behind, per medicine. A health worker who has just taken the
+    last twelve tablets off a shelf should be told so at the moment they do it,
+    while the patient is still in the room and while restocking is still a
+    decision somebody can make today -- not on the next render of a dashboard
+    they may not open. The figure is the one record_dispensing() wrote, read back
+    off its own return rather than re-queried, so the sentence cannot report a
+    level the shelf does not hold.
+
+    And a refusal that arrived too late to bounce the form. check_dispensing()
+    runs before the consultation is written, so this is only reachable when the
+    shelf moved between that check and the save -- another dispensing committing
+    in between. The consultation is saved either way, because it is the clinical
+    fact and it happened; what did not happen is the medicine leaving the store,
+    and saying so plainly is the only honest option. Quietly dropping it would
+    leave a record of a visit whose prescription vanished.
+    """
+    if failures:
+        return (
+            " The consultation was saved, but no medicine was dispensed: "
+            + " ".join(failures.values())
+            + " Stock has not been changed — record it from the patient's "
+            "consultation history once the shelf is right."
+        )
+    if not dispensed:
+        return ""
+
+    given = ", ".join(_dispensing_labels(dispensed))
+    remaining = ", ".join(
+        "{} now {}".format(row["medicine_name"], row["stock_after"])
+        for row in dispensed
+    )
+    return (
+        " {} medicine{} dispensed: {}. Stock updated — {}.".format(
+            len(dispensed), "s" if len(dispensed) != 1 else "", given, remaining
+        )
+    )
 
 
 def _apply_immunization_edit(patient, consultation_id, consultation, ticked,
@@ -548,17 +698,25 @@ def _apply_general_vaccination_edit(patient, consultation_id, consultation,
     )
 
 
-def _describe_dose_changes(added, removed, general_added=()):
-    """The vaccination half of an audit line. Returns (summary, changed_labels).
+def _describe_dose_changes(added, removed, general_added=(), dispensed=()):
+    """The vaccination and dispensing half of an audit line.
+
+    Returns (summary, changed_labels).
 
     Named in full rather than counted -- "2 immunisations changed" would tell a
     later reader nothing about which child got what, which is the whole reason
     the entry exists.
 
-    EPI doses and other vaccinations are reported as two separate phrases rather
-    than pooled into one count, so an entry read months later still says which
-    kind of record moved -- a scheduled infant dose and an adult booster are not
-    interchangeable facts.
+    EPI doses, other vaccinations and dispensed medicine are reported as separate
+    phrases rather than pooled into one count, so an entry read months later still
+    says which kind of record moved -- a scheduled infant dose, an adult booster
+    and twenty tablets off a shelf are not interchangeable facts.
+
+    Dispensing earns its place in the audit trail more plainly than either
+    vaccination does: it is the only edit reachable from this form that changes a
+    figure on a *different* screen. Twenty tablets recorded here leave Medicine
+    Inventory twenty lighter, and a stock movement that no entry names is exactly
+    the kind of change an audit log exists to make answerable.
     """
     parts, changed = [], []
     if added:
@@ -578,6 +736,15 @@ def _describe_dose_changes(added, removed, general_added=()):
             "Other vaccinations added: " + ", ".join(_general_labels(general_added))
         )
         changed.append("other vaccinations added")
+    if dispensed:
+        parts.append(
+            "Medicine dispensed: "
+            + ", ".join(
+                "{} (stock now {})".format(dispensing_label(row), row["stock_after"])
+                for row in dispensed
+            )
+        )
+        changed.append("medicine dispensed")
     return "; ".join(parts), changed
 
 
@@ -607,12 +774,23 @@ def process_edit_consultation(consultation_id, form_data, user_id, ip_address=No
     general_entries, general_errors = parse_general_vaccinations(form_data)
     general_submitted = _submitted_general_vaccinations(form_data)
 
+    # consultation_id is passed to the pre-check here and not on the record path,
+    # because only an edit can meet a visit that already has dispensing on file.
+    # It is what turns a repeat line into "Paracetamol is already recorded for
+    # this visit (20 tablets)" instead of a UNIQUE constraint failure.
+    dispense_entries, dispense_errors = parse_dispensing(form_data)
+    dispense_submitted = _submitted_dispensing(form_data)
+    if not dispense_errors:
+        dispense_errors = check_dispensing(dispense_entries, consultation_id)
+
     errors = validate_consultation_form(values, age_context)
     errors.update(general_errors)
+    errors.update(dispense_errors)
     if errors:
         return None, consultation_form_context(
             patient, consultation=before, form=values, errors=errors, ticked=set(ticked),
             general_submitted=general_submitted,
+            dispensing_submitted=dispense_submitted,
         ), (
             f"{len(errors)} field{'s' if len(errors) != 1 else ''} need attention. "
             "Your changes have not been saved."
@@ -631,20 +809,40 @@ def process_edit_consultation(consultation_id, form_data, user_id, ip_address=No
     general_added = _apply_general_vaccination_edit(
         patient, consultation_id, before, general_entries, user_id
     )
+    # Add-only, exactly as the two above are, and dated to the visit rather than
+    # to today -- a medicine recorded late was still handed over on the day of
+    # the consultation. The stock movement, however, is real and current: the
+    # units come off the shelf now, because now is when the system learned they
+    # had gone.
+    dispensed, dispense_failures = record_dispensing(
+        patient_id=patient["id"],
+        entries=dispense_entries,
+        dispensed_by=user_id,
+        date_dispensed=before["consultation_date"],
+        consultation_id=consultation_id,
+    )
 
     after = get_consultation_by_id(consultation_id)
     summary, changed = describe_changes(
         before, after, FIELD_LABELS, formatters=AUDIT_FORMATTERS
     )
-    dose_summary, dose_changed = _describe_dose_changes(added, removed, general_added)
+    dose_summary, dose_changed = _describe_dose_changes(
+        added, removed, general_added, dispensed
+    )
     if dose_summary:
         summary = f"{summary}; {dose_summary}" if summary else dose_summary
     changed = list(changed) + dose_changed
 
     if not changed:
+        # `dispensed` is empty on this path by construction -- anything stored
+        # would have put "medicine dispensed" into `changed` -- so the only thing
+        # _dispensing_message() can add here is a late refusal, which still has to
+        # be said. A save that silently dropped a medicine line would read as
+        # "no changes" to the person who typed one.
         return patient["id"], None, (
             f"No changes. {patient['full_name']}'s consultation of "
             f"{display_date(before['consultation_date'])} is unchanged."
+            + _dispensing_message(dispensed, dispense_failures)
         )
 
     # Self-contained on purpose: an audit entry read months later, on its own,
@@ -672,4 +870,5 @@ def process_edit_consultation(consultation_id, form_data, user_id, ip_address=No
         f"{patient['full_name']}'s consultation updated — {len(changed)} field"
         f"{'s' if len(changed) != 1 else ''} changed ({field_names}). "
         "The change has been recorded in the audit log."
+        + _dispensing_message(dispensed, dispense_failures)
     )

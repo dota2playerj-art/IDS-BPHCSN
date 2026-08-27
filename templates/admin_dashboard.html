@@ -279,9 +279,12 @@
               <td>{{ entry.age if entry.age is not none else '—' }}</td>
               <td>{{ entry.consultation_date | display_date }}</td>
               <td>{{ entry.chief_complaint or '—' }}</td>
-              {#- Dispensing is not recorded anywhere, so this column has no
-                  source. See untracked.dispensing, printed under the table. #}
-              <td style="color:var(--text-muted);">&mdash;</td>
+{#- This column printed an em dash for the whole life of the project, with
+    untracked.dispensing under the table saying why. It reads the real issues
+    now, named in full rather than counted -- "2 medicines" in a column headed
+    Medicine tells a reader nothing they opened this table for. Grouped in one
+    query for the whole panel by dashboard_views._recent_consultations(). #}
+              <td{% if not entry.medicines %} style="color:var(--text-muted);"{% endif %}>{{ entry.medicines_text or '—' }}</td>
               <td>{{ entry.recorded_by }}</td>
               <td><span class="badge-status badge-completed">Recorded</span></td>
             </tr>
@@ -296,9 +299,10 @@
           </tbody>
         </table>
       </div>
-{%- if recent_consultations %}
-      <div class="panel-sub" style="margin-top:10px; font-size:12.5px;">{{ untracked.dispensing }}</div>
-{%- endif %}
+{#- The note that used to sit here explained why the Medicine column was empty.
+    The column is filled, so the note is gone rather than reworded -- a reason
+    with nothing left to be true about is exactly the drift the project's
+    untracked dicts exist to prevent. #}
     </div>
 
     <!-- SECOND ROW: ANALYTICS + INVENTORY + SMS + ACTIVITY -->
@@ -322,14 +326,12 @@
             </div>
             <div class="col-6">
               <div style="font-size:12.5px; font-weight:600; color:var(--text-dark); margin-bottom:6px;">Medicine Units Dispensed</div>
-              {#- No chart: there is no dispensing history to plot. The canvas
-                  that used to sit here was drawing six invented monthly totals. #}
-              <div class="chart-wrap" style="height:140px; display:flex; align-items:center; justify-content:center; background:var(--bg); border-radius:10px; padding:12px;">
-                <div style="font-size:11.5px; color:var(--text-muted); line-height:1.55; text-align:center;">
-                  <span class="material-symbols-outlined" style="font-size:20px; opacity:0.5; display:block; margin-bottom:4px;">query_stats</span>
-                  Not yet tracked &mdash; no dispensing history exists to plot.
-                </div>
-              </div>
+              {#- The canvas originally here drew six invented monthly totals,
+                  and was then replaced by a note stating that no such history
+                  was stored. It is stored now, so the chart is real: the same
+                  six-month window as the two charts beside it, from
+                  models/dispensing.py get_dispensing_stats(). #}
+              <div class="chart-wrap" style="height:140px;"><canvas id="chartDispensed"></canvas></div>
             </div>
           </div>
         </div>
@@ -457,12 +459,15 @@
   Chart.defaults.color = '#6B7280';
   Chart.defaults.font.size = 11;
 
-  const teal = '#169B92';
+  const teal = '#169B92', warning = '#F59E0B';
 
-  // Both series are emitted from the same six-month windows Screen 10 plots,
-  // through | tojson -- there is no literal data array left on this screen.
+  // All three series are emitted from the same six-month windows Screen 10
+  // plots, through | tojson -- there is no literal data array left on this
+  // screen. The third used to be a note saying no dispensing history existed;
+  // medicine_dispensing is what changed that.
   const consultTrend = {{ consultation_trend | tojson }};
   const regTrend = {{ registration_trend | tojson }};
+  const dispenseTrend = {{ dispensing_trend | tojson }};
 
   new Chart(document.getElementById('chartConsult'), {
     type: 'line',
@@ -484,5 +489,17 @@
       datasets: [{ data: regTrend.map(m => m.count), backgroundColor: teal, borderRadius:4 }]
     },
     options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true, grid:{color:'#F1F3F5'}}, x:{grid:{display:false}}} }
+  });
+
+  // Amber rather than teal, matching the Medicines Dispensed section on the
+  // consultation form and the dispensing panels on Screen 10: on every screen in
+  // this project, stock leaving the shelf is the amber thing.
+  new Chart(document.getElementById('chartDispensed'), {
+    type: 'bar',
+    data: {
+      labels: dispenseTrend.map(m => m.label),
+      datasets: [{ data: dispenseTrend.map(m => m.units), backgroundColor: warning, borderRadius:4 }]
+    },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true, ticks:{precision:0}, grid:{color:'#F1F3F5'}}, x:{grid:{display:false}}} }
   });
 </script>{% endblock %}

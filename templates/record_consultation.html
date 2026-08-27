@@ -108,6 +108,27 @@
   }
   .recorded-vaccine .material-symbols-outlined{font-size:18px;}
 
+  /* MEDICINES DISPENSED — amber rather than teal, and that is the one visual
+     decision in this section worth writing down. Every other section on this
+     form writes a record. This one writes a record *and moves a figure on
+     another screen*: saving it takes units off Medicine Inventory, which may
+     drop an item below its reorder level and light up the low-stock badge in
+     the sidebar. A section with a consequence outside its own page should not
+     look identical to the sections without one. */
+  .dispense-card .section-icon{background:#FEF3C7;}
+  .dispense-card .section-icon .material-symbols-outlined{color:#B45309;}
+  .dispense-qty-input{width:110px;}
+  .dispense-select{min-width:240px;}
+  .recorded-dispense{
+    display:flex; align-items:center; gap:8px; padding:9px 12px; border-radius:10px;
+    background:#FFFBEB; border:1px solid #FDE68A; color:#92400E; font-size:13px; margin-bottom:8px;
+  }
+  .recorded-dispense .material-symbols-outlined{font-size:18px;}
+  .dispense-empty{
+    font-size:13px; color:var(--text-muted); background:var(--bg); border-radius:10px;
+    padding:14px 16px; line-height:1.6;
+  }
+
   /* FOOTER ACTION BAR */
   .form-actions{
     background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:18px 24px;
@@ -551,6 +572,127 @@
 {%- if consultation %}
           A vaccination already on file for this visit is shown above as fact and cannot be
           removed here &mdash; the same rule the immunisation record follows.
+{%- endif %}
+        </div>
+      </div>
+
+      <!-- MEDICINES DISPENSED — the other half of Objective 2, and the only
+           section on this form that changes a figure on another screen.
+
+           WHY IT IS HERE AND NOT ON MEDICINE INVENTORY
+           Because a dispensing event that is not traceable to the clinical
+           encounter behind it is not, at a barangay health station, a legitimate
+           record. DOH guidance for this level of facility requires medicine
+           handed out to be traceable to the medical supervision that authorised
+           it, and HL7 FHIR models the same relationship: MedicationDispense —
+           issuing a dose from ward stock to a patient for consumption — carries
+           the Encounter it happened during. So this system has no standalone
+           "dispense a medicine" screen, deliberately. The consultation is where
+           a clinician decides a patient needs something, and it is where they
+           record having given it.
+
+           WHAT SAVING THIS DOES
+           Each line inserts a dispensing record and decrements that medicine's
+           stock in one transaction — see models/dispensing.py. Before this
+           existed, inventory stock only ever went up.
+
+           Shown for every patient at every age. What narrows the list is the
+           shelf, not the patient: only in-service, unexpired, in-stock medicines
+           are offered. -->
+      <div class="panel-card dispense-card">
+        <div class="section-head">
+          <div class="section-icon"><span class="material-symbols-outlined">pill</span></div>
+          <div>
+            <div class="section-title">Medicines Dispensed</div>
+            <div class="section-sub">
+              Taken off the shelf and given to the patient &middot; updates Medicine Inventory
+            </div>
+          </div>
+        </div>
+
+{%- if dispensing.recorded %}
+        <!-- Already dispensed at this visit. Shown as fact rather than as
+             editable lines, exactly as a recorded vaccination is — and for one
+             extra reason of its own: un-recording an issue would have to put
+             units back on the shelf, and a stock increase with no supplier, no
+             batch and no expiry date behind it is not a restock. It is a hole in
+             the inventory that looks like one. -->
+        <div style="margin-bottom:16px;">
+          <div style="font-size:12.5px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.03em; margin-bottom:8px;">Dispensed at this visit</div>
+{%- for record in dispensing.recorded %}
+          <div class="recorded-dispense">
+            <span class="material-symbols-outlined">task_alt</span>
+            <span><strong style="display:inline;">{{ record.label }}</strong> &middot; {{ record.date_dispensed | display_date }}{% if record.dispensed_by_name %} &middot; {{ record.dispensed_by_name }}{% endif %}</span>
+          </div>
+{%- endfor %}
+        </div>
+{%- endif %}
+
+{%- if dispensing.options %}
+        <div style="overflow-x:auto;">
+          <table class="appt-table" style="width:100%; border-collapse:separate; border-spacing:0; font-size:13.5px;">
+            <thead>
+              <tr>
+                <th>Medicine</th>
+                <th style="width:170px;">Quantity given</th>
+              </tr>
+            </thead>
+            <tbody>
+{%- for row in dispensing.rows %}
+              <tr>
+                <td>
+                  <select class="form-select dispense-select{% if errors.get(row.item_field) %} is-invalid{% endif %}"
+                          name="{{ row.item_field }}"
+                          aria-label="Medicine dispensed on line {{ row.index + 1 }}">
+                    <option value="">&mdash; No medicine on this line &mdash;</option>
+{#- Every option carries what is actually on the shelf, so the ceiling is
+    visible before it is hit rather than only in the refusal afterwards. #}
+{%- for option in dispensing.options %}
+                    <option value="{{ option.id }}"{% if row.item_value == option.id | string %} selected{% endif %}>{{ option.label }} &mdash; {{ option.stock_text }} in stock</option>
+{%- endfor %}
+                  </select>
+{%- if errors.get(row.item_field) %}
+                  <div class="invalid-feedback d-block">{{ errors.get(row.item_field) }}</div>
+{%- endif %}
+                </td>
+                <td>
+                  <input type="text" inputmode="numeric"
+                         class="form-control dispense-qty-input{% if errors.get(row.quantity_field) %} is-invalid{% endif %}"
+                         name="{{ row.quantity_field }}" value="{{ row.quantity_value }}"
+                         maxlength="4" placeholder="&mdash;"
+                         aria-label="Quantity dispensed on line {{ row.index + 1 }}">
+{%- if errors.get(row.quantity_field) %}
+                  <div class="invalid-feedback d-block">{{ errors.get(row.quantity_field) }}</div>
+{%- endif %}
+                </td>
+              </tr>
+{%- endfor %}
+            </tbody>
+          </table>
+        </div>
+{%- else %}
+        <!-- Nothing on the shelf can be dispensed. Stated rather than shown as
+             an empty dropdown, which would read as the feature being broken. -->
+        <div class="dispense-empty">
+          No medicine can be dispensed right now. The list offers only items filed under
+          Medicine that are in service, unexpired and above zero stock, and nothing in the
+          inventory currently meets all three. Restock or update expiry dates on
+          Medicine Inventory and this section will fill itself.
+        </div>
+{%- endif %}
+
+        <div class="cohort-note">
+          Leave every line blank if no medicine was given. What is recorded here comes off
+          Medicine Inventory immediately and is dated {{ visit_date | display_date }}, and
+          appears on {{ patient.first_name }}'s profile under Medicine History.
+          A medicine is refused outright &mdash; not warned about &mdash; if the amount asked for
+          is more than the shelf holds, or if the medicine has expired. Expired stock is
+          physically present, which is exactly why being in stock is not the test.
+          Put the whole amount given at this visit on one line per medicine.
+{%- if consultation %}
+          Medicine already dispensed at this visit is shown above as fact and cannot be
+          removed here &mdash; taking it back would mean putting units on the shelf with no
+          batch or expiry behind them.
 {%- endif %}
         </div>
       </div>

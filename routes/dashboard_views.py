@@ -40,6 +40,7 @@ from models.consultations import (
     get_consultation_report,
     get_consultation_stats,
 )
+from models.dispensing import get_dispensing_by_consultation, get_dispensing_stats
 from models.immunizations import get_immunization_alert
 from models.inventory import get_inventory_stats, get_low_stock_alert
 from models.patients import (
@@ -68,11 +69,17 @@ VACCINATION_WORDS = ("immuniz", "immunis", "vaccin")
 TREND_MONTHS = 6
 
 UNTRACKED = {
-    "dispensing": (
-        "Medicine dispensing is not recorded. inventory_items holds the current "
-        "stock level only, with no per-issue history, so units dispensed per "
-        "month and the medicine given at a consultation cannot be recovered."
-    ),
+    # THERE IS NO "dispensing" ENTRY ANY MORE, AND THAT IS THE POINT.
+    # It said dispensing is not recorded, and that units dispensed per month and
+    # the medicine given at a consultation could not be recovered. Both of those
+    # were exactly what this dashboard was missing, and both are now recorded:
+    # medicine_dispensing holds one row per issue, anchored to the consultation
+    # that justified it. So the Medicine Units Dispensed chart plots a real
+    # series and the Medicine column on Recent Consultations reads a real value,
+    # and the reason that explained their absence goes with the absence. See the
+    # matching note in routes/report_views.UNTRACKED for what its removal does
+    # *not* claim -- supplies and equipment leaving the store are still not
+    # recorded anywhere.
     "notifications": (
         "Per-user notifications are not recorded. There is no notifications "
         "table and nothing writes one, so this panel would have to invent its "
@@ -119,13 +126,32 @@ def _recent_registrations(limit):
 
 
 def _recent_consultations(limit, reference):
-    """The latest visits written up, with the age the patient was on the day."""
+    """The latest visits written up, with the age the patient was on the day.
+
+    The Medicine column on this table printed an em dash for the whole life of
+    the project, with UNTRACKED["dispensing"] under the table saying why. It now
+    reads what was actually handed over at each visit.
+
+    One query for the whole panel rather than one per row:
+    get_dispensing_by_consultation() takes the five consultation ids this table
+    is already holding and returns their issues grouped. A five-row panel that
+    issued six queries would be the kind of quiet cost that only shows up once
+    the register is large.
+    """
     entries = get_consultation_report(limit=limit)["entries"]
+    dispensed = get_dispensing_by_consultation(
+        entry.get("id") for entry in entries
+    )
     rows = []
     for entry in entries:
         stamp = to_clinic_time(entry.get("created_at"))
+        issues = dispensed.get(entry.get("id"), [])
         rows.append({
             **entry,
+            # Named in full rather than counted. "2 medicines" in a column headed
+            # Medicine tells a reader nothing they came to this table for.
+            "medicines": issues,
+            "medicines_text": ", ".join(record["label"] for record in issues),
             "full_name": f"{entry.get('first_name', '')} {entry.get('last_name', '')}".strip(),
             # format_age(), not calculate_age(): this column prints the value,
             # and the numeric form is what makes an infant read as "0".
@@ -178,6 +204,7 @@ def dashboard_context():
     queue_stats = get_queue_stats(queue)
     patient_stats = get_patient_stats()
     consultation_stats = get_consultation_stats(months=TREND_MONTHS)
+    dispensing_stats = get_dispensing_stats(months=TREND_MONTHS)
     inventory_stats = get_inventory_stats()
     upcoming_all = get_upcoming_appointments()
 
@@ -233,6 +260,11 @@ def dashboard_context():
         # exactly as Screen 10 emits its eight.
         "registration_trend": get_registration_trend(months=TREND_MONTHS),
         "consultation_trend": consultation_stats["trend"],
+        # The third mini trend chart, and the one that had no source until
+        # medicine_dispensing existed. Same six-month window as the two beside
+        # it, from the same TREND_MONTHS, so the three x axes line up.
+        "dispensing_stats": dispensing_stats,
+        "dispensing_trend": dispensing_stats["trend"],
         "pediatric_age_years": PEDIATRIC_AGE_YEARS,
         "untracked": UNTRACKED,
     }

@@ -8,6 +8,7 @@ own redirect target.
 """
 from models.appointments import get_appointments_for_patient, get_next_appointment_for_patient
 from models.consultations import get_consultations_for_patient
+from models.dispensing import get_dispensing_for_patient
 from models.general_vaccinations import get_general_vaccinations_for_patient
 from models.immunizations import dose_label, get_immunization_status
 from models.patients import (
@@ -433,6 +434,12 @@ def patient_profile_context(patient_id):
     # not, and the tab says so either way.
     general_vaccinations = get_general_vaccinations_for_patient(patient_id)
 
+    # Read unconditionally too, and for the same reason. This is the tab that
+    # said "Medicine dispensing is not recorded yet" for the whole life of the
+    # project; there is now a table behind it, so it shows what that table holds
+    # for this patient and an honest empty state when it holds nothing.
+    dispensing = get_dispensing_for_patient(patient_id)
+
     return {
         "patient": patient,
         "consultations": get_consultations_for_patient(patient_id),
@@ -456,7 +463,35 @@ def patient_profile_context(patient_id):
         # assembled here, so the dialog cannot offer a value the endpoint behind
         # it would refuse, or omit one it would accept.
         "correction": correction_options(),
+        # The Medicine History tab, and the Active Prescriptions stat card above
+        # it. Both were placeholders until medicine_dispensing existed.
+        "dispensing": dispensing,
+        "dispensing_by_consultation": _dispensing_by_consultation(dispensing),
+        # Units, not rows: "3 issues" and "60 tablets" answer different questions,
+        # and the card is headed with the one a health worker asks. Summed from
+        # the list already read rather than by a second query.
+        "dispensed_units": sum(row["quantity_dispensed"] for row in dispensing),
     }
+
+
+def _dispensing_by_consultation(records):
+    """{consultation_id: [dispensing, ...]} for the View panel on a history row.
+
+    Built from the list the Medicine History tab has already read rather than by
+    asking the database again -- exactly what _doses_by_consultation() and
+    _general_by_consultation() do, and for the same reason: the records carry
+    their consultation_id, so the grouping is free.
+
+    A dispensing recorded against no consultation is skipped, as the vaccinations
+    are: it belongs to the patient's history but to no row in this table. That
+    only arises if a consultation is deleted out from under it -- the column is
+    ON DELETE SET NULL -- and the medicine still shows on the tab itself.
+    """
+    grouped = {}
+    for record in records:
+        if record.get("consultation_id"):
+            grouped.setdefault(record["consultation_id"], []).append(record)
+    return grouped
 
 
 def _general_by_consultation(records):

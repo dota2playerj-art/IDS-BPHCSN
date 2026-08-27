@@ -58,8 +58,9 @@ The "not yet tracked" notes are, on their own final sheet. An export that
 silently dropped them would be the one place in this system where a figure's
 absence stopped being stated -- and it is the copy that leaves the building, so
 it is the copy where an unexplained blank does the most damage. A reader of the
-workbook can see that delivery confirmation, dispensing history and programme
-enrolment are not recorded, in the same words the screen uses.
+workbook can see that delivery confirmation and programme enrolment are not
+recorded, in the same words the screen uses. (Dispensing history used to be on
+that list and is not any more -- it has a sheet of its own now.)
 """
 from io import BytesIO
 
@@ -88,6 +89,10 @@ SECTION_ORDER = (
     "seniors",
     "programs",
     "inventory",
+    # Directly after inventory and never before it: the stock sheet is the shelf
+    # as it stands and this one is what left it, and a reader who has just seen
+    # a low figure is a reader about to ask why.
+    "dispensing",
     "sms",
     "notifications",
 )
@@ -107,6 +112,7 @@ SHEET_TITLES = {
     "seniors": "Senior Citizens",
     "programs": "Health Programmes",
     "inventory": "Medicine Inventory",
+    "dispensing": "Medicine Dispensed",
     "sms": "SMS Activity",
     "notifications": "Notifications",
 }
@@ -124,6 +130,7 @@ SHEET_SUMMARIES = {
     "seniors": "The senior cohort and the conditions recorded against it.",
     "programs": "Programme membership the stored data can establish.",
     "inventory": "Stock condition today, and every item below its reorder level.",
+    "dispensing": "Medicine issued to patients inside the range, and which medicines moved most.",
     "sms": "SMS broadcast activity inside the range, and all time.",
     "notifications": "SMS broadcast activity inside the range, and all time.",
 }
@@ -137,7 +144,13 @@ SECTION_UNTRACKED = {
     "vaccination": ("population", "campaigns"),
     "seniors": ("prenatal",),
     "programs": ("programs",),
-    "inventory": ("dispensing",),
+    # "inventory" used to be responsible for stating ("dispensing",) here -- that
+    # medicine leaving the shelf was not recorded and units dispensed could not be
+    # recovered. It is recorded now, on its own sheet, so the reason is gone from
+    # routes/report_views.UNTRACKED and the mapping to it goes with it. A key
+    # listed here that the context no longer holds would be dropped silently by
+    # _not_tracked_sheet()'s `if key in untracked` guard, which is exactly the
+    # kind of quiet nothing worth removing deliberately instead.
     "sms": ("sms",),
     "notifications": ("delivery",),
 }
@@ -397,6 +410,10 @@ def _summary_sheet(context, sections):
         inventory = context["inventory_report"]
         rows.append(("Inventory items in service", inventory["total_items"], standing))
         rows.append(("Items below reorder level", inventory["low_stock_count"], standing))
+    if "dispensing" in sections:
+        dispensed = context["dispensing_stats"]["window"]
+        rows.append(("Medicine units dispensed", dispensed["units"], ranged))
+        rows.append(("Dispensing events", dispensed["events"], ranged))
     if "programs" in sections:
         for program in context["programs"]:
             rows.append((f"{program['name']} — members", program["count"],
@@ -828,6 +845,57 @@ def _inventory(context):
     ]
 
 
+def _dispensing(context):
+    """Medicine that actually left the shelf inside the range.
+
+    The sheet that could not exist before medicine_dispensing did. Everything on
+    it is ranged -- unlike the inventory sheet directly before it, which reports
+    the shelf as it stands today and says so -- because every row behind these
+    figures carries the date it happened on.
+
+    The ranking is by units rather than by number of issues, and both are
+    printed. They answer different questions: an antibiotic given to forty
+    patients in tens is a different supply problem from a maintenance drug given
+    to two patients in hundreds, and a sheet that showed only one of the two
+    would let a reader draw the wrong conclusion about which shelf to restock.
+    """
+    dispensing = context["dispensing_stats"]
+    window = context["report_window"]
+    scoped = dispensing["window"]
+    span = "{} to {}".format(
+        display_date(window["start"]), display_date(window["end"]))
+
+    return [
+        figures("Medicine dispensed in this range", [
+            ("Units dispensed", scoped["units"], span),
+            ("Dispensing events", scoped["events"],
+             "One event is one medicine issued to one patient at one visit"),
+            ("Patients supplied", scoped["patients"], ""),
+            ("Different medicines dispensed", scoped["medicines"], ""),
+        ]),
+        _trend_block("Units dispensed, by month", scoped["trend"],
+                     [("Units", "units")],
+                     note="Clipped to the range, not rounded out to whole "
+                          "months, so the bars sum to the figure above."),
+        _trend_block("Dispensing events, by month", scoped["trend"],
+                     [("Events", "events")]),
+        table("Most dispensed medicines in this range",
+              ("Medicine", "Units", "Unit", "Issues"),
+              [[entry["medicine_name"], entry["units"], entry["unit"] or "",
+                entry["events"]]
+               for entry in scoped["all_medicines"]],
+              note="Most units first. Named as the dispensing records name them: "
+                   "an inventory item renamed part way through a range appears "
+                   "under both names, because that is what the records say.",
+              empty="No medicine was dispensed inside this range."),
+        figures("All time", [
+            ("Units dispensed", dispensing["total_units"], ""),
+            ("Dispensing events", dispensing["total_events"], ""),
+            ("Patients supplied at least once", dispensing["patients_supplied"], ""),
+        ]),
+    ]
+
+
 def _broadcasts(context):
     broadcasts = context["broadcast_stats"]
     window = context["report_window"]
@@ -864,6 +932,7 @@ _SECTION_BUILDERS = {
     "seniors": _seniors,
     "programs": _programs,
     "inventory": _inventory,
+    "dispensing": _dispensing,
     # One builder, two section names. Screen 10 calls this section "sms" and
     # Screen 18 calls it "notifications"; they are the same figures from
     # get_broadcast_stats() and are deliberately not built twice.

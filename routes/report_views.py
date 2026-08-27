@@ -33,6 +33,7 @@ from models.appointments import get_appointment_report
 from models.broadcasts import get_broadcast_stats
 from models.consultations import get_consultation_stats
 from models.immunizations import get_immunization_coverage
+from models.dispensing import get_dispensing_stats
 from models.inventory import get_inventory_report
 from models.patients import get_patient_report
 from utils.dates import resolve_range, today
@@ -56,9 +57,13 @@ MAX_REPORT_MONTHS = 36
 # templates can print the reason beside the panel rather than each inventing
 # its own wording, and so the decision is written down once:
 #
-#   inventory     inventory_items holds the current stock level only, with no
-#                 per-issue history -- see UNTRACKED["dispensing"]. "Stock in
-#                 March" is not recoverable from it at all.
+#   inventory     inventory_items holds the current stock level only. Dispensing
+#                 is now recorded per issue and IS reported over the range -- see
+#                 the Dispensing section -- but that is a record of what moved,
+#                 not of what the shelf held. Nothing snapshots a stock level, so
+#                 "stock in March" is still not recoverable and the stock panels
+#                 still report today. The two sit next to each other on the
+#                 screen and answer different questions on purpose.
 #   demographics  the age, sex and condition breakdowns describe who is on the
 #                 register today. Narrowed to a range they would silently become
 #                 "the age profile of people who registered in June", which is a
@@ -78,9 +83,9 @@ SNAPSHOT_NOTE = (
 ANALYTICS_REPORT_TYPES = {
     "all": {
         "label": "All Reports",
-        "sections": {"registrations", "appointments", "inventory", "sms", "programs",
-                     "demographics", "seniors", "services", "consultations",
-                     "diagnoses"},
+        "sections": {"registrations", "appointments", "inventory", "dispensing",
+                     "sms", "programs", "demographics", "seniors", "services",
+                     "consultations", "diagnoses"},
         "ranged": True,
     },
     "patients": {
@@ -100,11 +105,25 @@ ANALYTICS_REPORT_TYPES = {
     },
     "inventory": {
         "label": "Medicine Inventory Status",
-        "sections": {"inventory"},
-        # Stock has no history. Generating this type over any range returns the
-        # same figures, and the screen says so rather than letting the operator
-        # conclude the range control is broken.
-        "ranged": False,
+        "sections": {"inventory", "dispensing"},
+        # This flipped from False when dispensing became real, and the reason it
+        # was False is worth keeping alongside the reason it no longer is.
+        #
+        # It said: stock has no history, so generating this type over any range
+        # returns the same figures, and the screen should say so rather than let
+        # an operator conclude the range control is broken. The first half of
+        # that is still exactly true -- inventory_items holds one number per item
+        # and no snapshot of what it held in March -- which is why the stock
+        # panels still carry SNAPSHOT_NOTE.
+        #
+        # What changed is that this report type is no longer made only of those
+        # panels. medicine_dispensing is a movement record with a date on every
+        # row, so "how much left the shelf between these two days" is now a real
+        # question with a real answer, and the figures under this type *do* move
+        # when the dates do. Leaving ranged False would now be the misleading
+        # setting: it would tell an operator the range does nothing here while
+        # half the sheet responded to it.
+        "ranged": True,
     },
     "sms": {
         "label": "SMS Notification Activity",
@@ -212,11 +231,29 @@ UNTRACKED = {
         "it -- but nothing reports back that a handset received a message, so "
         "there is no delivered figure to chart here."
     ),
-    "dispensing": (
-        "Medicine dispensing is not recorded. inventory_items holds the current "
-        "stock level only, with no per-issue history, so units dispensed in a "
-        "month cannot be recovered from it."
-    ),
+    # THERE IS NO "dispensing" ENTRY ANY MORE, AND THAT IS THE POINT.
+    # It said medicine dispensing is not recorded, that inventory_items holds a
+    # stock level with no per-issue history, and that units dispensed in a month
+    # could not be recovered. Every clause of that was true when it was written
+    # and none of it is true now: medicine_dispensing records one row per issue,
+    # with the medicine, the amount, the patient, the visit, the staff member and
+    # the date, and models/dispensing.py get_dispensing_stats() answers exactly
+    # the question the reason said could not be answered.
+    #
+    # So it goes, the way "export_pdf" and "print" went before it -- deleted once
+    # true of nothing, rather than left here describing a state the application
+    # has left. The panels that quoted it are filled with the real series: the
+    # Dispensing section below, the Administrator dashboard's Medicine Units
+    # Dispensed chart, and that dashboard's Medicine column on Recent
+    # Consultations.
+    #
+    # What is NOT claimed by its removal, and is worth stating so nobody has to
+    # re-derive it: supplies and equipment leaving the store are still not
+    # recorded. models/dispensing.py dispenses items of category 'Medicine' only,
+    # for the reason its header gives -- a dose issued to a patient for
+    # consumption is a different event from a consumable used during a procedure.
+    # That is a real remaining gap in stock movement, it is a smaller and
+    # different one, and nothing on these screens claims otherwise.
     "prenatal": (
         "Prenatal enrolment is not recorded. Nothing in the schema marks a "
         "patient as pregnant or stores an expected delivery date, so active "
@@ -296,6 +333,15 @@ def reports_analytics_context(report_type="all", args=None):
         "appointment_report": appointments,
         "immunization_coverage": immunization,
         "inventory_report": get_inventory_report(),
+        # The other half of the inventory story, and the half that has a date on
+        # it. Ranged through the same start/end every other figure here uses, so
+        # the dispensing chart covers exactly the window the letterhead prints.
+        # Shaped like get_consultation_stats() -- all-time totals at the top,
+        # the range's own answers in a `window` block -- so the template reads
+        # the two the same way.
+        "dispensing_stats": get_dispensing_stats(
+            months=TREND_MONTHS, start=start, end=end
+        ),
         # Screen 09's figures. The SMS panel here used to report only its own
         # gap; sends and failures are stored and are now counted over the range,
         # with delivery -- the half that genuinely is not recorded -- still

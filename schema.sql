@@ -253,6 +253,53 @@ CREATE TABLE general_vaccinations (
     FOREIGN KEY (administered_by) REFERENCES users(id) ON DELETE RESTRICT
 );
 
+-- Medicine actually handed to a patient, taken off the shelf.
+--
+-- The other half of Objective 2's "real-time monitoring". inventory_items holds
+-- one number per item, and every other writer moves it up or corrects it
+-- wholesale; this is the only thing in the system that takes units off a shelf,
+-- and models/dispensing.py decrements inventory_items.stock_quantity in the same
+-- transaction that inserts the row here, so the record and the shelf can never
+-- disagree about what left.
+--
+-- One row is HL7 FHIR's MedicationDispense in its ward-stock sense -- issuing a
+-- dose from stock to a patient for consumption -- and, like FHIR's, it is tied to
+-- the encounter that justified it. There is no dispensing path in this system
+-- that is not anchored to a consultation, which is what DOH guidance for a
+-- barangay-level facility requires: medicine given out here is traceable to the
+-- medical supervision that authorised it.
+--
+-- inventory_item_id is the traceability link back to the batch, the expiry date
+-- and the supplier the units came from. medicine_name and unit are a snapshot of
+-- what was actually handed over: the Add / Edit Medicine form can rewrite an
+-- inventory row's name in place, and a history rendered purely by joining would
+-- silently re-label a dose given months ago. Same pair, same reason, as
+-- sms_broadcast_recipients' patient_id alongside recipient_name.
+--
+-- UNIQUE (consultation_id, inventory_item_id): one medicine, one line per visit,
+-- with the amount on it. Dispensing is quantitative and so cannot use the
+-- INSERT OR IGNORE that makes a double-submitted vaccination form harmless -- an
+-- ignored insert here would leave the stock decrement beside it unmatched. So a
+-- double submission is refused rather than absorbed, and this is what it is
+-- refused on. See migrate_add_medicine_dispensing.py for the full reasoning.
+CREATE TABLE medicine_dispensing (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    patient_id INTEGER NOT NULL,
+    consultation_id INTEGER,
+    inventory_item_id INTEGER NOT NULL,
+    medicine_name TEXT NOT NULL,
+    unit TEXT,
+    quantity_dispensed INTEGER NOT NULL CHECK (quantity_dispensed > 0),
+    date_dispensed TEXT NOT NULL,
+    dispensed_by INTEGER NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (consultation_id, inventory_item_id),
+    FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
+    FOREIGN KEY (consultation_id) REFERENCES consultations(id) ON DELETE SET NULL,
+    FOREIGN KEY (inventory_item_id) REFERENCES inventory_items(id) ON DELETE RESTRICT,
+    FOREIGN KEY (dispensed_by) REFERENCES users(id) ON DELETE RESTRICT
+);
+
 CREATE TABLE audit_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
@@ -358,6 +405,13 @@ CREATE INDEX idx_immunizations_consultation ON immunizations(consultation_id);
 -- first; the consultation form reads back what was given during one visit.
 CREATE INDEX idx_general_vaccinations_patient ON general_vaccinations(patient_id, date_administered);
 CREATE INDEX idx_general_vaccinations_consultation ON general_vaccinations(consultation_id);
+-- Patient Profile reads one patient's dispensing history, newest first; the
+-- consultation form and the dashboard's Recent Consultations table read what was
+-- given during one visit; Reports & Analytics ranks the most-dispensed medicines
+-- inside a date range.
+CREATE INDEX idx_medicine_dispensing_patient ON medicine_dispensing(patient_id, date_dispensed);
+CREATE INDEX idx_medicine_dispensing_consultation ON medicine_dispensing(consultation_id);
+CREATE INDEX idx_medicine_dispensing_item ON medicine_dispensing(inventory_item_id, date_dispensed);
 CREATE INDEX idx_audit_logs_user ON audit_logs(user_id, created_at);
 -- The history table is one page of broadcasts, newest first.
 CREATE INDEX idx_sms_broadcasts_sent_at ON sms_broadcasts(sent_at, id);

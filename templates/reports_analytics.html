@@ -398,10 +398,13 @@
             <div class="mini-legend-item"><span class="mini-legend-dot" style="background:#FFEDD5;"></span>Near Expiry ({{ dist.near_expiry }})</div>
             <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--danger);"></span>Expired ({{ dist.expired }})</div>
           </div>
-{#- Stock has no history at all -- inventory_items holds the current level and
-    nothing records an issue, which is the same gap untracked.dispensing names.
-    So this panel answers today and only today, whatever range was generated. #}
-          <div class="snapshot-note">{{ snapshot_note }} {{ untracked.dispensing }}</div>
+{#- Still a snapshot, and the reason is now narrower than it was. It used to be
+    that nothing recorded an issue at all; issues are recorded now. What is still
+    not recorded is a *stock level* at a past date -- inventory_items holds one
+    number per item and nothing snapshots it -- so "what the shelf held in March"
+    remains unanswerable and this panel answers today. Where the medicine went is
+    on the Medicine Dispensed panel below, which is ranged. #}
+          <div class="snapshot-note">{{ snapshot_note }} Dispensing is recorded and is reported over the selected range under Medicine Dispensed; what is not stored is the stock level itself at a past date, so this panel reports the shelf as it stands.</div>
         </div>
       </div>
       <div class="col-lg-6">
@@ -426,6 +429,73 @@
 {%- endif %}
           </div>
           <div class="snapshot-note">{{ snapshot_note }}</div>
+        </div>
+      </div>
+    </div>
+{%- endif %}
+
+{%- if 'dispensing' in sections %}
+    <!-- ROW: MEDICINE DISPENSED — the panel that had no source until
+         medicine_dispensing existed, and the only inventory figure on this
+         screen that answers a range rather than today.
+
+         It sits directly under the stock panels deliberately. Those report the
+         shelf as it stands and carry a snapshot note saying so; this reports
+         what left it and carries none, because every row behind it is dated.
+         Read together they are the two halves of Objective 2's "real-time
+         monitoring": what is there, and what is going. -->
+    <div class="row g-3">
+{%- set disp = dispensing_stats.window %}
+      <div class="col-lg-7">
+        <div class="panel-card">
+          <h2 class="print-only print-section-title">Most Dispensed Medicines</h2>
+          <div class="panel-title no-print">Most Dispensed Medicines</div>
+          <div class="panel-sub">
+            {{ disp.units }} unit{{ '' if disp.units == 1 else 's' }} issued
+            across {{ disp.events }} dispensing event{{ '' if disp.events == 1 else 's' }}
+            to {{ disp.patients }} patient{{ '' if disp.patients == 1 else 's' }}
+            &middot; {{ report_window.start | display_date }}&ndash;{{ report_window.end | display_date }}
+          </div>
+{%- if disp.top_medicines %}
+          <div class="chart-wrap"><canvas id="chartTopMedicines"></canvas></div>
+{{ ct.chart_table('Most dispensed medicines in this range',
+                  disp.top_medicines | map(attribute='medicine_name') | list,
+                  [{'name': 'Units', 'values': disp.top_medicines | map(attribute='units') | list}],
+                  first_head='Medicine') }}
+          <div class="mini-legend no-print">
+{%- for entry in disp.top_medicines %}
+            <div class="mini-legend-item">{{ entry.medicine_name }} &middot; {{ entry.units_text }} in {{ entry.events }} issue{{ '' if entry.events == 1 else 's' }}</div>
+{%- endfor %}
+          </div>
+{%- else %}
+          <div class="panel-sub" style="margin-top:14px;">No medicine was dispensed inside this range. Medicine issued during a consultation is recorded here from the day it is given.</div>
+{%- endif %}
+{#- Ranked by units, with the issue count printed beside it, because the two are
+    different supply questions: forty patients given ten tablets each and two
+    patients given two hundred are not the same shelf problem. #}
+          <div class="snapshot-note">Ranked by units dispensed inside the selected range, most first. Named as the dispensing records name them &mdash; an item renamed part way through a range appears under both names, because that is what the records say.</div>
+        </div>
+      </div>
+      <div class="col-lg-5">
+        <div class="panel-card">
+          <h2 class="print-only print-section-title">Dispensing Totals</h2>
+          <div class="panel-title no-print">Dispensing Totals</div>
+          <div class="panel-sub">Inside the range, and on record altogether</div>
+          <div class="row g-3" style="margin-top:4px;">
+            <div class="col-6">
+              <div class="stat-card"><div class="stat-value">{{ disp.units }}</div><div class="stat-label">Units dispensed</div><div class="stat-trend" style="color:var(--text-muted);">In this range</div></div>
+            </div>
+            <div class="col-6">
+              <div class="stat-card"><div class="stat-value">{{ disp.events }}</div><div class="stat-label">Dispensing events</div><div class="stat-trend" style="color:var(--text-muted);">One medicine, one patient, one visit</div></div>
+            </div>
+            <div class="col-6">
+              <div class="stat-card"><div class="stat-value">{{ disp.medicines }}</div><div class="stat-label">Different medicines</div><div class="stat-trend" style="color:var(--text-muted);">Distinct names issued</div></div>
+            </div>
+            <div class="col-6">
+              <div class="stat-card"><div class="stat-value">{{ dispensing_stats.total_units }}</div><div class="stat-label">Units, all time</div><div class="stat-trend" style="color:var(--text-muted);">{{ dispensing_stats.total_events }} event{{ '' if dispensing_stats.total_events == 1 else 's' }} on record</div></div>
+            </div>
+          </div>
+          <div class="snapshot-note">Every issue was recorded during a consultation and came off Medicine Inventory in the same transaction, so these totals and the stock figures above describe the same movements.</div>
         </div>
       </div>
     </div>
@@ -653,16 +723,27 @@
 {{ ct.chart_table('Consultations written up, by month',
                   ctrend | map(attribute='label') | list,
                   [{'name': 'Consultations', 'values': ctrend | map(attribute='count') | list}]) }}
-          <!-- This panel was "Consultations vs. medicine units dispensed". The
-               consultation series is real; the dispensing series had no source
-               and has been removed rather than left as a plausible second line. -->
-          <div class="untracked mt-3">
-            <span class="material-symbols-outlined">query_stats</span>
-            <div>
-              <div class="untracked-title">Medicine units dispensed is not shown &mdash; it is not recorded</div>
-              <div class="untracked-body">{{ untracked.dispensing }}</div>
-            </div>
+          <!-- This panel was drawn as "Consultations vs. medicine units
+               dispensed", then spent the project as consultations alone with a
+               note saying the second series had no source. It has one now:
+               medicine_dispensing records every issue with the date it happened
+               on. The two series are plotted together again, as the panel was
+               always meant to read — a month with more visits than medicine, or
+               the reverse, is the comparison somebody opens this panel for.
+
+               Second y axis, not a shared one: units and consultations are
+               different quantities in different orders of magnitude, and one
+               axis would flatten the smaller series into the floor. -->
+{%- set dtrend = dispensing_stats.window.trend %}
+          <div class="panel-sub" style="margin-top:12px;">
+            Medicine dispensed over the same months
+            &middot; {{ dispensing_stats.window.units }} unit{{ '' if dispensing_stats.window.units == 1 else 's' }} in this range
+            across {{ dispensing_stats.window.events }} issue{{ '' if dispensing_stats.window.events == 1 else 's' }}
           </div>
+          <div class="chart-wrap"><canvas id="chartDispensed"></canvas></div>
+{{ ct.chart_table('Medicine units dispensed, by month',
+                  dtrend | map(attribute='label') | list,
+                  [{'name': 'Units dispensed', 'values': dtrend | map(attribute='units') | list}]) }}
         </div>
       </div>
 {%- endif %}
@@ -754,8 +835,10 @@
   // already had. A chart and the panel subtitle above it are therefore reading
   // the same numbers, and neither can be updated without the other.
   //
-  // Charts whose data had no source at all (SMS delivery, medicine dispensed,
-  // the prenatal trend) are gone rather than rewired; their panels now say so.
+  // Charts whose data had no source at all (SMS delivery, the prenatal trend)
+  // are gone rather than rewired; their panels now say so. Medicine dispensed
+  // used to be on that list and has come off it: medicine_dispensing records
+  // every issue with a date, so the two series below are as real as the rest.
   const reportData = {
     registrations: {
       labels: {{ patient_report.registration_trend | map(attribute='label') | list | tojson }},
@@ -790,6 +873,15 @@
     seniorConditions: {
       labels: {{ patient_report.senior_conditions.counts | map(attribute='condition') | list | tojson }},
       counts: {{ patient_report.senior_conditions.counts | map(attribute='count') | list | tojson }}
+    },
+    dispensing: {
+      labels: {{ dispensing_stats.window.trend | map(attribute='label') | list | tojson }},
+      units: {{ dispensing_stats.window.trend | map(attribute='units') | list | tojson }},
+      events: {{ dispensing_stats.window.trend | map(attribute='events') | list | tojson }}
+    },
+    topMedicines: {
+      labels: {{ dispensing_stats.window.top_medicines | map(attribute='medicine_name') | list | tojson }},
+      units: {{ dispensing_stats.window.top_medicines | map(attribute='units') | list | tojson }}
     }
   };
 
@@ -904,8 +996,9 @@
     options: { indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:countAxisX, y:{grid:{display:false}}} }
   });
 
-  // Consultation Activity (line) — was a combo chart whose second series,
-  // medicine units dispensed, had no source. One real series remains.
+  // Consultation Activity (line) — drawn as a combo chart, then reduced to one
+  // series for the whole project because "medicine units dispensed" had no
+  // source. It has one now, so the panel is a combo chart again.
   draw('chartMonthlyActivity', {
     type: 'line',
     data: {
@@ -917,6 +1010,36 @@
       }]
     },
     options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:countAxis, x:{grid:{display:false}}} }
+  });
+
+  // Medicine Units Dispensed (bar) — its own canvas beneath the consultation
+  // line rather than a second dataset on it. Units and consultations are
+  // different quantities in different orders of magnitude, and sharing one y
+  // axis would flatten whichever is smaller into the floor; a reader comparing
+  // two flat lines would draw the wrong conclusion from a chart that looked
+  // fine. Same months, same labels, so the two read against each other.
+  draw('chartDispensed', {
+    type: 'bar',
+    data: {
+      labels: reportData.dispensing.labels,
+      datasets: [{
+        label:'Units dispensed', data: reportData.dispensing.units,
+        backgroundColor: warning, borderRadius:4
+      }]
+    },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:countAxis, x:{grid:{display:false}}} }
+  });
+
+  // Most Dispensed Medicines (horizontal bar) — ranked by units inside the
+  // range, from models/dispensing.py get_dispensing_stats(). Horizontal because
+  // the labels are medicine names, which do not fit under a vertical axis.
+  draw('chartTopMedicines', {
+    type: 'bar',
+    data: {
+      labels: reportData.topMedicines.labels,
+      datasets: [{ label:'Units', data: reportData.topMedicines.units, backgroundColor: warning, borderRadius:4 }]
+    },
+    options: { indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:countAxisX, y:{grid:{display:false}}} }
   });
 
   // The printed date is stamped when the dialog opens, not at page load: a
