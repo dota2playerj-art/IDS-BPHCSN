@@ -22,6 +22,26 @@ app.db-journal
 app.db-wal
 app.db-shm
 
+# --- Verification screenshots -----------------------------------------------
+# Screenshots taken while click-testing a feature in a real browser. They are
+# kept on the machine as evidence a thing was actually exercised, and they are
+# excluded here for the SAME reason the database backups above are: a screenshot
+# of the Patient Profile is a patient record. The ones from the vaccination
+# correction pass carry a full name, a patient ID, an age, a home address, a
+# contact number and a clinical history, which is more identifying material than
+# a row of app.db holds, not less -- the file format is different and the data is
+# the same. A repository that refuses to hold app.db must refuse to hold a
+# picture of app.db.
+#
+# The folder itself is tracked, and so is its README, so the evidence is
+# discoverable by anyone who needs it and its absence from git is stated rather
+# than left to be discovered. See docs/verification/README.md.
+docs/verification/**/*.jpg
+docs/verification/**/*.jpeg
+docs/verification/**/*.png
+docs/verification/**/*.gif
+docs/verification/**/*.webp
+
 # --- Secrets ----------------------------------------------------------------
 # config.py reads SECRET_KEY from the environment and falls back to a dev value.
 # A real key belongs in a .env that never leaves the machine.
