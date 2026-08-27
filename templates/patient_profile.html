@@ -18,19 +18,84 @@
     background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:24px; margin-bottom:24px;
   }
 
-  /* PROFILE HEADER */
-  .profile-header{display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:20px;}
-  .profile-id-block{display:flex; gap:18px;}
+  /* PROFILE HEADER
+
+     GRID, NOT FLEX, AND THAT IS THE WHOLE FIX.
+     This was `display:flex; flex-wrap:wrap; justify-content:space-between`, and
+     under that rule the identity block and the action buttons were two flex
+     items competing for one line. A flex item's base size comes from its
+     content, so the width of the identity block was decided by the longest
+     string inside it -- in practice the patient's ADDRESS, which sets the width
+     of .profile-meta-grid below, which sets the width of the block. Once that
+     width plus the buttons exceeded the card, flex-wrap did what it was asked to
+     and dropped the buttons onto their own row.
+
+     The consequence was a control that moved depending on whose record was open.
+     Measured: a 27-character address needed 1085px of header before the buttons
+     could sit beside it, a 61-character address needed 1310px, and an ordinary
+     1536px-wide window gives 1129px -- between the two. So on one screen, at one
+     window size, Print / Schedule / Edit sat top-right for one patient and a row
+     lower for the next. Nothing about the patient should decide where a button
+     is; a person clicking Edit Profile twice in a row should not have to look
+     for it the second time.
+
+     Two columns, and only the first of them may flex:
+
+         minmax(0,1fr)   the identity block. 1fr so it takes what is left, and
+                         the minmax(0,...) floor is load bearing -- a bare 1fr
+                         still refuses to shrink past its content's min-content
+                         width, which is the same "content decides the width"
+                         behaviour being removed here, just wearing a different
+                         hat.
+         auto            the buttons, sized to themselves and nothing else. They
+                         are no longer in a wrapping context, so no amount of
+                         text on the left can move them.
+
+     A long address now wraps inside its own cell, which is what it should
+     always have done -- the record stays complete and the layout stays put.
+
+     There is deliberately no media query. This project has none outside the
+     print stylesheet and is worked on desktop; adding a breakpoint here would
+     invent a responsive convention for one card. It degrades without one: `auto`
+     is min-content..max-content, so on a genuinely narrow card the button column
+     shrinks and the buttons stack within it rather than overflowing. Where they
+     stack is still decided by the window, never by the patient. */
+  .profile-header{
+    display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:start; gap:20px;
+  }
+  /* min-width:0 twice, for the same reason the minmax(0,...) above exists: a
+     flex item and a grid item both default to a min-content floor, and either
+     one left at `auto` would let a long address push the whole column wide again
+     from the inside. */
+  .profile-id-block{display:flex; gap:18px; min-width:0;}
+  .profile-id-block > div{min-width:0;}
   .profile-avatar{
     width:76px; height:76px; border-radius:50%; background:var(--teal-light); color:var(--teal-dark);
     display:flex; align-items:center; justify-content:center; font-weight:700; font-size:24px; flex-shrink:0;
   }
-  .profile-name{font-size:22px; font-weight:700; color:var(--text-dark); display:flex; align-items:center; gap:10px;}
+  /* flex-wrap so a long name takes a second line and carries its status badge
+     with it, instead of the badge being pushed out of the card. */
+  .profile-name{font-size:22px; font-weight:700; color:var(--text-dark); display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
   .profile-id{font-size:13px; color:var(--text-muted); margin-top:2px;}
-  .profile-meta-grid{display:grid; grid-template-columns:repeat(4,auto); gap:22px 32px; margin-top:16px;}
+  /* auto-fit rather than a fixed 4, so the grid answers for its own narrowness
+     instead of shredding every label to fit four columns into space that only
+     holds two. At the widths this system is actually worked on it still lays out
+     as four columns exactly as before -- the 100px floor is chosen so four
+     survive down to a ~430px text column, which is what a 1536px window gives --
+     and below that it drops to two wide columns rather than four unreadable
+     ones. The Address keeps `grid-column:span 2`, which is a full row when there
+     are two columns and half a row when there are four, so it is never orphaned
+     into an implicit column. */
+  .profile-meta-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(100px,1fr)); gap:22px 32px; margin-top:16px;}
+  .meta-item{min-width:0;}
   .meta-item .meta-label{font-size:11.5px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.04em; font-weight:600;}
-  .meta-item .meta-value{font-size:14px; color:var(--text-dark); font-weight:600; margin-top:2px;}
-  .profile-actions{display:flex; gap:10px; flex-wrap:wrap;}
+  /* overflow-wrap catches the case wrapping cannot: a single unbroken token
+     longer than its cell -- a mistyped address with no spaces, say. It breaks
+     rather than overflowing the card. */
+  .meta-item .meta-value{font-size:14px; color:var(--text-dark); font-weight:600; margin-top:2px; overflow-wrap:break-word;}
+  /* justify-content keeps them against the right edge in the narrow case where
+     the column has shrunk and they have stacked. */
+  .profile-actions{display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end;}
 
   .btn-ghost-ids{
     background:transparent; border:1px solid var(--border-color); color:var(--text-dark); border-radius:10px; padding:10px 16px;
