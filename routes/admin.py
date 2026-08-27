@@ -81,6 +81,7 @@ from routes.roster_export import (
     user_roster_workbook,
 )
 from routes.user_views import user_management_context
+from routes.vaccination_correction_views import process_vaccination_correction
 from utils.security import login_required, role_required
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
@@ -199,6 +200,36 @@ def export_patient_selection_pdf():
 def archive_patients():
     flash(process_archive_patients(request.form))
     return redirect(url_for("admin.patient_records"))
+
+
+# Correcting one recorded vaccination -- an EPI dose or one given outside that
+# schedule. POST only, like archive_patients above and for the same reason: this
+# changes a clinical record, so there is no URL anyone can navigate to.
+#
+# Reachable only from the Patient Profile's Immunization Record tab, never from
+# the consultation form. That separation is the point of the whole path and
+# routes/vaccination_correction_views.py's header sets out why: the recording
+# form is worked at speed with a patient in the room, and a correction has to be
+# a deliberate act on a screen where records are being reviewed.
+#
+# A Barangay Official is stopped by role_required and lands on their own
+# dashboard, the same bounce every other Admin-only view gives them -- and they
+# have no Patient Profile to reach this from in the first place.
+@admin_bp.route('/patient_profile/<int:patient_id>/correct-vaccination', methods=["POST"])
+@login_required
+@role_required("Admin")
+def correct_vaccination(patient_id):
+    corrected_for, message = process_vaccination_correction(
+        request.form, session.get("user_id"), ip_address=request.remote_addr
+    )
+    flash(message)
+    # The record's own patient wins over the one in the URL. The id in the path
+    # is what the page was rendered for; the id the correction resolved is read
+    # from the stored row, so a mismatched or stale URL cannot land the operator
+    # on a profile that is not the one they just changed.
+    return redirect(url_for(
+        "admin.patient_profile", patient_id=corrected_for or patient_id, tab="vaccine"
+    ))
 
 
 @admin_bp.route('/patient_profile/<int:patient_id>')

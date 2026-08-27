@@ -300,6 +300,12 @@ def get_immunization_status(patient, on_date=None, records=None):
             "badge_class": STATUS_BADGE_CLASS[status],
             "needs_attention": status in NEEDS_ATTENTION,
             "given": given is not None,
+            # The immunizations row behind this scheduled dose, when one exists.
+            # Carried so the Patient Profile's Correct action can name the record
+            # it means -- the (code, dose) pair identifies the dose in the
+            # schedule, but the correction endpoint has to be handed the row's
+            # own id, because correcting a dose may change that very pair.
+            "record_id": given["id"] if given else None,
             "date_administered": given["date_administered"] if given else None,
             "administered_by_name": given["administered_by_name"] if given else None,
             "consultation_id": given["consultation_id"] if given else None,
@@ -718,3 +724,91 @@ def remove_immunizations(patient_id, dose_keys, consultation_id):
     conn.commit()
     conn.close()
     return removed
+
+
+def get_immunization_by_id(record_id):
+    """One recorded dose by primary key, or None. The correction path's first read.
+
+    Returns the stored row plus the name of whoever administered it, because a
+    correction's audit entry has to say who recorded the dose originally --
+    exactly as a consultation edit names who wrote the visit up. The patient is
+    deliberately NOT joined here: the caller resolves them through
+    models.patients.get_patient_by_id() so a corrected record is named by the
+    same full_name builder every other screen uses, rather than by a second
+    concatenation in SQL that could spell the same person differently.
+    """
+    conn = get_db()
+    row = conn.execute(
+        """
+        SELECT i.id, i.patient_id, i.consultation_id, i.vaccine_code, i.dose_number,
+               i.date_administered, i.administered_by, i.notes, i.created_at,
+               u.full_name AS administered_by_name
+        FROM immunizations i
+        JOIN users u ON u.id = i.administered_by
+        WHERE i.id = ?
+        """,
+        (record_id,),
+    ).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def correct_immunization(record_id, vaccine_code, dose_number, date_administered):
+    """Correct one recorded dose's vaccine, dose number and date. Deliberate path.
+
+    Returns "corrected", "missing" or "duplicate". Never removes the row: this
+    is the correction capability routes/consultation_views.py's
+    _apply_immunization_edit() says belongs on a path of its own, and a
+    correction moves a record's field values rather than making the record go
+    away.
+
+    THE DUPLICATE CHECK AND THE UPDATE SHARE ONE CONNECTION ON PURPOSE.
+    The table's UNIQUE (patient_id, vaccine_code, dose_number) means correcting
+    a dose onto a (vaccine, dose) the same child already has on file is a
+    collision, and it is a collision worth naming rather than letting SQLite
+    raise: "Pentavalent dose 2 is already recorded for this child" tells the
+    operator what to do next, and IntegrityError does not. Checking in the same
+    connection that then writes is what keeps the answer true at the moment the
+    write happens rather than a moment before it.
+
+    The patient is never moved. A record that was filed against the wrong
+    *patient* is not a field-value correction -- it is one child's record
+    claiming another child's vaccination, and undoing that means removing a row
+    from one history and adding it to another. That is a different, larger
+    action than this one and it is not offered here; what this fixes is the
+    wrong vaccine, the wrong dose number or the wrong date on a record that is
+    on the right patient.
+    """
+    day = date_administered
+    day = day.isoformat() if hasattr(day, "isoformat") else str(day)
+
+    conn = get_db()
+    row = conn.execute(
+        "SELECT patient_id FROM immunizations WHERE id = ?", (record_id,)
+    ).fetchone()
+    if row is None:
+        conn.close()
+        return "missing"
+
+    clash = conn.execute(
+        """
+        SELECT id FROM immunizations
+         WHERE patient_id = ? AND vaccine_code = ? AND dose_number = ? AND id <> ?
+        """,
+        (row["patient_id"], vaccine_code, dose_number, record_id),
+    ).fetchone()
+    if clash is not None:
+        conn.close()
+        return "duplicate"
+
+    conn.execute(
+        """
+        UPDATE immunizations
+           SET vaccine_code = ?, dose_number = ?, date_administered = ?
+         WHERE id = ?
+        """,
+        (vaccine_code, dose_number, day, record_id),
+    )
+    conn.commit()
+    conn.close()
+    return "corrected"

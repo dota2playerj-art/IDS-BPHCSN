@@ -68,6 +68,7 @@ from routes.patient_views import (
     registered_patient_name,
     save_and_register_another_requested,
 )
+from routes.vaccination_correction_views import process_vaccination_correction
 from utils.security import login_required, role_required
 
 staff_bp = Blueprint("staff", __name__, url_prefix="/staff")
@@ -178,6 +179,30 @@ def staff_export_patient_selection_pdf():
 def staff_archive_patients():
     flash(process_archive_patients(request.form))
     return redirect(url_for("staff.staff_patient_records"))
+
+
+# The Health Center Staff copy of the correction endpoint. Named apart from the
+# Admin one so the flat endpoint namespace in utils/endpoints.py stays
+# unambiguous, and guarded the same way every other Staff view is.
+#
+# Both roles hold this because both record vaccinations: the health worker who
+# ticked the wrong box is the person who will notice, and making them fetch an
+# administrator to fix a typed date is how a wrong clinical record stays wrong.
+# One shared process_vaccination_correction() serves both, so neither role's
+# copy can validate or audit a correction differently from the other's.
+@staff_bp.route('/patient_profile/<int:patient_id>/correct-vaccination', methods=["POST"])
+@login_required
+@role_required("Health Staff")
+def staff_correct_vaccination(patient_id):
+    corrected_for, message = process_vaccination_correction(
+        request.form, session.get("user_id"), ip_address=request.remote_addr
+    )
+    flash(message)
+    return redirect(url_for(
+        "staff.staff_patient_profile",
+        patient_id=corrected_for or patient_id,
+        tab="vaccine",
+    ))
 
 
 @staff_bp.route('/patient_profile/<int:patient_id>')

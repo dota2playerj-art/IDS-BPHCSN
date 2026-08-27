@@ -34,6 +34,13 @@ MODULE_CONSULTATIONS = "Consultation Records"
 MODULE_PATIENTS = "Patient Records"
 MODULE_INVENTORY = "Medicine Inventory"
 MODULE_APPOINTMENTS = "Appointment Scheduling"
+# The two immunisation tables, under one pill. Both halves of the Patient
+# Profile's Immunization Record tab write here: the DOH EPI doses and the
+# vaccinations given outside that schedule. One module rather than two because
+# the question this pill answers is "which screen was touched", and those two
+# lists are one screen -- the trail keeps them apart where it matters, in the
+# activity phrase, which names which kind of record moved.
+MODULE_IMMUNIZATIONS = "Immunization Records"
 MODULE_SMS = "SMS Notifications"
 # Sign-ins and refused sign-ins. Its own module rather than folded into one of
 # the record modules above, because it answers a different question: those say
@@ -45,6 +52,28 @@ MODULE_AUTH = "Authentication"
 # Activity phrases, in the same voice as the ones on that screen ("Updated
 # patient record", "Updated stock quantity").
 ACTION_CONSULTATION_UPDATED = "Updated consultation record"
+# The two correction phrases, written from routes/vaccination_correction_views.py
+# when a recorded vaccination's own field values are put right.
+#
+# "Corrected", not "Updated", and the difference is the whole point of the path
+# that writes these. Every other record in this system is edited through the form
+# that created it; a vaccination is not, because both entry forms are deliberately
+# add-only -- see routes/consultation_views.py _apply_immunization_edit(). A
+# correction is therefore a rarer and more deliberate act than an edit, reached
+# from a different screen behind its own confirmation, and the trail says so in
+# the one word an administrator scanning it will actually read.
+#
+# THEY ARE TWO PHRASES RATHER THAN ONE FOR THE REASON ACTION_LOGIN_BLOCKED IS
+# SEPARATE FROM ACTION_LOGIN_FAILED. Both sentences are about a vaccination
+# record, and collapsing them would lose the distinction that decides what a
+# reader does next. An EPI dose is graded against the national schedule: moving
+# its date moves whether a child reads as Due Now or Overdue on every screen that
+# counts them. A vaccination outside that schedule is graded against nothing, so
+# correcting one changes a history and no status anywhere. An administrator
+# asking "did a correction change who is showing as a defaulter?" needs those two
+# to look different in a list, not to be filtered apart by reading each entry.
+ACTION_IMMUNIZATION_CORRECTED = "Corrected EPI immunisation record"
+ACTION_GENERAL_VACCINATION_CORRECTED = "Corrected other vaccination record"
 # A broadcast is not editable, so unlike the consultation entry above there is no
 # before-and-after to describe. What earns its place in `details` instead is the
 # message itself, who it reached, and whether it was actually transmitted -- an

@@ -32,6 +32,7 @@ from models.patients import (
     update_patient,
     validate_patient_form,
 )
+from routes.vaccination_correction_views import correction_options
 from utils.context import HEADER_SEARCH_MAX
 
 # Bulk status changes are restricted to a selection that is already all on the
@@ -448,6 +449,13 @@ def patient_profile_context(patient_id):
         "general_vaccinations_by_consultation": _general_by_consultation(
             general_vaccinations
         ),
+        # The vocabularies the Correct dialog offers -- the EPI schedule's dose
+        # list, the common vaccine names, the dose range and today's date as the
+        # picker's ceiling. Read from
+        # routes/vaccination_correction_views.correction_options() rather than
+        # assembled here, so the dialog cannot offer a value the endpoint behind
+        # it would refuse, or omit one it would accept.
+        "correction": correction_options(),
     }
 
 

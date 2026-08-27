@@ -130,13 +130,25 @@ def vaccination_label(vaccine_name, dose_number):
     return "{} dose {}".format(name, dose_number)
 
 
-def _clean_name(raw):
-    """Collapse a typed vaccine name to the single form that gets stored."""
+def clean_vaccine_name(raw):
+    """Collapse a typed vaccine name to the single form that gets stored.
+
+    Public rather than module-private because it now has a second caller. The
+    correction path in routes/vaccination_correction_views.py cleans a corrected
+    name through this exact function rather than through a copy of it, so a
+    vaccine name put right months later is normalised the same way the one first
+    recorded was -- a correction must not be a route around the validation the
+    original entry passed.
+    """
     return " ".join(str(raw or "").split())[:MAX_NAME_LENGTH]
 
 
-def _clean_dose(raw):
-    """'3' -> (3, True); '' -> (None, True); anything else -> (None, False)."""
+def clean_dose_number(raw):
+    """'3' -> (3, True); '' -> (None, True); anything else -> (None, False).
+
+    Public for the reason clean_vaccine_name() above is: the correction dialog
+    range-checks a corrected dose number through this same function.
+    """
     text = str(raw or "").strip()
     if not text:
         return None, True
@@ -186,7 +198,7 @@ def parse_general_vaccinations(form_data):
     it is trusted.
     """
     ticked = _ticked_keys(form_data)
-    other_name = _clean_name(form_data.get(OTHER_NAME_FIELD))
+    other_name = clean_vaccine_name(form_data.get(OTHER_NAME_FIELD))
 
     entries, errors = [], {}
 
@@ -201,7 +213,7 @@ def parse_general_vaccinations(form_data):
         else:
             name = VACCINE_NAMES[key]
 
-        dose_number, ok = _clean_dose(form_data.get(dose_field(key)))
+        dose_number, ok = clean_dose_number(form_data.get(dose_field(key)))
         if not ok:
             low, high = DOSE_RANGE
             errors[dose_field(key)] = (
@@ -310,3 +322,90 @@ def record_general_vaccinations(patient_id, entries, administered_by,
     conn.commit()
     conn.close()
     return stored
+
+
+def get_general_vaccination_by_id(record_id):
+    """One recorded vaccination by primary key, or None.
+
+    The mirror of models.immunizations.get_immunization_by_id(), down to what it
+    deliberately leaves out: the patient is resolved by the caller through
+    models.patients.get_patient_by_id() so a corrected record is named by the
+    same full_name builder every other screen uses.
+    """
+    conn = get_db()
+    row = conn.execute(
+        """
+        SELECT g.id, g.patient_id, g.consultation_id, g.vaccine_name, g.dose_number,
+               g.date_administered, g.administered_by, g.created_at,
+               u.full_name AS administered_by_name
+        FROM general_vaccinations g
+        JOIN users u ON u.id = g.administered_by
+        WHERE g.id = ?
+        """,
+        (record_id,),
+    ).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def correct_general_vaccination(record_id, vaccine_name, dose_number, date_administered):
+    """Correct one recorded vaccination's name, dose number and date.
+
+    Returns "corrected", "missing" or "duplicate", exactly as
+    models.immunizations.correct_immunization() does -- one vocabulary for both
+    halves of the correction path, so the shared flow that calls them does not
+    have to know which table it is talking to.
+
+    The duplicate this one can hit is a different constraint from the EPI table's
+    and catches a different mistake. Here it is UNIQUE (patient_id, vaccine_name,
+    date_administered): correcting a row onto a vaccine and date the patient
+    already has on file would be claiming the same shot twice. The dose number is
+    outside the constraint on purpose -- influenza recurs yearly and a Td booster
+    a decade later is a new dose, not a duplicate, so the date is what makes a row
+    unique here. See migrate_add_general_vaccinations.py.
+
+    THIS FILE NOW HAS A WRITER THAT IS NOT AN INSERT, AND THAT IS A CHANGE WORTH
+    NAMING. Until now the module's only writer was record_general_vaccinations(),
+    and routes/consultation_views.py's _apply_general_vaccination_edit() said in
+    as many words that there is no removal function here at all -- a step further
+    than the EPI module goes -- because "an unused DELETE is a thing that can be
+    called by mistake". That still holds: there is no DELETE here and this is not
+    one. An UPDATE that moves three named columns on a row that keeps existing is
+    the correction the add-only forms deliberately left to a path of its own, and
+    the row survives it. Nothing in this module can make a vaccination record
+    disappear.
+    """
+    day = date_administered
+    day = day.isoformat() if hasattr(day, "isoformat") else str(day)
+
+    conn = get_db()
+    row = conn.execute(
+        "SELECT patient_id FROM general_vaccinations WHERE id = ?", (record_id,)
+    ).fetchone()
+    if row is None:
+        conn.close()
+        return "missing"
+
+    clash = conn.execute(
+        """
+        SELECT id FROM general_vaccinations
+         WHERE patient_id = ? AND vaccine_name = ? AND date_administered = ?
+           AND id <> ?
+        """,
+        (row["patient_id"], vaccine_name, day, record_id),
+    ).fetchone()
+    if clash is not None:
+        conn.close()
+        return "duplicate"
+
+    conn.execute(
+        """
+        UPDATE general_vaccinations
+           SET vaccine_name = ?, dose_number = ?, date_administered = ?
+         WHERE id = ?
+        """,
+        (vaccine_name, dose_number, day, record_id),
+    )
+    conn.commit()
+    conn.close()
+    return "corrected"

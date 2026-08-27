@@ -49,6 +49,13 @@ def inject_role_context():
             "dashboard_endpoint": "staff_dashboard",
             "patient_records_endpoint": "staff_patient_records",
             "patient_profile_endpoint": "staff_patient_profile",
+            # Correcting one recorded vaccination from the profile's Immunization
+            # Record tab. Present for exactly the two roles that record
+            # vaccinations in the first place -- the Barangay Official has no
+            # Patient Profile at all, so the name is simply absent for them and
+            # a shared template reusing it would fail loudly rather than emit a
+            # URL they bounce off.
+            "correct_vaccination_endpoint": "staff_correct_vaccination",
             "register_patient_endpoint": "staff_register_patient",
             "archive_patients_endpoint": "staff_archive_patients",
             "medicine_inventory_endpoint": "staff_medicine_inventory",
@@ -89,6 +96,7 @@ def inject_role_context():
             "dashboard_endpoint": "admin_dashboard",
             "patient_records_endpoint": "patient_records",
             "patient_profile_endpoint": "patient_profile",
+            "correct_vaccination_endpoint": "correct_vaccination",
             "register_patient_endpoint": "register_patient",
             "archive_patients_endpoint": "archive_patients",
             "medicine_inventory_endpoint": "medicine_inventory",

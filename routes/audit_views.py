@@ -6,10 +6,26 @@ and the shape of the screen is one readable thing in one place.
 
 WHAT THIS SCREEN CAN AND CANNOT SHOW
 ------------------------------------
-audit_logs has three writers today: the consultation edit path in
+audit_logs has four writers today: the consultation edit path in
 routes/consultation_views.py, the broadcast send path in
-routes/broadcast_views.py, and the login route in routes/auth.py. Everything
-they write is shown here in full.
+routes/broadcast_views.py, the login route in routes/auth.py, and the
+vaccination correction path in routes/vaccination_correction_views.py.
+Everything they write is shown here in full.
+
+THE FOURTH WRITER IS THE FIRST THAT IS NOT AN EDIT, A MESSAGE OR AN ACCESS
+--------------------------------------------------------------------------
+It is a correction, and the trail says so in its own word. Both places a
+vaccination can be entered are deliberately add-only -- a recorded dose is shown
+as locked fact rather than as a checkbox, because an absent checkbox is not
+evidence a child was never vaccinated -- so a wrongly recorded vaccine, dose or
+date is put right on a separate, confirmed path reached from the Patient Profile
+and nowhere else. Every correction writes one entry here under
+"Immunization Records", naming the record, the patient, who recorded it
+originally, and each field that moved with both of its values. The two activity
+phrases stay apart because an EPI dose is graded against the national schedule
+and a vaccination outside it is graded against nothing: moving an EPI date moves
+who reads as Due Now or Overdue, and a reader scanning for that must not have to
+open each entry to tell the two apart.
 
 THE THIRD WRITER IS NEW, AND IT CHANGED WHAT THIS SCREEN CAN SAY
 -----------------------------------------------------------------
@@ -54,6 +70,7 @@ from models.audit import (
     ACTION_LOGIN_SUCCESS,
     ACTION_SESSION_REVOKED,
     MODULE_AUTH,
+    MODULE_IMMUNIZATIONS,
     MODULE_SMS,
     count_audit_logs,
     get_audit_logs,
@@ -197,6 +214,14 @@ _ICONS = {
 _MODULE_ICONS = {
     MODULE_SMS: "campaign",
     MODULE_AUTH: "shield_person",
+    # A correction to a vaccination record. The default edit_note pencil would
+    # be true but uninformative here -- these entries are the ones a reviewer
+    # goes looking for, and the tab they came from is labelled with this same
+    # glyph on the Patient Profile, so the two read as one place. Verified
+    # present in static/fonts/material-symbols-outlined.woff2: that file is a
+    # fixed subset and a ligature it does not carry renders as its own literal
+    # name, and `vaccines` is already drawn on the profile's tab strip.
+    MODULE_IMMUNIZATIONS: "vaccines",
 }
 
 

@@ -1,5 +1,15 @@
 {% extends "base.html" %}
 {% set active_nav = "patient_records" %}
+{#- Whether this render may offer the Correct action on a vaccination record.
+
+    It is a test for the endpoint's existence, not a role name. utils/context.py
+    hands `correct_vaccination_endpoint` to exactly the two roles whose blueprint
+    registers a correction route -- Administrator and Health Center Staff -- and
+    to nobody else, so the control is offered precisely where a POST would be
+    admitted. Asking "is there a URL for this?" rather than "is this an admin?"
+    is what keeps the button and the guard from ever disagreeing: adding or
+    withdrawing the endpoint moves both at once. #}
+{% set can_correct = correct_vaccination_endpoint is defined %}
 {% block title %}IDS-BPHCSN | Patient Profile{% endblock %}
 
 {% block styles %}
@@ -92,6 +102,27 @@
   }
   .action-icon:hover{background:var(--bg); color:var(--teal-dark);}
 
+  /* The Correct dialog's fields. Same shapes Register Patient and Add/Edit
+     Medicine give theirs -- 48px tall, 12px radius, the teal focus ring -- so a
+     correction is typed into controls the operator has already used elsewhere
+     rather than into a form that looks like a different application. */
+  label.field-label{font-size:13px; font-weight:600; color:var(--text-dark); margin-bottom:6px; display:inline-block;}
+  .form-control, .form-select{
+    height:48px; border-radius:12px; border:1px solid var(--border-color); font-size:14px; color:var(--text-dark);
+  }
+  .form-control:focus, .form-select:focus{
+    border-color:var(--teal); box-shadow:0 0 0 3px rgba(22,155,146,0.12);
+  }
+  .field-hint{font-size:12px; color:var(--text-muted); margin-top:4px;}
+  /* The "this will be logged" notice. Amber rather than red: a correction is a
+     legitimate act, not a warning -- what the box says is that it leaves a
+     permanent trace, which is a fact about the action and not a reason to
+     hesitate over it. Same palette as the Due Now panel above it. */
+  .audit-notice{
+    border-radius:12px; border:1px solid #FDE68A; background:#FFFBEB; color:#92400E;
+    padding:12px 14px; font-size:12.5px; display:flex; gap:10px; align-items:flex-start;
+  }
+
   /* TIMELINE */
   .timeline{position:relative; padding-left:28px;}
   .timeline::before{content:''; position:absolute; left:8px; top:6px; bottom:6px; width:2px; background:var(--border-color);}
@@ -146,7 +177,13 @@
   #tab-consult .history-table tbody td:not([colspan]):first-child,
   #tab-consult .history-table tbody td:not([colspan]):last-child,
   #tab-appt .history-table thead th:last-child,
-  #tab-appt .history-table tbody td:last-child{display:none !important;}
+  #tab-appt .history-table tbody td:last-child,
+  /* The three vaccination tables carry an Actions column too, for the same
+     reason and with the same treatment. The button inside it is already hidden
+     by the shared rule against printing controls, which would leave a column of
+     headed blanks; the whole column goes instead. */
+  #tab-vaccine .history-table thead th:last-child,
+  #tab-vaccine .history-table tbody td:last-child{display:none !important;}
 
   /* The identity block at the top of the screen is repeated by the letterhead
      and by Personal Information below it, so the on-screen version goes. */
@@ -666,6 +703,9 @@
                   <th>Date Given</th>
                   <th>Administered By</th>
                   <th>Status</th>
+{%- if can_correct %}
+                  <th class="text-end">Actions</th>
+{%- endif %}
                 </tr>
               </thead>
               <tbody>
@@ -678,6 +718,28 @@
                   <td>{{ item.date_administered | display_date if item.date_administered else '—' }}</td>
                   <td>{{ item.administered_by_name or '—' }}</td>
                   <td><span class="badge-status {{ item.badge_class }}">{{ item.status }}</span></td>
+{%- if can_correct %}
+                  <td class="text-end">
+{#- Only a dose that has actually been recorded has anything to correct. A row
+    that is merely Due or Upcoming is not a record at all -- it is the schedule
+    saying this dose has not happened yet -- and offering Correct on it would
+    suggest a vaccination could be created from here. It cannot: doses are
+    recorded during a consultation, and this path only puts right what that
+    path already wrote. #}
+{%- if item.given %}
+                    <button type="button" class="action-icon" title="Correct this record — {{ item.label }}, given {{ item.date_administered | display_date }}"
+                            data-bs-toggle="modal" data-bs-target="#correctVaccinationModal"
+                            data-kind="{{ correction.epi_kind }}"
+                            data-record-id="{{ item.record_id }}"
+                            data-label="{{ item.label }}"
+                            data-vaccine="{{ item.code }}:{{ item.dose_number }}"
+                            data-date="{{ item.date_administered }}"
+                            data-recorded-by="{{ item.administered_by_name or '' }}"><span class="material-symbols-outlined" style="font-size:18px;">edit</span></button>
+{%- else %}
+                    <span style="color:var(--text-muted); font-size:12px;">&mdash;</span>
+{%- endif %}
+                  </td>
+{%- endif %}
                 </tr>
 {%- endfor %}
               </tbody>
@@ -692,13 +754,29 @@
             <div style="font-size:13.5px; font-weight:600; color:var(--text-dark); margin-bottom:8px;">Other recorded doses</div>
             <div style="overflow-x:auto;">
               <table class="history-table">
-                <thead><tr><th>Vaccine / Dose</th><th>Date Given</th><th>Administered By</th></tr></thead>
+                <thead><tr><th>Vaccine / Dose</th><th>Date Given</th><th>Administered By</th>{% if can_correct %}<th class="text-end">Actions</th>{% endif %}</tr></thead>
                 <tbody>
 {%- for record in immunization.extra_records %}
                   <tr>
                     <td style="font-weight:600;">{{ record.label }}</td>
                     <td>{{ record.date_administered | display_date }}</td>
                     <td>{{ record.administered_by_name }}</td>
+{%- if can_correct %}
+                    <td class="text-end">
+{#- Correctable like any other recorded dose. The dialog adds this row's own
+    vaccine to its list when the current schedule no longer carries it, so the
+    date on a dose from a superseded schedule revision can be put right without
+    the record being forced onto a pairing that would misname what was given. #}
+                      <button type="button" class="action-icon" title="Correct this record — {{ record.label }}, given {{ record.date_administered | display_date }}"
+                              data-bs-toggle="modal" data-bs-target="#correctVaccinationModal"
+                              data-kind="{{ correction.epi_kind }}"
+                              data-record-id="{{ record.id }}"
+                              data-label="{{ record.label }}"
+                              data-vaccine="{{ record.vaccine_code }}:{{ record.dose_number }}"
+                              data-date="{{ record.date_administered }}"
+                              data-recorded-by="{{ record.administered_by_name or '' }}"><span class="material-symbols-outlined" style="font-size:18px;">edit</span></button>
+                    </td>
+{%- endif %}
                   </tr>
 {%- endfor %}
                 </tbody>
@@ -766,6 +844,9 @@
                     <th>Dose No.</th>
                     <th>Date Given</th>
                     <th>Administered By</th>
+{%- if can_correct %}
+                    <th class="text-end">Actions</th>
+{%- endif %}
                   </tr>
                 </thead>
                 <tbody>
@@ -775,6 +856,19 @@
                     <td>{{ record.dose_number if record.dose_number else '&mdash;' | safe }}</td>
                     <td>{{ record.date_administered | display_date }}</td>
                     <td>{{ record.administered_by_name }}</td>
+{%- if can_correct %}
+                    <td class="text-end">
+                      <button type="button" class="action-icon" title="Correct this record — {{ record.label }}, given {{ record.date_administered | display_date }}"
+                              data-bs-toggle="modal" data-bs-target="#correctVaccinationModal"
+                              data-kind="{{ correction.general_kind }}"
+                              data-record-id="{{ record.id }}"
+                              data-label="{{ record.label }}"
+                              data-vaccine-name="{{ record.vaccine_name }}"
+                              data-dose="{{ record.dose_number if record.dose_number else '' }}"
+                              data-date="{{ record.date_administered }}"
+                              data-recorded-by="{{ record.administered_by_name or '' }}"><span class="material-symbols-outlined" style="font-size:18px;">edit</span></button>
+                    </td>
+{%- endif %}
                   </tr>
 {%- endfor %}
                 </tbody>
@@ -869,6 +963,106 @@
       </div>
     </div>
 
+{%- if can_correct %}
+    <!-- CORRECT A VACCINATION RECORD - one dialog for both halves of the
+         Immunization Record tab.
+
+         SAME SHAPE AS PATIENT RECORDS' STATUS CHANGE, DELIBERATELY. Centred
+         dialog, 16px radius, header / body / footer, Cancel on the left and the
+         action on the right, opened by a row control that fills the dialog in
+         from its data- attributes. That screen's own comment explains the two
+         choices copied here: render the whole dialog once and let it configure
+         itself as it opens, rather than building it per row, so the form wiring
+         stays declarative; and put the destructive-ish action behind its own
+         endpoint and its own confirmation rather than inside a general edit
+         form. This is not a new pattern, and it should not be one -- a
+         correction is rare enough that the operator will meet it for the first
+         time in a hurry, and it should look like something they have used.
+
+         ONE DIALOG, TWO KINDS. The EPI half offers the DOH schedule as a closed
+         list, because the schedule is closed; the other half offers a typed name
+         with the common vaccines as suggestions, because that table stores a
+         name and its list is a convenience rather than a limit. Both are in the
+         markup and the one that does not apply is hidden AND disabled as the
+         dialog opens - disabled so that a field the operator cannot see is not
+         quietly submitted alongside the one they filled in.
+
+         The date is outside both groups because it is the one field both kinds
+         share, and it is the field most corrections are actually about. -->
+    <div class="modal fade" id="correctVaccinationModal" tabindex="-1" aria-labelledby="correctVaccinationModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.12);">
+          <form method="post" action="{{ url_for(correct_vaccination_endpoint, patient_id=patient.id) }}" novalidate>
+            <input type="hidden" name="{{ correction.kind_field }}" id="correctKind" value="">
+            <input type="hidden" name="{{ correction.record_field }}" id="correctRecordId" value="">
+            <div class="modal-header">
+              <h5 class="modal-title" id="correctVaccinationModalLabel">Correct Vaccination Record</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <p style="margin-bottom:10px; font-size:13.5px;">
+                This corrects what the record says. The record itself is kept &mdash; nothing is deleted,
+                and it stays on {{ patient.first_name }}'s file under the corrected details.
+              </p>
+              <p id="correctSubject" style="margin-bottom:16px; font-size:13.5px; color:var(--text-muted);"></p>
+
+              <div id="correctEpiFields" style="margin-bottom:16px;">
+                <label class="field-label" for="correctVaccine">Vaccine and dose</label>
+                <select class="form-select" id="correctVaccine" name="{{ correction.vaccine_field }}">
+{%- for dose in correction.epi_doses %}
+                  <option value="{{ dose.key }}">{{ dose.label }}</option>
+{%- endfor %}
+                </select>
+                <div class="field-hint">The DOH Expanded Program on Immunization schedule. Correcting this moves which scheduled dose the record answers for.</div>
+              </div>
+
+              <div id="correctGeneralFields">
+                <div style="margin-bottom:16px;">
+                  <label class="field-label" for="correctVaccineName">Vaccine</label>
+                  <input type="text" class="form-control" id="correctVaccineName" name="{{ correction.name_field }}"
+                         list="correctVaccineNames" maxlength="{{ correction.max_name_length }}" autocomplete="off">
+                  <datalist id="correctVaccineNames">
+{%- for name in correction.common_vaccine_names %}
+                    <option value="{{ name }}"></option>
+{%- endfor %}
+                  </datalist>
+                  <div class="field-hint">The vaccines the health center gives most often are suggested; any other name can be typed.</div>
+                </div>
+                <div style="margin-bottom:16px;">
+                  <label class="field-label" for="correctDose">Dose number</label>
+                  <input type="number" class="form-control" id="correctDose" name="{{ correction.dose_field }}"
+                         min="{{ correction.dose_range[0] }}" max="{{ correction.dose_range[1] }}" step="1" placeholder="Leave blank if none">
+                  <div class="field-hint">Optional. Most of these have no fixed dose count &mdash; a blank is a better record than an invented number.</div>
+                </div>
+              </div>
+
+              <div style="margin-bottom:16px;">
+                <label class="field-label" for="correctDate">Date given</label>
+                <input type="date" class="form-control" id="correctDate" name="{{ correction.date_field }}" max="{{ correction.today }}">
+                <div class="field-hint">The day the vaccine was actually administered. It cannot be in the future or before {{ patient.first_name }} was born.</div>
+              </div>
+
+              <div class="audit-notice">
+                <span class="material-symbols-outlined" style="font-size:18px; margin-top:1px;">history</span>
+                <div>
+                  <strong style="display:block; margin-bottom:2px;">This correction will be logged</strong>
+                  The audit trail will record your name, the time, and every field that changed
+                  with both its old and its new value. That entry cannot be edited or removed.
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn-primary-teal">
+                <span class="material-symbols-outlined" style="font-size:18px;">save</span>Save Correction
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+{%- endif %}
+
     <div class="print-only print-foot">
       Printed from IDS-BPHCSN, Barangay Poblacion Health Center. This is a copy of
       {{ patient.full_name }}'s record ({{ patient.patient_id }}) as held at the time of printing;
@@ -901,6 +1095,92 @@
     if(new URLSearchParams(window.location.search).has('print')){
       window.addEventListener('load', function(){ window.print(); });
     }
+  })();
+
+  // ?tab=vaccine opens the profile with the Immunization Record tab showing.
+  // A correction redirects back here, and landing on Personal Information would
+  // put the flash message about a corrected dose above a tab that does not show
+  // the dose. Reuses the same URLSearchParams read the print flag above uses,
+  // and Bootstrap's own Tab API rather than a second way of switching panes.
+  (function(){
+    var wanted = new URLSearchParams(window.location.search).get('tab');
+    if(!wanted){ return; }
+    var trigger = document.querySelector('#profileTabs [data-bs-target="#tab-' + wanted + '"]');
+    if(trigger && window.bootstrap && bootstrap.Tab){ new bootstrap.Tab(trigger).show(); }
+  })();
+
+  // THE CORRECT DIALOG.
+  //
+  // One dialog serves three tables and two kinds of record, so everything that
+  // differs between them arrives on the button that opened it. This is exactly
+  // how Patient Records' status dialog reads data-patient-status off its own row
+  // control, and for the same reason: the row already knows what it is, and
+  // asking the server again would be a second answer that could differ from the
+  // one on screen.
+  (function(){
+    var modal = document.getElementById('correctVaccinationModal');
+    if(!modal){ return; }
+
+    var kindField    = document.getElementById('correctKind');
+    var recordField  = document.getElementById('correctRecordId');
+    var epiGroup     = document.getElementById('correctEpiFields');
+    var generalGroup = document.getElementById('correctGeneralFields');
+    var vaccineSel   = document.getElementById('correctVaccine');
+    var nameInput    = document.getElementById('correctVaccineName');
+    var doseInput    = document.getElementById('correctDose');
+    var dateInput    = document.getElementById('correctDate');
+    var subject      = document.getElementById('correctSubject');
+
+    // Hidden AND disabled. Hiding alone would still post the inactive half's
+    // fields; the endpoint ignores them, but a form that submits values the
+    // operator was never shown is a form whose submission does not match what
+    // they did, and that is worth not relying on the server to absorb.
+    function setGroup(group, on){
+      group.style.display = on ? '' : 'none';
+      group.querySelectorAll('input, select').forEach(function(field){
+        field.disabled = !on;
+      });
+    }
+
+    modal.addEventListener('show.bs.modal', function(event){
+      var button = event.relatedTarget;
+      if(!button){ return; }
+
+      var kind = button.dataset.kind || '';
+      kindField.value = kind;
+      recordField.value = button.dataset.recordId || '';
+      dateInput.value = button.dataset.date || '';
+
+      var isEpi = kind === '{{ correction.epi_kind }}';
+      setGroup(epiGroup, isEpi);
+      setGroup(generalGroup, !isEpi);
+
+      if(isEpi){
+        var key = button.dataset.vaccine || '';
+        // A dose the current schedule no longer lists is still a real record --
+        // get_immunization_status() reports it under "Other recorded doses" --
+        // and the select must be able to show what it actually says before it
+        // can offer anything else. Its own pairing is added rather than the
+        // dialog silently selecting a different vaccine, which would present a
+        // wrong current value as though it were the stored one.
+        if(key && !vaccineSel.querySelector('option[value="' + key + '"]')){
+          var option = document.createElement('option');
+          option.value = key;
+          option.textContent = (button.dataset.label || key) + ' (not in the current schedule)';
+          vaccineSel.insertBefore(option, vaccineSel.firstChild);
+        }
+        vaccineSel.value = key;
+      } else {
+        nameInput.value = button.dataset.vaccineName || '';
+        doseInput.value = button.dataset.dose || '';
+      }
+
+      // Says what is being corrected, in the words the table used, so the dialog
+      // and the row cannot appear to be about different records.
+      var recordedBy = button.dataset.recordedBy;
+      subject.textContent = 'Correcting: ' + (button.dataset.label || 'this record')
+        + (recordedBy ? ', recorded by ' + recordedBy : '') + '.';
+    });
   })();
 </script>
 {% endblock %}
