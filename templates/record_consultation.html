@@ -719,7 +719,21 @@
           <textarea class="form-control{% if errors.treatment_plan %} is-invalid{% endif %}" name="treatment_plan"
                     placeholder="e.g. Paracetamol 500mg every 6 hours for 3 days; increased fluids; return if fever persists past 3 days">{{ form.treatment_plan or '' }}</textarea>
           {%- if errors.treatment_plan %}<div class="invalid-feedback d-block">{{ errors.treatment_plan }}</div>
-          {%- else %}<div class="form-text-hint">Include any medicines given and their dosage. Stock deduction is not linked to this yet.</div>{% endif %}
+{#- This hint used to end "Stock deduction is not linked to this yet", which was
+    true for the whole life of the project and stopped being true the moment the
+    Medicines Dispensed section above it started writing to Medicine Inventory.
+    Leaving it would have been the worst kind of stale sentence: it sits directly
+    under a field headed "medicines given", and it told the operator the opposite
+    of what the form now does.
+
+    What replaces it is not just a correction but a division of labour, because
+    the two fields genuinely differ. This box is the clinical instruction, in
+    prose, including dosage and duration — the things a patient is told. The
+    section above records the units that physically left the shelf. A course of
+    "three times a day for five days" is written here; the fifteen tablets handed
+    over are recorded there. Saying so stops the two being filled in as though
+    either one were the other. #}
+          {%- else %}<div class="form-text-hint">The instruction itself &mdash; what to take, how much, how often, for how long. The amount actually handed over is recorded under Medicines Dispensed above, which is what moves the stock.</div>{% endif %}
         </div>
 
         <div class="mb-3">
