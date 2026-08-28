@@ -81,16 +81,29 @@ from utils.dates import display_date, resolve_range, today
 # why supplies and equipment are deliberately outside it.
 DISPENSABLE_CATEGORY = "Medicine"
 
-# How many medicine lines the consultation form offers at once.
+# How many medicine lines the form starts with, and the most it will read from
+# one submission.
 #
-# Fixed rather than grown by script on purpose. Four covers what a barangay
-# consultation actually issues -- an antibiotic, something for fever, a
-# maintenance drug and one more -- and a fixed count means the section works with
-# no JavaScript at all, which is the same standing the immunisation and
-# vaccination sections above it have. A visit that genuinely needs a fifth
-# medicine records it by editing the consultation afterwards, which is a path
-# that already exists and is already audited.
-DISPENSE_ROWS = 4
+# The section used to render exactly four lines, fixed, on the argument that four
+# covers what a barangay consultation issues and that a visit needing a fifth
+# could be edited afterwards. Both halves of that were wrong. A patient on
+# maintenance drugs for two chronic conditions who arrives with an infection is
+# an ordinary afternoon at this station, not an edge case; and telling the
+# operator to save the visit and reopen it to finish recording what they have
+# already handed to the patient is a worse answer than one more line.
+#
+# So the form starts at DISPENSE_START_ROWS and grows on request. The starting
+# figure is low because most consultations dispense nothing and most that do
+# dispense one thing -- four blank rows made the common case wear the shape of
+# the rare one. Two lines are server-rendered, so the section still records a
+# consultation with JavaScript off; only the lines past them need the button.
+#
+# DISPENSE_MAX_ROWS is a bound on the parse loop rather than a clinical opinion:
+# parse_dispensing() reads fields by index and something has to stop it. Ten is
+# far past any single visit this station will record, and a ceiling the form
+# never reaches costs nothing.
+DISPENSE_START_ROWS = 2
+DISPENSE_MAX_ROWS = 10
 
 # The largest amount one line may carry. Not a storage limit -- the column would
 # take any integer -- but a typo guard, and the specific typo it is aimed at is a
@@ -120,7 +133,7 @@ def quantity_field(index):
 # Labels for the error summary at the top of the consultation form, which prints
 # `field_labels.get(field, field)` and would otherwise show a raw field name.
 FIELD_LABELS = {}
-for _index in range(DISPENSE_ROWS):
+for _index in range(DISPENSE_MAX_ROWS):
     FIELD_LABELS[item_field(_index)] = "Medicine on line {}".format(_index + 1)
     FIELD_LABELS[quantity_field(_index)] = "Quantity on line {}".format(_index + 1)
 del _index
@@ -292,7 +305,7 @@ def parse_dispensing(form_data):
     `entries` is [{'index', 'item_id', 'quantity'}] for the lines that were
     filled in, in form order. A line with neither field filled is not an entry
     and not an error -- most consultations dispense nothing, and most that do
-    dispense fill one line of four.
+    dispense fill a single line.
 
     `errors` is {field: message}, merged by the caller into the consultation's
     own errors so one refusal summary covers the whole form.
@@ -310,7 +323,10 @@ def parse_dispensing(form_data):
     entries, errors = [], {}
     chosen = {}
 
-    for index in range(DISPENSE_ROWS):
+    # Every index the form could have posted, not the number it started with:
+    # the operator may have asked for more lines, and a line the server declined
+    # to read would be a medicine handed over and not recorded.
+    for index in range(DISPENSE_MAX_ROWS):
         raw_item = str(form_data.get(item_field(index)) or "").strip()
         raw_quantity = str(form_data.get(quantity_field(index)) or "").strip()
 

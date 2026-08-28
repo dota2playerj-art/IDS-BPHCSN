@@ -48,7 +48,10 @@ from models.consultations import (
     validate_consultation_form,
 )
 from models.dispensing import (
-    DISPENSE_ROWS,
+    DISPENSE_MAX_ROWS,
+    DISPENSE_START_ROWS,
+    ITEM_FIELD_PREFIX,
+    QUANTITY_FIELD_PREFIX,
     QUANTITY_RANGE,
     check_dispensing,
     dispensable_items,
@@ -260,18 +263,47 @@ def _dispensing_context(consultation, submitted=None):
                 "item_value": values.get(item_field(index), ""),
                 "quantity_value": values.get(quantity_field(index), ""),
             }
-            for index in range(DISPENSE_ROWS)
+            for index in range(_dispensing_row_count(values))
         ],
         "recorded": recorded,
+        "start_rows": DISPENSE_START_ROWS,
+        "max_rows": DISPENSE_MAX_ROWS,
+        # The two halves of a line's field names, for the script that adds a
+        # line after the page has rendered. Handed over rather than spelled out
+        # in the template, so the name the browser posts and the name
+        # parse_dispensing() reads have one definition -- item_field() -- and
+        # cannot drift apart.
+        "item_prefix": ITEM_FIELD_PREFIX,
+        "quantity_prefix": QUANTITY_FIELD_PREFIX,
         "min_quantity": low,
         "max_quantity": high,
     }
 
 
+def _dispensing_row_count(values):
+    """How many medicine lines to render: the starting number, or more.
+
+    A fresh form gets DISPENSE_START_ROWS and the operator adds the rest with the
+    button. A bounced one has to come back with every line they had asked for,
+    including the ones the button created -- rendering only the first two would
+    silently drop the third medicine from a form the operator is being told to
+    correct, which is the one moment they are least likely to notice it missing.
+
+    Counted from the highest index carrying anything at all, so a line that was
+    half-filled (and is therefore holding an error message of its own) survives
+    the bounce alongside the complete ones.
+    """
+    highest = -1
+    for index in range(DISPENSE_MAX_ROWS):
+        if values.get(item_field(index)) or values.get(quantity_field(index)):
+            highest = index
+    return max(DISPENSE_START_ROWS, highest + 1)
+
+
 def _submitted_dispensing(form_data):
     """What the operator had chosen and typed, for replay through a bounce."""
     values = {}
-    for index in range(DISPENSE_ROWS):
+    for index in range(DISPENSE_MAX_ROWS):
         for field in (item_field(index), quantity_field(index)):
             values[field] = (form_data.get(field) or "").strip()
     return values

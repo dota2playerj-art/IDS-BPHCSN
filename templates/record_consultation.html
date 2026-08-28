@@ -128,6 +128,24 @@
     font-size:13px; color:var(--text-muted); background:var(--bg); border-radius:10px;
     padding:14px 16px; line-height:1.6;
   }
+  /* ADD ANOTHER MEDICINE — dashed and amber. Dashed because it makes a line
+     that is not there yet rather than acting on the record, and amber because
+     it belongs to this card rather than to the teal form around it. It is
+     deliberately quieter than Save: adding a line is not the point of the
+     screen, it is what you do on the afternoon the patient needs three. */
+  .dispense-add-wrap{display:flex; align-items:center; gap:12px; margin-top:14px; flex-wrap:wrap;}
+  .btn-add-line{
+    background:transparent; border:1px dashed #FCD34D; color:#B45309; border-radius:10px;
+    padding:9px 14px; font-size:13px; font-weight:600;
+    display:inline-flex; align-items:center; gap:6px;
+  }
+  .btn-add-line:hover{background:#FFFBEB; border-color:#F59E0B;}
+  .btn-add-line:focus-visible{outline:2px solid #F59E0B; outline-offset:2px;}
+  .btn-add-line .material-symbols-outlined{font-size:18px;}
+  .dispense-add-note{font-size:12.5px; color:var(--text-muted);}
+  /* Both controls are rendered with the hidden attribute; without this the
+     display rules above would win over it and show them anyway. */
+  .btn-add-line[hidden], .dispense-add-note[hidden]{display:none;}
 
   /* FOOTER ACTION BAR */
   .form-actions{
@@ -561,20 +579,60 @@
           </table>
         </div>
 
+{#- Kept to the rules an operator has to act on. The version this replaces
+    argued its own design back at the reader -- why an invented dose number is
+    worse than a blank, why nothing here is graded due or overdue -- which is
+    reasoning that belonged in this comment rather than under the form. Every
+    rule it stated is still stated. #}
         <div class="cohort-note">
-          Leave every box unticked if no vaccination was given. What is ticked is recorded
-          against this consultation and dated {{ visit_date | display_date }}, and appears on
-          {{ patient.first_name }}'s profile under Other Vaccinations.
-          A dose number is only worth filling in where the vaccine actually has one &mdash;
-          a rabies course, say. Most do not, and an invented number is worse than a blank.
-          Nothing here is graded due or overdue: this is a record of what was given, not a
-          schedule.
+          Tick what was given today. Ticked doses are dated {{ visit_date | display_date }},
+          appear under Other Vaccinations on {{ patient.first_name }}'s profile, and need a
+          dose number only where the vaccine has one &mdash; a rabies course, say.
 {%- if consultation %}
-          A vaccination already on file for this visit is shown above as fact and cannot be
-          removed here &mdash; the same rule the immunisation record follows.
+          A vaccination already on file for this visit cannot be removed here.
 {%- endif %}
         </div>
       </div>
+
+{#- ONE definition of a medicine line, rendered twice: once for each line the
+    server puts on the page, and once, blank, inside the <template> the Add
+    button clones. Written as a macro because two hand-kept copies of this
+    markup would be two things to keep in step, and the copy that drifted would
+    be the one nobody looks at -- the clone, which is only ever seen after a
+    click.
+
+    The clone is rendered with no field names and no line number; the script
+    fills both in from the index it is appended at, because only the browser
+    knows how many lines are on the page by then. #}
+{%- macro dispense_row(options, line, item_name, quantity_name, item_value, quantity_value, item_error, quantity_error) %}
+              <tr>
+                <td>
+                  <select class="form-select dispense-select{% if item_error %} is-invalid{% endif %}"
+                          name="{{ item_name }}"
+                          aria-label="Medicine dispensed on line {{ line }}">
+                    <option value="">&mdash; No medicine on this line &mdash;</option>
+{#- Every option carries what is actually on the shelf, so the ceiling is
+    visible before it is hit rather than only in the refusal afterwards. #}
+{%- for option in options %}
+                    <option value="{{ option.id }}"{% if item_value == option.id | string %} selected{% endif %}>{{ option.label }} &mdash; {{ option.stock_text }} in stock</option>
+{%- endfor %}
+                  </select>
+{%- if item_error %}
+                  <div class="invalid-feedback d-block">{{ item_error }}</div>
+{%- endif %}
+                </td>
+                <td>
+                  <input type="text" inputmode="numeric"
+                         class="form-control dispense-qty-input{% if quantity_error %} is-invalid{% endif %}"
+                         name="{{ quantity_name }}" value="{{ quantity_value }}"
+                         maxlength="4" placeholder="&mdash;"
+                         aria-label="Quantity dispensed on line {{ line }}">
+{%- if quantity_error %}
+                  <div class="invalid-feedback d-block">{{ quantity_error }}</div>
+{%- endif %}
+                </td>
+              </tr>
+{%- endmacro %}
 
       <!-- MEDICINES DISPENSED — the other half of Objective 2, and the only
            section on this form that changes a figure on another screen.
@@ -637,39 +695,43 @@
                 <th style="width:170px;">Quantity given</th>
               </tr>
             </thead>
-            <tbody>
+{#- The script reads the field-name halves and the ceiling off this element
+    rather than carrying its own copy of any of them. All three come from
+    models/dispensing.py. #}
+            <tbody id="dispenseRows"
+                   data-item-prefix="{{ dispensing.item_prefix }}"
+                   data-quantity-prefix="{{ dispensing.quantity_prefix }}"
+                   data-max-rows="{{ dispensing.max_rows }}">
 {%- for row in dispensing.rows %}
-              <tr>
-                <td>
-                  <select class="form-select dispense-select{% if errors.get(row.item_field) %} is-invalid{% endif %}"
-                          name="{{ row.item_field }}"
-                          aria-label="Medicine dispensed on line {{ row.index + 1 }}">
-                    <option value="">&mdash; No medicine on this line &mdash;</option>
-{#- Every option carries what is actually on the shelf, so the ceiling is
-    visible before it is hit rather than only in the refusal afterwards. #}
-{%- for option in dispensing.options %}
-                    <option value="{{ option.id }}"{% if row.item_value == option.id | string %} selected{% endif %}>{{ option.label }} &mdash; {{ option.stock_text }} in stock</option>
-{%- endfor %}
-                  </select>
-{%- if errors.get(row.item_field) %}
-                  <div class="invalid-feedback d-block">{{ errors.get(row.item_field) }}</div>
-{%- endif %}
-                </td>
-                <td>
-                  <input type="text" inputmode="numeric"
-                         class="form-control dispense-qty-input{% if errors.get(row.quantity_field) %} is-invalid{% endif %}"
-                         name="{{ row.quantity_field }}" value="{{ row.quantity_value }}"
-                         maxlength="4" placeholder="&mdash;"
-                         aria-label="Quantity dispensed on line {{ row.index + 1 }}">
-{%- if errors.get(row.quantity_field) %}
-                  <div class="invalid-feedback d-block">{{ errors.get(row.quantity_field) }}</div>
-{%- endif %}
-                </td>
-              </tr>
+{{ dispense_row(dispensing.options, row.index + 1, row.item_field, row.quantity_field,
+                row.item_value, row.quantity_value,
+                errors.get(row.item_field), errors.get(row.quantity_field)) }}
 {%- endfor %}
             </tbody>
           </table>
         </div>
+
+        <!-- ADDING A LINE — the section used to render four lines and stop
+             there, so a visit that issued a fifth medicine could not record it
+             without being saved and reopened. It now starts at two and grows on
+             request, up to the ceiling in models/dispensing.py.
+
+             The button is rendered hidden and revealed by the script below. A
+             browser with JavaScript off therefore never shows a control that
+             would do nothing when clicked; it shows the two lines it can use,
+             and the server reads whatever arrives either way. -->
+        <div class="dispense-add-wrap">
+          <button type="button" class="btn-add-line" id="addMedicineLine" hidden>
+            <span class="material-symbols-outlined">add</span>Add another medicine
+          </button>
+          <span class="dispense-add-note" id="dispenseLineCap" hidden>
+            {{ dispensing.max_rows }} medicines is the most one visit can record.
+          </span>
+        </div>
+
+        <template id="dispenseRowTemplate">
+{{ dispense_row(dispensing.options, '', '', '', '', '', none, none) }}
+        </template>
 {%- else %}
         <!-- Nothing on the shelf can be dispensed. Stated rather than shown as
              an empty dropdown, which would read as the feature being broken. -->
@@ -681,18 +743,20 @@
         </div>
 {%- endif %}
 
+{#- Same treatment as the vaccination note above. What went was the argument,
+    not a rule: why expired stock being physically present means stock is not
+    the test, why a dispensing cannot be taken back. Both reasons are written
+    out at length in models/dispensing.py and in the comments on this section,
+    which is where someone asking "why" is; the operator at the form is asking
+    "what happens if I type this". #}
         <div class="cohort-note">
-          Leave every line blank if no medicine was given. What is recorded here comes off
-          Medicine Inventory immediately and is dated {{ visit_date | display_date }}, and
-          appears on {{ patient.first_name }}'s profile under Medicine History.
-          A medicine is refused outright &mdash; not warned about &mdash; if the amount asked for
-          is more than the shelf holds, or if the medicine has expired. Expired stock is
-          physically present, which is exactly why being in stock is not the test.
-          Put the whole amount given at this visit on one line per medicine.
+          Each line comes off Medicine Inventory immediately, is dated
+          {{ visit_date | display_date }}, and appears under Medicine History on
+          {{ patient.first_name }}'s profile. One line per medicine with the whole amount
+          given; a line is refused outright if the amount is more than the shelf holds or
+          the medicine has expired.
 {%- if consultation %}
-          Medicine already dispensed at this visit is shown above as fact and cannot be
-          removed here &mdash; taking it back would mean putting units on the shelf with no
-          batch or expiry behind them.
+          Medicine already dispensed at this visit cannot be removed here.
 {%- endif %}
         </div>
       </div>
@@ -796,4 +860,66 @@
       </div>
 
     </form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // MEDICINES DISPENSED — the lines past the two the server rendered.
+  //
+  // The whole of this script is one button appending one row. What it must not
+  // do is invent anything the server already decides: the field names are built
+  // from the prefixes models.dispensing.item_field() uses, read off the tbody,
+  // and the ceiling is that module's DISPENSE_MAX_ROWS read off the same place.
+  // A second spelling of either here would be a value free to drift from the
+  // one the parser actually reads.
+  //
+  // Nothing is removed. A line added by mistake is left blank, which
+  // parse_dispensing() treats as no line at all -- and a Remove button on a
+  // section that writes to inventory is a control worth not having.
+  (function(){
+    var tbody = document.getElementById('dispenseRows');
+    var proto = document.getElementById('dispenseRowTemplate');
+    var button = document.getElementById('addMedicineLine');
+    var capNote = document.getElementById('dispenseLineCap');
+    // Absent on a visit where nothing can be dispensed: that case renders a
+    // sentence instead of the table, and there is no line to add to it.
+    if(!tbody || !proto || !button){ return; }
+
+    var itemPrefix = tbody.getAttribute('data-item-prefix');
+    var quantityPrefix = tbody.getAttribute('data-quantity-prefix');
+    var maxRows = parseInt(tbody.getAttribute('data-max-rows'), 10) || 0;
+
+    // Also the reveal: the button is rendered hidden, so this is what makes it
+    // appear at all. A bounced form can come back already at the ceiling, which
+    // is why the state is computed rather than assumed on load.
+    function refresh(){
+      var atCap = tbody.rows.length >= maxRows;
+      button.hidden = atCap;
+      if(capNote){ capNote.hidden = !atCap; }
+    }
+
+    function addLine(){
+      if(tbody.rows.length >= maxRows){ refresh(); return; }
+
+      var index = tbody.rows.length;
+      var row = proto.content.firstElementChild.cloneNode(true);
+      var select = row.querySelector('select');
+      var quantity = row.querySelector('input');
+
+      select.name = itemPrefix + index;
+      select.setAttribute('aria-label', 'Medicine dispensed on line ' + (index + 1));
+      quantity.name = quantityPrefix + index;
+      quantity.setAttribute('aria-label', 'Quantity dispensed on line ' + (index + 1));
+
+      tbody.appendChild(row);
+      refresh();
+      // The line was asked for in order to type in it, and a click that leaves
+      // the caret where it was makes the operator hunt for what just appeared.
+      select.focus();
+    }
+
+    button.addEventListener('click', addLine);
+    refresh();
+  })();
+</script>
 {% endblock %}
