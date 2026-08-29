@@ -1145,8 +1145,15 @@ def _appointment_export(context, produced_by):
                 ("In the waiting room", queue_stats["waiting"],
                  f"{queue_stats['ready']} ready to be seen, "
                  f"{queue_stats['still_waiting']} still waiting"),
+                # The room, not this day's rows -- see get_queue_stats(). When
+                # the visit holding it was started on another day the note says
+                # so, rather than letting a report headed with today's date
+                # imply the patient it names arrived today.
                 ("In consultation now", queue_stats["in_consultation"],
-                 queue_stats["active_name"] or "The clinician is free"),
+                 (f"{queue_stats['active_name']} — started "
+                  f"{display_date(queue_stats['active_date'])} and still open"
+                  if queue_stats["active_is_stale"]
+                  else queue_stats["active_name"] or "The clinician is free")),
                 ("Completed today", queue_stats["completed"],
                  f"Of the {queue_stats['total_today']} booked or checked in today"),
                 ("Booked but not yet arrived", queue_stats["not_arrived"],

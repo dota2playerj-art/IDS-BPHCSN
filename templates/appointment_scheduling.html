@@ -301,9 +301,17 @@
           <div class="stat-value">{{ queue_stats.waiting }}</div>
           <div class="stat-label">In the waiting room</div>
           <!-- The whole waiting room above; below, how many of them can actually
-               go in, which under one-at-a-time is never more than one. -->
+               go in, which under one-at-a-time is never more than one.
+
+               The middle branch is what this pass added. While the room is held
+               the first branch is correctly false, and falling straight to "N
+               not yet arrived" left the card saying nothing about the person
+               standing at the desk. Naming who is next and why they are still
+               sitting down is the answer the card is being asked for. -->
           <div class="stat-trend" style="color:var(--text-muted);">
-            {%- if queue_stats.ready %}{{ queue_stats.next_up_name }} can be seen now{% else %}{{ queue_stats.not_arrived }} not yet arrived{% endif -%}
+            {%- if queue_stats.ready %}{{ queue_stats.next_up_name }} can be seen now
+            {%- elif queue_stats.next_up_name %}{{ queue_stats.next_up_name }} is next, once {{ queue_stats.active_name }} is finished
+            {%- else %}{{ queue_stats.not_arrived }} not yet arrived{% endif -%}
           </div>
         </div>
       </div>
@@ -313,9 +321,18 @@
           <div class="stat-value">{{ queue_stats.in_consultation }}</div>
           <div class="stat-label">In Consultation</div>
           <!-- One clinician, so this card is a 0 or a 1 and the line under it can
-               afford to name the person rather than count them. -->
-          <div class="stat-trend" style="color:var(--text-muted);">
-            {%- if queue_stats.active_name %}{{ queue_stats.active_name }}, being seen now
+               afford to name the person rather than count them.
+
+               This counts the ROOM, not today's rows -- get_queue_stats()
+               in_consultation vs in_consultation_today. A visit left open on an
+               earlier day holds the clinician and is refused a Start by the
+               server, so a card headed "In Consultation" reading 0 beside that
+               refusal would be the contradiction this pass exists to remove. It
+               reads 1, the line below says which day it is from, and the banner
+               over the queue carries the two ways to resolve it. -->
+          <div class="stat-trend" style="color:{{ '#B45309' if queue_stats.active_is_stale else 'var(--text-muted)' }};">
+            {%- if queue_stats.active_is_stale %}{{ queue_stats.active_name }} · open since {{ queue_stats.active_date | display_date }}, not in today's queue
+            {%- elif queue_stats.active_name %}{{ queue_stats.active_name }}, being seen now
             {%- elif queue_stats.next_up_name %}Clinician free · {{ queue_stats.next_up_name }} is next
             {%- else %}Clinician free{% endif -%}
           </div>
@@ -463,6 +480,58 @@
           <div class="panel-sub">{{ queue_date | display_date }} &middot; in arrival order, patients in consultation first</div>
         </div>
       </div>
+
+{#- A CONSULTATION LEFT OPEN ON AN EARLIER DAY.
+
+    This table is today's, and the visit holding the room is not in it. Without
+    this banner that state is invisible here and only inferable from the stat
+    card: on 2026-08-29 a visit started at 23:36 the night before was still open,
+    every Start Consultation button was refused by the server, and this screen
+    said nothing about why. The queue is where the desk is standing when it hits
+    that, so this is where it has to be said.
+
+    Both ways out are offered on the row itself rather than described in prose.
+    They are the same two the queue gives any in-progress visit -- write it up,
+    or close it with nothing written -- pointed at an appointment from another
+    day, and they need no new endpoint: complete_consultation() and
+    record_consultation() both take the appointment and guard on its status.
+
+    Nothing here closes it automatically. A visit genuinely still in progress
+    across midnight is a real possibility -- a late delivery, an emergency -- and
+    a timer that completed it would silently discard a record of it. The screen's
+    job is to make the state impossible to miss and trivial to resolve; deciding
+    which of the two resolutions is true is the clinician's. #}
+{%- if queue_stats.active_is_stale %}
+      <div class="alert-ids alert-warning-ids">
+        <span class="material-symbols-outlined">warning</span>
+        <div style="flex:1;">
+          <strong>{{ queue_stats.active_name }}'s consultation is still open from {{ queue_stats.active_date | display_date }}</strong>
+          It was started {{ queue_stats.active_days_open }} day{{ '' if queue_stats.active_days_open == 1 else 's' }} ago
+          ({{ queue_stats.active.reference }}{% if queue_stats.active.arrival_time %}, checked in {{ queue_stats.active.arrival_time }}{% endif %})
+          and was never written up or closed, so it is not in today's queue below.
+          One patient is seen at a time here, so it is still holding the clinician:
+          {% if queue_stats.next_up_name %}{{ queue_stats.next_up_name }} and everyone behind them cannot be started{% else %}nobody else can be started{% endif %}
+          until it is resolved. Write up what happened, or close it with nothing recorded if nothing was.
+          <div class="d-flex gap-2 mt-2 flex-wrap">
+            <a href="{{ url_for(record_consultation_endpoint, appointment_id=queue_stats.active.id) }}"
+               class="btn-primary-teal" style="padding:6px 12px; font-size:12.5px; text-decoration:none;"
+               title="Write up {{ queue_stats.active_name }}'s consultation and close the visit">
+              <span class="material-symbols-outlined" style="font-size:16px;">edit_note</span>Record Consultation
+            </a>
+            <button type="submit" form="completeConsultationForm" name="appointment_id" value="{{ queue_stats.active.id }}"
+                    class="btn-outline-teal" style="padding:6px 12px; font-size:12.5px;"
+                    title="Close {{ queue_stats.active_name }}'s visit without recording a consultation{% if queue_stats.next_up_name %} — {{ queue_stats.next_up_name }} can then be started{% endif %}">
+              <span class="material-symbols-outlined" style="font-size:16px;">check_circle</span>Mark Completed
+            </button>
+            <a href="{{ url_for(patient_profile_endpoint, patient_id=queue_stats.active.patient_id) }}"
+               class="btn-outline-teal" style="padding:6px 12px; font-size:12.5px; text-decoration:none;"
+               title="Open {{ queue_stats.active_name }}'s profile">
+              <span class="material-symbols-outlined" style="font-size:16px;">visibility</span>View Patient
+            </a>
+          </div>
+        </div>
+      </div>
+{%- endif %}
 
       <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-3">
         <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -742,7 +811,7 @@
              or 1, and the summary reads as the real state of the room. -->
         <div class="pg-info">
           <span id="queueShown">{{ queue|length }}</span> of {{ queue|length }} patient{{ '' if queue|length == 1 else 's' }} for today
-          &middot; {{ queue_stats.in_consultation }} in consultation
+          &middot; {{ queue_stats.in_consultation_today }} in consultation
           &middot; {{ queue_stats.ready }} ready to consult
           &middot; {{ queue_stats.still_waiting }} waiting
 {%- if queue_stats.not_arrived %}

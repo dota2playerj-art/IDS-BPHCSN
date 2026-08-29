@@ -134,7 +134,14 @@ def appointment_scheduling_context(month=None, booking=None, reschedule=None,
     dialog it asked for opens on the right row, and the operator is put back on
     the profile when it is done.
     """
-    entries = get_todays_appointments()
+    # The room is resolved once, here, and handed to both the queue and its stat
+    # cards. get_active_consultation() is not scoped to a date -- a visit left
+    # open on an earlier day still holds the clinician, and start_consultation()
+    # refuses on exactly that basis -- so this is the fact the Start Consultation
+    # button has to be offered on if the screen is not to advertise an action the
+    # server will reject. One lookup, one answer, both consumers.
+    active = get_active_consultation()
+    entries = get_todays_appointments(active=active)
 
     # Which children in today's queue are due or overdue for a dose. Read once
     # for the whole roster rather than per row -- get_immunization_alert() reads
@@ -176,7 +183,7 @@ def appointment_scheduling_context(month=None, booking=None, reschedule=None,
 
     return {
         "queue": entries,
-        "queue_stats": get_queue_stats(entries),
+        "queue_stats": get_queue_stats(entries, active=active),
         # The filter panel's two dropdowns, built from the rows in today's queue
         # rather than from APPOINTMENT_TYPES and the status vocabulary. Those
         # list everything that can be booked or reached; offering a service

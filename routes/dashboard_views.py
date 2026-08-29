@@ -200,8 +200,13 @@ def dashboard_context():
     """Everything both dashboards render. Neither adds a figure of its own."""
     reference = today()
 
-    queue = get_todays_appointments()
-    queue_stats = get_queue_stats(queue)
+    # Resolved once and handed to both, for the reason spelled out at the
+    # active-consultation block below: the queue's flow fields, its stat cards
+    # and this dashboard's shortcut all have to be answering from one reading of
+    # who holds the room, or they can contradict each other on the same page.
+    active = get_active_consultation()
+    queue = get_todays_appointments(active=active)
+    queue_stats = get_queue_stats(queue, active=active)
     patient_stats = get_patient_stats()
     consultation_stats = get_consultation_stats(months=TREND_MONTHS)
     dispensing_stats = get_dispensing_stats(months=TREND_MONTHS)
@@ -224,8 +229,8 @@ def dashboard_context():
     # get_active_consultation() is the same call Appointment Scheduling uses to
     # decide who may start a consultation, and it is deliberately not scoped to
     # today -- see its docstring. Reusing it means the dashboard and the queue
-    # can never disagree about whether the room is occupied.
-    active = get_active_consultation()
+    # can never disagree about whether the room is occupied. It is read once at
+    # the top of this function and used here.
 
     return {
         "clinic_date": reference,

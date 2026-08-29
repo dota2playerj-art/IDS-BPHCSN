@@ -276,12 +276,12 @@ _QUEUE_SELECT = """
 """
 
 
-def _apply_queue_flow(entries):
+def _apply_queue_flow(entries, active=None):
     """Add the single-active-consultation fields to an ordered queue.
 
     The clinic sees one patient at a time, so the whole of that rule is decided
-    here, once, from the day's rows -- and every screen, message and stat card
-    reads the answer off these fields rather than working it out again:
+    here, once -- and every screen, message and stat card reads the answer off
+    these fields rather than working it out again:
 
         line_position   place in the waiting line, 1-based; None once seen
         can_start       this patient may be brought in now
@@ -299,9 +299,38 @@ def _apply_queue_flow(entries):
     that is the enforcement Gap 1 was about. It is re-checked in SQL inside
     start_consultation() as well, because a page can go stale between render and
     click.
+
+    WHY "WHO HOLDS THE ROOM" IS ASKED OF THE DATABASE, NOT OF `entries`
+    ------------------------------------------------------------------
+    This used to read the active consultation out of the day's own rows:
+
+        active = next(e for e in entries if e["is_in_consultation"])
+
+    which is the same question start_consultation() asks, but asked of a
+    strictly smaller set. The UPDATE's guard there is
+    `NOT EXISTS (... status = 'In Consultation')` over the whole table, with no
+    date filter, deliberately -- see get_active_consultation(). So the two
+    disagreed for exactly one case, and it was not a hypothetical one: a visit
+    started and never written up stops being in *today's* rows at midnight while
+    still occupying the clinician. On 2026-08-29 the queue showed the room free
+    and offered Start Consultation for a waiting patient, and the server refused
+    the click, because a consultation opened at 23:36 the previous night was
+    still open. The screen was reading one fact and the server another.
+
+    Asking get_active_consultation() closes that by construction: the button is
+    offered on the same fact the UPDATE tests, so the screen cannot advertise an
+    action the server will reject. `active` may be passed in when the caller has
+    already looked it up, so one render resolves the room exactly once and the
+    queue and its stat cards cannot disagree with each other either.
     """
     entries = list(entries)
-    active = next((entry for entry in entries if entry["is_in_consultation"]), None)
+    if active is None:
+        active = get_active_consultation()
+    # Prefer this day's own row for the holder when there is one, so the object
+    # the flow fields were computed against is the same object the table renders.
+    active = next(
+        (entry for entry in entries if entry["is_in_consultation"]), active
+    )
     room_free = active is None
 
     for entry in entries:
@@ -330,12 +359,16 @@ def _apply_queue_flow(entries):
     return entries
 
 
-def get_todays_appointments(on_date=None):
+def get_todays_appointments(on_date=None, active=None):
     """Every appointment for the clinic-local day, in queue order.
 
     Ordering is done in Python rather than SQL because the status ranking is a
     presentation rule, not a property of the data -- putting it in a CASE inside
     the query would hide it from anything else that needs the same order.
+
+    `active` is passed straight to _apply_queue_flow(): a caller that also wants
+    get_queue_stats() should look the room up once and hand it to both, so the
+    table and the cards above it are answering from one reading.
     """
     day = (on_date or today()).isoformat()
     conn = get_db()
@@ -356,7 +389,7 @@ def get_todays_appointments(on_date=None):
             entry["id"],
         )
     )
-    return _apply_queue_flow(entries)
+    return _apply_queue_flow(entries, active=active)
 
 
 def get_queue_entry(appointment_id, on_date=None):
@@ -373,23 +406,53 @@ def get_queue_entry(appointment_id, on_date=None):
     return None
 
 
-def get_queue_stats(entries=None):
+def get_queue_stats(entries=None, active=None):
     """The figures Screen 08's stat cards and footer show for today.
 
-    Accepts an already-fetched list so the screen does not query twice for the
-    same day.
+    Accepts an already-fetched list, and the already-resolved room, so one render
+    queries each once. Pass the same `active` given to get_todays_appointments()
+    and the cards cannot disagree with the table under them.
 
-    ready / still_waiting / in_consultation are disjoint by construction, so the
-    footer can print them side by side and have them add up to the number of
-    people actually in the building.
+    TWO DIFFERENT QUESTIONS, KEPT APART
+    -----------------------------------
+    "How many of today's rows are In Consultation" and "is the clinician free"
+    read like the same question and were answered by one figure until the
+    2026-08-29 stuck-consultation bug showed they are not. A visit started
+    yesterday and never written up is not in today's rows and still holds the
+    room. So:
+
+        in_consultation_today   today's rows only. Disjoint from ready and
+                                still_waiting, which is what lets the table
+                                footer print the three side by side and have
+                                them add up to the people in the building.
+        in_consultation         the room itself, whole-database, 0 or 1. This is
+                                what the stat card shows, because a card headed
+                                "In Consultation" reading 0 while the server
+                                refuses every Start Consultation is the lie this
+                                pair of keys exists to stop telling.
+
+    active_is_stale marks the case that pulled them apart: the room is held by a
+    visit from a day other than the one on screen. The queue screen renders that
+    as a banner naming the patient and offering the two ways to resolve it,
+    rather than leaving it to be inferred from a card.
     """
     if entries is None:
-        entries = get_todays_appointments()
+        entries = get_todays_appointments(active=active)
+    if active is None:
+        active = get_active_consultation()
+    # The same preference _apply_queue_flow() makes: this day's own row for the
+    # holder when there is one, so the stats and the table share an object.
+    active = next(
+        (entry for entry in entries if entry["is_in_consultation"]), active
+    )
 
     waiting = [entry for entry in entries if entry["is_waiting"]]
     ready = [entry for entry in waiting if entry["is_ready"]]
-    active = next((entry for entry in entries if entry["is_in_consultation"]), None)
     next_up = next((entry for entry in waiting if entry["is_next_up"]), None)
+
+    reference = today()
+    active_date = _as_date(active["appointment_date"]) if active else None
+    stale = bool(active_date and active_date != reference)
 
     return {
         "total_today": len(entries),
@@ -400,8 +463,13 @@ def get_queue_stats(entries=None):
         "ready": len(ready),
         # The waiting room minus that one, so the two never double-count.
         "still_waiting": len(waiting) - len(ready),
-        # At most 1 as well, and enforced as such by start_consultation().
-        "in_consultation": sum(1 for entry in entries if entry["is_in_consultation"]),
+        # The room, whole-database. At most 1, enforced by start_consultation().
+        "in_consultation": 1 if active else 0,
+        # Today's rows only -- the footer's tally. Equal to the above except
+        # while the room is held by another day's visit.
+        "in_consultation_today": sum(
+            1 for entry in entries if entry["is_in_consultation"]
+        ),
         "completed": sum(1 for entry in entries if entry["status"] == COMPLETED),
         "not_arrived": sum(
             1 for entry in entries if entry["status"] in PENDING_STATUSES
@@ -409,7 +477,29 @@ def get_queue_stats(entries=None):
         "room_free": active is None,
         "active_name": queue_display_name(active),
         "next_up_name": queue_display_name(next_up),
+        # The stuck-consultation case, for the banner on Screen 08.
+        "active": active,
+        "active_is_stale": stale,
+        "active_date": active_date,
+        "active_days_open": (reference - active_date).days if stale else 0,
     }
+
+
+def _as_date(value):
+    """'YYYY-MM-DD' (or a date) as a date, or None if it is neither.
+
+    Tolerant on purpose: appointment_date is TEXT, so a row written by hand or by
+    an older migration could hold something this cannot parse, and a stat card
+    must not be the thing that raises on it.
+    """
+    if isinstance(value, date):
+        return value
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(str(value).strip()[:10])
+    except ValueError:
+        return None
 
 
 def get_appointment_by_id(appointment_id):
