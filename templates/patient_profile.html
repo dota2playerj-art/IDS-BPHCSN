@@ -766,10 +766,9 @@
             </table>
           </div>
           <div style="font-size:12px; color:var(--text-muted); margin-top:16px; padding-top:12px; border-top:1px dashed var(--border-color);">
-            Every issue was recorded during a consultation and came off Medicine Inventory
-            at the moment it was saved. Nothing here is a prescription with a course or a
-            refill date &mdash; this system records what was given, not what is still being
-            taken, so no such status is claimed.
+            Every line was recorded during a consultation and came off Medicine Inventory.
+            This is what was handed over, not a prescription &mdash; there is no course or
+            refill date here.
           </div>
 {%- else %}
           <div class="empty-state">
@@ -947,8 +946,7 @@
 
           <div style="font-size:12px; color:var(--text-muted); margin-top:16px; padding-top:12px; border-top:1px dashed var(--border-color);">
             Doses are recorded during a consultation. A dose is <strong style="display:inline;">Due Now</strong> from its
-            recommended age and becomes <strong style="display:inline;">Overdue</strong> {{ immunization.grace_period_days }} days later —
-            about one missed monthly immunisation session.
+            recommended age and becomes <strong style="display:inline;">Overdue</strong> {{ immunization.grace_period_days }} days later.
 {%- if not immunization.applicable %}
             {{ patient.first_name }} is past the under-{{ immunization.pediatric_age_years }} cohort the infant schedule covers,
             so nothing here is flagged due or overdue; the history is shown as recorded.
@@ -1035,9 +1033,8 @@
               </table>
             </div>
             <div style="font-size:12px; color:var(--text-muted); margin-top:16px; padding-top:12px; border-top:1px dashed var(--border-color);">
-              Recorded during a consultation, most recent first. Nothing in this list is due or
-              overdue: no single official adult immunisation schedule exists to measure against,
-              so none is claimed. A blank dose number means the vaccine has no fixed dose count.
+              Recorded during a consultation, most recent first. Nothing here is due or overdue.
+              A blank dose number means the vaccine has no fixed dose count.
             </div>
 {%- else %}
             <div style="border-radius:12px; border:1px dashed var(--border-color); background:var(--bg); color:var(--text-muted); padding:16px; font-size:13px;">
@@ -1173,7 +1170,7 @@
                   <option value="{{ dose.key }}">{{ dose.label }}</option>
 {%- endfor %}
                 </select>
-                <div class="field-hint">The DOH Expanded Program on Immunization schedule. Correcting this moves which scheduled dose the record answers for.</div>
+                <div class="field-hint">The DOH Expanded Program on Immunization schedule. Changing this files the record under a different scheduled dose.</div>
               </div>
 
               <div id="correctGeneralFields">
@@ -1192,7 +1189,10 @@
                   <label class="field-label" for="correctDose">Dose number</label>
                   <input type="number" class="form-control" id="correctDose" name="{{ correction.dose_field }}"
                          min="{{ correction.dose_range[0] }}" max="{{ correction.dose_range[1] }}" step="1" placeholder="Leave blank if none">
-                  <div class="field-hint">Optional. Most of these have no fixed dose count &mdash; a blank is a better record than an invented number.</div>
+{#- The surviving twin of the sentence c3ea786 cut from the consultation form:
+    "an invented number is worse than a blank", reworded. Same fix here, so the
+    project does not go on saying the thing it decided not to say. #}
+                  <div class="field-hint">Optional. Leave it blank where the vaccine has no fixed dose count &mdash; most do not.</div>
                 </div>
               </div>
 

@@ -255,10 +255,12 @@
 {%- if patient.medical_conditions_list %}
         {% if patient.allergies_list %}<br>{% endif %}<strong style="margin-top:4px;">Conditions noted on the patient record</strong>
         {{ patient.medical_conditions_list | join(', ') }}.
+{#- The rules an operator acts on, without the argument for them. What went was
+    the explanation of why a stale entry survives; what stayed is that it can be
+    stale, which is the part that changes what the clinician does with it. #}
         <span style="display:block; margin-top:3px; font-size:12px; opacity:0.85;">
-          Entered on the patient's record{% if patient.updated_at %}, last updated {{ patient.updated_at | display_date }}{% endif %}.
-          Not a confirmed current diagnosis and not checked against this patient's consultation
-          history — an entry stays here until someone edits the record, whether or not it still applies.
+          From the patient's record, not from this visit{% if patient.updated_at %} &mdash; last updated {{ patient.updated_at | display_date }}{% endif %}.
+          It may be out of date. Nothing here is removed on its own.
         </span>
 {%- endif %}
       </div>
@@ -360,7 +362,7 @@
           <div>
             <div class="section-title">Growth Measurements</div>
             <div class="section-sub">
-              Shown because {{ patient.first_name }} is {{ age_context.age_display }} old, inside the under-{{ pediatric_age_years }} growth monitoring cohort
+              Shown because {{ patient.first_name }} is {{ age_context.age_display }} old
             </div>
           </div>
         </div>
@@ -381,13 +383,16 @@
 {%- endfor %}
         </div>
 
+{#- The two age rules, without the standards citation behind them. Height's
+    boundary follows DOH Operation Timbang Plus and the WHO growth standards and
+    head circumference's follows the age display; both are recorded in
+    models/consultations.py, which is where someone asking why will be. #}
         <div class="cohort-note">
-          Height is collected for children under {{ pediatric_age_years }} (0&ndash;59 months), matching the DOH
-          Operation Timbang Plus / WHO growth standards cohort.
+          Height is asked for under {{ pediatric_age_years }} (0&ndash;59 months).
 {%- if age_context.is_infant %}
-          Head circumference is collected under {{ infant_age_years }} year, the same boundary the age display uses.
+          Head circumference is asked for under {{ infant_age_years }} year.
 {%- else %}
-          Head circumference is collected only under {{ infant_age_years }} year, so it is not asked for here.
+          Head circumference is asked for only under {{ infant_age_years }} year, so it is not here.
 {%- endif %}
         </div>
       </div>
@@ -472,14 +477,18 @@
           </table>
         </div>
 
+{#- The third note in this section's set, and the one the shortening pass in
+    c3ea786 walked past: the vaccination and medicine notes either side of it
+    were rewritten and this was left arguing for the add-only rule. Why a dose
+    on file cannot be unticked -- that an absent checkbox is not evidence a
+    vaccination never happened -- is written out in models/immunizations.py and
+    in the comment on the locked cell above. The operator at the form is asking
+    what this screen will let them do, so that is all it now says. #}
         <div class="cohort-note">
-          Doses are recorded against this consultation and dated {{ visit_date | display_date }}.
-          A dose already on file cannot be changed here &mdash; whichever visit recorded it.
+          Ticked doses are recorded against this consultation and dated {{ visit_date | display_date }}.
+          A dose already on file cannot be changed or removed here, whichever visit recorded it.
 {%- if consultation %}
-          This form can add a dose that was missed, and every addition is written to the audit
-          log. It cannot remove one: a dose on file is a record that the child was vaccinated,
-          and un-recording it needs a deliberate correction rather than an unticked box on a
-          form opened to fix something else.
+          You can still add a dose that was missed. Every addition is written to the audit log.
 {%- endif %}
         </div>
       </div>
@@ -735,11 +744,14 @@
 {%- else %}
         <!-- Nothing on the shelf can be dispensed. Stated rather than shown as
              an empty dropdown, which would read as the feature being broken. -->
+{#- "Filed under Medicine" was the category test spelled the way the database
+    spells it. Supplies and equipment are the other two categories and are the
+    thing an operator would otherwise go looking for, so they are named instead
+    of left as the negative space around a word. #}
         <div class="dispense-empty">
-          No medicine can be dispensed right now. The list offers only items filed under
-          Medicine that are in service, unexpired and above zero stock, and nothing in the
-          inventory currently meets all three. Restock or update expiry dates on
-          Medicine Inventory and this section will fill itself.
+          Nothing can be dispensed at this visit. This list holds medicines only &mdash; not supplies
+          or equipment &mdash; and each one must be active, unexpired and in stock.
+          Restock or correct an expiry date on Medicine Inventory to fill it.
         </div>
 {%- endif %}
 
@@ -797,7 +809,7 @@
     "three times a day for five days" is written here; the fifteen tablets handed
     over are recorded there. Saying so stops the two being filled in as though
     either one were the other. #}
-          {%- else %}<div class="form-text-hint">The instruction itself &mdash; what to take, how much, how often, for how long. The amount actually handed over is recorded under Medicines Dispensed above, which is what moves the stock.</div>{% endif %}
+          {%- else %}<div class="form-text-hint">The instruction itself &mdash; what to take, how much, how often, for how long. The amount handed over goes under Medicines Dispensed above.</div>{% endif %}
         </div>
 
         <div class="mb-3">
