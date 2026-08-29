@@ -230,10 +230,10 @@ UNTRACKED = {
     # names only the half that is still missing, and points at the screen that
     # holds the other half.
     "sms": (
-        "Delivery is not recorded. sms_broadcasts stores what was handed to the "
-        "Semaphore gateway -- SMS Notifications counts sends and failures from "
-        "it -- but nothing reports back that a handset received a message, so "
-        "there is no delivered figure to chart here."
+        "Delivery is not recorded. What is stored is what was handed to the SMS "
+        "gateway, and SMS Notifications counts sends and failures from it. "
+        "Nothing reports back that a handset received a message, so there is no "
+        "delivered figure to chart here."
     ),
     # THERE IS NO "dispensing" ENTRY ANY MORE, AND THAT IS THE POINT.
     # It said medicine dispensing is not recorded, that inventory_items holds a
@@ -259,11 +259,11 @@ UNTRACKED = {
     # That is a real remaining gap in stock movement, it is a smaller and
     # different one, and nothing on these screens claims otherwise.
     "prenatal": (
-        "Prenatal enrolment is not recorded. Nothing in the schema marks a "
-        "patient as pregnant or stores an expected delivery date, so active "
-        "cases, check-ups due and expected deliveries cannot be counted. "
-        "Prenatal Check-up appointments are counted under Health Services "
-        "Availed, which is a record of visits, not of who is enrolled."
+        "Prenatal enrolment is not recorded. Nothing marks a patient as pregnant "
+        "or stores an expected delivery date, so active cases, check-ups due and "
+        "expected deliveries cannot be counted. Prenatal Check-up appointments "
+        "are counted under Health Services Availed, which is a record of visits, "
+        "not of who is enrolled."
     ),
     "programs": (
         "Programme enrolment is not recorded. There is no table linking a "
@@ -280,10 +280,10 @@ UNTRACKED = {
     # A list is the honest shape here -- the point of the sentence is that this
     # screen's subject is not on it -- so it is kept, and kept current.
     "generated_reports": (
-        "Report exports are not recorded. Nothing writes a row when a report is "
-        "printed or exported, so there is no history of generated reports to "
-        "list. The audit_logs table records three things, and none of them is "
-        "this one: consultation edits, SMS broadcasts, and sign-ins."
+        "Report exports are not recorded. Nothing is written down when a report "
+        "is printed or exported, so there is no history of generated reports to "
+        "list. Audit Logs records three things, and none of them is this one: "
+        "consultation edits, SMS broadcasts, and sign-ins."
     ),
 }
 

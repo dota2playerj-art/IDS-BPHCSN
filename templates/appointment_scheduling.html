@@ -1090,9 +1090,8 @@
               <form id="checkInNewForm" method="get" action="{{ url_for(register_patient_endpoint) }}">
                 <input type="hidden" name="check_in" value="1">
                 <div class="mode-hint">
-                  Opens the Register Patient form. Saving it registers the patient permanently
-                  <em>and</em> places them in today's queue in one step — there is no separate
-                  check-in to remember afterwards.
+                  Opens the Register Patient form. Saving it registers the patient
+                  <em>and</em> places them in today's queue in one step.
                 </div>
 
                 <label class="field-label" for="newPatientReason">Reason for visit</label>
@@ -1180,19 +1179,17 @@
             <div class="alert-ids alert-warning-ids">
               <span class="material-symbols-outlined">warning</span>
               <div>
-                <strong>That day is already spoken for — please check before booking</strong>
+                <strong>Please check this day before you save</strong>
 {%- if day_clashes %}
                 This patient already has {{ day_clashes|length }} appointment{{ '' if day_clashes|length == 1 else 's' }} that day:
                 {% for other in day_clashes %}{{ other.booked_time or 'time not set' }} {{ other.appointment_type or 'Consultation' }}{{ '; ' if not loop.last else '' }}{% endfor %}.
-                Only the earliest of a day's bookings is checked in when they arrive, so a second one would be left Scheduled with nobody to close it.
 {%- endif %}
 {%- if slot_clashes %}
                 {{ slot_clashes|length }} other patient{{ '' if slot_clashes|length == 1 else 's' }} already booked for {{ booking.form.appointment_time }}:
                 {% for other in slot_clashes %}{{ other.first_name }} {{ other.last_name }} ({{ other.appointment_type or 'Consultation' }}){{ '; ' if not loop.last else '' }}{% endfor %}.
-                One clinician sees one patient at a time here, so one of them will wait.
 {%- endif %}
-                Nothing has been saved yet. If this is what you intend, press
-                <strong style="display:inline;">Book Appointment</strong> again — or change the time first.
+                Nothing has been saved yet. Press
+                <strong style="display:inline;">Book Appointment</strong> again to save it anyway, or change the time first.
               </div>
             </div>
 {%- endif %}
@@ -1246,8 +1243,8 @@
               <div id="bookingNewPane" class="d-none">
                 <div class="mode-hint">
                   Continues to the Register Patient form with this appointment attached. Nothing is
-                  created until that form is completed and saved — and when it is, the patient is
-                  registered <em>and</em> the appointment below is booked in one step.
+                  created until that form is saved. Saving it registers the patient
+                  <em>and</em> books the appointment below in one step.
                 </div>
               </div>
 
@@ -1355,8 +1352,7 @@
           <div class="modal-body">
             <p style="margin-bottom:10px;">
               This changes the appointment's status only. <strong style="display:inline;">Nothing is deleted</strong> —
-              the booking stays in the patient's appointment history, which is what records that the
-              clinic held a slot and the visit did not happen.
+              the booking stays in the patient's appointment history.
             </p>
             <!-- Pre-filled when a ?cancel=<id> link opened this dialog; a button
                  on this page overwrites both lines from its data-* attributes. -->
@@ -1432,19 +1428,17 @@
             <div class="alert-ids alert-warning-ids">
               <span class="material-symbols-outlined">warning</span>
               <div>
-                <strong>That day is already spoken for — please check before moving it</strong>
+                <strong>Please check this day before you save</strong>
 {%- if r_day %}
-                This patient already has {{ r_day|length }} other appointment{{ '' if r_day|length == 1 else 's' }} that day:
+                This patient already has {{ r_day|length }} appointment{{ '' if r_day|length == 1 else 's' }} that day:
                 {% for other in r_day %}{{ other.booked_time or 'time not set' }} {{ other.appointment_type or 'Consultation' }}{{ '; ' if not loop.last else '' }}{% endfor %}.
-                Only the earliest of a day's bookings is checked in when they arrive, so a second one would be left Scheduled with nobody to close it.
 {%- endif %}
 {%- if r_slot %}
                 {{ r_slot|length }} other patient{{ '' if r_slot|length == 1 else 's' }} already booked for {{ reschedule.form.appointment_time }}:
                 {% for other in r_slot %}{{ other.first_name }} {{ other.last_name }} ({{ other.appointment_type or 'Consultation' }}){{ '; ' if not loop.last else '' }}{% endfor %}.
-                One clinician sees one patient at a time here, so one of them will wait.
 {%- endif %}
-                Nothing has been moved yet. If this is what you intend, press
-                <strong style="display:inline;">Move Appointment</strong> again — or choose another time first.
+                Nothing has been saved yet. Press
+                <strong style="display:inline;">Move Appointment</strong> again to save it anyway, or change the time first.
               </div>
             </div>
 {%- endif %}
@@ -1496,8 +1490,8 @@
                 </div>
               </div>
               <div class="form-text-hint mt-3">
-                The patient, the reason and any notes stay exactly as they are — this is the same
-                appointment at a different time, not a new one, so the record keeps its history.
+                The patient, the reason and any notes stay exactly as they are. This is the same
+                appointment at a different time, not a new one.
               </div>
             </form>
           </div>

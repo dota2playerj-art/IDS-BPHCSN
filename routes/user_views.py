@@ -157,9 +157,9 @@ UNTRACKED = {
         "database, not from this screen."
     ),
     "reset_password": (
-        "Password reset is not implemented. Hashes are written once by "
-        "seed_demo_users(); nothing else in the project sets a password, and "
-        "there is no email channel to send a reset through."
+        "Password reset is not built. Each password is set once when the "
+        "account is first created, nothing else can change it, and there is no "
+        "email channel to send a reset through."
     ),
 }
 

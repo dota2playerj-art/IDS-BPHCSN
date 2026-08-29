@@ -71,10 +71,10 @@ LOCAL_UNTRACKED = {
         "counted against the patient roster, and are labelled that way."
     ),
     "events": (
-        "Community health events are not recorded. Nothing in the schema stores "
-        "a barangay event, its date or its venue, so an events list would have "
-        "to invent its own. Clinic appointments are recorded, but those belong "
-        "to Appointment Scheduling and are not this role's to read."
+        "Community health events are not recorded. Nothing here stores a "
+        "barangay event, its date or its venue, so an events list would have to "
+        "invent its own. Clinic appointments are recorded, but they belong to "
+        "Appointment Scheduling and are not this role's to read."
     ),
     "campaigns": (
         "Vaccination campaigns are not recorded. Individual doses are -- see "

@@ -349,12 +349,11 @@ def _cover_sheet(context, screen, sections, produced_by):
         # that refusal rather than quietly presenting the fallback as though it
         # were what was asked for.
         blocks.append(table(
-            "The range asked for was not used",
+            "Date range",
             ("Problem",),
             [[problem] for problem in selection["errors"]],
-            note=("The figures in this workbook cover the default window instead. "
-                  "A report quietly counting different days from the ones typed "
-                  "would be worse than one that says so."),
+            note=("That range was not used. The report covers the default window "
+                  "instead. The problems with it are listed below."),
         ))
 
     return sheet(
@@ -884,9 +883,9 @@ def _dispensing(context):
               [[entry["medicine_name"], entry["units"], entry["unit"] or "",
                 entry["events"]]
                for entry in scoped["all_medicines"]],
-              note="Most units first. Named as the dispensing records name them: "
-                   "an inventory item renamed part way through a range appears "
-                   "under both names, because that is what the records say.",
+              note="Ranked by units dispensed inside the selected range, most "
+                   "first. Named as the dispensing records name them. An item "
+                   "renamed part way through a range appears under both names.",
               empty="No medicine was dispensed inside this range."),
         figures("All time", [
             ("Units dispensed", dispensing["total_units"], ""),

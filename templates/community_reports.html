@@ -159,17 +159,15 @@
 
     <div class="scope-note no-print">
       <strong>Every figure on this screen is read from stored records.</strong>
-      The cards and both charts come from the same functions behind Reports &amp; Analytics,
-      Health Programs and Vaccination Campaigns, so this screen cannot report a different
-      barangay from the ones beside it in the sidebar. Two things on it still have no source and
-      say so where they sit: how many reports have been generated, and coverage measured
-      against the whole barangay rather than against registered patients.
+      Two things on it have no source and say so where they sit: how many reports have been
+      generated, and coverage measured against the whole barangay rather than against
+      registered patients.
     </div>
 
 {%- if selection.errors %}
     <div class="range-error no-print">
-      <strong>That range was not used.</strong> The report below covers the default window instead
-      &mdash; a report quietly counting different days from the ones typed would be worse than one that says so.
+      <strong>That range was not used.</strong> The report covers the default window instead.
+      The problems with it are listed below.
       <ul>
 {%- for problem in selection.errors %}
         <li>{{ problem }}</li>
@@ -252,8 +250,8 @@
           <span class="panel-sub" style="margin-left:8px;">
 {%- if window.custom %}Generated range &middot; {{ selection.type_label }}.
 {%- else %}Default window &middot; the last {{ window.months | length }} clinic months.{% endif %}
-            Immunisation coverage is judged as of {{ window.end | display_date }}; it is a
-            position on a day, not something counted across one.
+            Consultations and registrations are counted inside it. Immunisation coverage is
+            not &mdash; it is a position on {{ window.end | display_date }}, not something counted across one.
           </span>
         </div>
       </div>
@@ -465,9 +463,8 @@
 {%- endfor %}
 {%- if consultation_report_stats.window.top_diagnoses %}
           <div class="basis-note mt-3">
-            Grouped by the text entered, ignoring case. Diagnosis is prose a health worker typed and is
-            not coded against ICD or any other classification this system holds, so two spellings of one
-            condition count separately.
+            Grouped by the text entered, ignoring case. Free text is not coded, so two
+            spellings of one condition count separately.
           </div>
 {%- endif %}
         </div>

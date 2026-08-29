@@ -153,12 +153,12 @@
 
     <div class="eyebrow no-print">Barangay Poblacion Health Center</div>
     <div class="page-title no-print">Reports &amp; Analytics</div>
-    <div class="page-desc no-print">Consolidated statistics on patient growth, appointments, medicine stock, SMS reach, and health programs for DOH reporting and internal planning.</div>
+    <div class="page-desc no-print">Statistics on patients, appointments, medicine, SMS, and health programs for DOH reporting and clinic planning.</div>
 
 {%- if selection.errors %}
     <div class="range-error no-print">
-      <strong>That range was not used.</strong> The report below covers the default window instead
-      &mdash; a report quietly counting different days from the ones typed would be worse than one that says so.
+      <strong>That range was not used.</strong> The report covers the default window instead.
+      The problems with it are listed below.
       <ul>
 {%- for problem in selection.errors %}
         <li>{{ problem }}</li>
@@ -239,7 +239,7 @@
 {%- else %}Default window &middot; the last {{ trend_months }} clinic months.{% endif %}
             Registrations, appointments, consultations and SMS are counted inside it.
             Medicine stock, the roster breakdowns and the programme memberships are not &mdash;
-            those are the position today and each says so.
+            each is a position on a day, not something counted across one.
           </span>
         </div>
       </div>
@@ -404,7 +404,7 @@
     number per item and nothing snapshots it -- so "what the shelf held in March"
     remains unanswerable and this panel answers today. Where the medicine went is
     on the Medicine Dispensed panel below, which is ranged. #}
-          <div class="snapshot-note">{{ snapshot_note }} Dispensing is recorded and is reported over the selected range under Medicine Dispensed; what is not stored is the stock level itself at a past date, so this panel reports the shelf as it stands.</div>
+          <div class="snapshot-note">{{ snapshot_note }} Dispensing is recorded and is reported over the selected range under Medicine Dispensed. The stock level at a past date is not stored, so this panel shows the shelf as it stands today.</div>
         </div>
       </div>
       <div class="col-lg-6">
@@ -473,7 +473,7 @@
 {#- Ranked by units, with the issue count printed beside it, because the two are
     different supply questions: forty patients given ten tablets each and two
     patients given two hundred are not the same shelf problem. #}
-          <div class="snapshot-note">Ranked by units dispensed inside the selected range, most first. Named as the dispensing records name them &mdash; an item renamed part way through a range appears under both names, because that is what the records say.</div>
+          <div class="snapshot-note">Ranked by units dispensed inside the selected range, most first. Named as the dispensing records name them. An item renamed part way through a range appears under both names.</div>
         </div>
       </div>
       <div class="col-lg-5">
@@ -495,7 +495,7 @@
               <div class="stat-card"><div class="stat-value">{{ dispensing_stats.total_units }}</div><div class="stat-label">Units, all time</div><div class="stat-trend" style="color:var(--text-muted);">{{ dispensing_stats.total_events }} event{{ '' if dispensing_stats.total_events == 1 else 's' }} on record</div></div>
             </div>
           </div>
-          <div class="snapshot-note">Every issue was recorded during a consultation and came off Medicine Inventory in the same transaction, so these totals and the stock figures above describe the same movements.</div>
+          <div class="snapshot-note">Every issue was recorded during a consultation and came off Medicine Inventory at the same time.</div>
         </div>
       </div>
     </div>
