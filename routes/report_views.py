@@ -70,10 +70,14 @@ MAX_REPORT_MONTHS = 36
 #                 real figure but not the one the panel is headed with.
 #   programs      both memberships are derived from the roster and the whole
 #                 dose history, for the same reason.
+# Printed under eight panels across the two report screens and carried into
+# both exports, so this one string is the highest-leverage sentence in the set.
+# What went was the reason -- that a position on a day is not something that
+# happened across a period -- which is true, and is the kind of thing a reader
+# works out from the first sentence anyway.
 SNAPSHOT_NOTE = (
     "Not narrowed by the selected range. This panel reports the position as it "
-    "stands today rather than something that happened during a period, so a "
-    "date range has nothing to filter here."
+    "stands today, so a date range has nothing to filter here."
 )
 
 # The report types this screen offers, and which of its panels each one keeps.

@@ -61,13 +61,14 @@ ANNOUNCEMENT_ROWS = 5
 # The gaps specific to this screen. Everything else it cannot show is already
 # named by report_views.UNTRACKED and is merged in below rather than restated.
 LOCAL_UNTRACKED = {
+    # The specification reference went: a document number is not something a
+    # barangay official can act on. The gap it named is unchanged -- there is no
+    # residents table and no census import.
     "population": (
         "Barangay population is not recorded. This system holds registered "
-        "patients only -- 09_UI_Architecture gives it no residents table and no "
-        "census import -- so a coverage figure against 'all eligible residents' "
-        "has no denominator. The immunisation and senior figures beside this "
-        "note are counted against the patient roster, which is a different and "
-        "smaller population, and are labelled as such."
+        "patients only, so there is no barangay-wide figure to measure coverage "
+        "against. The immunisation and senior figures beside this note are "
+        "counted against the patient roster, and are labelled that way."
     ),
     "events": (
         "Community health events are not recorded. Nothing in the schema stores "
@@ -80,19 +81,19 @@ LOCAL_UNTRACKED = {
         "Immunization Doses Recorded above -- but nothing groups them into a "
         "named campaign with a target group, a date range or a coverage goal."
     ),
+    # The retired Community Announcements screen is project history: it had no
+    # store and wrote nothing, which is why broadcasts are the answer. The reader
+    # of this feed never saw that screen.
     "announcements": (
-        "Announcements are SMS broadcasts. The separate Community Announcements "
-        "screen was retired -- it had no store and wrote nothing -- so the "
-        "messages this barangay has actually published are its broadcasts. "
-        "Those are what this feed shows, and they are the same rows SMS "
-        "Notifications lists."
+        "Announcements are SMS broadcasts. This feed shows the messages this "
+        "barangay has published, and they are the same rows SMS Notifications "
+        "lists."
     ),
     "delivery": (
-        "Delivery is never confirmed. sms_broadcasts records what was handed to "
-        "the gateway, which is where the Sent and Failed counts above come "
-        "from, but nothing reports back that a handset received a message -- so "
-        "there is no 'delivered' figure, and the legend that used to show one "
-        "was inventing it."
+        "Delivery is never confirmed. What is recorded is what was handed to the "
+        "gateway, which is where the Sent and Failed counts above come from. "
+        "Nothing reports back that a phone received a message, so there is no "
+        "delivered figure."
     ),
     "notifications": (
         "Per-user notifications are not recorded. There is no notifications "
@@ -100,18 +101,19 @@ LOCAL_UNTRACKED = {
         "own alerts."
     ),
     "program_schedule": (
-        "Programme start and end dates are not recorded. There is no programmes "
-        "table at all -- the two memberships below are counted from the patient "
-        "roster and the dose records, not read from a programme that was set up "
-        "somewhere -- so a launch date, a closing date, an Active/Upcoming "
-        "status and a target headcount have nothing to come from."
+        "Programme start and end dates are not recorded. Nothing here sets up a "
+        "programme, so a launch date, a closing date, a status and a target "
+        "headcount have nothing to come from. The two memberships below are "
+        "counted from the patient roster and the dose records."
     ),
+    # The source file went; the rule it enforced is the sentence. Note this is
+    # about the EPI section of the consultation form only -- Other Vaccinations
+    # records any vaccine by name, but not against a schedule, so there is still
+    # no coverage figure to report here.
     "non_epi_vaccines": (
-        "Only the DOH EPI infant schedule is tracked. COVID-19 boosters, "
-        "influenza, HPV and tetanus toxoid are not on it, and the consultation "
-        "form cannot record a dose of any of them -- models/immunizations.py "
-        "accepts only the schedule's own vaccine codes -- so there is no dose "
-        "history behind them and no coverage to report."
+        "Only the DOH EPI infant schedule is counted here. COVID-19 boosters, "
+        "influenza, HPV and tetanus toxoid are not on that schedule, so there is "
+        "no coverage to report for them."
     ),
 }
 

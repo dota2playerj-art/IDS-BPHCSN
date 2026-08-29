@@ -106,14 +106,13 @@ UNTRACKED = {
     # that line would have been this file's own Deactivated card all over again --
     # a confident description of an access rule the application had stopped
     # following, on the very screen that shows the flag.
+    # The screen number went, and so did the second half: that nothing acts on a
+    # rising count of refused sign-ins is now said once, on the card that shows
+    # the count, in audit_views.UNTRACKED["login_scope"]. It was being said in
+    # three places.
     "invitations": (
-        "There is no invitation or activation flow. An account exists and is "
-        "either allowed to sign in or deactivated; nothing records one awaiting "
-        "activation. Deactivating is the only thing that closes an account, and "
-        "it is done by hand rather than by the system: refused sign-ins are "
-        "recorded in the audit trail -- Screen 12 counts them under Security "
-        "Events -- but nothing acts on that count, so repeated failures against "
-        "an account never close it on their own."
+        "There is no invitation or activation flow. An account is either allowed "
+        "to sign in or deactivated; nothing records one waiting to be activated."
     ),
     "contact": (
         "The users table has email and phone columns, but nothing in the "
@@ -146,14 +145,16 @@ UNTRACKED = {
     # enforced. What is missing here is the button, not the mechanism -- and a
     # reader who has just been told access is revoked deserves to know where the
     # revoking currently happens.
+    # "A deliberate decision rather than a missing button" is the argument for
+    # not building it, and it is worth keeping where a maintainer will read it:
+    # every write on this screen touches authentication -- password hashing, role
+    # assignment, and the power to revoke a sign-in -- which is why it was left
+    # out rather than left unfinished. The filename went with the argument.
     "write": (
-        "Creating, editing and deactivating accounts is not implemented. "
-        "Every write here touches authentication -- password hashing, role "
-        "assignment, and the ability to revoke a sign-in -- so it is a "
-        "deliberate decision rather than a missing button. The three seeded "
-        "accounts are managed in models/users.py. Deactivation itself is real "
-        "and enforced at the login form; what is absent is a control on this "
-        "screen to set it, so the flag changes by direct database edit."
+        "Creating, editing and deactivating accounts is not built. The three "
+        "accounts here are set up in the application's own code. Deactivation "
+        "does work and is enforced at sign-in, but it is set by hand in the "
+        "database, not from this screen."
     ),
     "reset_password": (
         "Password reset is not implemented. Hashes are written once by "

@@ -286,24 +286,23 @@ UNAVAILABLE = {
     # If Appointment Scheduling's Upcoming Appointments panel ever gets its own
     # Sort control, this reason does not cover it: that panel is a list of future
     # bookings with no queue position, and the argument below does not apply to it.
+    # SHORTENED. Nine clauses, six of them argument -- and it is a tooltip, so
+    # the argument was being made at a size nobody finishes reading. The reasons
+    # are the ones above and they stay above: the queue's order is the answer to
+    # "who may be brought in next", re-sorting it by name or booked time throws
+    # that answer away while still looking like a working queue, and a roster and
+    # a shelf sort usefully several ways where a queue sorts usefully one way.
+    # What the operator needs is that it cannot be sorted, what the order is, and
+    # where sorting does work.
     "sort": (
-        "This queue is not sortable, and that is deliberate rather than "
-        "unfinished. Its order is already a clinical answer: whoever is in "
-        "consultation now, then whoever is waiting, then the not-yet-arrived, "
-        "then everything already resolved -- ties broken by arrival time, exactly "
-        "as the line above the table says. That order tells the desk who may be "
-        "brought in next, and re-sorting it by name or by booked time would "
-        "discard the one thing this list is for while still looking like a "
-        "working queue. Sorting is built where it means something: Patient "
-        "Records and Medicine Inventory each sort by four of their columns, "
-        "because a roster and a shelf have no inherent order and any of several "
-        "are useful. A queue has exactly one."
+        "This queue cannot be sorted. Its order is who is in consultation, then "
+        "who is waiting, then who has not arrived, then everyone already seen or "
+        "cancelled -- and arrival time within each. Sort works on Patient Records "
+        "and Medicine Inventory."
     ),
     "pagination": (
-        "Paging is not implemented. Every row the query returns is already on "
-        "this page, so there is no second page to turn to. The page numbers "
-        "that used to sit here were markup -- they counted a roster this "
-        "system does not hold."
+        "Paging is not implemented. Every row is already on this page, so there "
+        "is no second page to turn to."
     ),
 
     # ---- Records ------------------------------------------------------------
@@ -350,12 +349,9 @@ UNAVAILABLE = {
     # and notes is not one of them. Same defect the deleted "medicine_detail"
     # had: a list of fields that quietly included one the screen does not show.
     "appointment_detail": (
-        "There is no separate view for one appointment. What the booking records "
-        "is almost all in this row already -- its date, time, purpose, assigned "
-        "staff and status -- so a detail view would mostly repeat the row it "
-        "opened from. What it would add is the booking's notes, which this table "
-        "has no column for; those are shown on Appointment Scheduling, under the "
-        "patient's name on the same booking."
+        "There is no separate view for one booking. The row already shows its "
+        "date, time, purpose, assigned staff and status. The booking's notes are "
+        "on Appointment Scheduling, under the patient's name."
     ),
     # THERE IS NO "medicine_archive" ENTRY ANY MORE, AND THAT IS THE POINT.
     # It is the entry this file argued with hardest, and it lost twice.
@@ -417,23 +413,29 @@ UNAVAILABLE = {
     # Note the asymmetry that survives, because it is the real state: nothing on
     # this screen is *stored*, and exactly one block on it is *read*. The
     # disabled fieldset over every input is unchanged and still correct.
+    # SHORTENED, AND SPLIT WITH THE SCREEN RATHER THAN REPEATED BY IT.
+    # This is printed inside Screen 13's opening note and is also the tooltip on
+    # four disabled buttons, so it has to stand alone -- but it and the note were
+    # saying the same thing twice, in different words, and between them put about
+    # a thousand characters and three filenames above the fold. It now carries
+    # what the screen is; the note carries only the live exception.
+    #
+    # The four schema columns are gone from the sentence and are recorded here
+    # instead, because the correction they were making still matters to anyone
+    # picking the work up: the settings table DOES exist -- setting_key,
+    # setting_value, updated_by, updated_at -- and the gap is that no model
+    # function and no route writes to it. A reason that denies an existing
+    # structure sends the next session off to build something already there.
     "settings": (
-        "Nothing typed on this screen is stored. The settings table exists in "
-        "schema.sql -- setting_key, setting_value, updated_by, updated_at, ready "
-        "for exactly this -- but no model function and no route writes to it, so "
-        "the gap is the wiring rather than the place to put the values. Nothing "
-        "entered here is saved, and no setting shown here is read by the running "
-        "system: the values are the defaults the application is actually built "
-        "with, which is why they are shown at all. The one exception is stated "
-        "where it sits -- the Security Settings pane reports live counts of "
-        "sign-ins and refused sign-ins from the audit trail, which are records "
-        "of what happened rather than settings that were chosen."
+        "Every field is read-only, because no part of the system stores what is "
+        "typed here. The values shown are the settings the application actually "
+        "runs on; they are changed in its own configuration, not on this screen."
     ),
     "backup": (
-        "Backup and restore are not implemented. The database is a single "
-        "SQLite file and the project's real backup practice is a dated copy of "
-        "it taken outside the application; doing it from this screen needs a "
-        "job that can safely quiesce and copy an open database."
+        "Backup and restore are not built. The database is one file, and the "
+        "practice today is to copy it, with the date in the name, outside the "
+        "application. Doing it from this screen needs a job that can copy the "
+        "file safely while the system is running."
     ),
     # REWRITTEN: THIS ONE HAD GONE FALSE, NOT MERELY IMPRECISE.
     # It said utils/sms.py records a broadcast "without contacting a provider",
@@ -448,18 +450,17 @@ UNAVAILABLE = {
     # "medicine_archive" had, and it was worse here: it was the stated grounds
     # for disabling a Test Connection button that now has something real to
     # test.
+    # SHORTENED. Six sentences on a disabled button, ending on a rhetorical
+    # figure -- "a key revealed here would be a key this project never held".
+    # The variable name went with them: an administrator turning this on is
+    # setting it on the server, and the exact spelling belongs in the note at the
+    # top of utils/sms.py that tells them how, not in a tooltip. What is left is
+    # why the buttons are dead, what turns them on, and what happens meanwhile.
     "sms_gateway": (
-        "There is no API key configured, so there is nothing for these controls "
-        "to act on. The integration itself is real and finished -- utils/sms.py "
-        "posts to Semaphore's endpoint, and every send checks the "
-        "SEMAPHORE_API_KEY environment variable to decide whether it goes on the "
-        "wire or is recorded as simulated. Broadcasts are written to history "
-        "either way, which is why SMS Notifications works today and marks its "
-        "rows 'simulated'. Setting that variable is the whole activation step; "
-        "nothing on this screen is part of it, because this screen stores "
-        "nothing. A key revealed here would be a key this project never held, "
-        "and a connection tested here would be testing the server's environment "
-        "rather than anything typed above."
+        "No API key is set on the server, so these controls have nothing to act "
+        "on. Setting that key is the whole step -- nothing on this screen is "
+        "part of it. Until then broadcasts are still written to history and "
+        "marked simulated, which is why SMS Notifications works today."
     ),
     # The last sentence points at Audit Logs for "recorded activity", and that
     # pointer got better rather than worse: the trail now holds sign-ins as well
@@ -468,11 +469,9 @@ UNAVAILABLE = {
     # this comment only because it was checked, and a reason that mentions
     # another screen's contents is exactly the kind that quietly goes stale.
     "notifications": (
-        "There is no notifications table. Nothing in this system writes, "
-        "stores or clears a notification, so marking one read or dismissing it "
-        "would change only what this browser is showing until the next reload. "
-        "Recorded activity lives on Audit Logs -- record edits, SMS broadcasts "
-        "and sign-ins -- and community messages on SMS Notifications."
+        "Notifications are not recorded. Nothing in this system writes, stores "
+        "or clears one. Recorded activity is on Audit Logs -- record edits, SMS "
+        "broadcasts and sign-ins -- and community messages on SMS Notifications."
     ),
     # THERE IS NO "community_reports" ENTRY ANY MORE, AND THAT IS THE POINT.
     # It has been deleted twice over. It first said Community Reports had no

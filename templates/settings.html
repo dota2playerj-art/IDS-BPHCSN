@@ -112,16 +112,16 @@
          asserted an event that had not happened and could not happen, the
          second one describing a save this screen cannot perform. They are
          replaced by the note below, which states what this screen actually is. -->
+{#- Written as one statement with unavailable["settings"], which prints in the
+    middle of it. The two used to overlap: the shared reason said nothing is
+    stored and this note said it again in different words, then named three
+    source files. Each now carries a different half -- the shared reason says
+    what the screen is, because it is also the tooltip on four disabled buttons
+    and has to stand alone there; this note adds only the live exception. #}
     <div class="scope-note">
-      <strong>This screen is not connected to storage.</strong>
+      <strong>Nothing on this screen is saved.</strong>
       {{ unavailable.settings }}
-      Every field below is shown read-only for that reason, rather than
-      accepting an entry that would be lost on the next page load. The
-      configuration that is real lives in <code>config.py</code>, in
-      <code>schema.sql</code>, and in the constants each model documents.
-      One block on this screen does read live data &mdash; what the system
-      records about sign-ins, under Security Settings &mdash; and it is marked
-      as such where it sits.
+      The sign-in figures under Security Settings are the one exception: those are live.
     </div>
 
     <!-- SETTINGS PANEL -->
@@ -442,7 +442,7 @@
                 <div class="col-md-4">
                   <label class="field-label">Login Attempt Limit</label>
                   <input type="number" class="form-control" value="5">
-                  <div class="form-text-hint">Not enforced. No account is ever locked out; failed attempts are recorded and counted, and nothing acts on the count.</div>
+                  <div class="form-text-hint">Not enforced. No account is ever locked out.</div>
                 </div>
               </div>
 
@@ -466,10 +466,7 @@
               <div class="subsection-divider"></div>
               <div class="subsection-title"><span class="material-symbols-outlined" style="color:var(--teal-dark); font-size:18px;">fact_check</span>What is actually recorded</div>
               <div class="scope-note" style="margin-top:0;">
-                None of the controls above is stored or enforced. What the system
-                does hold is a record of every sign-in and every refused sign-in,
-                written by the login route to the audit trail. These figures are
-                live, and are the same rows
+                These figures are live. They are the same rows
                 <a href="{{ url_for('admin.audit_logs', module='Authentication') }}">Audit Logs</a>
                 lists under Authentication.
               </div>
@@ -500,21 +497,28 @@
                 <div class="backup-value" style="color:var(--text-muted);" title="The trail holds no sign-in yet. This is a real state on a freshly seeded database, not a missing figure.">No sign-in recorded yet</div>
                 {%- endif %}
               </div>
-              {#- Stated beside the figures rather than left to be inferred: a
-                  refusal aimed at a username that does not exist writes no row,
-                  because audit_logs.user_id is NOT NULL and foreign-keyed to a
-                  real account. And under no circumstance is a supplied password
-                  recorded -- see the module note in routes/auth.py. #}
+              {#- THE SAME FIVE SENTENCES AUDIT LOGS PRINTS, WORD FOR WORD.
+                  These facts were being stated twice in the project, at two
+                  lengths and in two vocabularies: here at 618 characters, and
+                  under Screen 12's Security Events card at 901, where they also
+                  quoted a NOT NULL constraint and a foreign key at a barangay
+                  official. Both are now the same short sentences, and
+                  audit_views.UNTRACKED["login_scope"] adds only the three facts
+                  that are about that card rather than about signing in.
+
+                  Why an attempt on an unknown username writes nothing:
+                  audit_logs.user_id is NOT NULL and foreign-keyed to a real
+                  account, so there is no row for it to belong to. Why a
+                  password never appears: see the module note in routes/auth.py.
+                  Neither reason is on the screen, because neither changes what
+                  anybody does about it. #}
               <div class="form-text-hint" style="margin-top:10px;">
-                A refused attempt records the account it was aimed at, the moment and the
-                address &mdash; never the password that was supplied. An attempt against a
-                username that does not exist is not recorded at all: there is no account for
-                the entry to belong to. Signing out is not recorded either, so these are
-                sign-in counts rather than session counts.
-                A deactivated account is refused even when the password presented is
-                correct, and its entry says which it was &mdash; but the person at the login
-                form sees the same message a wrong password gets, so the form cannot be used
-                to discover which accounts exist or which have been switched off.
+                A refused sign-in records the account, the time and the address.
+                The password is never recorded.
+                An attempt on a username that does not exist is not recorded at all.
+                Signing out is not recorded either, so these are sign-in counts, not sessions.
+                A deactivated account is refused even when the password is correct,
+                and the entry says so.
               </div>
             </div>
 

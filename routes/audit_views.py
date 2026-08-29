@@ -102,25 +102,38 @@ UNTRACKED = {
     # remain inside it. So the reason narrowed to exactly those two, under a name
     # that says what it now is: not "this figure has no source" but "this figure
     # has a source and here is its edge".
+    # SHORTENED, AND PUT IN STEP WITH SCREEN 13.
+    # At 901 characters this was the longest string in the project's UI, and it
+    # quoted a NOT NULL constraint and a foreign key under a card a barangay
+    # official reads. It also stated the same five facts about signing in that
+    # Settings stated in its own words at its own length, so one system had two
+    # vocabularies for one subject.
+    #
+    # The first five sentences below are now word for word the ones in
+    # templates/settings.html under "What is actually recorded". What is added
+    # here is only what is about this card rather than about signing in: that the
+    # figures count rows in the trail below, and that nothing acts on a rising
+    # count. Edit the two together or they drift apart again.
+    #
+    # The schema reason is kept here rather than on screen: an attempt on an
+    # unknown username writes nothing because audit_logs.user_id is NOT NULL and
+    # foreign-keyed to a real account, so what is counted is every refusal aimed
+    # at an account that exists -- which is every attempt that could ever have
+    # succeeded.
     "login_scope": (
-        "Both sign-in figures count real rows, and every one of them is in the "
-        "trail below. Two things sit outside them. An attempt against a username "
-        "that does not exist writes nothing: audit_logs.user_id is NOT NULL and "
-        "foreign-keyed to a real account, so there is no row such an attempt "
-        "could be attributed to -- what is counted is every refusal aimed at an "
-        "account that exists, which is every attempt that could ever have "
-        "succeeded. And signing out is not recorded, so these are sign-in counts "
-        "rather than session counts. Nothing here locks an account either: a "
-        "rising number is something for a person to notice, because repeated "
-        "failures against an account never close it on their own. An account can "
-        "be shut off, but only by being marked deactivated -- those refusals are "
-        "counted here too, under their own activity phrase, and a deactivated "
-        "account is refused even when the password presented is correct."
+        "Both figures count rows in the trail below. "
+        "A refused sign-in records the account, the time and the address. "
+        "The password is never recorded. "
+        "An attempt on a username that does not exist is not recorded at all. "
+        "Signing out is not recorded either, so these are sign-in counts, not "
+        "sessions. "
+        "A deactivated account is refused even when the password is correct, and "
+        "the entry says so -- those refusals are counted here too. "
+        "Nothing locks an account: a rising count is for someone to notice."
     ),
     "filters": (
-        "Filtering by user, activity type or status is not wired. The stored "
-        "query supports a module filter only, which is the one offered above; "
-        "the rest would need columns audit_logs does not have."
+        "The module filter above is the only one that works. Filtering by user, "
+        "activity type or status is not built."
     ),
     # THERE IS NO "export" ENTRY ANY MORE, AND THAT IS THE POINT.
     # It said exporting the trail is not implemented. Export Excel and Export PDF
