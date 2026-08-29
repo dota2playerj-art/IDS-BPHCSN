@@ -49,8 +49,12 @@ path, not a URL typed in.
 One defect, and it is **not** from this change and was **not** fixed here: the
 amber notice above a refused consultation reads "1 field need attention" — the
 noun is pluralised and the verb is not. `routes/consultation_views.py` builds it
-in two places. It predates this work and is left for a task of its own rather
+in two places. It predates this work and was left for a task of its own rather
 than folded into an unrelated commit.
+
+That task has since been done: both places now agree the verb with the count, so
+one error reads "1 field needs attention" and several read "N fields need
+attention".
 
 ## Reproducing it
 

@@ -494,7 +494,8 @@ def process_record_consultation(appointment_id, form_data, user_id):
             ticked=set(ticked), general_submitted=general_submitted,
             dispensing_submitted=dispense_submitted,
         ), (
-            f"{len(errors)} field{'s' if len(errors) != 1 else ''} need attention. "
+            f"{len(errors)} field{'s' if len(errors) != 1 else ''} "
+            f"need{'s' if len(errors) == 1 else ''} attention. "
             "Nothing has been saved yet."
         )
 
@@ -824,7 +825,8 @@ def process_edit_consultation(consultation_id, form_data, user_id, ip_address=No
             general_submitted=general_submitted,
             dispensing_submitted=dispense_submitted,
         ), (
-            f"{len(errors)} field{'s' if len(errors) != 1 else ''} need attention. "
+            f"{len(errors)} field{'s' if len(errors) != 1 else ''} "
+            f"need{'s' if len(errors) == 1 else ''} attention. "
             "Your changes have not been saved."
         )
 
