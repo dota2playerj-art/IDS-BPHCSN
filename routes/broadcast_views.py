@@ -65,15 +65,14 @@ def _gateway_context():
     live = gateway_configured()
     return {
         "gateway_live": live,
-        "gateway_label": "Live — Semaphore" if live else "Simulated — no API key",
+        "gateway_label": "Live — connected" if live else "Simulated — no key set",
         "gateway_note": (
-            "SEMAPHORE_API_KEY is configured; broadcasts are transmitted through "
-            "the Semaphore gateway."
+            "A key is set, so broadcasts are transmitted through the messaging "
+            "service."
             if live else
-            "SEMAPHORE_API_KEY is not configured, so broadcasts are recorded in "
-            "full but not transmitted. Setting that environment variable and "
-            "restarting the app is the only step needed to go live — see the note "
-            "at the top of utils/sms.py."
+            "No key is set, so broadcasts are recorded in full but not "
+            "transmitted. Setting a key on the server and restarting this system "
+            "is the only step needed to go live."
         ),
     }
 
@@ -162,9 +161,9 @@ def _sent_message(broadcast):
     # recorded, it simply has not been transmitted yet.
     if broadcast["delivery_mode"] == SIMULATED:
         message += (
-            " SIMULATED SEND — no SEMAPHORE_API_KEY is configured, so this "
-            "broadcast was recorded in full but no message left the system. It "
-            "becomes a live send as soon as that key is set."
+            " SIMULATED SEND — no key is set for the messaging service, so "
+            "this broadcast was recorded in full but no message left the system. "
+            "It becomes a live send as soon as that key is set."
         )
     return message
 

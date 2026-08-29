@@ -90,9 +90,9 @@ UNTRACKED = {
     # in" -- which is a fact about the account rather than a gap in the system,
     # and is why it is written in the template rather than kept here.
     "assignment": (
-        "Station and zone assignment is not stored. The users table has no "
-        "column for it, so an account cannot be placed at the main health "
-        "center, a purok zone or the dispensary."
+        "Station and zone assignment is not stored. There is nowhere to record "
+        "it, so an account cannot be placed at the main health center, a purok "
+        "zone or the dispensary."
     ),
     # CORRECTED TWICE, AND THE SECOND TIME BECAUSE THE FIX MADE IT FALSE.
     # It first read "no account is ever locked out -- there is no failed-login
@@ -115,9 +115,9 @@ UNTRACKED = {
         "to sign in or deactivated; nothing records one waiting to be activated."
     ),
     "contact": (
-        "The users table has email and phone columns, but nothing in the "
-        "application writes to them and they are empty for every account. "
-        "Contact details were never captured, so there is none to show."
+        "An email address and a phone number can be held for an account, but "
+        "nothing in this system ever fills them in and both are empty for every "
+        "account. Contact details were never captured, so there is none to show."
     ),
     # THERE IS NO "search" ENTRY ANY MORE, AND THAT IS THE POINT.
     # It said searching and filtering are not wired, and that three accounts on
@@ -152,9 +152,9 @@ UNTRACKED = {
     # out rather than left unfinished. The filename went with the argument.
     "write": (
         "Creating, editing and deactivating accounts is not built. The three "
-        "accounts here are set up in the application's own code. Deactivation "
-        "does work and is enforced at sign-in, but it is set by hand in the "
-        "database, not from this screen."
+        "accounts here are set up by the system itself. Deactivation does work "
+        "and is enforced at sign-in, but it is set by hand in the database, not "
+        "from this screen."
     ),
     "reset_password": (
         "Password reset is not built. Each password is set once when the "

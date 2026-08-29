@@ -88,9 +88,9 @@ AUDIENCE_NOT_AVAILABLE = (
     {
         "label": "Pregnant Women",
         "reason": (
-            "Nothing in the schema records a pregnancy, which is why Screen 03's "
-            "prenatal figure reads 0. This audience needs a prenatal flag or a "
-            "prenatal appointment type first."
+            "Nothing here records a pregnancy, which is why the Prenatal "
+            "Patients figure on Patient Records reads 0. This audience needs a "
+            "prenatal flag or a prenatal appointment type first."
         ),
     },
 )

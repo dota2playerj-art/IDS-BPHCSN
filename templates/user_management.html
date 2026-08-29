@@ -146,7 +146,7 @@
           routes/user_views.py::RECENT_SIGN_IN_DAYS sets. The trend line states
           the window, because "recently" is meaningless without it. #}
       <div class="col-md-3 col-sm-6">
-        <div class="stat-card" title="Accounts with a sign-in recorded in the last {{ recent_sign_in_days }} days, counted from the audit trail — the same rows Screen 12's Login Events card counts.">
+        <div class="stat-card" title="Accounts with a sign-in recorded in the last {{ recent_sign_in_days }} days, counted from the audit trail — the same rows the Login Events card on Audit Logs counts.">
           <div class="stat-icon" style="background:#DBEAFE;"><span class="material-symbols-outlined" style="color:var(--info);">login</span></div>
           <div class="stat-value">{{ recent_sign_ins }}</div>
           <div class="stat-label">Signed In Recently</div>
@@ -204,9 +204,9 @@
               Three accounts fit on one screen, so all three controls filtered
               or paged a list that is already complete. #}
           <div class="scope-note">
-            <strong>Accounts are seeded, not created here.</strong>
-            The three accounts below are written once by <code>models/users.py</code>,
-            one for each role the database allows. {{ untracked.write }}
+            <strong>Accounts are set up once, not created here.</strong>
+            The three accounts below are written once by the system itself, one for
+            each role it allows. {{ untracked.write }}
           </div>
 
           <div style="overflow-x:auto;">

@@ -182,8 +182,8 @@ LIVE = "live"
 SIMULATED = "simulated"
 
 SIMULATED_NOTE = (
-    "Simulated send: SEMAPHORE_API_KEY is not configured, so nothing was "
-    "transmitted to the gateway."
+    "Simulated send: no key is set for the messaging service, so nothing was "
+    "transmitted."
 )
 
 

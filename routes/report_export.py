@@ -906,7 +906,7 @@ def _broadcasts(context):
             ("Messages handed to the gateway", scoped["messages_sent"], ""),
             ("Messages that failed to send", scoped["messages_failed"], ""),
             ("Broadcasts sent through the simulated gateway", scoped["simulated"],
-             "utils/sms.py records a broadcast without contacting a provider"),
+             "recorded in full, but never handed to the messaging service"),
         ]),
         figures("All time", [
             ("Broadcasts on record", broadcasts["total_broadcasts"], ""),

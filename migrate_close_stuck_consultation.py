@@ -82,11 +82,11 @@ AUDIT_DETAILS = (
     "2026-08-28) was moved from 'In Consultation' to 'Completed'. It was "
     "checked in at 23:36:30 and started at 23:36:36 on 2026-08-28 and was "
     "never completed, so it still held the clinician a day later and refused "
-    "every new consultation system-wide -- the single-active-consultation "
-    "guard is not scoped to a date. No consultation record was written for "
-    "this visit and none was created here: the appointment is closed, and what "
-    "was not recorded stays not recorded. Applied by "
-    "migrate_close_stuck_consultation.py."
+    "every new consultation across the whole system -- only one consultation "
+    "may be open at a time, and that rule does not reset overnight. No "
+    "consultation record was written for this visit and none was created here: "
+    "the appointment is closed, and what was not recorded stays not recorded. "
+    "Applied by a one-off correction run against the records."
 )
 
 

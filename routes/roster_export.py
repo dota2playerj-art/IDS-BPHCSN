@@ -110,7 +110,7 @@ FILTER_SCOPE_NOTE = (
     "This file holds the complete list. The search box and filter controls on the "
     "screen narrow rows inside the browser, so the server is never told what was "
     "typed or chosen and a download cannot honour them. Print has the same limit "
-    "and resolves it the same way -- see templates/_print.html. If the file should "
+    "and resolves it the same way. If the file should "
     "cover less, narrow it after opening it: that is what a spreadsheet is for."
 )
 
@@ -135,9 +135,9 @@ PATIENT_UNTRACKED = (
     ),
     (
         "Prenatal enrolment",
-        "Nothing in the schema marks a patient as pregnant or stores an expected "
-        "delivery date. The Prenatal Patients card on the screen reports its own "
-        "absence for the same reason, and there is no column for it here.",
+        "Nothing marks a patient as pregnant or stores an expected delivery "
+        "date. The Prenatal Patients card on the screen reports its own absence "
+        "for the same reason, and there is no column for it here.",
     ),
     (
         "Purok or zone",
@@ -495,7 +495,7 @@ PATIENT_COLUMNS = (
 # same thing about them -- the argument _cover_sheet() makes about the scope
 # note, applied to the columns underneath it.
 PATIENT_ROW_NOTE = (
-    "Sorted by surname, A–Z, the order Screen 03's table states in its own "
+    "Sorted by surname, A–Z, the order the Patient Records table states in its "
     "footer. Age is the age today, computed from the stored birth date; Last "
     "Visit is the most recent recorded consultation, not a stored field."
 )
@@ -557,7 +557,7 @@ def _patient_export(context, produced_by):
     summary = sheet(
         "Roster Summary",
         [figures(
-            "The figures on Screen 03's stat cards",
+            "The figures on the Patient Records stat cards",
             [
                 ("Total registered patients", stats["total_patients"],
                  "Every record, whatever its status"),
@@ -579,7 +579,7 @@ def _patient_export(context, produced_by):
     )
 
     cover = _cover_sheet(
-        "Patient Records (Screen 03)",
+        "Patient Records",
         "Full patient roster",
         produced_by,
         detail=[("Patients in this file", total)],
@@ -653,7 +653,8 @@ def _patient_export(context, produced_by):
 SELECTION_UNTRACKED = (
     (
         "Why these records were selected",
-        "The selection was made by ticking rows on Screen 03 and nothing stores "
+        "The selection was made by ticking rows on Patient Records and nothing "
+        "stores "
         "it. There is no saved cohort, no shared list and no reason field behind "
         "it, so this file is a snapshot of one operator's choice at one moment "
         "and cannot be reproduced from the system afterwards. If the grounds "
@@ -694,7 +695,7 @@ def _patient_selection_export(context, produced_by):
     listing = sheet(
         "Selected Patients",
         [table(
-            f"The records selected on Screen 03 — {_count_label(total, 'record')}",
+            f"The records selected on Patient Records — {_count_label(total, 'record')}",
             PATIENT_COLUMNS,
             _patient_rows(patients),
             note=PATIENT_ROW_NOTE,
@@ -705,7 +706,7 @@ def _patient_selection_export(context, produced_by):
             f"{_count_label(total, 'patient')} selected from the "
             f"{_count_label(registered, 'patient')} on the register, as of "
             f"{long_date(today())}. These are the records that were ticked on "
-            "Screen 03 and no others; a patient missing from this list was not "
+            "Patient Records and no others; a patient missing from this list was not "
             "selected, rather than filtered out."
         ),
     )
@@ -736,18 +737,18 @@ def _patient_selection_export(context, produced_by):
             f"{missing} could not be included: the register has no row for them. "
             "Retiring a patient does not do this -- an Inactive or Deceased "
             "record is still on the roster and would still be in this file -- so "
-            "reload Screen 03 and select again if the full set is needed.",
+            "reload Patient Records and select again if the full set is needed.",
         ])
 
     cover = _cover_sheet(
-        "Patient Records (Screen 03)",
+        "Patient Records",
         "Selected patients",
         produced_by,
         detail=detail,
         scope=(
             "A selection, not the register",
-            "This file holds only the patient records that were ticked on Screen "
-            "03 before Export was pressed. It is NOT the full roster -- the "
+            "This file holds only the patient records that were ticked on Patient "
+            "Records before Export was pressed. It is NOT the full roster -- the "
             "toolbar's own Export Excel and Export PDF are, and they download "
             "every registered patient. It is not the result of a saved search "
             "either: the selection was made by hand, one row at a time, and "
@@ -844,7 +845,7 @@ def _inventory_export(context, produced_by):
             f"Every item on the shelf — {_count_label(total, 'item')}",
             INVENTORY_COLUMNS,
             rows,
-            note=("Sorted by medicine name, A–Z, the order Screen 06's table "
+            note=("Sorted by medicine name, A–Z, the order the Medicine Inventory table "
                   "states in its own footer. Status is what the screen's badge "
                   "shows: the item's lifecycle status where it has been retired, "
                   "and its stock condition otherwise. Stock condition is always "
@@ -873,7 +874,7 @@ def _inventory_export(context, produced_by):
     summary = sheet(
         "Stock Summary",
         [figures(
-            "The figures on Screen 06's stat cards",
+            "The figures on the Medicine Inventory stat cards",
             [
                 ("Items in service", stats["total_items"],
                  f"{stats['medicine_count']} medicines, "
@@ -903,7 +904,7 @@ def _inventory_export(context, produced_by):
     )
 
     cover = _cover_sheet(
-        "Medicine Inventory (Screen 06)",
+        "Medicine Inventory",
         "Full inventory list",
         produced_by,
         detail=[
@@ -1137,7 +1138,7 @@ def _appointment_export(context, produced_by):
     summary = sheet(
         "Summary",
         [figures(
-            "The figures on Screen 08's stat cards and panel headers",
+            "The figures on the Appointment Scheduling stat cards and panel headers",
             [
                 ("Appointments today", queue_stats["total_today"],
                  f"{queue_stats['walk_ins']} walk-in"
@@ -1174,7 +1175,7 @@ def _appointment_export(context, produced_by):
     )
 
     cover = _cover_sheet(
-        "Appointment Scheduling (Screen 08)",
+        "Appointment Scheduling",
         "Today's queue, upcoming bookings and the calendar month",
         produced_by,
         detail=[
@@ -1206,8 +1207,8 @@ def _appointment_export(context, produced_by):
             ["Summary", "The figures the screen's stat cards and headers show."],
         ],
         intro=(
-            "Screen 08 shows three lists side by side, and all three are in this "
-            "file on sheets of their own. Taken off the system on "
+            "Appointment Scheduling shows three lists side by side, and all "
+            "three are in this file on sheets of their own. Taken off the system on "
             f"{now().strftime('%B %d, %Y')}."
         ),
     )
@@ -1300,7 +1301,7 @@ def _user_export(context, produced_by):
             f"{_count_label(total, 'account')} — {context['active_users']} active, "
             f"{context['inactive_users']} deactivated — across "
             f"{_count_label(context['roles_represented'], 'role')}. This is the "
-            "complete list: the accounts are seeded by models/users.py, one for "
+            "complete list: the accounts are set up by the system itself, one for "
             "each role the database allows, and nothing on the screen creates "
             "another. A deactivated account is refused at the login form even when "
             "the password presented is correct, and the refusal is recorded in the "
@@ -1320,7 +1321,7 @@ def _user_export(context, produced_by):
             "Which screens each account's role can open",
             ACCESS_COLUMNS,
             access_rows,
-            note=("Read at export time off each view's own role_required() guard, "
+            note=("Read at export time from the access rule each screen enforces, "
                   "so this is the access rule that is enforced rather than a "
                   "description of it kept in step by hand. An account appears once "
                   "per screen its role admits it to."),
@@ -1328,7 +1329,7 @@ def _user_export(context, produced_by):
         )],
         heading="Access By Account",
         intro=(
-            "The permissions panel on the right of Screen 11, for every account at "
+            "The permissions panel on the right of User Management, for every account at "
             "once. A screen absent from an account's rows is a screen that "
             "account's role is refused."
         ),
@@ -1337,7 +1338,7 @@ def _user_export(context, produced_by):
     summary = sheet(
         "Account Summary",
         [figures(
-            "The figures on Screen 11's stat cards",
+            "The figures on the User Management stat cards",
             [
                 ("Total accounts", total,
                  f"Across {_count_label(context['roles_represented'], 'role')}"),
@@ -1351,14 +1352,14 @@ def _user_export(context, produced_by):
                  "signed in. Counted from the audit trail"),
             ],
             note=("The same figures the four cards above the table show, read from "
-                  "the same call. The sign-in counts are the rows Screen 12's "
+                  "the same source. The sign-in counts are the rows the Audit Logs "
                   "Login Events card counts, so the two cannot disagree."),
         )],
         heading="Account Summary",
     )
 
     cover = _cover_sheet(
-        "User Management (Screen 11)",
+        "User Management",
         "All system accounts and the access each one carries",
         produced_by,
         detail=[
@@ -1368,8 +1369,9 @@ def _user_export(context, produced_by):
         ],
         controls=[[
             "There is nothing on this screen to narrow",
-            "Screen 11 has no search box and no filter panel — with three accounts "
-            "on one page there is nothing to narrow, and the screen says so. This "
+            "User Management has no search box and no filter panel — with three "
+            "accounts on one page there is nothing to narrow, and the screen says "
+            "so. This "
             "file is the complete roster for the same reason the screen is: it is "
             "all there is.",
         ]],
@@ -1383,8 +1385,8 @@ def _user_export(context, produced_by):
             "Every account that can sign in to IDS-BPHCSN, with the role and the "
             "access each one carries, taken off the system on "
             f"{now().strftime('%B %d, %Y')}. This file names accounts and their "
-            "privileges; no password and no hash is in it, and none can be — "
-            "get_all_users() does not select the column."
+            "privileges; no password is in it, and none can be — this file never "
+            "reads one."
         ),
     )
 
@@ -1400,9 +1402,9 @@ def _user_export(context, produced_by):
             "system. The cover sheet names who took it off and when, and that name "
             "is the only record of it that exists.",
         ]],
-        "The roster is complete for what the users table holds. The reasons below "
-        "are the screen's own, quoted from routes/user_views.py so this file and "
-        "Screen 11 state them in one wording.",
+        "The roster is complete for everything held about an account. The reasons "
+        "below are the screen's own, quoted word for word so this file and "
+        "User Management state them in one wording.",
     )
 
     return _assemble(

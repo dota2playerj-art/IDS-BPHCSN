@@ -173,7 +173,7 @@
 {% block content %}
     <div class="eyebrow">Barangay Poblacion Health Center</div>
     <div class="page-title">SMS Notifications</div>
-    <div class="page-desc">Community SMS broadcasts sent through the Semaphore gateway, and the record of every one already sent.</div>
+    <div class="page-desc">Community SMS broadcasts sent through the messaging service, and the record of every one already sent.</div>
 
     <!-- GATEWAY STATUS. Read fresh on every render from the environment, so this
          line changes the moment SEMAPHORE_API_KEY is set and the app restarts. -->
@@ -316,7 +316,7 @@
                   <td>
                     <div class="recip-mobile">{{ broadcast.reference }}</div>
 {%- if broadcast.is_simulated %}
-                    <span class="sim-flag" title="Recorded in full, but no message was transmitted: no SEMAPHORE_API_KEY was configured when this was sent.">
+                    <span class="sim-flag" title="Recorded in full, but no message was transmitted: no key for the messaging service was set when this was sent.">
                       <span class="material-symbols-outlined" style="font-size:13px;">wifi_off</span>Simulated
                     </span>
 {%- endif %}
@@ -403,7 +403,7 @@
           <div class="detail-row">
             <div class="detail-label">Channel</div>
             <div class="detail-value">
-              {% if latest.is_simulated %}Simulated &middot; not transmitted{% else %}SMS &middot; Semaphore gateway{% endif %}
+              {% if latest.is_simulated %}Simulated &middot; not transmitted{% else %}SMS &middot; messaging service{% endif %}
             </div>
           </div>
           <div class="detail-row"><div class="detail-label">Status</div><div class="detail-value"><span class="badge-status {{ latest.status_badge_class }}">{{ latest.status }}</span></div></div>
@@ -414,8 +414,8 @@
           <div class="unavailable-note" style="margin-top:0;">
             <strong>This broadcast was not transmitted.</strong>
             It was composed, addressed and recorded exactly as a live send would be, but
-            no <code>SEMAPHORE_API_KEY</code> was configured at the time, so nothing was
-            sent to the gateway. Setting that key makes the next broadcast live.
+            no key for the messaging service was set at the time, so nothing was
+            sent to it. Setting that key makes the next broadcast live.
           </div>
 {% endif %}
 
@@ -439,7 +439,7 @@
 {%- endif %}
           <div class="panel-note">
             &ldquo;Sent&rdquo; means the gateway accepted the message. This system receives no
-            delivery reports from Semaphore, so no broadcast is ever marked delivered.
+            delivery reports from the messaging service, so no broadcast is ever marked delivered.
           </div>
 {% endif %}
 {% else %}
