@@ -146,7 +146,7 @@
         <div class="stat-card">
           <div class="stat-icon" style="background:#FEF3C7;"><span class="material-symbols-outlined" style="color:var(--warning);">trending_down</span></div>
           <div class="stat-value">{{ low_stock.low_stock_count }}</div>
-          <div class="stat-label">Low Stock Medicines</div>
+          <div class="stat-label">Low Stock Items</div>
           {%- if low_stock.out_of_stock_count %}
           <div class="stat-trend" style="color:var(--danger);">{{ low_stock.out_of_stock_count }} out of stock</div>
           {%- elif low_stock.low_stock_count %}

@@ -145,7 +145,7 @@
         <div class="stat-card">
           <div class="stat-icon" style="background:#FEF3C7;"><span class="material-symbols-outlined" style="color:var(--warning); font-size:20px;">trending_down</span></div>
           <div class="stat-value">{{ low_stock.low_stock_count }}</div>
-          <div class="stat-label">Low Stock Medicines</div>
+          <div class="stat-label">Low Stock Items</div>
           {%- if low_stock.out_of_stock_count %}
           <div class="stat-trend" style="color:var(--danger);">{{ low_stock.out_of_stock_count }} out of stock</div>
           {%- elif low_stock.low_stock_count %}
@@ -266,7 +266,7 @@
               <th>Age</th>
               <th>Time</th>
               <th>Chief Complaint</th>
-              <th>Medicine</th>
+              <th>Dispensed</th>
               <th>BHW</th>
               <th>Status</th>
             </tr>
@@ -325,7 +325,7 @@
               <div class="chart-wrap" style="height:140px;"><canvas id="chartRegs"></canvas></div>
             </div>
             <div class="col-6">
-              <div style="font-size:12.5px; font-weight:600; color:var(--text-dark); margin-bottom:6px;">Medicine Units Dispensed</div>
+              <div style="font-size:12.5px; font-weight:600; color:var(--text-dark); margin-bottom:6px;">Units Dispensed</div>
               {#- The canvas originally here drew six invented monthly totals,
                   and was then replaced by a note stating that no such history
                   was stored. It is stored now, so the chart is real: the same
@@ -491,7 +491,7 @@
     options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true, grid:{color:'#F1F3F5'}}, x:{grid:{display:false}}} }
   });
 
-  // Amber rather than teal, matching the Medicines Dispensed section on the
+  // Amber rather than teal, matching the Items Dispensed section on the
   // consultation form and the dispensing panels on Screen 10: on every screen in
   // this project, stock leaving the shelf is the amber thing.
   new Chart(document.getElementById('chartDispensed'), {

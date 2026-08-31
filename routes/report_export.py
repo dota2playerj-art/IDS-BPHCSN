@@ -112,7 +112,7 @@ SHEET_TITLES = {
     "seniors": "Senior Citizens",
     "programs": "Health Programmes",
     "inventory": "Medicine Inventory",
-    "dispensing": "Medicine Dispensed",
+    "dispensing": "Items Dispensed",
     "sms": "SMS Activity",
     "notifications": "Notifications",
 }
@@ -845,7 +845,7 @@ def _inventory(context):
 
 
 def _dispensing(context):
-    """Medicine that actually left the shelf inside the range.
+    """What actually left the shelf inside the range.
 
     The sheet that could not exist before medicine_dispensing did. Everything on
     it is ranged -- unlike the inventory sheet directly before it, which reports
@@ -857,6 +857,11 @@ def _dispensing(context):
     patients in tens is a different supply problem from a maintenance drug given
     to two patients in hundreds, and a sheet that showed only one of the two
     would let a reader draw the wrong conclusion about which shelf to restock.
+
+    Covers all three inventory categories, as the dispensing form does. The
+    stats dict still keys its ranking "medicines" -- that is an internal name
+    predating the widening, and renaming it would touch every reader of
+    get_dispensing_stats() for nothing a reader of this sheet ever sees.
     """
     dispensing = context["dispensing_stats"]
     window = context["report_window"]
@@ -865,12 +870,12 @@ def _dispensing(context):
         display_date(window["start"]), display_date(window["end"]))
 
     return [
-        figures("Medicine dispensed in this range", [
+        figures("Items dispensed in this range", [
             ("Units dispensed", scoped["units"], span),
             ("Dispensing events", scoped["events"],
-             "One event is one medicine issued to one patient at one visit"),
+             "One event is one item issued to one patient at one visit"),
             ("Patients supplied", scoped["patients"], ""),
-            ("Different medicines dispensed", scoped["medicines"], ""),
+            ("Different items dispensed", scoped["medicines"], ""),
         ]),
         _trend_block("Units dispensed, by month", scoped["trend"],
                      [("Units", "units")],
@@ -878,15 +883,15 @@ def _dispensing(context):
                           "months, so the bars sum to the figure above."),
         _trend_block("Dispensing events, by month", scoped["trend"],
                      [("Events", "events")]),
-        table("Most dispensed medicines in this range",
-              ("Medicine", "Units", "Unit", "Issues"),
+        table("Most dispensed items in this range",
+              ("Item", "Units", "Unit", "Issues"),
               [[entry["medicine_name"], entry["units"], entry["unit"] or "",
                 entry["events"]]
                for entry in scoped["all_medicines"]],
               note="Ranked by units dispensed inside the selected range, most "
                    "first. Named as the dispensing records name them. An item "
                    "renamed part way through a range appears under both names.",
-              empty="No medicine was dispensed inside this range."),
+              empty="Nothing was dispensed inside this range."),
         figures("All time", [
             ("Units dispensed", dispensing["total_units"], ""),
             ("Dispensing events", dispensing["total_events"], ""),

@@ -378,7 +378,7 @@
 {%- endif %}
     </div>
 
-    <!-- ROW: MEDICINE INVENTORY STATUS + LOW STOCK MEDICINES -->
+    <!-- ROW: MEDICINE INVENTORY STATUS + LOW STOCK ITEMS -->
 {%- if 'inventory' in sections %}
     <div class="row g-3">
       <div class="col-lg-6">
@@ -403,14 +403,14 @@
     not recorded is a *stock level* at a past date -- inventory_items holds one
     number per item and nothing snapshots it -- so "what the shelf held in March"
     remains unanswerable and this panel answers today. Where the medicine went is
-    on the Medicine Dispensed panel below, which is ranged. #}
-          <div class="snapshot-note">{{ snapshot_note }} Dispensing is recorded and is reported over the selected range under Medicine Dispensed. The stock level at a past date is not stored, so this panel shows the shelf as it stands today.</div>
+    on the Most Dispensed Items panel below, which is ranged. #}
+          <div class="snapshot-note">{{ snapshot_note }} Dispensing is recorded and is reported over the selected range under Most Dispensed Items. The stock level at a past date is not stored, so this panel shows the shelf as it stands today.</div>
         </div>
       </div>
       <div class="col-lg-6">
         <div class="panel-card">
-          <h2 class="print-only print-section-title">Low Stock Medicines</h2>
-          <div class="panel-title no-print">Low Stock Medicines</div>
+          <h2 class="print-only print-section-title">Low Stock Items</h2>
+          <div class="panel-title no-print">Low Stock Items</div>
           <div class="panel-sub">Below reorder level as of {{ report_date | display_date }}, needs restock</div>
           <div>
 {%- for item in inventory_report.low_stock_items %}
@@ -448,8 +448,8 @@
 {%- set disp = dispensing_stats.window %}
       <div class="col-lg-7">
         <div class="panel-card">
-          <h2 class="print-only print-section-title">Most Dispensed Medicines</h2>
-          <div class="panel-title no-print">Most Dispensed Medicines</div>
+          <h2 class="print-only print-section-title">Most Dispensed Items</h2>
+          <div class="panel-title no-print">Most Dispensed Items</div>
           <div class="panel-sub">
             {{ disp.units }} unit{{ '' if disp.units == 1 else 's' }} issued
             across {{ disp.events }} dispensing event{{ '' if disp.events == 1 else 's' }}
@@ -458,17 +458,17 @@
           </div>
 {%- if disp.top_medicines %}
           <div class="chart-wrap"><canvas id="chartTopMedicines"></canvas></div>
-{{ ct.chart_table('Most dispensed medicines in this range',
+{{ ct.chart_table('Most dispensed items in this range',
                   disp.top_medicines | map(attribute='medicine_name') | list,
                   [{'name': 'Units', 'values': disp.top_medicines | map(attribute='units') | list}],
-                  first_head='Medicine') }}
+                  first_head='Item') }}
           <div class="mini-legend no-print">
 {%- for entry in disp.top_medicines %}
             <div class="mini-legend-item">{{ entry.medicine_name }} &middot; {{ entry.units_text }} in {{ entry.events }} issue{{ '' if entry.events == 1 else 's' }}</div>
 {%- endfor %}
           </div>
 {%- else %}
-          <div class="panel-sub" style="margin-top:14px;">No medicine was dispensed inside this range. Medicine issued during a consultation is recorded here from the day it is given.</div>
+          <div class="panel-sub" style="margin-top:14px;">Nothing was dispensed inside this range. Medicine, supplies and equipment issued during a consultation are recorded here from the day they are given.</div>
 {%- endif %}
 {#- Ranked by units, with the issue count printed beside it, because the two are
     different supply questions: forty patients given ten tablets each and two
@@ -741,7 +741,7 @@
             across {{ dispensing_stats.window.events }} issue{{ '' if dispensing_stats.window.events == 1 else 's' }}
           </div>
           <div class="chart-wrap"><canvas id="chartDispensed"></canvas></div>
-{{ ct.chart_table('Medicine units dispensed, by month',
+{{ ct.chart_table('Units dispensed, by month',
                   dtrend | map(attribute='label') | list,
                   [{'name': 'Units dispensed', 'values': dtrend | map(attribute='units') | list}]) }}
         </div>
@@ -1012,7 +1012,7 @@
     options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:countAxis, x:{grid:{display:false}}} }
   });
 
-  // Medicine Units Dispensed (bar) — its own canvas beneath the consultation
+  // Units Dispensed (bar) — its own canvas beneath the consultation
   // line rather than a second dataset on it. Units and consultations are
   // different quantities in different orders of magnitude, and sharing one y
   // axis would flatten whichever is smaller into the floor; a reader comparing
@@ -1030,7 +1030,7 @@
     options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:countAxis, x:{grid:{display:false}}} }
   });
 
-  // Most Dispensed Medicines (horizontal bar) — ranked by units inside the
+  // Most Dispensed Items (horizontal bar) — ranked by units inside the
   // range, from models/dispensing.py get_dispensing_stats(). Horizontal because
   // the labels are medicine names, which do not fit under a vertical axis.
   draw('chartTopMedicines', {

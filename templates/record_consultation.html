@@ -108,7 +108,7 @@
   }
   .recorded-vaccine .material-symbols-outlined{font-size:18px;}
 
-  /* MEDICINES DISPENSED — amber rather than teal, and that is the one visual
+  /* ITEMS DISPENSED — amber rather than teal, and that is the one visual
      decision in this section worth writing down. Every other section on this
      form writes a record. This one writes a record *and moves a figure on
      another screen*: saving it takes units off Medicine Inventory, which may
@@ -128,7 +128,7 @@
     font-size:13px; color:var(--text-muted); background:var(--bg); border-radius:10px;
     padding:14px 16px; line-height:1.6;
   }
-  /* ADD ANOTHER MEDICINE — dashed and amber. Dashed because it makes a line
+  /* ADD ANOTHER ITEM — dashed and amber. Dashed because it makes a line
      that is not there yet rather than acting on the record, and amber because
      it belongs to this card rather than to the teal form around it. It is
      deliberately quieter than Save: adding a line is not the point of the
@@ -603,7 +603,7 @@
         </div>
       </div>
 
-{#- ONE definition of a medicine line, rendered twice: once for each line the
+{#- ONE definition of an item line, rendered twice: once for each line the
     server puts on the page, and once, blank, inside the <template> the Add
     button clones. Written as a macro because two hand-kept copies of this
     markup would be two things to keep in step, and the copy that drifted would
@@ -618,12 +618,18 @@
                 <td>
                   <select class="form-select dispense-select{% if item_error %} is-invalid{% endif %}"
                           name="{{ item_name }}"
-                          aria-label="Medicine dispensed on line {{ line }}">
-                    <option value="">&mdash; No medicine on this line &mdash;</option>
+                          aria-label="Item dispensed on line {{ line }}">
+                    <option value="">&mdash; No item on this line &mdash;</option>
 {#- Every option carries what is actually on the shelf, so the ceiling is
-    visible before it is hit rather than only in the refusal afterwards. #}
+    visible before it is hit rather than only in the refusal afterwards.
+
+    Supplies and equipment are marked with their item type; medicines are not.
+    The list mixes all three now, and on a clinical form the difference between a
+    drug and a consumable is worth stating where somebody picks one -- but marking
+    the medicines too would put a word on nine options out of eleven in order to
+    distinguish the two that need it. #}
 {%- for option in options %}
-                    <option value="{{ option.id }}"{% if item_value == option.id | string %} selected{% endif %}>{{ option.label }} &mdash; {{ option.stock_text }} in stock</option>
+                    <option value="{{ option.id }}"{% if item_value == option.id | string %} selected{% endif %}>{{ option.label }}{% if option.category and option.category != 'Medicine' %} ({{ option.category }}){% endif %} &mdash; {{ option.stock_text }} in stock</option>
 {%- endfor %}
                   </select>
 {%- if item_error %}
@@ -643,8 +649,8 @@
               </tr>
 {%- endmacro %}
 
-      <!-- MEDICINES DISPENSED — the other half of Objective 2, and the only
-           section on this form that changes a figure on another screen.
+      <!-- ITEMS DISPENSED — the other half of Objective 2, and the only section
+           on this form that changes a figure on another screen.
 
            WHY IT IS HERE AND NOT ON MEDICINE INVENTORY
            Because a dispensing event that is not traceable to the clinical
@@ -659,20 +665,27 @@
            record having given it.
 
            WHAT SAVING THIS DOES
-           Each line inserts a dispensing record and decrements that medicine's
+           Each line inserts a dispensing record and decrements that item's
            stock in one transaction — see models/dispensing.py. Before this
            existed, inventory stock only ever went up.
 
+           WHAT IT COVERS
+           Medicine, Supply and Equipment — every category the inventory records.
+           It was medicines only to begin with; supplies and equipment genuinely
+           get used up during real visits, and the consultation is the only moment
+           the system sees them leave the shelf. models/dispensing.py carries the
+           reasoning, and what widening it costs.
+
            Shown for every patient at every age. What narrows the list is the
-           shelf, not the patient: only in-service, unexpired, in-stock medicines
-           are offered. -->
+           shelf, not the patient: only in-service, unexpired, in-stock items are
+           offered. -->
       <div class="panel-card dispense-card">
         <div class="section-head">
           <div class="section-icon"><span class="material-symbols-outlined">pill</span></div>
           <div>
-            <div class="section-title">Medicines Dispensed</div>
+            <div class="section-title">Items Dispensed</div>
             <div class="section-sub">
-              Taken off the shelf and given to the patient &middot; updates Medicine Inventory
+              Medicine, supplies or equipment taken off the shelf at this visit &middot; updates Medicine Inventory
             </div>
           </div>
         </div>
@@ -700,7 +713,7 @@
           <table class="appt-table" style="width:100%; border-collapse:separate; border-spacing:0; font-size:13.5px;">
             <thead>
               <tr>
-                <th>Medicine</th>
+                <th>Item</th>
                 <th style="width:170px;">Quantity given</th>
               </tr>
             </thead>
@@ -721,7 +734,7 @@
         </div>
 
         <!-- ADDING A LINE — the section used to render four lines and stop
-             there, so a visit that issued a fifth medicine could not record it
+             there, so a visit that issued a fifth item could not record it
              without being saved and reopened. It now starts at two and grows on
              request, up to the ceiling in models/dispensing.py.
 
@@ -730,11 +743,11 @@
              would do nothing when clicked; it shows the two lines it can use,
              and the server reads whatever arrives either way. -->
         <div class="dispense-add-wrap">
-          <button type="button" class="btn-add-line" id="addMedicineLine" hidden>
-            <span class="material-symbols-outlined">add</span>Add another medicine
+          <button type="button" class="btn-add-line" id="addItemLine" hidden>
+            <span class="material-symbols-outlined">add</span>Add another item
           </button>
           <span class="dispense-add-note" id="dispenseLineCap" hidden>
-            {{ dispensing.max_rows }} medicines is the most one visit can record.
+            {{ dispensing.max_rows }} items is the most one visit can record.
           </span>
         </div>
 
@@ -744,14 +757,15 @@
 {%- else %}
         <!-- Nothing on the shelf can be dispensed. Stated rather than shown as
              an empty dropdown, which would read as the feature being broken. -->
-{#- "Filed under Medicine" was the category test spelled the way the database
-    spells it. Supplies and equipment are the other two categories and are the
-    thing an operator would otherwise go looking for, so they are named instead
-    of left as the negative space around a word. #}
+{#- This used to have to explain that the list held medicines only. It no longer
+    does, so what is left to say is the one thing that still narrows it: the
+    shelf. Every condition is named, because "nothing can be dispensed" with a
+    stocked store behind it reads as the feature being broken. #}
         <div class="dispense-empty">
-          Nothing can be dispensed at this visit. This list holds medicines only &mdash; not supplies
-          or equipment &mdash; and each one must be active, unexpired and in stock.
-          Restock or correct an expiry date on Medicine Inventory to fill it.
+          Nothing can be dispensed at this visit. Medicine, supplies and equipment are all
+          offered here, but each one must be active, unexpired and in stock &mdash; and
+          nothing on the shelf currently is. Restock or correct an expiry date on
+          Medicine Inventory to fill it.
         </div>
 {%- endif %}
 
@@ -763,12 +777,12 @@
     "what happens if I type this". #}
         <div class="cohort-note">
           Each line comes off Medicine Inventory immediately, is dated
-          {{ visit_date | display_date }}, and appears under Medicine History on
-          {{ patient.first_name }}'s profile. One line per medicine with the whole amount
+          {{ visit_date | display_date }}, and appears under Dispensing History on
+          {{ patient.first_name }}'s profile. One line per item with the whole amount
           given; a line is refused outright if the amount is more than the shelf holds or
-          the medicine has expired.
+          the item has expired.
 {%- if consultation %}
-          Medicine already dispensed at this visit cannot be removed here.
+          Anything already dispensed at this visit cannot be removed here.
 {%- endif %}
         </div>
       </div>
@@ -797,7 +811,7 @@
           {%- if errors.treatment_plan %}<div class="invalid-feedback d-block">{{ errors.treatment_plan }}</div>
 {#- This hint used to end "Stock deduction is not linked to this yet", which was
     true for the whole life of the project and stopped being true the moment the
-    Medicines Dispensed section above it started writing to Medicine Inventory.
+    Items Dispensed section above it started writing to Medicine Inventory.
     Leaving it would have been the worst kind of stale sentence: it sits directly
     under a field headed "medicines given", and it told the operator the opposite
     of what the form now does.
@@ -809,7 +823,7 @@
     "three times a day for five days" is written here; the fifteen tablets handed
     over are recorded there. Saying so stops the two being filled in as though
     either one were the other. #}
-          {%- else %}<div class="form-text-hint">The instruction itself &mdash; what to take, how much, how often, for how long. The amount handed over goes under Medicines Dispensed above.</div>{% endif %}
+          {%- else %}<div class="form-text-hint">The instruction itself &mdash; what to take, how much, how often, for how long. The amount handed over goes under Items Dispensed above.</div>{% endif %}
         </div>
 
         <div class="mb-3">
@@ -876,7 +890,7 @@
 
 {% block scripts %}
 <script>
-  // MEDICINES DISPENSED — the lines past the two the server rendered.
+  // ITEMS DISPENSED — the lines past the two the server rendered.
   //
   // The whole of this script is one button appending one row. What it must not
   // do is invent anything the server already decides: the field names are built
@@ -891,7 +905,7 @@
   (function(){
     var tbody = document.getElementById('dispenseRows');
     var proto = document.getElementById('dispenseRowTemplate');
-    var button = document.getElementById('addMedicineLine');
+    var button = document.getElementById('addItemLine');
     var capNote = document.getElementById('dispenseLineCap');
     // Absent on a visit where nothing can be dispensed: that case renders a
     // sentence instead of the table, and there is no line to add to it.
@@ -919,7 +933,7 @@
       var quantity = row.querySelector('input');
 
       select.name = itemPrefix + index;
-      select.setAttribute('aria-label', 'Medicine dispensed on line ' + (index + 1));
+      select.setAttribute('aria-label', 'Item dispensed on line ' + (index + 1));
       quantity.name = quantityPrefix + index;
       quantity.setAttribute('aria-label', 'Quantity dispensed on line ' + (index + 1));
 

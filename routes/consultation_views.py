@@ -226,7 +226,7 @@ def _general_vaccination_context(consultation, submitted=None):
 
 
 def _dispensing_context(consultation, submitted=None):
-    """The "Medicines Dispensed" section's state for this visit.
+    """The "Items Dispensed" section's state for this visit.
 
     Thinner again than the two vaccination sections above it, because there is no
     list to offer and no schedule to resolve: the choices are whatever is
@@ -281,12 +281,12 @@ def _dispensing_context(consultation, submitted=None):
 
 
 def _dispensing_row_count(values):
-    """How many medicine lines to render: the starting number, or more.
+    """How many item lines to render: the starting number, or more.
 
     A fresh form gets DISPENSE_START_ROWS and the operator adds the rest with the
     button. A bounced one has to come back with every line they had asked for,
     including the ones the button created -- rendering only the first two would
-    silently drop the third medicine from a form the operator is being told to
+    silently drop the third item from a form the operator is being told to
     correct, which is the one moment they are least likely to notice it missing.
 
     Counted from the highest index carrying anything at all, so a line that was
@@ -598,12 +598,12 @@ def process_record_consultation(appointment_id, form_data, user_id):
 
 
 def _dispensing_message(dispensed, failures):
-    """What to add to the save's flash message about the medicine given.
+    """What to add to the save's flash message about what was dispensed.
 
     Two things it deliberately says that a bare count would not.
 
-    The stock left behind, per medicine. A health worker who has just taken the
-    last twelve tablets off a shelf should be told so at the moment they do it,
+    The stock left behind, per item. A health worker who has just taken the last
+    twelve tablets off a shelf should be told so at the moment they do it,
     while the patient is still in the room and while restocking is still a
     decision somebody can make today -- not on the next render of a dashboard
     they may not open. The figure is the one record_dispensing() wrote, read back
@@ -614,13 +614,13 @@ def _dispensing_message(dispensed, failures):
     runs before the consultation is written, so this is only reachable when the
     shelf moved between that check and the save -- another dispensing committing
     in between. The consultation is saved either way, because it is the clinical
-    fact and it happened; what did not happen is the medicine leaving the store,
-    and saying so plainly is the only honest option. Quietly dropping it would
-    leave a record of a visit whose prescription vanished.
+    fact and it happened; what did not happen is the stock leaving the store, and
+    saying so plainly is the only honest option. Quietly dropping it would leave a
+    record of a visit whose prescription vanished.
     """
     if failures:
         return (
-            " The consultation was saved, but no medicine was dispensed: "
+            " The consultation was saved, but nothing was dispensed: "
             + " ".join(failures.values())
             + " Stock has not been changed — record it from the patient's "
             "consultation history once the shelf is right."
@@ -634,7 +634,7 @@ def _dispensing_message(dispensed, failures):
         for row in dispensed
     )
     return (
-        " {} medicine{} dispensed: {}. Stock updated — {}.".format(
+        " {} item{} dispensed: {}. Stock updated — {}.".format(
             len(dispensed), "s" if len(dispensed) != 1 else "", given, remaining
         )
     )
@@ -777,7 +777,7 @@ def _describe_dose_changes(added, removed, general_added=(), dispensed=()):
                 for row in dispensed
             )
         )
-        changed.append("medicine dispensed")
+        changed.append("items dispensed")
     return "; ".join(parts), changed
 
 
@@ -869,9 +869,9 @@ def process_edit_consultation(consultation_id, form_data, user_id, ip_address=No
 
     if not changed:
         # `dispensed` is empty on this path by construction -- anything stored
-        # would have put "medicine dispensed" into `changed` -- so the only thing
+        # would have put "items dispensed" into `changed` -- so the only thing
         # _dispensing_message() can add here is a late refusal, which still has to
-        # be said. A save that silently dropped a medicine line would read as
+        # be said. A save that silently dropped a dispensing line would read as
         # "no changes" to the person who typed one.
         return patient["id"], None, (
             f"No changes. {patient['full_name']}'s consultation of "

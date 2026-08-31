@@ -172,7 +172,7 @@ PATIENT_UNTRACKED = (
 INVENTORY_UNTRACKED = (
     (
         "Stock movement, in this file",
-        "Medicine dispensed to a patient is recorded -- see Medicine Dispensed on "
+        "Stock dispensed at a consultation is recorded -- see Items Dispensed on "
         "Reports & Analytics, which reports units issued over a date range. This "
         "file is not that report: the Current Stock column is the shelf as it "
         "stands today, with no movement column beside it. Restocking is not "

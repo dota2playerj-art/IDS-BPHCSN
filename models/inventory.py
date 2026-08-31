@@ -567,7 +567,7 @@ def get_inventory_report():
         "items": items,
         "total_items": len(items),
         # Ordered most-critical-first by get_low_stock_alert(), which is the order
-        # Screen 10's Low Stock Medicines list wants to read them in.
+        # Screen 10's Low Stock Items list wants to read them in.
         "low_stock_items": alert["low_stock_items"],
         "out_of_stock_items": [item for item in items if item["is_out_of_stock"]],
         "low_stock_count": alert["low_stock_count"],

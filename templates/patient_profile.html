@@ -225,7 +225,7 @@
     margin-bottom:4px;
   }
 
-  /* Medicine History used to be left out here, because there was no dispensing
+  /* Dispensing History used to be left out here, because there was no dispensing
      table and the tab was an empty state saying so -- true on screen, where it
      told the operator where the feature stood, and pure noise on a clinical
      record going into a folder.
@@ -422,7 +422,7 @@
     on file instead. #}
           <div class="stat-icon" style="background:#FEF3C7;"><span class="material-symbols-outlined" style="color:var(--warning);">pill</span></div>
           <div class="stat-value">{{ dispensing | length }}</div>
-          <div class="stat-label">Medicines Dispensed</div>
+          <div class="stat-label">Items Dispensed</div>
           <div class="stat-trend" style="color:var(--text-muted);">{{ dispensing[0].label ~ ', ' ~ (dispensing[0].date_dispensed | display_date) if dispensing else 'Nothing dispensed yet' }}</div>
         </div>
       </div>
@@ -456,7 +456,7 @@
         </li>
         <li class="nav-item" role="presentation">
           <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-medicine" type="button">
-            <span class="material-symbols-outlined" style="font-size:17px;">pill</span>Medicine History
+            <span class="material-symbols-outlined" style="font-size:17px;">pill</span>Dispensing History
           </button>
         </li>
         <li class="nav-item" role="presentation">
@@ -667,13 +667,13 @@
     this is what the system *did* — units that came off Medicine Inventory,
     named and counted. The two answer different questions and a reader comparing
     them is a reader doing something useful. Grouped in
-    patient_views._dispensing_by_consultation() from the list the Medicine
+    patient_views._dispensing_by_consultation() from the list the Dispensing
     History tab has already read, so this costs no extra query either. #}
-{%- set visit_medicines = dispensing_by_consultation.get(consultation.id) %}
-{%- if visit_medicines %}
+{%- set visit_items = dispensing_by_consultation.get(consultation.id) %}
+{%- if visit_items %}
                         <div style="margin-top:16px; padding-top:14px; border-top:1px solid var(--border-color);">
-                          <div class="info-label" style="margin-bottom:8px;">Medicine Dispensed at This Visit</div>
-{%- for record in visit_medicines %}
+                          <div class="info-label" style="margin-bottom:8px;">Dispensed at This Visit</div>
+{%- for record in visit_items %}
                           <div style="font-size:13px; color:var(--text-dark); padding:5px 0;">
                             <span class="material-symbols-outlined" style="font-size:15px; vertical-align:-2px; color:var(--warning);">pill</span>
                             {{ record.label }}
@@ -724,11 +724,11 @@
     the others describe what is on the page and shipping them is fine, and this
     one restates a claim that is no longer true. #}
         <div class="tab-pane fade" id="tab-medicine">
-          <h2 class="print-only print-section-title">Medicine History</h2>
+          <h2 class="print-only print-section-title">Dispensing History</h2>
 {%- if dispensing %}
           <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
             <div>
-              <div style="font-size:15px; font-weight:600; color:var(--text-dark);">Medicine Dispensed</div>
+              <div style="font-size:15px; font-weight:600; color:var(--text-dark);">Items Dispensed</div>
               <div style="font-size:12.5px; color:var(--text-muted); margin-top:2px;">
                 {{ dispensing | length }} issue{{ '' if dispensing | length == 1 else 's' }} on file
                 &middot; {{ dispensed_units }} unit{{ '' if dispensed_units == 1 else 's' }} in total
@@ -741,7 +741,7 @@
             <table class="history-table">
               <thead>
                 <tr>
-                  <th>Medicine</th>
+                  <th>Item</th>
                   <th>Quantity</th>
                   <th>Date Dispensed</th>
                   <th>For (Diagnosis)</th>
@@ -758,8 +758,8 @@
                   <td>{{ record.quantity_text }}</td>
                   <td>{{ record.date_dispensed | display_date }}</td>
 {#- The visit this was given during. Blank only if that consultation record was
-    later removed — the medicine was still handed over, which is why the column
-    is ON DELETE SET NULL rather than cascading. #}
+    later removed — the item was still handed over, which is why the column is
+    ON DELETE SET NULL rather than cascading. #}
                   <td>{{ record.consultation_diagnosis or '—' }}</td>
                   <td>{{ record.dispensed_by_name }}</td>
                 </tr>
@@ -768,17 +768,18 @@
             </table>
           </div>
           <div style="font-size:12px; color:var(--text-muted); margin-top:16px; padding-top:12px; border-top:1px dashed var(--border-color);">
-            Every line was recorded during a consultation and came off Medicine Inventory.
-            This is what was handed over, not a prescription &mdash; there is no course or
-            refill date here.
+            Every line was recorded during a consultation and came off Medicine Inventory
+            &mdash; medicine given to the patient, and supplies or equipment used during the
+            visit. This is what actually left the shelf, not a prescription &mdash; there is
+            no course or refill date here.
           </div>
 {%- else %}
           <div class="empty-state">
             <div class="icon-circle">
               <span class="material-symbols-outlined" style="font-size:30px; color:var(--teal-dark);">pill</span>
             </div>
-            <h5>No medicine dispensed yet</h5>
-            <p>Nothing has been issued to this patient from the health center's stock. Medicine given during a consultation is recorded on the Record Consultation form and appears here.</p>
+            <h5>Nothing dispensed yet</h5>
+            <p>Nothing has been issued to this patient from the health center's stock. Medicine, supplies and equipment recorded on the Record Consultation form appear here.</p>
           </div>
 {%- endif %}
         </div>

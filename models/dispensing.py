@@ -1,4 +1,4 @@
-"""Medicine actually handed to a patient, and the stock it came off.
+"""What was handed over or used at a visit, and the stock it came off.
 
 THE OTHER HALF OF OBJECTIVE 2
 -----------------------------
@@ -25,22 +25,58 @@ standalone "dispense a medicine" screen in this system, deliberately. The
 consultation is where a clinician decides a patient needs something, and it is
 where the system lets them record having given it.
 
-WHAT THIS MODULE COVERS, AND WHAT IT DOES NOT
-----------------------------------------------
-Items of category 'Medicine' only, and that is a line drawn on purpose rather
-than a corner cut. The FHIR sense this implements is a dose issued to a patient
-*for consumption*: a tablet, a capsule, a sachet of ORS. A box of face masks or a
-pack of gauze leaves the store as a facility consumable used during a procedure,
-not as something handed to a patient to take away, and a thermometer is not
-dispensed at all -- it is used and kept. Filing those through a clinical
-dispensing record on a patient's chart would put a consumable in somebody's
-medical history.
+WHAT THIS MODULE COVERS
+-----------------------
+Every category the inventory records: Medicine, Supply and Equipment.
 
-The honest consequence, stated rather than glossed: supplies and equipment
-leaving the store are still not recorded anywhere. That is a real remaining gap
-in inventory movement, it is smaller and different from the one this closes, and
-it needs a stock-movement path of its own rather than a widened definition of
-this one.
+It began narrower. The original line was medicines only, on the argument that
+what this implements is the FHIR sense of a dose issued to a patient *for
+consumption* -- a tablet, a capsule, a sachet of ORS -- while a pack of gauze
+leaves the store as a facility consumable used during a procedure and a
+thermometer is not handed over at all. The stated cost of drawing it there was
+that supplies and equipment leaving the store were recorded nowhere, which was
+named at the time as a real remaining gap needing a path of its own.
+
+That gap is what this now closes, and it closes it here rather than in a second
+module, because a second module would be this one with the word "medicine"
+changed. Gauze and masks are genuinely used up during real visits at this
+station; the consultation is the only moment the system observes them leaving
+the shelf, and the alternative to recording them here is not a tidier record but
+no record at all. The stock half of Objective 2 is "real-time monitoring of
+inventory", and an inventory whose supplies only ever move upward is not being
+monitored.
+
+What that widening does mean, said plainly rather than glossed: a row here is no
+longer purely a clinical dispensing event. A pack of gauze used during a
+procedure appears on the visit alongside the medicines the patient took away,
+because the visit is what consumed it. The screens say "items" rather than
+"medicines" throughout for exactly that reason -- see the labelling note below.
+
+WHAT THE THREE CATEGORIES SHARE, AND WHY ONE RULE COVERS THEM
+-------------------------------------------------------------
+Nothing in the two hard blocks was ever specific to medicine. "Do not go
+negative" is arithmetic about a shelf, and "do not issue expired stock" is a
+question about a date -- gauze and saline expire exactly as tablets do, and both
+tests already read models.inventory.stock_status(), which has never asked what
+category it was looking at.
+
+The one case the widening genuinely adds is an item with no expiry date at all,
+which is ordinary for equipment: a thermometer has a stock level and no expiry.
+That case needs no special handling and is deliberately given none.
+days_until_expiry() returns None when there is no date to parse, stock_status()
+tests `remaining is not None and remaining < 0`, and None fails that test -- so
+an item with no expiry date is simply never Expired, while every other check
+still applies to it in full. Skipping the expiry test is therefore what the
+existing code already does for a missing date; it is not a branch added here,
+and nothing exempts such an item from the stock block.
+
+LABELLING
+---------
+The database column is still `medicine_name`, and the table is still
+`medicine_dispensing`. Renaming either would be a migration across a proven table
+with a foreign key and a UNIQUE constraint on it, for no gain a reader ever sees:
+the column holds the name of the thing dispensed, which is what it always held.
+The user-facing wording is what had to be right, and that says "item" throughout.
 
 THE TWO HARD BLOCKS
 -------------------
@@ -74,15 +110,26 @@ medicine is expired is exactly the drift models/inventory.py's own header warns
 against.
 """
 from database.connection import get_db
-from models.inventory import RETIRED_STATUS, get_all_inventory_items, stock_status
+from models.inventory import (
+    ITEM_CATEGORIES,
+    RETIRED_STATUS,
+    get_all_inventory_items,
+    stock_status,
+)
 from utils.dates import display_date, resolve_range, today
 
-# Items of this category are what this form dispenses. See the module header for
-# why supplies and equipment are deliberately outside it.
-DISPENSABLE_CATEGORY = "Medicine"
+# What this form may dispense: every category the inventory records, read from
+# models.inventory rather than listed again here, so a category added to the
+# vocabulary cannot end up dispensable on one screen and not on another.
+#
+# The test that reads this is therefore satisfied by any item the Add Medicine
+# form could have created, and is kept for the same reason the rowcount check in
+# record_dispensing() is kept -- it is the guard that does not depend on the
+# vocabulary being what this module assumes.
+DISPENSABLE_CATEGORIES = ITEM_CATEGORIES
 
-# How many medicine lines the form starts with, and the most it will read from
-# one submission.
+# How many item lines the form starts with, and the most it will read from one
+# submission.
 #
 # The section used to render exactly four lines, fixed, on the argument that four
 # covers what a barangay consultation issues and that a visit needing a fifth
@@ -116,12 +163,16 @@ QUANTITY_RANGE = (1, 1000)
 # The form posts one pair of fields per line. Named through these functions so
 # the template, the parser and the error messages cannot disagree about a field
 # name -- the same arrangement models/general_vaccinations.py uses for its rows.
+#
+# The prefixes keep the word "dispense" rather than "medicine", which is what
+# they always said, so widening the section to supplies and equipment changed no
+# posted field name and no already-rendered form.
 ITEM_FIELD_PREFIX = "dispense_item_"
 QUANTITY_FIELD_PREFIX = "dispense_qty_"
 
 
 def item_field(index):
-    """The form field carrying the chosen medicine for one line."""
+    """The form field carrying the chosen item for one line."""
     return "{}{}".format(ITEM_FIELD_PREFIX, index)
 
 
@@ -134,7 +185,7 @@ def quantity_field(index):
 # `field_labels.get(field, field)` and would otherwise show a raw field name.
 FIELD_LABELS = {}
 for _index in range(DISPENSE_MAX_ROWS):
-    FIELD_LABELS[item_field(_index)] = "Medicine on line {}".format(_index + 1)
+    FIELD_LABELS[item_field(_index)] = "Item on line {}".format(_index + 1)
     FIELD_LABELS[quantity_field(_index)] = "Quantity on line {}".format(_index + 1)
 del _index
 
@@ -161,7 +212,7 @@ def _plural(count, unit):
 def dispensing_label(record):
     """'Paracetamol — 10 tablets'. The one place a dispensing becomes words.
 
-    Read by the profile's Medicine History tab, the consultation form's
+    Read by the profile's Dispensing History tab, the consultation form's
     already-recorded list, the flash message and the audit line, so all four name
     an issue identically -- the job vaccination_label() does for a vaccination.
     """
@@ -178,25 +229,35 @@ def _describe(item):
 
 
 def dispensable_items(items=None):
-    """The medicines the form may offer, in the order it lists them.
+    """The items the form may offer, in the order it lists them.
 
     Four conditions, and each is one this project already decides somewhere else
     rather than a new judgement made here:
 
-        category is Medicine       see the module header
+        a category the inventory   see the module header. Medicine, Supply and
+        records                    Equipment all qualify; the test is kept as a
+                                   guard rather than as a narrowing.
         not retired                models.inventory.RETIRED_STATUS -- the same
                                    flag in_service() excludes from every
                                    operating figure. An item the centre has
                                    stopped stocking is not one to hand out.
-        not expired                stock_status() -- the same call behind the
-                                   badge on Screen 06
+        not expired                stock_status() via is_expired -- the same call
+                                   behind the badge on Screen 06. An item with no
+                                   expiry date is not expired and never becomes
+                                   so, which is how a thermometer passes this
+                                   without a rule of its own.
         stock above zero           there is nothing to give
 
     The last two are the two hard blocks, applied here as well so the form does
     not offer a choice it is about to refuse. That is not a substitute for the
     refusal -- an option list is a suggestion and a POST need not have come from
-    one -- but a dropdown listing an expired medicine and then rejecting it is a
+    one -- but a dropdown listing an expired item and then rejecting it is a
     worse screen than one that never offered it.
+
+    Sorted by label, so the three categories interleave alphabetically rather than
+    grouping. The operator is looking for one named thing and knows its name; the
+    alternative -- medicines, then supplies, then equipment -- would make them
+    know which drawer the system files it under before they can find it.
 
     `items` lets a caller that has already loaded the inventory pass it in rather
     than querying twice.
@@ -206,7 +267,7 @@ def dispensable_items(items=None):
 
     offered = []
     for item in items:
-        if (item.get("category") != DISPENSABLE_CATEGORY
+        if (item.get("category") not in DISPENSABLE_CATEGORIES
                 or item.get("is_retired")
                 or item.get("is_expired")
                 or (item.get("stock_quantity") or 0) <= 0):
@@ -218,6 +279,11 @@ def dispensable_items(items=None):
             "unit": item.get("unit"),
             "stock_quantity": item.get("stock_quantity") or 0,
             "stock_status": item.get("stock_status"),
+            # Carried so the dropdown can mark a supply or a piece of equipment
+            # as such. The list mixes three kinds of thing now, and on a clinical
+            # form the difference between a drug and a consumable is worth
+            # stating at the moment somebody picks one.
+            "category": item.get("category"),
             # So the option can say "820 tablets in stock" and the operator sees
             # the limit before they hit it rather than after.
             "stock_text": _plural(item.get("stock_quantity") or 0, item.get("unit")),
@@ -227,13 +293,18 @@ def dispensable_items(items=None):
 
 
 def _refusal(row, quantity):
-    """Why this medicine cannot be dispensed in this amount, or None if it can.
+    """Why this item cannot be dispensed in this amount, or None if it can.
 
     THE SINGLE DEFINITION OF BOTH HARD BLOCKS. Called by check_dispensing()
     before anything is written and again by record_dispensing() inside the write
     transaction, on the row it is about to decrement. Two callers, one rule, so
     the check the operator was shown and the check that actually governs the
     write cannot come apart.
+
+    Category-blind, and always was: nothing below asks what kind of thing it is
+    looking at. An item with no expiry date -- ordinary for equipment -- is not
+    expired, because stock_status() only calls something expired when it has a
+    date that has passed. Every other test still applies to it in full.
 
     `row` is anything with the inventory columns on it: an enriched dict from
     get_inventory_item_by_id(), or a bare sqlite3.Row read inside a transaction.
@@ -253,9 +324,10 @@ def _refusal(row, quantity):
             .format(name)
         )
 
-    # The same call behind the badge on Screen 06. An expired medicine is
-    # physically on the shelf, which is exactly why stock alone cannot be the
-    # test -- and why this is a refusal rather than a warning.
+    # The same call behind the badge on Screen 06. Expired stock is physically on
+    # the shelf, which is exactly why stock alone cannot be the test -- and why
+    # this is a refusal rather than a warning. Returns a non-Expired status for an
+    # item carrying no expiry date, which is how equipment passes here.
     status = stock_status(stock, row["low_stock_threshold"], row["expiry_date"])
     if status == "Expired":
         return (
@@ -284,7 +356,7 @@ def _blamed_field(index, row, quantity):
     """Which of a line's two boxes a refusal should be reported against.
 
     The quantity box when the amount is the thing that has to change -- there is
-    stock, just not that much of it -- and the medicine box for everything else,
+    stock, just not that much of it -- and the item box for everything else,
     because an expired, retired or empty item cannot be fixed by typing a smaller
     number.
 
@@ -300,7 +372,7 @@ def _blamed_field(index, row, quantity):
 
 
 def parse_dispensing(form_data):
-    """Read the "Medicines Dispensed" section. Returns (entries, errors).
+    """Read the "Items Dispensed" section. Returns (entries, errors).
 
     `entries` is [{'index', 'item_id', 'quantity'}] for the lines that were
     filled in, in form order. A line with neither field filled is not an entry
@@ -310,22 +382,22 @@ def parse_dispensing(form_data):
     `errors` is {field: message}, merged by the caller into the consultation's
     own errors so one refusal summary covers the whole form.
 
-    This is the structural gate only: is there a medicine, is the amount a
-    sensible whole number, is the same medicine on two lines. Whether the shelf
-    can actually supply it is check_dispensing()'s question, because that one
-    needs the database and this one does not.
+    This is the structural gate only: is there an item, is the amount a sensible
+    whole number, is the same item on two lines. Whether the shelf can actually
+    supply it is check_dispensing()'s question, because that one needs the
+    database and this one does not.
 
-    HALF-FILLED LINES ARE ERRORS, NOT SILENT DROPS. A quantity typed with no
-    medicine chosen, or a medicine chosen with no quantity, is somebody in the
-    middle of recording an issue -- and a save that quietly discarded it would
-    take units off a patient's record that the operator watched themselves type.
+    HALF-FILLED LINES ARE ERRORS, NOT SILENT DROPS. A quantity typed with no item
+    chosen, or an item chosen with no quantity, is somebody in the middle of
+    recording an issue -- and a save that quietly discarded it would take units
+    off a patient's record that the operator watched themselves type.
     """
     entries, errors = [], {}
     chosen = {}
 
     # Every index the form could have posted, not the number it started with:
     # the operator may have asked for more lines, and a line the server declined
-    # to read would be a medicine handed over and not recorded.
+    # to read would be something handed over and not recorded.
     for index in range(DISPENSE_MAX_ROWS):
         raw_item = str(form_data.get(item_field(index)) or "").strip()
         raw_quantity = str(form_data.get(quantity_field(index)) or "").strip()
@@ -335,7 +407,7 @@ def parse_dispensing(form_data):
 
         if not raw_item:
             errors[item_field(index)] = (
-                "Choose the medicine this quantity was given from, or clear the "
+                "Choose the item this quantity was given from, or clear the "
                 "quantity."
             )
             continue
@@ -346,14 +418,14 @@ def parse_dispensing(form_data):
             # parse_general_vaccinations() refuses a vaccine key its list does
             # not contain.
             errors[item_field(index)] = (
-                "That is not a medicine this form offers. Pick one from the list."
+                "That is not an item this form offers. Pick one from the list."
             )
             continue
         item_id = int(raw_item)
 
         if not raw_quantity:
             errors[quantity_field(index)] = (
-                "Enter how many were given, or clear the medicine on this line."
+                "Enter how many were given, or clear the item on this line."
             )
             continue
 
@@ -366,13 +438,13 @@ def parse_dispensing(form_data):
             continue
         quantity = int(raw_quantity)
 
-        # One medicine, one line, with the whole amount on it -- the rule the
+        # One item, one line, with the whole amount on it -- the rule the
         # table's UNIQUE (consultation_id, inventory_item_id) enforces. Caught
         # here so the operator is told which line to fix instead of meeting a
         # constraint error at the write.
         if item_id in chosen:
             errors[item_field(index)] = (
-                "This medicine is already on line {}. Put the whole amount given "
+                "This item is already on line {}. Put the whole amount given "
                 "at this visit on that one line.".format(chosen[item_id] + 1)
             )
             continue
@@ -393,8 +465,8 @@ def check_dispensing(entries, consultation_id=None):
     that saved with a failure notice attached to it.
 
     `consultation_id` is passed when editing a visit that may already have
-    dispensing on file, so a line repeating a medicine already issued at that
-    visit is refused here with the amount named -- rather than at the UNIQUE
+    dispensing on file, so a line repeating an item already issued at that visit
+    is refused here with the amount named -- rather than at the UNIQUE
     constraint, which would say nothing useful to the person who typed it.
     """
     if not entries:
@@ -435,15 +507,20 @@ def check_dispensing(entries, consultation_id=None):
 
         if row is None:
             errors[item_field(entry["index"])] = (
-                "That medicine is no longer in the inventory. Pick one from the "
+                "That item is no longer in the inventory. Pick one from the "
                 "list."
             )
             continue
 
-        if row["category"] != DISPENSABLE_CATEGORY:
+        # Unreachable for any row the Add Medicine form could have created, since
+        # every category it offers is dispensable. Kept as the guard for a row
+        # that arrived some other way, so a category this module has never heard
+        # of cannot be dispensed by default.
+        if row["category"] not in DISPENSABLE_CATEGORIES:
             errors[item_field(entry["index"])] = (
-                "{} is filed under {}, not Medicine. Only medicines are "
-                "dispensed to a patient here.".format(row["name"], row["category"])
+                "{} is filed under {}, which is not something this form can "
+                "dispense. Correct its item type on Medicine Inventory."
+                .format(row["name"], row["category"] or "no item type")
             )
             continue
 
@@ -461,10 +538,10 @@ class _Refused(Exception):
 
 def record_dispensing(patient_id, entries, dispensed_by, date_dispensed,
                       consultation_id=None):
-    """Write the medicines given at one visit and take them off the shelf.
+    """Write what was given or used at one visit and take it off the shelf.
 
     Returns (stored, errors). `stored` is the rows actually written, each with
-    the medicine's name, unit and the stock level it left behind; `errors` is
+    the item's name, unit and the stock level it left behind; `errors` is
     {field: message} and is non-empty only when the write was refused.
 
     ATOMIC, AND ALL-OR-NOTHING ACROSS THE WHOLE SUBMISSION
@@ -520,9 +597,9 @@ def record_dispensing(patient_id, entries, dispensed_by, date_dispensed,
                 (entry["item_id"],),
             ).fetchone()
 
-            if row is None or row["category"] != DISPENSABLE_CATEGORY:
+            if row is None or row["category"] not in DISPENSABLE_CATEGORIES:
                 errors[item_field(entry["index"])] = (
-                    "That medicine is no longer available to dispense. Pick one "
+                    "That item is no longer available to dispense. Pick one "
                     "from the list."
                 )
                 raise _Refused
@@ -532,7 +609,7 @@ def record_dispensing(patient_id, entries, dispensed_by, date_dispensed,
                 errors[_blamed_field(entry["index"], row, entry["quantity"])] = refusal
                 raise _Refused
 
-            # The same medicine, at the same visit, already on file. The table's
+            # The same item, at the same visit, already on file. The table's
             # UNIQUE (consultation_id, inventory_item_id) would refuse the insert
             # below anyway -- that is the guarantee, and it is why the constraint
             # exists -- but it would refuse it by raising, which reaches the
@@ -658,9 +735,9 @@ def _to_records(rows):
 
 
 def get_dispensing_for_patient(patient_id):
-    """Every medicine issued to one patient, most recent first.
+    """Everything issued to one patient, most recent first.
 
-    The Medicine History tab on Screen 04. Newest first, matching the general
+    The Dispensing History tab on Screen 04. Newest first, matching the general
     vaccination history and for the same reason: this is a plain record of what
     was given rather than a schedule read in order, and the most useful line is
     the last thing the patient collected.
@@ -680,7 +757,7 @@ def get_dispensing_for_patient(patient_id):
 
 
 def get_dispensing_for_consultation(consultation_id):
-    """The medicines issued during one visit, oldest row first."""
+    """The items issued during one visit, oldest row first."""
     if not consultation_id:
         return []
     conn = get_db()
@@ -695,7 +772,7 @@ def get_dispensing_for_consultation(consultation_id):
 def get_dispensing_by_consultation(consultation_ids):
     """{consultation_id: [record, ...]} for a list of visits, in one query.
 
-    The Recent Consultations table on the Administrator dashboard has a Medicine
+    The Recent Consultations table on the Administrator dashboard has a Dispensed
     column and prints five rows. Asking per row would be five queries for a panel
     that already has its consultations in hand; this is one.
     """

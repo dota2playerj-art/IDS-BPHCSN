@@ -463,8 +463,8 @@ def patient_profile_context(patient_id):
         # assembled here, so the dialog cannot offer a value the endpoint behind
         # it would refuse, or omit one it would accept.
         "correction": correction_options(),
-        # The Medicine History tab, and the Active Prescriptions stat card above
-        # it. Both were placeholders until medicine_dispensing existed.
+        # The Dispensing History tab, and the stat card above it. Both were
+        # placeholders until medicine_dispensing existed.
         "dispensing": dispensing,
         "dispensing_by_consultation": _dispensing_by_consultation(dispensing),
         # Units, not rows: "3 issues" and "60 tablets" answer different questions,
@@ -477,7 +477,7 @@ def patient_profile_context(patient_id):
 def _dispensing_by_consultation(records):
     """{consultation_id: [dispensing, ...]} for the View panel on a history row.
 
-    Built from the list the Medicine History tab has already read rather than by
+    Built from the list the Dispensing History tab has already read rather than by
     asking the database again -- exactly what _doses_by_consultation() and
     _general_by_consultation() do, and for the same reason: the records carry
     their consultation_id, so the grouping is free.
@@ -485,7 +485,7 @@ def _dispensing_by_consultation(records):
     A dispensing recorded against no consultation is skipped, as the vaccinations
     are: it belongs to the patient's history but to no row in this table. That
     only arises if a consultation is deleted out from under it -- the column is
-    ON DELETE SET NULL -- and the medicine still shows on the tab itself.
+    ON DELETE SET NULL -- and the item still shows on the tab itself.
     """
     grouped = {}
     for record in records:
