@@ -11,6 +11,13 @@ carried into both exports. So the question is not only "is each note right" but
 
 No images are committed — see the note in the parent README.
 
+**This is a record of a run, not a description of the code today.**
+`UNAVAILABLE["appointment_detail"]`, named below, no longer exists: the View
+icon on Patient Profile's Appointment History that quoted it now opens the
+booking's notes in place, and the reason was deleted with it. The counts and
+assertions below are left exactly as they were on the day, because editing them
+would misrepresent what was actually checked.
+
 ## What changed
 
 | Where | Entries | Longest before → after |

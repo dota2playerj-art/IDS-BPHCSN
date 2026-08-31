@@ -142,6 +142,16 @@ deleted in the same commit rather than a later one. A reason outliving its gap
 by even a commit is how this file starts lying, and a single citation is not a
 reason to be gentler about it.
 
+"appointment_detail" has now gone the same way, and it is worth naming because
+it failed in the harder direction. It never collapsed outright: every clause in
+it stayed literally true, and it still misdirected, because "the booking's notes
+are on Appointment Scheduling" holds only for a booking in today's queue or
+still to come. A note on a visit six weeks ago was on no screen at all. A reason
+can be accurate about where something is and still be the wrong answer to why a
+control is dead, and that is the version hardest to catch by re-reading. The
+View icon it sat on now opens the note in place, to the same expand-in-place
+pattern "medicine_detail" was deleted for.
+
 The three per-screen reasons that went false in the same change are not here,
 because they are not shared: Audit Logs' "logins" and "security" and User
 Management's "last_login" all lived in their own routes/*_views.py UNTRACKED
@@ -343,16 +353,28 @@ UNAVAILABLE = {
     # "Use Register Patient again from the sidebar" is a fair answer for one
     # registration; at a community health drive, where staff register a queue of
     # people back to back from one desk, it is a detour taken once per person.
-    # REWRITTEN: the old sentence listed "notes" among the fields "already in
-    # this row". The Appointment History table on Patient Profile has five
-    # columns before its actions -- Date, Time, Purpose, Assigned To, Status --
-    # and notes is not one of them. Same defect the deleted "medicine_detail"
-    # had: a list of fields that quietly included one the screen does not show.
-    "appointment_detail": (
-        "There is no separate view for one booking. The row already shows its "
-        "date, time, purpose, assigned staff and status. The booking's notes are "
-        "on Appointment Scheduling, under the patient's name."
-    ),
+    # THERE IS NO "appointment_detail" ENTRY ANY MORE, AND IT WENT THE WAY
+    # "medicine_detail" DID -- for the same reason, to the same pattern.
+    #
+    # Its first version listed "notes" among the fields "already in this row",
+    # which was false: Appointment History has five columns before its actions
+    # -- Date, Time, Purpose, Assigned To, Status -- and notes is not one of
+    # them. The rewrite said so and pointed the reader at Appointment Scheduling
+    # instead, "under the patient's name". That was honest about the note
+    # existing, and it was still a bad answer, because it is only true of a
+    # booking that is in today's queue or still to come. A note on a visit six
+    # weeks ago is on no panel of that screen at all, so the sentence sent a
+    # reader off the profile to look for something they would not find.
+    #
+    # The View icon on an Appointment History row now opens a read-only panel in
+    # place, built from the same info-grid classes and the same Bootstrap
+    # collapse as Consultation History's panel and Medicine Inventory's View,
+    # showing appointment.notes -- the column get_appointments_for_patient()
+    # was already selecting and no template was reading. No new route, no new
+    # screen, and nothing that can write.
+    #
+    # Nothing quotes this any more, so it goes rather than sitting here
+    # describing a gap the application has closed.
     # THERE IS NO "medicine_archive" ENTRY ANY MORE, AND THAT IS THE POINT.
     # It is the entry this file argued with hardest, and it lost twice.
     #

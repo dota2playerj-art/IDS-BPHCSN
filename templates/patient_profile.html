@@ -239,13 +239,15 @@
   /* The two history tables carry a control column each. The chevron column
      opens a detail row and the Actions column edits the record -- neither
      means anything on paper. :not([colspan]) exempts the collapsed detail
-     row, whose single wide cell would otherwise match :last-child. */
+     row, whose single wide cell would otherwise match :last-child -- both
+     tables have one now that an appointment's notes open in place too, and
+     that cell carries record rather than control, so it must survive. */
   #tab-consult .history-table thead th:first-child,
   #tab-consult .history-table thead th:last-child,
   #tab-consult .history-table tbody td:not([colspan]):first-child,
   #tab-consult .history-table tbody td:not([colspan]):last-child,
   #tab-appt .history-table thead th:last-child,
-  #tab-appt .history-table tbody td:last-child,
+  #tab-appt .history-table tbody td:not([colspan]):last-child,
   /* The three vaccination tables carry an Actions column too, for the same
      reason and with the same treatment. The button inside it is already hidden
      by the shared rule against printing controls, which would leave a column of
@@ -1098,7 +1100,46 @@
                          class="action-icon" style="color:var(--danger);"
                          title="Cancel this appointment — the record is kept, its status becomes Cancelled"><span class="material-symbols-outlined" style="font-size:18px;">event_busy</span></a>
 {%- endif %}
-                      <button type="button" class="action-icon" disabled title="{{ unavailable.appointment_detail }}"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button>
+{#- The booking's notes, opened in place. Same treatment Consultation History
+    above and Medicine Inventory's View action give a record with more in it
+    than its row shows: a Bootstrap collapse over a detail row, built from the
+    info-grid classes, holding divs rather than inputs. There is no form
+    element inside it and no endpoint it could post to, so nothing here can
+    alter the booking -- Reschedule and Cancel beside it are the only controls
+    on this row that write, and they still go to the dialogs that own those
+    rules.
+
+    It reads appointment.notes, which get_appointments_for_patient() already
+    selects and Appointment Scheduling already prints verbatim in its own
+    reason line. One column, one value, no formatting on either screen, so the
+    two cannot come to show different things about the same booking. #}
+                      <button type="button" class="action-icon" data-bs-toggle="collapse"
+                              data-bs-target="#apptDetail{{ appointment.id }}"
+                              aria-expanded="false" aria-controls="apptDetail{{ appointment.id }}"
+                              title="View this booking's notes — read only, nothing here can change the record"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td colspan="6" style="padding:0; border-bottom:1px solid var(--border-color);">
+                    <div class="collapse" id="apptDetail{{ appointment.id }}">
+                      <div style="padding:16px 14px 20px; background:#FAFBFC;">
+                        <div class="info-grid">
+                          <div class="info-item" style="grid-column:1/-1;">
+                            <div class="info-label">Notes</div>
+{#- An honest sentence rather than an empty box. Most bookings carry a note --
+    the reason the visit was made -- so a blank cell here would read as a
+    rendering fault rather than as the record being silent, which is exactly
+    the mistake the consultation panel's "Not recorded" exists to prevent. #}
+                            <div class="info-value">{{ appointment.notes if appointment.notes and appointment.notes.strip() else 'No notes recorded for this visit.' }}</div>
+                          </div>
+                        </div>
+                        <div style="font-size:12px; color:var(--text-muted); margin-top:14px; padding-top:12px; border-top:1px dashed var(--border-color);">
+                          Written when the booking was made or the patient checked in. No screen edits a
+                          note afterwards, so this panel is read only. What happened at the visit is on
+                          Consultation History.
+                        </div>
+                      </div>
                     </div>
                   </td>
                 </tr>
