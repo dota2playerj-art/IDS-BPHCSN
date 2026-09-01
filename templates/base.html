@@ -116,6 +116,42 @@
   }
   .flash-ids .material-symbols-outlined{font-size:20px; margin-top:1px;}
 
+  /* THE SMS CONFIRMATION OFFER
+     Rendered directly under the flash message that reports a booking, a move or
+     a cancellation, because it is the second half of that same sentence: this is
+     what happened, and here is the one thing left to do about it.
+
+     It lives in base.html rather than on Screen 08 because the three actions can
+     land the operator on either Appointment Scheduling or the Patient Profile,
+     in either of two role blueprints -- four places for one panel. One copy here
+     cannot drift from itself.
+
+     There is deliberately no disabled variant of the button below. When the
+     patient has no usable mobile number the panel renders as .untracked instead:
+     dashed, grey, and carrying no clickable element at all. See
+     utils/unavailable.py for the rule, and models/appointment_sms.py for why a
+     dead Send button would be the worse of the two. */
+  .sms-offer{
+    border-radius:12px; border:1px solid var(--teal); background:var(--teal-light);
+    padding:16px 18px; margin-bottom:16px;
+  }
+  .sms-offer-head{display:flex; align-items:center; gap:10px; margin-bottom:10px;}
+  .sms-offer-head .material-symbols-outlined{font-size:22px; color:var(--teal-dark);}
+  .sms-offer-title{font-size:13.5px; font-weight:700; color:var(--teal-dark);}
+  .sms-offer-to{font-size:12.5px; color:var(--text-muted);}
+  /* The exact text that would be sent, shown before it is sent. A text to a
+     patient cannot be recalled, so the last look at it belongs here rather than
+     in the history afterwards. Monospaced and boxed so it reads as the message
+     itself and not as more of the page's prose. */
+  .sms-offer-message{
+    background:var(--white); border:1px solid var(--border-color); border-radius:12px;
+    padding:12px 14px; font-size:13px; line-height:1.55; color:var(--text-dark);
+    white-space:pre-wrap; margin-bottom:10px;
+  }
+  .sms-offer-meta{font-size:12px; color:var(--text-muted); line-height:1.5; margin-bottom:12px;}
+  .sms-offer-meta strong{color:var(--text-dark); font-weight:600;}
+  .sms-offer-actions{display:flex; align-items:center; gap:12px; flex-wrap:wrap;}
+
   .eyebrow{font-size:12px; font-weight:700; letter-spacing:0.08em; color:var(--teal-dark); text-transform:uppercase;}
   .page-title{font-size:32px; font-weight:700; color:var(--text-dark); margin-top:2px;}
 
@@ -414,6 +450,64 @@
     </div>
 {%- endif %}
 {%- endwith %}
+{#- The SMS confirmation offered after a booking, a move or a cancellation.
+    Present on exactly one render -- the one the redirect from that save lands on
+    -- because utils.context.inject_role_context() consumes it the way
+    get_flashed_messages() consumes a flash. Absent on every other page, and on
+    every page a Barangay Official sees at all: they have no Appointment
+    Scheduling screen, so no action of theirs can produce one. #}
+{%- if appointment_sms_offer %}
+    <div class="{{ 'sms-offer' if appointment_sms_offer.can_send else 'untracked' }}" style="margin-bottom:16px;">
+{%- if appointment_sms_offer.can_send %}
+      <div class="sms-offer-head">
+        <span class="material-symbols-outlined">sms</span>
+        <div>
+          <div class="sms-offer-title">{{ appointment_sms_offer.event_label }} — tell the patient by SMS?</div>
+          <div class="sms-offer-to">
+            To {{ appointment_sms_offer.patient_name }}
+            {%- if appointment_sms_offer.patient_reference %} ({{ appointment_sms_offer.patient_reference }}){% endif %}
+            on {{ appointment_sms_offer.mobile }} · {{ appointment_sms_offer.appointment_reference }}
+          </div>
+        </div>
+      </div>
+      <div class="sms-offer-message">{{ appointment_sms_offer.message }}</div>
+      <div class="sms-offer-meta">
+        <strong>{{ appointment_sms_offer.metrics.length }}</strong> characters ·
+        <strong>{{ appointment_sms_offer.metrics.segments }}</strong>
+        {{ appointment_sms_offer.metrics.encoding }} segment{{ '' if appointment_sms_offer.metrics.segments == 1 else 's' }},
+        which is what this message costs to send.
+{%- if appointment_sms_offer.simulated %}
+        No key is set for the messaging service, so pressing Send records this message in full
+        but transmits nothing. It becomes a live send as soon as that key is set.
+{%- else %}
+        A key is set, so pressing Send transmits this message through the messaging service. It cannot be recalled.
+{%- endif %}
+      </div>
+      <div class="sms-offer-actions">
+        <form method="POST" action="{{ url_for(send_appointment_sms_endpoint) }}">
+          <input type="hidden" name="appointment_id" value="{{ appointment_sms_offer.appointment_id }}">
+          <input type="hidden" name="event" value="{{ appointment_sms_offer.event }}">
+          <input type="hidden" name="return_to" value="{{ appointment_sms_offer.return_to }}">
+          <button type="submit" class="btn-primary-teal">
+            <span class="material-symbols-outlined">send</span>{{ appointment_sms_offer.button_label }}
+          </button>
+        </form>
+        <span class="sms-offer-to">Optional — the appointment is already saved either way.</span>
+      </div>
+{%- else %}
+      {#- No usable number on file. Stated, not offered: there is no button here,
+          disabled or otherwise, because there is genuinely nothing to click. #}
+      <span class="material-symbols-outlined">smartphone</span>
+      <div>
+        <div class="untracked-title">{{ appointment_sms_offer.event_label }} — no SMS can be sent</div>
+        <div class="untracked-body">
+          {{ appointment_sms_offer.reason }}
+          The appointment itself is saved and is unaffected.
+        </div>
+      </div>
+{%- endif %}
+    </div>
+{%- endif %}
 {%- block breadcrumb %}{% endblock %}
 {% block content %}{% endblock %}
   </div>

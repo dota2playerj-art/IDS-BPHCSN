@@ -5,6 +5,7 @@ separately so each role's URL space and role_required guard stay explicit.
 """
 from flask import Blueprint, flash, redirect, render_template, request, session, url_for
 
+from models.appointment_sms import BOOKED, CANCELLED_EVENT, RESCHEDULED
 from models.consultations import PEDIATRIC_AGE_YEARS
 from models.immunizations import get_immunization_alert
 from models.inventory import get_inventory_item_by_id, get_low_stock_alert
@@ -22,7 +23,9 @@ from routes.appointment_views import (
     process_new_patient_booking_request,
     process_new_patient_check_in,
     process_reschedule_appointment,
+    process_send_appointment_sms,
     process_start_consultation,
+    offer_appointment_sms,
 )
 from routes.broadcast_views import sms_notifications_context
 from routes.consultation_views import (
@@ -357,6 +360,10 @@ def staff_book_appointment():
     )
     if appointment_id:
         flash(message)
+        # The booking is saved; the offer to tell the patient rides along to the
+        # screen the redirect lands on. Nothing is sent by this call -- see the
+        # section note in routes/appointment_views.py.
+        offer_appointment_sms(appointment_id, BOOKED)
         return redirect(url_for("staff.staff_appointment_scheduling"))
     # Field errors and unacknowledged conflicts are shown inside the reopened
     # dialog, next to what they refer to, rather than as a flash above the page.
@@ -373,7 +380,14 @@ def staff_book_appointment():
 @login_required
 @role_required("Health Staff")
 def staff_cancel_appointment():
-    flash(process_cancel_appointment(request.form))
+    appointment_id, message = process_cancel_appointment(request.form)
+    flash(message)
+    # Set only when a booking was genuinely just cancelled. A no-show closes the
+    # same dialog and returns no id, so no message is offered for it -- see
+    # process_cancel_appointment() for why that is a decision, not a gap.
+    offer_appointment_sms(
+        appointment_id, CANCELLED_EVENT, request.form.get("return_to")
+    )
     return redirect(appointment_return_url(
         request.form, "staff.staff_appointment_scheduling",
         "staff.staff_patient_profile",
@@ -387,11 +401,33 @@ def staff_reschedule_appointment():
     appointment_id, context, message = process_reschedule_appointment(request.form)
     if context is None:
         flash(message)
+        offer_appointment_sms(
+            appointment_id, RESCHEDULED, request.form.get("return_to")
+        )
         return redirect(appointment_return_url(
         request.form, "staff.staff_appointment_scheduling",
         "staff.staff_patient_profile",
     ))
     return render_template('appointment_scheduling.html', **context)
+
+
+# Send one SMS confirmation to one patient about one of their own appointments,
+# this role's copy. Health Center Staff is view-only on community broadcasts --
+# there is no staff send endpoint for those at all -- and that ruling is not
+# loosened here: this is the opposite thing. A broadcast is what the barangay
+# says to everybody; this is one message to the one patient whose visit the desk
+# has just booked, moved or called off, which is squarely this role's own work.
+@staff_bp.route('/appointment_scheduling/send-sms', methods=["POST"])
+@login_required
+@role_required("Health Staff")
+def staff_send_appointment_sms():
+    flash(process_send_appointment_sms(
+        request.form, session.get("user_id"), request.remote_addr
+    ))
+    return redirect(appointment_return_url(
+        request.form, "staff.staff_appointment_scheduling",
+        "staff.staff_patient_profile",
+    ))
 
 
 # POST only, and named apart from the Admin equivalents so the flat endpoint
@@ -525,13 +561,13 @@ def staff_register_patient(patient_id=None):
             # path: the record now exists, so book the visit it was opened for
             # and land back on the screen the operator started from.
             if patient is None and booking_requested(request.form):
-                flash(
-                    process_new_patient_booking(
-                        saved_id,
-                        booking_details(request.form),
-                        session.get("user_id"),
-                    )
+                appointment_id, message = process_new_patient_booking(
+                    saved_id,
+                    booking_details(request.form),
+                    session.get("user_id"),
                 )
+                flash(message)
+                offer_appointment_sms(appointment_id, BOOKED)
                 return redirect(url_for("staff.staff_appointment_scheduling"))
             # Save & Register Another. The record is saved -- the branch above
             # only runs on a row id returned by the very same

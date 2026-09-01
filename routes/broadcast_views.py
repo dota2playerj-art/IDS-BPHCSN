@@ -20,6 +20,12 @@ the Staff blueprint: there is no /staff/sms_notifications/send URL to post to,
 and the two that do exist are each guarded by role_required. Staff has the GET
 and nothing else.
 """
+from flask import session
+
+from models.appointment_sms import (
+    get_appointment_sms_history,
+    get_appointment_sms_stats,
+)
 from models.audit import ACTION_SMS_BROADCAST_SENT, MODULE_SMS, log_action
 from models.broadcasts import (
     AUDIENCE_NOT_AVAILABLE,
@@ -33,6 +39,8 @@ from models.broadcasts import (
     send_broadcast,
     validate_broadcast_form,
 )
+from utils.roles import normalize_role
+from utils.security import get_current_user
 from utils.sms import (
     GSM_BASIC_CHARACTERS,
     GSM_EXTENDED_CHARACTERS,
@@ -54,6 +62,23 @@ COMPOSE_FIELDS = ("message", "audience", "category")
 # How many recipients the detail panel names before it stops listing them.
 DETAIL_RECIPIENT_LIMIT = 8
 
+# Who may see the individual appointment confirmations panel, and how many rows
+# it shows.
+#
+# THE BARANGAY OFFICIAL IS DELIBERATELY NOT ON THIS LIST, AND IT IS NOT THE
+# BROADCAST RULE BEING RESTATED.
+# That rule is about *sending*: Administrator and Barangay Official send
+# community broadcasts, Health Center Staff does not. This is the opposite way
+# round and about *reading*. Every row in the individual history names one
+# patient, the service they are booked for and the date they are expected --
+# which is a clinical record in miniature, and 09_UI_Architecture §2 keeps the
+# Barangay Official out of Patient Records entirely. Putting that same material
+# on a screen they do reach would route around the restriction rather than
+# honour it. They keep the whole broadcast half of this screen, which names
+# nobody.
+APPOINTMENT_SMS_ROLES = {"admin", "health staff"}
+APPOINTMENT_SMS_LIMIT = 25
+
 
 def _gateway_context():
     """Whether this process could actually transmit, and what to say about it.
@@ -74,6 +99,35 @@ def _gateway_context():
             "transmitted. Setting a key on the server and restarting this system "
             "is the only step needed to go live."
         ),
+    }
+
+
+def _appointment_sms_context():
+    """The individual-confirmation panel's rows, or the absence of the panel.
+
+    The role is read the same way utils.context.inject_role_context() reads it --
+    the signed-in account first, the session's own label as the fallback -- so
+    one screen cannot decide a viewer is staff while the sidebar beside it
+    decides they are not.
+    """
+    user = get_current_user()
+    if user:
+        role = normalize_role(user["role"])
+    else:
+        role = normalize_role(session.get("role"))
+
+    if role not in APPOINTMENT_SMS_ROLES:
+        return {
+            "can_see_appointment_sms": False,
+            "appointment_sms": [],
+            "appointment_sms_stats": None,
+        }
+
+    history = get_appointment_sms_history(limit=APPOINTMENT_SMS_LIMIT)
+    return {
+        "can_see_appointment_sms": True,
+        "appointment_sms": history,
+        "appointment_sms_stats": get_appointment_sms_stats(history),
     }
 
 
@@ -116,6 +170,13 @@ def sms_notifications_context(compose=None, errors=None):
             "gsm_extended": "".join(sorted(GSM_EXTENDED_CHARACTERS)),
         },
         **_gateway_context(),
+        # The individual half of this screen: one message to one patient about
+        # one of their own appointments, sent from Appointment Scheduling or the
+        # Patient Profile rather than from here. It is shown here because this is
+        # where somebody asking "what has this system texted, and to whom?" comes
+        # to look, and an answer that covered only broadcasts would be a partial
+        # one presented as complete.
+        **_appointment_sms_context(),
     }
 
 

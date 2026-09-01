@@ -379,6 +379,57 @@ CREATE TABLE sms_broadcast_recipients (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
+-- One text message to one patient about one of their own appointments -- the
+-- individual counterpart of the two broadcast tables above. It is a separate
+-- table rather than a nullable patient_id on sms_broadcasts because the two
+-- record different things: a broadcast is what the barangay told the community
+-- and belongs to no patient, while a row here belongs to one appointment and is
+-- part of what that person was told about their own care.
+--
+-- event is what the message is about, and it is CHECK-constrained to the three
+-- things worth telling one patient: a new booking, a move, a cancellation. There
+-- is no 'no-show' member -- somebody who did not attend already knows, and a text
+-- saying so would be a reprimand sent at the barangay's expense.
+--
+-- status admits 'Sent' and 'Failed' and nothing else, exactly as
+-- sms_broadcast_recipients.status does, and for the same reason: nothing in this
+-- application receives Semaphore's delivery callbacks, so no row could ever
+-- legitimately hold 'Delivered'.
+--
+-- message, recipient_name and mobile_number are stored rather than recomposed or
+-- joined. They record what was actually sent, to whom, and on what number, at
+-- the time. A patient who later changes their number -- or an appointment later
+-- moved again -- must not retroactively rewrite the history of what was sent.
+--
+-- delivery_mode is per message for the reason it is per broadcast: 'live' when
+-- SEMAPHORE_API_KEY was configured at send time, 'simulated' when it was not.
+--
+-- appointment_id and patient_id are ON DELETE SET NULL: the message was sent
+-- whether or not the rows it was composed from still exist. sent_by is ON DELETE
+-- RESTRICT, matching sms_broadcasts.sent_by -- an account cannot be deleted out
+-- from under a record naming them as the sender.
+CREATE TABLE appointment_sms_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    reference TEXT NOT NULL UNIQUE,
+    appointment_id INTEGER,
+    patient_id INTEGER,
+    event TEXT NOT NULL CHECK (event IN ('booked', 'rescheduled', 'cancelled')),
+    recipient_name TEXT NOT NULL,
+    mobile_number TEXT NOT NULL,
+    message TEXT NOT NULL,
+    segments INTEGER NOT NULL DEFAULT 0,
+    encoding TEXT NOT NULL DEFAULT 'GSM-7',
+    status TEXT NOT NULL CHECK (status IN ('Sent', 'Failed')),
+    delivery_mode TEXT NOT NULL CHECK (delivery_mode IN ('live', 'simulated')),
+    gateway_response TEXT,
+    sent_by INTEGER NOT NULL,
+    sent_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (appointment_id) REFERENCES appointments(id) ON DELETE SET NULL,
+    FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE SET NULL,
+    FOREIGN KEY (sent_by) REFERENCES users(id) ON DELETE RESTRICT
+);
+
 CREATE TABLE settings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     setting_key TEXT NOT NULL UNIQUE,
@@ -417,4 +468,8 @@ CREATE INDEX idx_audit_logs_user ON audit_logs(user_id, created_at);
 CREATE INDEX idx_sms_broadcasts_sent_at ON sms_broadcasts(sent_at, id);
 -- The detail panel reads one broadcast's recipients.
 CREATE INDEX idx_sms_recipients_broadcast ON sms_broadcast_recipients(broadcast_id, status);
+-- The individual-confirmation history panel is one page of messages, newest
+-- first; the patient-facing lookups read one appointment's messages.
+CREATE INDEX idx_appointment_sms_sent_at ON appointment_sms_messages(sent_at, id);
+CREATE INDEX idx_appointment_sms_appointment ON appointment_sms_messages(appointment_id, sent_at);
 CREATE INDEX idx_settings_key ON settings(setting_key, updated_at);

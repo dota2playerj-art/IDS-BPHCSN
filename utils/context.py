@@ -2,6 +2,7 @@
 from flask import session
 
 from models.inventory import get_low_stock_alert
+from routes.appointment_views import take_appointment_sms_offer
 from utils.dates import now, today
 from utils.roles import normalize_role
 from utils.security import get_current_user
@@ -71,6 +72,16 @@ def inject_role_context():
             "record_consultation_endpoint": "staff_record_consultation",
             "edit_consultation_endpoint": "staff_edit_consultation",
             "sms_notifications_endpoint": "staff_sms_notifications",
+            # The individual appointment confirmation. Present for the two roles
+            # that book, move and cancel appointments in the first place, and
+            # absent for the Barangay Official -- who has no Appointment
+            # Scheduling screen, so no booking of theirs could ever produce the
+            # offer this endpoint answers. Health Center Staff has it even though
+            # they are view-only on community broadcasts: the confirmed ruling
+            # keeps them out of what the barangay says to everybody, and this is
+            # the opposite thing -- one patient being told about their own visit,
+            # which is squarely their own scope.
+            "send_appointment_sms_endpoint": "staff_send_appointment_sms",
             # Export Excel and Export PDF on Screens 03, 06 and 08. Named per
             # role for the same reason every endpoint above is: these three
             # templates are each rendered by two blueprints, and each role must
@@ -112,6 +123,7 @@ def inject_role_context():
             "record_consultation_endpoint": "record_consultation",
             "edit_consultation_endpoint": "edit_consultation",
             "sms_notifications_endpoint": "sms_notifications",
+            "send_appointment_sms_endpoint": "send_appointment_sms",
             # Only the two broadcast-holding roles get a send endpoint at all. The
             # Health Staff branch above has none, which is what makes that role
             # view-only -- there is no URL for a forged POST to reach.
@@ -218,6 +230,18 @@ def inject_role_context():
     # Official compose/send/schedule community announcements and SMS; Health Center
     # Staff is view-only (individual patient scheduling is their scope, not broadcast).
     context["can_broadcast"] = normalized_role in {"admin", "barangay official"}
+
+    # The SMS confirmation offered after a booking, a move or a cancellation, or
+    # None -- which is every render but the one immediately after one of those
+    # three saves. Consumed here, once, exactly as get_flashed_messages() consumes
+    # a flash: the offer belongs beside the message confirming the save that
+    # produced it, and the two travel together to whichever screen the operator
+    # was redirected to. See the section note in routes/appointment_views.py.
+    #
+    # Building it reads the appointment and the patient back from the database,
+    # so the message previewed on screen is composed from the record as it stands
+    # at render time rather than from what the form said.
+    context["appointment_sms_offer"] = take_appointment_sms_offer()
 
     # Why each deliberately disabled control is disabled. On every render rather
     # than per route, because the same reasons are quoted by screens built from

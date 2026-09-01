@@ -99,6 +99,16 @@
     margin-top:5px; white-space:nowrap;
   }
   .view-only-note{font-size:12px; color:var(--text-muted); white-space:nowrap;}
+  /* The individual-message table has one wide column where the broadcast table
+     above has three narrow ones, so its preview is given the room that leaves.
+     Same one-line-with-ellipsis treatment, same full text in the title. */
+  .appointment-sms .msg-preview{max-width:330px;}
+  /* A reference is one token and is quoted as one; it must never be split
+     across two lines by the column it happens to land in. */
+  .appointment-sms .sms-ref{white-space:nowrap;}
+  /* The number and the patient ID are one identity line, not two facts that may
+     be split apart by a column boundary. */
+  .appointment-sms .sms-who{white-space:nowrap;}
 
   .table-footer{display:flex; align-items:center; justify-content:space-between; padding-top:18px; margin-top:6px; border-top:1px solid var(--border-color); flex-wrap:wrap; gap:12px;}
   .pg-info{font-size:13px; color:var(--text-muted);}
@@ -459,6 +469,109 @@
       </div>
 
     </div>
+
+{% if can_see_appointment_sms %}
+    <!-- INDIVIDUAL APPOINTMENT MESSAGES.
+         The other kind of message this system sends: one text to one patient
+         about one of their own appointments, sent from Appointment Scheduling or
+         the Patient Profile at the moment a booking is made, moved or called
+         off. It is listed here, apart from the broadcast history above, because
+         the two are different things -- a broadcast is what the barangay said to
+         the community and names nobody; every row below names one patient.
+
+         It is not shown to a Barangay Official. That is a reading restriction
+         rather than the sending one above being restated: these rows carry a
+         patient's name, service and appointment date, and 09_UI_Architecture §2
+         keeps that role out of patient records entirely. See
+         APPOINTMENT_SMS_ROLES in routes/broadcast_views.py. -->
+    <div class="row g-3 mt-1">
+      <div class="col-12">
+        <div class="panel-card">
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-3">
+            <div>
+              <div class="detail-title">Individual appointment messages</div>
+              <div class="detail-sub">
+                One message to one patient about their own booking. Sent by hand from
+                Appointment Scheduling or the Patient Profile after a booking is made,
+                moved or cancelled &mdash; never automatically.
+              </div>
+            </div>
+{%- if appointment_sms %}
+            <div class="pg-info">
+              {{ appointment_sms_stats.total }} message{{ '' if appointment_sms_stats.total == 1 else 's' }}
+{%- if appointment_sms_stats.failed %} &middot; {{ appointment_sms_stats.failed }} failed{% endif %}
+{%- if appointment_sms_stats.simulated %} &middot; {{ appointment_sms_stats.simulated }} simulated, {{ appointment_sms_stats.live }} live{% endif %}
+            </div>
+{%- endif %}
+          </div>
+
+{% if appointment_sms %}
+          <div class="table-responsive">
+            <table class="sms-table appointment-sms">
+              <thead>
+                <tr>
+                  <th>Reference</th>
+                  <th>Patient</th>
+                  <th>About</th>
+                  <th>Message</th>
+                  <th>Sent</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+{%- for message in appointment_sms %}
+                <tr>
+                  <td>
+                    <div class="recip-mobile sms-ref">{{ message.reference }}</div>
+{%- if message.is_simulated %}
+                    <span class="sim-flag" title="Recorded in full, but no message was transmitted: no key for the messaging service was set when this was sent.">
+                      <span class="material-symbols-outlined" style="font-size:13px;">wifi_off</span>Simulated
+                    </span>
+{%- endif %}
+                  </td>
+                  <td>
+                    <div class="recip-name">{{ message.recipient_name }}</div>
+                    <div class="recip-mobile sms-who">
+                      {{ message.mobile_number }}
+{%- if message.patient_reference %} &middot; {{ message.patient_reference }}{% endif %}
+                    </div>
+                  </td>
+                  <td><span class="cat-pill">{{ message.event_label }}</span></td>
+                  <td><span class="msg-preview" title="{{ message.message }}">{{ message.message }}</span></td>
+                  <td>
+                    <div>{{ message.sent_at_display }}</div>
+                    <div class="recip-mobile">by {{ message.sent_by_name }}</div>
+                  </td>
+                  <td><span class="badge-status {{ message.status_badge_class }}">{{ message.status }}</span></td>
+                </tr>
+{%- endfor %}
+              </tbody>
+            </table>
+          </div>
+          <div class="panel-note">
+            &ldquo;Sent&rdquo; means the messaging service accepted the message. This system
+            receives no delivery reports, so no message here is ever marked delivered &mdash;
+            the same limit the broadcast history above states.
+          </div>
+{% else %}
+          <!-- Nothing is invented to fill this table; the history starts with the
+               first message somebody actually chooses to send. -->
+          <div class="empty-state show" style="padding:44px 24px;">
+            <div class="icon-circle">
+              <span class="material-symbols-outlined" style="font-size:34px; color:var(--teal-dark);">smartphone</span>
+            </div>
+            <h5>No appointment messages sent yet</h5>
+            <p>
+              No patient has been texted about their own appointment from this system.
+              The offer to send one appears on Appointment Scheduling and the Patient
+              Profile immediately after a booking is made, moved or cancelled.
+            </p>
+          </div>
+{% endif %}
+        </div>
+      </div>
+    </div>
+{% endif %}
 
 {% if can_broadcast %}
     <!-- COMPOSE DIALOG. Rendered only for the two roles that hold broadcast

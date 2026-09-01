@@ -79,6 +79,18 @@ ACTION_GENERAL_VACCINATION_CORRECTED = "Corrected other vaccination record"
 # message itself, who it reached, and whether it was actually transmitted -- an
 # entry that omitted the last of those would read as a send that happened.
 ACTION_SMS_BROADCAST_SENT = "Sent community SMS broadcast"
+# The individual counterpart, and its own phrase rather than a variant of the one
+# above. Both are a message that went out, and collapsing them would lose the
+# distinction that decides what a reader does next: a broadcast is what the
+# barangay said to the community and names no patient, while this is one message
+# to one named patient about their own appointment. An administrator asking "who
+# have we texted about their bookings?" needs those two to look different in a
+# list, not to be told apart by reading every entry.
+#
+# `details` carries the message itself, the number it was addressed to, the
+# appointment it is about and whether it was actually transmitted -- an entry
+# that omitted the last of those would read as a send that happened.
+ACTION_APPOINTMENT_SMS_SENT = "Sent appointment SMS to patient"
 # The two authentication outcomes, written from routes/auth.py's login route.
 # Both phrases are stable strings because the counts below select on them: a
 # reworded action would silently stop being counted, so they are constants for

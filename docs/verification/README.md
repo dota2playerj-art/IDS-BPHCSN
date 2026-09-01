@@ -25,6 +25,80 @@ So the evidence lives on the machine that produced it. What is committed is this
 file, naming what was captured and how to produce it again, so the absence is
 stated rather than left for someone to trip over.
 
+## appointment-sms/
+
+Verification of the individual appointment SMS confirmation — one text to one
+patient about their own booking, sent by hand after it is made, moved or called
+off.
+
+**No images were retained from this pass, and that is deliberate.** The whole run
+was driven against a *throwaway copy* of `app.db` rather than the real one, so
+that click-testing a feature that writes messages and audit entries left no test
+residue in the patient database. A screenshot of that session shows the same real
+patient name, contact number and appointment a screenshot of the live system
+would, so it would be excluded from git for the reason above either way — and the
+copy it came from no longer exists. What survives instead is the reproduction
+recipe below and the automated suite, which is the more checkable half.
+
+### What was exercised in a real browser
+
+Signed in as **Health Center Staff** and then as the **Administrator**, against
+the app served from a scratch database copy. The role column says which account
+actually produced each state in the browser; the automated suite below then
+covers every state under *both* roles.
+
+| Role | State | What it showed |
+| --- | --- | --- |
+| Staff | New booking, patient with a mobile | The teal offer panel under the flash: the exact 137-character message, "1 GSM-7 segment", the simulated-mode note, and a live **Send SMS Confirmation** button. |
+| Staff | After pressing Send | `APT-SMS-2026-0001 — new appointment message to Grace Ilagan on 09171000777. SIMULATED SEND — …`, and the offer gone from the next render. |
+| Staff | New booking, patient with **no** mobile | A plain dashed grey block: "New appointment — no SMS can be sent … Add a mobile number through Edit Profile on their patient record. The appointment itself is saved and is unaffected." **No button, no form, no disabled control** — nothing clickable at all. |
+| Admin | Reschedule | Same panel, labelled "Appointment moved", button **Send SMS Notice of Change**, message stating the new date and time. |
+| Admin | Cancellation | Same panel, labelled "Appointment cancelled", button **Send SMS Cancellation Notice**. |
+| Admin | SMS Notifications (Screen 09) | The new **Individual appointment messages** panel listing all three sends with their references, the patient, the event, the sender and a Simulated flag — beneath the community broadcast history, which was unchanged. |
+
+The **Barangay Official** was not driven through the browser: that account's
+sign-in would not take through the automation being used, and rather than report
+a click-through that did not happen, its one claim — that the individual-message
+panel is absent for that role while the broadcast history stays — was checked
+against the same running application and the same database through its own login
+route. It is also the last check in the automated suite below.
+
+### Reproducing it
+
+1. Copy `app.db` somewhere scratch and point a throwaway launcher at it, so the
+   run writes nothing to the real database:
+
+   ```python
+   import app as m
+   m.app.config["DATABASE"] = r"C:/path/to/scratch/app.db"
+   m.app.run(port=5055)
+   ```
+
+   Running `python app.py` instead works exactly the same way — it simply leaves
+   the messages and audit entries in the real database.
+2. Sign in, open **Appointment Scheduling**, and book a future visit for a
+   patient who has a mobile number (PAT-007 has one). The offer appears above the
+   page title, under the flash.
+3. Press Send, then repeat for **Reschedule** and **Cancel** on the same booking.
+4. Book one more for a patient with no number on file — PAT-016, PAT-017, PAT-021
+   and PAT-022 all have an empty `contact_number` — and confirm the block that
+   appears carries no control of any kind.
+5. Repeat signed in as the other role.
+
+Every send writes an `appointment_sms_messages` row and an `audit_logs` entry
+under **SMS Notifications**, so the Audit Logs screen and that table are the
+other half of this evidence — and that half *is* in the database rather than in a
+picture.
+
+### The automated suite
+
+Run alongside the browser pass, also against a scratch copy: 85 checks over both
+roles and all three events, covering the recorded row, the composed text, the
+audit entry, the no-number state's markup, forged posts, event/status mismatches,
+role isolation, and a broadcast send proving Screen 09's community half is
+untouched. All 85 passed, as did a sweep rendering all 183 GET routes across the
+three roles with no 5xx.
+
 ## vaccination-correction/
 
 Real-browser verification of the vaccination correction path (`e7416d8`), run

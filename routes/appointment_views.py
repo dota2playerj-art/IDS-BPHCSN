@@ -9,8 +9,9 @@ This mirrors routes/patient_views.py and routes/inventory_views.py exactly.
 """
 from datetime import timedelta
 
-from flask import url_for
+from flask import session, url_for
 
+from models.appointment_sms import EVENTS, build_offer, send_appointment_sms
 from models.appointments import (
     APPOINTMENT_TYPES,
     BOOKING_HORIZON_DAYS,
@@ -37,10 +38,12 @@ from models.appointments import (
     start_consultation,
     validate_booking_form,
 )
+from models.audit import ACTION_APPOINTMENT_SMS_SENT, MODULE_SMS, log_action
 from models.immunizations import get_immunization_alert, get_immunization_status
 from models.patients import get_all_patients, get_patient_by_id
 from models.users import get_clinical_staff
 from utils.dates import display_date, today
+from utils.sms import SIMULATED
 
 # Only a living, active record may be checked in or booked. An Inactive or
 # Deceased patient appearing in either picker is a data-entry accident waiting to
@@ -649,6 +652,12 @@ def process_new_patient_booking_request(form_data):
 def process_new_patient_booking(patient_id, values, user_id):
     """Book the future visit for a patient who was just registered.
 
+    Returns (appointment_id, message). The id is None on every path that did not
+    create a booking, and is what lets the caller offer an SMS confirmation for a
+    first-time patient exactly as it does for an existing one -- the same shape
+    process_book_appointment() returns, so neither path can quietly become the
+    one that forgets to offer it.
+
     The second half of the dialog's "New patient" path, and the exact mirror of
     process_new_patient_check_in(): Register Patient has created the record, and
     this creates the appointment that registration was opened for, so the
@@ -661,14 +670,14 @@ def process_new_patient_booking(patient_id, values, user_id):
     """
     patient, message = _bookable_patient(patient_id)
     if patient is None:
-        return f"{message} No appointment was booked."
+        return None, f"{message} No appointment was booked."
 
     staff_ids = [member["id"] for member in get_clinical_staff()]
     values = dict(values)
     values["patient_id"] = str(patient["id"])
     errors = validate_booking_form(values, staff_ids=staff_ids)
     if errors:
-        return (
+        return None, (
             f"{patient['full_name']} was registered as patient "
             f"{patient['patient_id']}, but the appointment was not booked: "
             + " ".join(errors.values())
@@ -678,7 +687,7 @@ def process_new_patient_booking(patient_id, values, user_id):
     conflicts = find_scheduling_conflicts(
         patient["id"], values["appointment_date"], values["appointment_time"]
     )
-    create_appointment(
+    appointment_id = create_appointment(
         patient_id=patient["id"],
         user_id=user_id,
         appointment_date=values["appointment_date"],
@@ -689,7 +698,7 @@ def process_new_patient_booking(patient_id, values, user_id):
             int(values["assigned_staff_id"]) if values["assigned_staff_id"] else None
         ),
     )
-    return (
+    return appointment_id, (
         f"{patient['full_name']} registered as patient {patient['patient_id']}. "
         + _booked_message(patient, values, conflicts)
     )
@@ -728,7 +737,17 @@ def _appointment_label(appointment):
 
 
 def process_cancel_appointment(form_data):
-    """Cancel a booking, or write it off as a no-show. Returns the message to flash.
+    """Cancel a booking, or write it off as a no-show.
+
+    Returns (appointment_id, message). The id is set only when a booking was
+    genuinely just CANCELLED, which is the one outcome here a patient should be
+    told about: it is what the caller offers an SMS notice on.
+
+    A no-show is deliberately not offered one, and the omission is a decision
+    rather than a gap. Somebody who did not attend already knows they did not
+    attend; a text saying so would be a reprimand sent at the barangay's expense.
+    See models/appointment_sms.py, whose event vocabulary -- and whose CHECK
+    constraint in the schema -- has no member for it either.
 
     The status arrives as the value of whichever submit button was pressed, the
     same way Screen 03's status dialog works, and is re-checked here against
@@ -741,11 +760,13 @@ def process_cancel_appointment(form_data):
     """
     appointment, message = _appointment_from(form_data)
     if appointment is None:
-        return message
+        return None, message
 
     status = (form_data.get("status") or "").strip()
     if status not in CLOSURE_STATUSES:
-        return "Choose how to close this appointment: Cancel it, or mark it a No-show."
+        return None, (
+            "Choose how to close this appointment: Cancel it, or mark it a No-show."
+        )
 
     label = _appointment_label(appointment)
     outcome = close_appointment(appointment["id"], status)
@@ -756,28 +777,30 @@ def process_cancel_appointment(form_data):
             "was deleted."
         )
         if status == "Cancelled":
-            return f"{label} is cancelled. It has left the upcoming list.{kept}"
-        return f"{label} is marked No-show.{kept}"
+            return appointment["id"], (
+                f"{label} is cancelled. It has left the upcoming list.{kept}"
+            )
+        return None, f"{label} is marked No-show.{kept}"
     if outcome == "already":
-        return f"{label} is already marked {status}."
+        return None, f"{label} is already marked {status}."
     if outcome == "arrived":
-        return (
+        return None, (
             f"{queue_display_name(appointment)} has already been checked in and is "
             f"in today's queue, so that visit is under way and cannot be "
             f"{'cancelled' if status == 'Cancelled' else 'marked a no-show'}. "
             "Complete the consultation instead, or mark it completed from the queue."
         )
     if outcome == "resolved":
-        return (
+        return None, (
             f"{label} is already marked {appointment['status']}, so there is "
             "nothing left to close."
         )
     if outcome == "too-early":
-        return (
+        return None, (
             f"{label} has not happened yet, so it cannot be a no-show. Cancel it "
             "instead if the patient has called it off."
         )
-    return "That appointment could not be found."
+    return None, "That appointment could not be found."
 
 
 def process_reschedule_appointment(form_data):
@@ -982,3 +1005,155 @@ def process_complete_consultation(form_data):
             )
         )
     return f"{name}'s consultation is complete. Nobody else is waiting."
+
+
+# ---------------------------------------------------------------------------
+# THE SMS CONFIRMATION OFFER
+#
+# A booking, a move or a cancellation saves, the operator is redirected, and the
+# flash message tells them what happened. This is the second half of that
+# sentence: beside the flash, on whichever screen they landed on, they are
+# offered the one thing the system can now do that it could not before -- tell
+# the patient.
+#
+# WHY THE OFFER TRAVELS IN THE SESSION AND NOT IN THE URL
+# -------------------------------------------------------
+# Because it is the same kind of thing a flash message is, and it has to behave
+# like one. The three actions each end in a redirect, and two of them can land on
+# either Appointment Scheduling or the Patient Profile depending on where the
+# operator started (see appointment_return_url). A query parameter would have to
+# be added to both destinations, in both role blueprints, and would then survive
+# every reload -- re-offering a send that was already made, on a page somebody
+# left open. Carried the way flash() carries its messages, the offer appears once,
+# next to the confirmation of the save that produced it, and is gone.
+#
+# It is consumed on render by utils.context.inject_role_context(), so it reaches
+# base.html without every screen's context builder having to pass it through.
+# Nothing is sent by rendering it: the form below still has to be submitted, and
+# process_send_appointment_sms() rebuilds the whole offer from the database
+# before it will send anything.
+# ---------------------------------------------------------------------------
+
+SMS_OFFER_SESSION_KEY = "appointment_sms_offer"
+
+# What the submitted form has to carry for the send to be identified at all.
+SMS_APPOINTMENT_FIELD = "appointment_id"
+SMS_EVENT_FIELD = "event"
+
+
+def offer_appointment_sms(appointment_id, event, return_to=""):
+    """Queue the SMS offer for the next screen this operator renders.
+
+    Stores the facts the offer is rebuilt from, not the offer itself: the
+    message, the recipient's number and the segment cost are all read off the
+    database when the page renders, so a session that outlived a change to the
+    appointment cannot show a confirmation for a booking that has since moved.
+
+    `return_to` is the same field the cancel and reschedule dialogs already carry
+    -- where the operator was working when they started. It travels with the
+    offer so that sending a confirmation from a patient's profile lands back on
+    that profile rather than tipping them onto Appointment Scheduling. It is
+    never trusted as a URL: appointment_return_url() re-reads it and falls back
+    to Appointment Scheduling for anything it does not recognise.
+    """
+    if not appointment_id or event not in EVENTS:
+        return
+    session[SMS_OFFER_SESSION_KEY] = {
+        "appointment_id": int(appointment_id),
+        "event": event,
+        "return_to": (return_to or "").strip(),
+    }
+
+
+def take_appointment_sms_offer():
+    """Pop the queued offer and build it, or None. Consumed like a flash message.
+
+    Popped whether or not it can still be built, so an offer that has gone stale
+    -- the appointment moved again in another tab, the booking was cancelled --
+    does not sit in the session waiting to appear on some later, unrelated page.
+    """
+    queued = session.pop(SMS_OFFER_SESSION_KEY, None)
+    if not isinstance(queued, dict):
+        return None
+    offer = build_offer(queued.get("appointment_id"), queued.get("event"))
+    if offer is not None:
+        offer["return_to"] = queued.get("return_to") or ""
+    return offer
+
+
+def _sent_sms_message(record):
+    """The line flashed after one confirmation is sent.
+
+    Concrete for the reason routes/broadcast_views.py _sent_message() is: "SMS
+    sent" would read the same whether it reached the patient's own number or a
+    stale one, and -- while there is no API key -- whether or not anything left
+    the building at all. Every figure is read back off the stored row.
+    """
+    parts = [
+        f"{record['reference']} — {record['event_label'].lower()} message to "
+        f"{record['recipient_name']} on {record['mobile_number']}"
+    ]
+    if record["segments"] > 1:
+        parts.append(f"{record['segments']} segments ({record['encoding']})")
+
+    if record["status"] != "Sent":
+        message = " — ".join(parts) + " could not be sent."
+        detail = (record.get("gateway_response") or "").strip()
+        return message + (f" The messaging service said: {detail}" if detail else "")
+
+    message = " — ".join(parts) + "."
+    if record["is_simulated"]:
+        message += (
+            " SIMULATED SEND — no key is set for the messaging service, so this "
+            "message was recorded in full but nothing left the system. It becomes "
+            "a live send as soon as that key is set."
+        )
+    return message
+
+
+def process_send_appointment_sms(form_data, user_id, ip_address=None):
+    """Send one appointment confirmation to one patient. Returns the flash text.
+
+    Nothing about the message is taken from the form. It carries which
+    appointment and which of the three events, and send_appointment_sms()
+    recomposes the text from the stored appointment and the stored patient --
+    so a hand-made POST cannot put words into a message the health center's name
+    is on, and cannot claim an event the record's own status contradicts.
+    """
+    raw_id = (form_data.get(SMS_APPOINTMENT_FIELD) or "").strip()
+    if not raw_id.isdigit():
+        return "Choose an appointment before sending a message about it."
+
+    event = (form_data.get(SMS_EVENT_FIELD) or "").strip()
+    if event not in EVENTS:
+        return "That is not something this system sends a message about."
+
+    record, error = send_appointment_sms(int(raw_id), event, user_id)
+    if record is None:
+        return error
+
+    log_action(
+        user_id,
+        ACTION_APPOINTMENT_SMS_SENT,
+        module=MODULE_SMS,
+        details=(
+            f"{record['reference']} ({record['event_label'].lower()}) to "
+            f"{record['recipient_name']}"
+            + (
+                f" ({record['patient_reference']})"
+                if record.get("patient_reference") else ""
+            )
+            + f" on {record['mobile_number']}, about appointment "
+            f"APT-{record['appointment_id']:05d}; {record['status']}; "
+            f"{record['segments']} {record['encoding']} segment"
+            f"{'' if record['segments'] == 1 else 's'}; delivery mode "
+            f"{record['delivery_mode']}"
+            + (
+                " (recorded only, nothing transmitted)"
+                if record["delivery_mode"] == SIMULATED else ""
+            )
+            + f'; message: "{record["message"]}"'
+        ),
+        ip_address=ip_address,
+    )
+    return _sent_sms_message(record)
