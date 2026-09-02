@@ -515,6 +515,36 @@
 {% block content %}{% endblock %}
   </div>
 </div>
+{#- THIS BLOCK IS RENDERED BEFORE BOOTSTRAP IS LOADED. READ THIS BEFORE ADDING
+    A SCRIPT THAT TOUCHES `bootstrap`.
+
+    The tag below is an ordinary parser-inserted <script src>, and it comes
+    after this block. So at the moment a page's inline script is PARSED,
+    `window.bootstrap` does not exist yet. Anything written as a bare statement
+    here that reaches for the library gets `undefined`.
+
+    The trap is that the usual defensive guard makes this silent. Written as
+
+        if (modal && window.bootstrap) { new bootstrap.Modal(modal).show(); }
+
+    the condition is simply false, so nothing throws, nothing reaches the
+    console, and the page looks fine -- it just never does the thing. That
+    defect shipped four times in this project (the Add User dialog, the booking
+    and reschedule dialogs, and the SMS compose dialog) and each time it looked
+    from the desk like a form throwing away everything typed on a validation
+    error: the server had re-rendered the values and the errors correctly, into
+    a dialog that was never shown.
+
+    So: anything that uses Bootstrap's JS API goes inside
+
+        document.addEventListener('DOMContentLoaded', function(){ ... });
+
+    which is guaranteed to run after this tag has executed. Keep the
+    `window.bootstrap` guard inside it -- there it is a real assertion about a
+    library that should be present, rather than a silent skip.
+
+    Ordinary DOM work that needs no library does NOT need the wrapper and should
+    stay where it is; only the calls into `bootstrap` need to wait. #}
 {% block scripts %}{% endblock %}
 
   <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>

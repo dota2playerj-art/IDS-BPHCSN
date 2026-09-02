@@ -1898,21 +1898,43 @@
   // happens for ?reschedule=<id>, which is how Patient Profile links in here.
 {%- if booking.open %}
   showBookingMode('{{ booking.mode }}');
-  if(bookAppointmentModal && window.bootstrap){
-    new bootstrap.Modal(bookAppointmentModal).show();
-  }
 {%- else %}
   showBookingMode('existing');
 {%- endif %}
+{%- if booking.open or (reschedule.open and reschedule.appointment) or cancel.open %}
+  // OPENING THE DIALOG WAITS FOR DOMContentLoaded; CHOOSING ITS MODE DOES NOT.
+  // showBookingMode() above is this file's own function and needs nothing
+  // loaded, so it stays where it was. Only the calls below touch Bootstrap.
+  //
+  // base.html renders its scripts block BEFORE it loads bootstrap.bundle.min.js,
+  // so at the moment this script is parsed `window.bootstrap` is undefined and
+  // the guards below were always false. Every one of these reopens failed
+  // silently: the server re-rendered the dialog's values and its errors
+  // correctly, and then nothing showed them. From the desk that is
+  // indistinguishable from being redirected away and losing the lot, which is
+  // how the same defect on Add User was reported before it was traced here.
+  //
+  // DOMContentLoaded is the right wait rather than a polling retry: the
+  // Bootstrap tag is an ordinary parser-inserted <script src>, so it has been
+  // executed by the time the event fires. The guards stay as real assertions.
+  // Same wait, same reason, as patient_profile.html's tab note.
+  document.addEventListener('DOMContentLoaded', function(){
+{%- if booking.open %}
+    if(bookAppointmentModal && window.bootstrap){
+      new bootstrap.Modal(bookAppointmentModal).show();
+    }
+{%- endif %}
 {%- if reschedule.open and reschedule.appointment %}
-  // The heading and the values are already rendered above; this only opens it.
-  if(rescheduleModal && window.bootstrap){
-    new bootstrap.Modal(rescheduleModal).show();
-  }
+    // The heading and the values are already rendered above; this only opens it.
+    if(rescheduleModal && window.bootstrap){
+      new bootstrap.Modal(rescheduleModal).show();
+    }
 {%- elif cancel.open %}
-  if(cancelModal && window.bootstrap){
-    new bootstrap.Modal(cancelModal).show();
-  }
+    if(cancelModal && window.bootstrap){
+      new bootstrap.Modal(cancelModal).show();
+    }
+{%- endif %}
+  });
 {%- endif %}
   markBookedSlots();
   markRescheduleSlots();

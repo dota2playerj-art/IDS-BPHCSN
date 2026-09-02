@@ -815,11 +815,26 @@
 
   // A submit that did not send comes back with what was typed; reopen the dialog
   // on exactly those values, with the errors beside the fields they belong to.
+  //
+  // IT WAITS FOR DOMContentLoaded, AND WITHOUT THE WAIT IT NEVER RAN.
+  // base.html renders its scripts block BEFORE it loads bootstrap.bundle.min.js,
+  // so `window.bootstrap` is undefined at the moment this is parsed and the
+  // guard below was always false. The dialog never reopened: the message the
+  // operator had typed and the error explaining why it was refused were both
+  // re-rendered correctly and both stayed inside a hidden dialog. A composed
+  // broadcast is the worst thing in this project to drop on the floor silently,
+  // because it is the most typing anyone does in one box.
+  //
+  // DOMContentLoaded rather than a polling retry: the Bootstrap tag is an
+  // ordinary parser-inserted <script src>, so it has run by the time the event
+  // fires. Same wait, same reason, as patient_profile.html's tab note.
 {%- if compose_open %}
-  var composeModal = document.getElementById('composeBroadcastModal');
-  if(composeModal && window.bootstrap){
-    new bootstrap.Modal(composeModal).show();
-  }
+  document.addEventListener('DOMContentLoaded', function(){
+    var composeModal = document.getElementById('composeBroadcastModal');
+    if(composeModal && window.bootstrap){
+      new bootstrap.Modal(composeModal).show();
+    }
+  });
 {%- endif %}
 {% endif %}
 </script>{% endblock %}

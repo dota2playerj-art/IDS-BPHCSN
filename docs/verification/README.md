@@ -25,6 +25,129 @@ So the evidence lives on the machine that produced it. What is committed is this
 file, naming what was captured and how to produce it again, so the absence is
 stated rather than left for someone to trip over.
 
+## form-redisplay/
+
+Verification that a form which fails validation redisplays **itself**, with the
+error beside the field it belongs to and every non-sensitive value still filled
+in — checked on every form in the project by submitting genuinely invalid data
+to each, not by reading the code.
+
+### What was actually wrong
+
+Add User was reported as redirecting away on a validation failure and losing
+both the entry and the error. It was not redirecting: the POST returned 200, the
+name, username and role were re-rendered, the error was in the markup, and the
+password boxes were correctly cleared. **The dialog just never reopened.**
+
+`base.html` renders `{% block scripts %}` *before* it loads
+`bootstrap.bundle.min.js`, so an inline `if (modal && window.bootstrap)` guard is
+evaluated while `window.bootstrap` is still undefined. The condition is false,
+nothing throws, nothing reaches the console — and the correctly-rendered dialog
+stays at `display:none`. From the desk that is indistinguishable from being
+thrown back to User Management with everything discarded, which is exactly how
+it was reported.
+
+The project had already met this defect once and written it up, on
+`patient_profile.html`'s tab-opening script. That note named the cause and the
+fix; the fix had simply never been applied anywhere else.
+
+**Four dialogs carried the same bug** — Add User, Book Appointment, Reschedule,
+and the SMS compose box (both the Administrator's and the Barangay Official's
+route into it). All four are now wrapped in `DOMContentLoaded`, and `base.html`
+carries a note at the block itself so the next dialog does not repeat it.
+
+### Every form, with its tested result
+
+Invalid data was POSTed to each. `redisplay` means the form came back at 200
+with its own errors; `action post` means nothing is typed into it, so a flash
+and a redirect is the correct shape rather than a defect.
+
+| Form | Roles tested | Result |
+| --- | --- | --- |
+| Add User | Admin | **was broken (dialog never reopened) — fixed** |
+| Book Appointment | Admin, Health Staff | **was broken (dialog never reopened) — fixed** |
+| Reschedule | Admin | **was broken (dialog never reopened) — fixed** |
+| SMS Broadcast (compose) | Admin, Barangay Official | **was broken (dialog never reopened) — fixed** |
+| Register Patient | Admin, Health Staff | already correct — redisplay, 10 field errors, values kept |
+| Edit Patient | Admin | already correct — redisplay with errors |
+| Add/Edit Medicine | Admin, Health Staff | already correct — redisplay, value kept |
+| Edit Medicine | Admin | already correct — redisplay with errors |
+| Record Consultation | Admin, Health Staff | already correct — redisplay, diagnosis and treatment plan kept |
+| Edit Consultation | Admin | already correct — redisplay with errors |
+| Correct Vaccination (EPI + general) | Admin, Health Staff | correct error, values not kept — see below |
+| Cancel / No-show | Admin | action post — specific message, nothing typed to lose |
+| Appointment SMS | Admin | action post — specific message |
+| Deactivate / Reactivate | Admin | action post — specific message |
+| Archive Medicine, Archive Patients | Admin | action post — specific message |
+| Check In, Start / Complete Consultation | Admin | action post — specific message |
+| Login | — | redirects by design; says only "Invalid security credentials." |
+
+Two entries in that table need their reasoning kept, because both look like the
+reported bug at first glance and neither is it.
+
+**Record Consultation** first appeared to redirect away. It does not. The probe
+was aimed at a `Scheduled` appointment, and the form refuses anything that is not
+`In Consultation` — a *state* guard, reached before validation, which answers
+with its own clear sentence. Put the queue entry in the state the form is for and
+a blank chief complaint redisplays the form with the error and keeps the
+diagnosis and treatment plan that were typed alongside it.
+
+**Correct Vaccination** genuinely does redirect, and it is the one place the
+established pattern is not followed. It is *not* the reported defect: the error
+is delivered in full and names every problem ("Enter the date the vaccine was
+actually given. Choose the vaccine and dose from the DOH EPI schedule. Nothing
+has been saved."), so nobody is left guessing. What is lost is the edit itself —
+the dialog reopens pre-filled from the stored record, not from what was typed.
+For a three-field dialog whose fields are already populated from the row that is
+a small loss, which is presumably why it was built this way. It is recorded here
+rather than changed, because changing it means giving
+`process_vaccination_correction()` a context to return and is a decision about
+that flow rather than a fix to this bug.
+
+### The automated suites
+
+- **28 form probes** across three roles, one per form above, each submitting
+  genuinely invalid data.
+- **5 modal-reopen probes** asserting, on the real rendered response, that the
+  reopen call is emitted *and* is inside a `DOMContentLoaded` callback. This is
+  the check that would have caught the original defect: the earlier suite
+  asserted the reopen call was present in the HTML, which it always was.
+- **The Add User suite re-run: 120 checks, 0 failures.** Its five hard-coded
+  counts ("exactly three accounts", "zero User Management audit rows") were made
+  relative to a baseline captured at the start of the run — they were written
+  when the roster could not grow, and the feature they verify is what makes it
+  grow, so an absolute count reports ordinary use of the feature as a regression.
+- Route × role matrix before and after: **identical, zero drift.**
+
+### The live browser pass
+
+Driven against a scratch copy on a separate port, signed in as the
+Administrator. Add User was submitted with **three distinct failures** — a weak
+password, a missing required field, and a duplicate username differing only in
+capitalisation — and each was confirmed in the live DOM: dialog visible, the
+right error text showing, `is-invalid` on the right field, name/username/role
+still filled in, and **both password boxes empty**. Book Appointment, Reschedule
+and SMS compose were each submitted invalid and confirmed to reopen with their
+errors visible. Register Patient was confirmed still correct as the reference
+full-page form.
+
+Before the fix, the same submit was observed with the dialog at `display: none`,
+`.field-error` elements present in the DOM but with no visible box, and every
+typed value sitting in a form nobody could see.
+
+### Reproducing it
+
+1. Copy `app.db` somewhere scratch and point `app.config["DATABASE"]` at it.
+2. `python app.py`, sign in as the Administrator, open User Management.
+3. Add User → fill it in, give it a five-character password, Create Account.
+4. The dialog must come straight back, showing "Too short. A password must be at
+   least 12 characters; this one is 5.", with the name, username and role still
+   there and both password boxes empty.
+5. Repeat with a blank Full Name, and with a username that differs from an
+   existing one only in capitals.
+6. Do the same on Appointment Scheduling (book with nothing filled in) and on SMS
+   Notifications (send an empty broadcast).
+
 ## add-user/
 
 Verification of **Add User** — an Administrator creating an account with a
