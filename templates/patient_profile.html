@@ -179,6 +179,17 @@
     border-color:var(--teal); box-shadow:0 0 0 3px rgba(22,155,146,0.12);
   }
   .field-hint{font-size:12px; color:var(--text-muted); margin-top:4px;}
+  /* A rejected correction, in the same red the Add User dialog uses for a
+     rejected account -- one treatment for "this field is why nothing saved",
+     wherever the operator meets it. */
+  .form-control.is-invalid, .form-select.is-invalid{border-color:var(--danger);}
+  .field-error{font-size:12.5px; color:var(--danger); margin-top:4px;}
+  .correction-alert{
+    border-radius:12px; border:1px solid #FECACA; background:#FEF2F2; color:#B91C1C;
+    padding:12px 14px; font-size:13px; display:flex; gap:10px; align-items:flex-start;
+    margin-bottom:16px;
+  }
+  .correction-alert strong{display:block; margin-bottom:2px;}
   /* The "this will be logged" notice. Amber rather than red: a correction is a
      legitimate act, not a warning -- what the box says is that it leaves a
      permanent trace, which is a fact about the action and not a reason to
@@ -1191,57 +1202,119 @@
     <div class="modal fade" id="correctVaccinationModal" tabindex="-1" aria-labelledby="correctVaccinationModalLabel" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content" style="border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.12);">
+{#- THE DIALOG'S STATE AFTER A SUBMIT THAT DID NOT SAVE.
+    `correction_state` is set only by the correction route, and only when the
+    correction was refused. Every field below reads its value from it when it is
+    present and renders empty when it is not, because on an ordinary page load
+    the dialog is filled in by the script at the foot of this file from the
+    data-* attributes of whichever Correct button was pressed.
+
+    Both halves have to work: the script populates the dialog the operator opens,
+    and this populates the dialog the server sends back. They never run on the
+    same request -- the script's `show.bs.modal` handler returns early when there
+    is no button behind the event, which is exactly the case when the reopen at
+    the foot of this file shows the dialog itself. #}
+{%- set cstate = correction_state | default(none) %}
+{%- set cerr = cstate.errors if cstate else {} %}
+{%- set cform = cstate.form if cstate else {} %}
+{%- set state_is_epi = cstate and cstate.kind == correction.epi_kind %}
+{%- set epi_keys = correction.epi_doses | map(attribute='key') | list %}
+{#- Which option the select comes back on. What was submitted, when that is a
+    dose the schedule lists -- so a correction refused for its DATE keeps the
+    vaccine the operator chose. Otherwise the pair the record actually holds,
+    because the only way the vaccine itself fails is by not being a real pair,
+    and there is no option to re-select. #}
+{%- set submitted_key = cform.get(correction.vaccine_field) if cstate else '' %}
+{%- set selected_key = submitted_key if submitted_key in epi_keys else (cstate.current.vaccine_key if cstate else '') %}
           <form method="post" action="{{ url_for(correct_vaccination_endpoint, patient_id=patient.id) }}" novalidate>
-            <input type="hidden" name="{{ correction.kind_field }}" id="correctKind" value="">
-            <input type="hidden" name="{{ correction.record_field }}" id="correctRecordId" value="">
+            <input type="hidden" name="{{ correction.kind_field }}" id="correctKind" value="{{ cstate.kind if cstate else '' }}">
+            <input type="hidden" name="{{ correction.record_field }}" id="correctRecordId" value="{{ cstate.record_id if cstate else '' }}">
             <div class="modal-header">
               <h5 class="modal-title" id="correctVaccinationModalLabel">Correct Vaccination Record</h5>
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
+{%- if cstate and cstate.banner %}
+              <div class="correction-alert">
+                <span class="material-symbols-outlined" style="font-size:20px; margin-top:1px;">error</span>
+                <div>
+                  <strong>This correction was not saved</strong>
+                  {{ cstate.banner }} The record is exactly as it was, and what you entered has been
+                  kept below so you can put it right rather than start again.
+                </div>
+              </div>
+{%- endif %}
               <p style="margin-bottom:10px; font-size:13.5px;">
                 This corrects what the record says. The record itself is kept &mdash; nothing is deleted,
                 and it stays on {{ patient.first_name }}'s file under the corrected details.
               </p>
-              <p id="correctSubject" style="margin-bottom:16px; font-size:13.5px; color:var(--text-muted);"></p>
+              <p id="correctSubject" style="margin-bottom:16px; font-size:13.5px; color:var(--text-muted);">
+{%- if cstate %}Correcting: {{ cstate.current.label }}{% if cstate.current.recorded_by %}, recorded by {{ cstate.current.recorded_by }}{% endif %}.{% endif %}
+              </p>
 
-              <div id="correctEpiFields" style="margin-bottom:16px;">
+              <div id="correctEpiFields" style="margin-bottom:16px;{% if cstate and not state_is_epi %} display:none;{% endif %}">
                 <label class="field-label" for="correctVaccine">Vaccine and dose</label>
-                <select class="form-select" id="correctVaccine" name="{{ correction.vaccine_field }}">
+                <select class="form-select{% if cerr.get(correction.vaccine_field) %} is-invalid{% endif %}" id="correctVaccine" name="{{ correction.vaccine_field }}"{% if cstate and not state_is_epi %} disabled{% endif %}>
+{#- A dose the current schedule no longer lists is still a real record, and the
+    select has to be able to show what the row actually says before it can offer
+    anything else. The script adds this option when the dialog is opened from a
+    button; this adds it when the server sends the dialog back. #}
+{%- if state_is_epi and cstate.current.vaccine_key and cstate.current.vaccine_key not in epi_keys %}
+                  <option value="{{ cstate.current.vaccine_key }}"{% if selected_key == cstate.current.vaccine_key %} selected{% endif %}>{{ cstate.current.label }} (not in the current schedule)</option>
+{%- endif %}
 {%- for dose in correction.epi_doses %}
-                  <option value="{{ dose.key }}">{{ dose.label }}</option>
+                  <option value="{{ dose.key }}"{% if selected_key == dose.key %} selected{% endif %}>{{ dose.label }}</option>
 {%- endfor %}
                 </select>
+{%- if cerr.get(correction.vaccine_field) %}
+                <div class="field-error">{{ cerr.get(correction.vaccine_field) }}</div>
+{%- else %}
                 <div class="field-hint">The DOH Expanded Program on Immunization schedule. Changing this files the record under a different scheduled dose.</div>
+{%- endif %}
               </div>
 
-              <div id="correctGeneralFields">
+              <div id="correctGeneralFields"{% if cstate and state_is_epi %} style="display:none;"{% endif %}>
                 <div style="margin-bottom:16px;">
                   <label class="field-label" for="correctVaccineName">Vaccine</label>
-                  <input type="text" class="form-control" id="correctVaccineName" name="{{ correction.name_field }}"
-                         list="correctVaccineNames" maxlength="{{ correction.max_name_length }}" autocomplete="off">
+                  <input type="text" class="form-control{% if cerr.get(correction.name_field) %} is-invalid{% endif %}" id="correctVaccineName" name="{{ correction.name_field }}"
+                         list="correctVaccineNames" maxlength="{{ correction.max_name_length }}" autocomplete="off"
+                         value="{{ cform.get(correction.name_field, '') if cstate and not state_is_epi else '' }}"{% if cstate and state_is_epi %} disabled{% endif %}>
                   <datalist id="correctVaccineNames">
 {%- for name in correction.common_vaccine_names %}
                     <option value="{{ name }}"></option>
 {%- endfor %}
                   </datalist>
+{%- if cerr.get(correction.name_field) %}
+                  <div class="field-error">{{ cerr.get(correction.name_field) }}</div>
+{%- else %}
                   <div class="field-hint">The vaccines the health center gives most often are suggested; any other name can be typed.</div>
+{%- endif %}
                 </div>
                 <div style="margin-bottom:16px;">
                   <label class="field-label" for="correctDose">Dose number</label>
-                  <input type="number" class="form-control" id="correctDose" name="{{ correction.dose_field }}"
-                         min="{{ correction.dose_range[0] }}" max="{{ correction.dose_range[1] }}" step="1" placeholder="Leave blank if none">
+                  <input type="number" class="form-control{% if cerr.get(correction.dose_field) %} is-invalid{% endif %}" id="correctDose" name="{{ correction.dose_field }}"
+                         min="{{ correction.dose_range[0] }}" max="{{ correction.dose_range[1] }}" step="1" placeholder="Leave blank if none"
+                         value="{{ cform.get(correction.dose_field, '') if cstate and not state_is_epi else '' }}"{% if cstate and state_is_epi %} disabled{% endif %}>
 {#- The surviving twin of the sentence c3ea786 cut from the consultation form:
     "an invented number is worse than a blank", reworded. Same fix here, so the
     project does not go on saying the thing it decided not to say. #}
+{%- if cerr.get(correction.dose_field) %}
+                  <div class="field-error">{{ cerr.get(correction.dose_field) }}</div>
+{%- else %}
                   <div class="field-hint">Optional. Leave it blank where the vaccine has no fixed dose count &mdash; most do not.</div>
+{%- endif %}
                 </div>
               </div>
 
               <div style="margin-bottom:16px;">
                 <label class="field-label" for="correctDate">Date given</label>
-                <input type="date" class="form-control" id="correctDate" name="{{ correction.date_field }}" max="{{ correction.today }}">
+                <input type="date" class="form-control{% if cerr.get(correction.date_field) %} is-invalid{% endif %}" id="correctDate" name="{{ correction.date_field }}" max="{{ correction.today }}"
+                       value="{{ cform.get(correction.date_field, '') if cstate else '' }}">
+{%- if cerr.get(correction.date_field) %}
+                <div class="field-error">{{ cerr.get(correction.date_field) }}</div>
+{%- else %}
                 <div class="field-hint">The day the vaccine was actually administered. It cannot be in the future or before {{ patient.first_name }} was born.</div>
+{%- endif %}
               </div>
 
               <div class="audit-notice">
@@ -1399,5 +1472,37 @@
         + (recordedBy ? ', recorded by ' + recordedBy : '') + '.';
     });
   })();
+
+{%- if correction_state %}
+  // THE DIALOG THE SERVER SENT BACK.
+  //
+  // A correction that did not save re-renders this page with correction_state
+  // set, and everything above has already put what was typed and the errors back
+  // into the dialog's markup. This is the half that makes any of that visible:
+  // without it the redisplay sits at display:none and the operator is left
+  // looking at the profile with their edit apparently gone -- which is exactly
+  // the failure e2616a5 found on four other dialogs, and this is its fix, not a
+  // new one.
+  //
+  // DOMContentLoaded rather than a bare statement, for the reason base.html
+  // documents at the block itself: the scripts block is rendered BEFORE the
+  // Bootstrap tag, so `window.bootstrap` is undefined at parse time here and the
+  // usual `if (window.bootstrap)` guard would simply be false and silent. By the
+  // time this callback runs the parser-inserted <script src> has executed. The
+  // guard stays as an assertion about a library that should be present.
+  //
+  // The vaccine tab is shown underneath because that is where the record and the
+  // Correct button that opened the dialog live; landing on Personal Details
+  // behind the error would put the dialog over a tab that has nothing to do with
+  // it. show.bs.modal's handler above returns early here -- there is no button
+  // behind a modal shown this way -- so it cannot overwrite the server's values.
+  document.addEventListener('DOMContentLoaded', function(){
+    if (!window.bootstrap) { return; }
+    var pane = document.querySelector('#profileTabs [data-bs-target="#tab-vaccine"]');
+    if (pane && bootstrap.Tab) { new bootstrap.Tab(pane).show(); }
+    var dialog = document.getElementById('correctVaccinationModal');
+    if (dialog) { new bootstrap.Modal(dialog).show(); }
+  });
+{%- endif %}
 </script>
 {% endblock %}

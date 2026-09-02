@@ -347,6 +347,8 @@ KINDS = {
             "same dose of the same vaccine twice — correct that record instead, "
             "or choose a different dose."
         ),
+        # The field the duplicate message tells the operator to change.
+        "duplicate_field": VACCINE_FIELD,
     },
     GENERAL_KIND: {
         "noun": "Vaccination",
@@ -363,6 +365,7 @@ KINDS = {
             "vaccine, to the same patient, on the same day is one event — "
             "correct that record instead, or check the date."
         ),
+        "duplicate_field": DATE_FIELD,
     },
 }
 
@@ -399,12 +402,70 @@ def correction_options():
     }
 
 
+def _reopen(kind, record_id, record, form_data, errors, banner):
+    """The dialog's state after a submit that did not save.
+
+    Everything the reopened dialog needs to come back exactly as it was left:
+    which record it is correcting, what was typed into it, and what was wrong
+    with each field. The same shape process_create_user() hands User Management
+    and process_register_patient() hands Register Patient.
+
+    `current` is the record as it is STORED, and it is here because two of these
+    fields cannot be redisplayed from what was posted. The EPI vaccine arrives as
+    a "CODE:DOSE" pair and the only way it fails is by not being a pair the
+    schedule lists -- so there is no option to re-select, and the select falls
+    back to the pair the record actually holds. The subject line likewise
+    describes the record, not the attempt. Everything the operator genuinely
+    typed -- the name, the dose number, the date -- comes back from `form`.
+    """
+    return {
+        "open": True,
+        "kind": kind,
+        "record_id": record_id,
+        "errors": errors,
+        "banner": banner,
+        "form": {
+            VACCINE_FIELD: str(form_data.get(VACCINE_FIELD) or "").strip(),
+            NAME_FIELD: str(form_data.get(NAME_FIELD) or "").strip(),
+            DOSE_FIELD: str(form_data.get(DOSE_FIELD) or "").strip(),
+            DATE_FIELD: str(form_data.get(DATE_FIELD) or "").strip(),
+        },
+        "current": {
+            "vaccine_key": (
+                f"{record['vaccine_code']}:{record['dose_number']}"
+                if kind == EPI_KIND
+                else ""
+            ),
+            "label": KINDS[kind]["label"](record),
+            "recorded_by": record["administered_by_name"],
+        },
+    }
+
+
 def process_vaccination_correction(form_data, user_id, ip_address=None):
     """Apply one correction and record it in the audit trail.
 
-    Returns (patient_id, message). A patient_id means the caller should redirect
-    to that profile; None means it could not resolve one and should fall back to
-    Patient Records. The message is flashed either way.
+    Returns (patient_id, reopen, message).
+
+    `reopen` is the dialog's state after a submit that did not save, and it is
+    the one of the three that decides what the caller does. When it is set the
+    caller re-renders Patient Profile with the correction dialog open on what was
+    typed, with the errors beside the fields they belong to, and flashes nothing;
+    `message` is None in that case because the dialog carries its own banner.
+    When it is None the outcome is terminal -- saved, or refused for a reason no
+    amount of retyping fixes -- so the caller flashes `message` and redirects to
+    the profile. A patient_id of None means it could not resolve one and the
+    caller should fall back to Patient Records.
+
+    WHY A FAILED CORRECTION NOW REDISPLAYS RATHER THAN REDIRECTING.
+    It used to flash one sentence naming every problem and send the operator back
+    to the profile with the dialog shut. That was a defensible reading -- the
+    record is untouched and the page behind is still correct -- and it was the
+    last form in the project that did it, which is what settled it. A correction
+    is typed into three fields chosen with some care; throwing them away to
+    deliver an error that names them is the one thing every other form here stops
+    doing. Consistency is the argument, and it is a real one: an operator should
+    not have to know which dialog in this system keeps their work.
 
     Everything the dialog claims is re-established here rather than trusted. The
     kind is checked against KINDS, the record is re-read from the table, the
@@ -423,42 +484,56 @@ def process_vaccination_correction(form_data, user_id, ip_address=None):
     kind = str(form_data.get(KIND_FIELD) or "").strip().lower()
     spec = KINDS.get(kind)
     if spec is None:
-        return None, "That is not a kind of record this system can correct."
+        return None, None, "That is not a kind of record this system can correct."
 
     raw_id = str(form_data.get(RECORD_FIELD) or "").strip()
     if not raw_id.isdigit():
-        return None, "Choose the vaccination record to correct."
+        return None, None, "Choose the vaccination record to correct."
     record_id = int(raw_id)
 
     before_record = spec["fetch"](record_id)
     if before_record is None:
-        return None, "That vaccination record could not be found."
+        return None, None, "That vaccination record could not be found."
 
     patient = get_patient_by_id(before_record["patient_id"])
     if patient is None:
-        return None, "That patient record could not be found."
+        return None, None, "That patient record could not be found."
 
     patient_id = patient["id"]
     original_label = spec["label"](before_record)
 
     values, errors = spec["parse"](form_data, before_record, patient)
     if errors:
-        # One flash naming every problem, rather than a re-rendered form. The
-        # dialog is a modal over a page that is still correct -- unlike the
-        # consultation form there is no half-filled screen to preserve, and the
-        # record is untouched. "Nothing has been saved" is said plainly because
-        # the operator's next question is exactly that.
-        return patient_id, "{} was not corrected. {} Nothing has been saved.".format(
-            original_label, " ".join(errors[field] for field in sorted(errors))
-        )
+        # The dialog comes back on what was typed, with each message beside the
+        # field it is about, rather than one flash naming every problem over a
+        # dialog that has shut. The record is untouched either way -- what
+        # changed is that the operator keeps the edit they were part-way through.
+        return patient_id, _reopen(
+            kind, record_id, before_record, form_data, errors,
+            "{} was not corrected. Correct the {} highlighted field{} below. "
+            "Nothing has been saved.".format(
+                original_label,
+                len(errors),
+                "" if len(errors) == 1 else "s",
+            ),
+        ), None
 
     outcome = spec["apply"](record_id, values)
     if outcome == "missing":
-        return patient_id, "That vaccination record could not be found."
+        return patient_id, None, "That vaccination record could not be found."
     if outcome == "duplicate":
-        return patient_id, spec["duplicate"].format(
+        # A conflict, not a mistyping -- but it is fixed the same way the field
+        # errors above are, by changing what is in the dialog and saving again.
+        # So it reopens too, with the sentence on the field that identifies the
+        # clashing record: the dose for an EPI record, the date for a general one,
+        # which is what each kind's message already tells the operator to check.
+        conflict = spec["duplicate"].format(
             patient=patient["full_name"], label=spec["submitted_label"](values)
         ) + " Nothing has been saved."
+        return patient_id, _reopen(
+            kind, record_id, before_record, form_data,
+            {spec["duplicate_field"]: conflict}, conflict,
+        ), None
 
     after_record = spec["fetch"](record_id)
     labels = _labels_for(kind)
@@ -470,7 +545,7 @@ def process_vaccination_correction(form_data, user_id, ip_address=None):
     )
 
     if not changed:
-        return patient_id, (
+        return patient_id, None, (
             f"No change. {original_label} for {patient['full_name']} is "
             "unchanged, and nothing has been written to the audit log."
         )
@@ -507,7 +582,7 @@ def process_vaccination_correction(form_data, user_id, ip_address=None):
         subject = f"{original_label} corrected to {corrected_label}"
     else:
         subject = f"{original_label} corrected"
-    return patient_id, (
+    return patient_id, None, (
         f"{subject} for {patient['full_name']} — {len(changed)} field"
         f"{'s' if len(changed) != 1 else ''} changed ({field_names}). "
         "The correction has been recorded in the audit log."

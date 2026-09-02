@@ -74,7 +74,7 @@ and a redirect is the correct shape rather than a defect.
 | Edit Medicine | Admin | already correct — redisplay with errors |
 | Record Consultation | Admin, Health Staff | already correct — redisplay, diagnosis and treatment plan kept |
 | Edit Consultation | Admin | already correct — redisplay with errors |
-| Correct Vaccination (EPI + general) | Admin, Health Staff | correct error, values not kept — see below |
+| Correct Vaccination (EPI + general) | Admin, Health Staff | **was the last exception (redirected, edit lost) — fixed: redisplay, values kept** |
 | Cancel / No-show | Admin | action post — specific message, nothing typed to lose |
 | Appointment SMS | Admin | action post — specific message |
 | Deactivate / Reactivate | Admin | action post — specific message |
@@ -92,17 +92,23 @@ with its own clear sentence. Put the queue entry in the state the form is for an
 a blank chief complaint redisplays the form with the error and keeps the
 diagnosis and treatment plan that were typed alongside it.
 
-**Correct Vaccination** genuinely does redirect, and it is the one place the
-established pattern is not followed. It is *not* the reported defect: the error
-is delivered in full and names every problem ("Enter the date the vaccine was
-actually given. Choose the vaccine and dose from the DOH EPI schedule. Nothing
-has been saved."), so nobody is left guessing. What is lost is the edit itself —
-the dialog reopens pre-filled from the stored record, not from what was typed.
-For a three-field dialog whose fields are already populated from the row that is
-a small loss, which is presumably why it was built this way. It is recorded here
-rather than changed, because changing it means giving
-`process_vaccination_correction()` a context to return and is a decision about
-that flow rather than a fix to this bug.
+**Correct Vaccination** used to genuinely redirect, and it was the one place the
+established pattern was not followed. That has now been fixed, closing the last
+known exception across the project. It was never the reported defect — the error
+was delivered in full and named every problem, so nobody was left guessing — but
+the edit itself was thrown away: the dialog reopened pre-filled from the stored
+record, not from what was typed. `process_vaccination_correction()` now returns a
+third value, a `reopen` state, and on any refusal (a field error, or a duplicate
+conflict) both the Administrator's and the Health Staff's route re-render Patient
+Profile with the correction dialog open on what was typed, each error beside the
+field it belongs to, and nothing flashed — the same shape Add User and Register
+Patient use. The vaccine tab is opened underneath, since that is where the record
+and the Correct button live. A `DOMContentLoaded` callback shows the dialog, for
+the reason `base.html` documents at the scripts block: it is rendered before
+Bootstrap loads, so a bare `if (window.bootstrap)` there would be silently false —
+exactly the trap `e2616a5` fixed on four other dialogs. The successful and
+no-change paths are unchanged: they still flash a sentence and redirect, which is
+right for an outcome no retyping fixes.
 
 ### The automated suites
 
@@ -381,3 +387,28 @@ Every correction writes an `audit_logs` entry under **Immunization Records**
 naming the acting account and both values, so the Audit Logs screen is the other
 half of this evidence — and that half *is* in the database rather than in a
 picture.
+
+### The redisplay pass (last exception fixed)
+
+A later pass verified that a *refused* correction now reopens the dialog with the
+edit kept, rather than redirecting and losing it (the change described under
+form-redisplay above). Run against the real `app.db`, then restored from a
+pre-task backup so nothing typed during the pass survived.
+
+Automated first: 57 checks POSTing genuinely invalid data — a future date, an
+off-schedule EPI pair, an out-of-range dose, a blank vaccine name — to both the
+EPI and the general path, under both Admin and Health Staff, asserting on the
+rendered response that the page returns 200 (not a redirect), the `DOMContentLoaded`
+modal-show is emitted, each typed value comes back, the right field carries
+`is-invalid`, the banner counts the right number of fields, and no row or audit
+entry was written. Then 5 more for the success, no-change and duplicate-conflict
+outcomes. All passed.
+
+Then live in the browser, all four role × path cells: an invalid submit reopened
+the dialog over the Immunization Record tab, the red "This correction was not
+saved" banner at the top, the offending field boxed in red with its message, and
+what was typed still in place — the future date on the EPI path, the blank
+vaccine name and preserved dose on the general path. A valid submit in the same
+session saved, closed the dialog, and redirected with the audit-log flash,
+confirming the success path is unchanged. Screenshots were captured but, like the
+rest of this folder, are not committed — they are full Patient Profile screens.

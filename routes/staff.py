@@ -197,9 +197,18 @@ def staff_archive_patients():
 @login_required
 @role_required("Health Staff")
 def staff_correct_vaccination(patient_id):
-    corrected_for, message = process_vaccination_correction(
+    corrected_for, reopen, message = process_vaccination_correction(
         request.form, session.get("user_id"), ip_address=request.remote_addr
     )
+    # The same redisplay the Administrator's route does, for the same reason --
+    # see the note there. Both roles reach one correction path, so both keep the
+    # edit when it does not save.
+    if reopen:
+        context = patient_profile_context(corrected_for or patient_id)
+        if context is not None:
+            context["correction_state"] = reopen
+            return render_template('patient_profile.html', **context)
+
     flash(message)
     return redirect(url_for(
         "staff.staff_patient_profile",

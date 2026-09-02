@@ -226,9 +226,20 @@ def archive_patients():
 @login_required
 @role_required("Admin")
 def correct_vaccination(patient_id):
-    corrected_for, message = process_vaccination_correction(
+    corrected_for, reopen, message = process_vaccination_correction(
         request.form, session.get("user_id"), ip_address=request.remote_addr
     )
+    # A submit that did not save comes back as the same dialog, on the same page,
+    # holding what was typed with the errors beside the fields -- the pattern
+    # every other form in this project follows. Nothing is flashed: the dialog
+    # carries its own banner, and a flash above a page whose dialog already
+    # explains itself would say it twice.
+    if reopen:
+        context = patient_profile_context(corrected_for or patient_id)
+        if context is not None:
+            context["correction_state"] = reopen
+            return render_template('patient_profile.html', **context)
+
     flash(message)
     # The record's own patient wins over the one in the URL. The id in the path
     # is what the page was rendered for; the id the correction resolved is read
