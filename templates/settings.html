@@ -333,7 +333,31 @@
                 <div class="col-md-6">
                   <label class="field-label">Sender Name<span class="req">*</span></label>
                   <input type="text" class="form-control" value="IDS-BPHCSN">
-                  <div class="form-text-hint">Appears as the sender ID on recipients' phones</div>
+                  {#- WAS "Appears as the sender ID on recipients' phones", which
+                      was a claim about what a recipient sees, and it was wrong.
+                      send_announcement_sms() builds its payload from three keys
+                      -- apikey, number, message -- and there is no sendername
+                      among them. Semaphore calls this a sender ID, it is
+                      optional, and utils/sms.py deliberately omits it: an
+                      account without an approved sender name has its messages
+                      delivered under Semaphore's default, which is the correct
+                      behaviour for a new account and is documented at the top of
+                      that file.
+
+                      So whatever this box says, nothing carries it to a phone.
+                      That made it the most checkable false claim left on the
+                      screen -- a panellist with a handset could have disproved it
+                      in one send -- and the worst kind to leave beside the API
+                      Key hint below, which is true and specific and was lending
+                      it credibility.
+
+                      Corrected rather than removed, unlike Billing Info. The
+                      sender ID is a real Semaphore feature this account may one
+                      day have approved, so the field has something to become;
+                      a billing account had nothing to become because none
+                      exists. The hint now says what happens instead, and names
+                      what would have to change for the field to mean anything. #}
+                  <div class="form-text-hint">Not sent. Messages are delivered under the provider's default sender identity, because no sender name has been approved for this account.</div>
                 </div>
               </div>
 
