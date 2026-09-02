@@ -236,11 +236,16 @@ APPOINTMENT_UNTRACKED = (
 # same arrangement audit_export.STATED_UNTRACKED uses. Named explicitly rather
 # than iterated so a reason added for a screen slot does not silently start
 # appearing in exports.
+# The "write" key is gone from that dict and so is the row that quoted it. It
+# was labelled "Creating, editing and deactivating accounts" and said none of the
+# three was built; two of them are, from this screen, so the label and the reason
+# were both false. What is left of it is the one clause that is still true --
+# editing an existing account -- under its own key and its own label.
 USER_STATED_UNTRACKED = (
     ("Station and zone assignment", "assignment"),
     ("Invitation and lock-out states", "invitations"),
     ("Contact details", "contact"),
-    ("Creating, editing and deactivating accounts", "write"),
+    ("Editing an existing account", "edit_account"),
     ("Password reset", "reset_password"),
 )
 
@@ -1259,9 +1264,13 @@ def _user_export(context, produced_by):
     role can open -- and that list is not a description kept in step by hand. It is
     read at request time off the role_required() guards themselves
     (routes/user_views.py::accessible_screens), so it is the access rule rather
-    than a copy of it. A file of three accounts with no statement of what those
+    than a copy of it. A roster naming accounts with no statement of what those
     accounts can reach would be the least useful possible export of an
     access-control screen, and this is the one place the rule can be read whole.
+
+    It matters more now than when it was written. The roster was three fixed
+    accounts then; User Management creates them, so this file is also the record
+    of how many ways into the system exist and what each of them opens.
     """
     users = context["users"]
     untracked = context["untracked"]
@@ -1367,11 +1376,16 @@ def _user_export(context, produced_by):
             ("Active", context["active_users"]),
             ("Deactivated", context["inactive_users"]),
         ],
+        # "with three accounts on one page" was true of a system that could not
+        # create a fourth. User Management creates accounts now, so the count is
+        # read from the roster this file was built from rather than asserted --
+        # a sentence that names a number the screen can change is a sentence
+        # that goes false the first time somebody uses the feature.
         controls=[[
             "There is nothing on this screen to narrow",
-            "User Management has no search box and no filter panel — with three "
-            "accounts on one page there is nothing to narrow, and the screen says "
-            "so. This "
+            "User Management has no search box and no filter panel — every "
+            f"account is on one page ({_count_label(total, 'account')} today), so "
+            "there is nothing to narrow, and the screen says so. This "
             "file is the complete roster for the same reason the screen is: it is "
             "all there is.",
         ]],

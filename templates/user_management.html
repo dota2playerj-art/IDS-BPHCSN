@@ -24,9 +24,59 @@
   .btn-ghost-ids:hover{border-color:#C7CBD1; background:var(--bg);}
   .btn-danger-text{background:transparent; border:none; color:var(--text-muted); font-size:13.5px; font-weight:500; padding:10px 14px;}
   {#- The disabled treatment and .scope-note were defined here first, for the
-      Add / Edit User buttons. They are now in base.html and apply system-wide,
+      Add User and Edit User buttons. They are now in base.html and apply
+      system-wide,
       so this screen inherits the same appearance every other disabled control
-      has instead of keeping a copy that could drift from it. #}
+      has instead of keeping a copy that could drift from it.
+
+      Add User is not one of them any more. It works, so it carries no reason
+      and no faded treatment -- and the two account-status buttons below it are
+      real as well. What is still disabled on this screen is Edit User and Reset
+      Password, and each says why in its own title. #}
+
+  {#- FORM FIELDS INSIDE THE DIALOGS. Same class names and the same values as
+      Register Patient and the booking dialog on Appointment Scheduling, so the
+      Add User form does not become this project's fourth way of drawing a
+      labelled input. #}
+  label.field-label{font-size:13px; font-weight:600; color:var(--text-dark); margin-bottom:6px; display:inline-block;}
+  label.field-label .req{color:var(--danger); margin-left:2px;}
+  .modal .form-control, .modal .form-select{
+    height:48px; border-radius:12px; border:1px solid var(--border-color); font-size:14px; color:var(--text-dark);
+  }
+  .modal .form-control:focus, .modal .form-select:focus{
+    border-color:var(--teal); box-shadow:0 0 0 3px rgba(22,155,146,0.12);
+  }
+  .modal .form-control.is-invalid, .modal .form-select.is-invalid{border-color:var(--danger);}
+  .form-text-hint{font-size:12px; color:var(--text-muted); margin-top:4px;}
+  .field-error{font-size:12.5px; color:var(--danger); margin-top:4px;}
+
+  .alert-ids{border-radius:12px; border:1px solid; padding:14px 16px; font-size:13.5px; display:flex; gap:12px; align-items:flex-start; margin-bottom:16px;}
+  .alert-warning-ids{background:#FFFBEB; border-color:#FDE68A; color:#92400E;}
+  .alert-danger-ids{background:#FEF2F2; border-color:#FECACA; color:#B91C1C;}
+  .alert-info-ids{background:var(--teal-light); border-color:#99DAD5; color:var(--teal-dark);}
+  .alert-ids .material-symbols-outlined{font-size:20px; margin-top:1px;}
+  .alert-ids strong{display:block; font-size:13.5px; margin-bottom:2px;}
+
+  {#- The password rule, printed on the form. It is a box rather than a line of
+      helper text because it is four separate conditions and an administrator
+      reading it is deciding what to type, not skimming. #}
+  .rule-box{
+    background:var(--bg); border:1px solid var(--border-color); border-radius:12px;
+    padding:12px 14px; font-size:12.5px; color:var(--text-muted); line-height:1.6;
+  }
+  .rule-box strong{color:var(--text-dark); font-weight:600;}
+  .rule-box ul{margin:6px 0 0; padding-left:18px;}
+
+  {#- Revoking access is destructive in intent even though it deletes nothing,
+      so it is the only red control on this screen -- the same weight Patient
+      Records gives Mark Deceased and Appointment Scheduling gives Cancel. #}
+  .btn-danger-ids{
+    background:#fff; border:1px solid #FECACA; color:var(--danger); border-radius:12px;
+    padding:10px 16px; font-size:14px; font-weight:600; display:inline-flex; align-items:center;
+    justify-content:center; gap:6px; white-space:nowrap;
+  }
+  .btn-danger-ids:hover{background:#FEF2F2;}
+  .btn-danger-ids:disabled:hover{background:#fff;}
 
   table.user-table{width:100%; border-collapse:separate; border-spacing:0; font-size:13.5px;}
   table.user-table thead th{
@@ -177,9 +227,11 @@
             <div class="d-flex align-items-center gap-2">
               {#- EXPORT. Two working links. This is the one of the four screens
                   wired in this pass with nothing to narrow -- no search box, no
-                  filter panel, three accounts on one page -- so the file being the
+                  filter panel, every account on one page -- so the file being the
                   complete roster is not a compromise here, it is simply what the
-                  screen is. Both files carry the access sheet as well as the
+                  screen is. It said "three accounts on one page" until Add User
+                  was built; the argument never rested on the number, only on the
+                  page being complete, so the number went and the argument stands. Both files carry the access sheet as well as the
                   roster: the permissions panel on the right is read off each
                   view's own role_required() guard, and a file naming accounts
                   without naming what they can reach would be the least useful
@@ -193,20 +245,58 @@
                  title="Download every account as a PDF on the health center's letterhead — role, status, last login, and the screens each role can open">
                 <span class="material-symbols-outlined" style="font-size:18px;">picture_as_pdf</span>Export PDF
               </a>
-              <button class="btn-primary-teal" type="button" disabled title="{{ untracked.write }}">
+              {#- LIVE. This button was disabled for the project's whole life and
+                  carried untracked.write, a reason that said creating accounts
+                  "is not built". It is built, so both the `disabled` and the
+                  reason are gone -- the rule this screen set for the rest of the
+                  system is that a control either works or says why it cannot,
+                  and its corollary is that a working one carries no excuse. #}
+              <button class="btn-primary-teal" type="button"
+                      data-bs-toggle="modal" data-bs-target="#addUserModal"
+                      title="Create an account that can sign in to this system — name, username, role, and a password you set here">
                 <span class="material-symbols-outlined" style="font-size:18px;">person_add</span>Add User
               </button>
             </div>
           </div>
 
           {#- The mockup carried a search box, an Advanced Filter panel offering
-              five roles, and pagination reading "Showing 1–7 of 18 users".
-              Three accounts fit on one screen, so all three controls filtered
-              or paged a list that is already complete. #}
+              five roles, and pagination reading "Showing 1–7 of 18 users". All
+              three narrowed or paged a list that is already complete on one
+              screen, so all three went.
+
+              That argument used to be stated as "three accounts fit on one
+              screen", and Add User is exactly what makes a sentence like that
+              worth re-reading: the roster is no longer fixed at three. It still
+              holds, because it never depended on the number -- a health center
+              with a dozen staff still fits on one page, and this table shows
+              every row it has rather than a page of them. If a roster ever grows
+              past what one screen can carry, these controls come back; what must
+              not happen is the footer claiming to show all of something it has
+              silently truncated. #}
+          {#- REWRITTEN, BECAUSE IT DESCRIBED A SCREEN THAT COULD ONLY LOOK.
+              It read "Accounts are set up once, not created here" and said the
+              three accounts were written by the system itself. Add User below
+              creates them now, and Deactivate and Reactivate revoke and restore
+              them, so the old sentence was a confident description of an
+              application that had moved on -- the exact failure this project's
+              own reason files exist to prevent.
+
+              What replaces it is not an excuse but the two facts an
+              administrator needs before pressing anything on this screen: the
+              password is set here and can never be read back, and the last
+              administrator cannot be switched off. #}
           <div class="scope-note">
-            <strong>Accounts are set up once, not created here.</strong>
-            The three accounts below are written once by the system itself, one for
-            each role it allows. {{ untracked.write }}
+            <strong>Every account that can sign in is on this list, and it is managed from this screen.</strong>
+            Add User creates one with a password you set yourself. That password is stored
+            only as a hash — nobody, including you, can look it up afterwards, and there is
+            no reset — so tell the new holder what it is before you leave this screen.
+            Deactivating an account refuses it at the login form from then on and ends any
+            session it already has open; nothing is deleted, and reactivating it restores
+            the same password.
+            {% if active_admins == 1 %}One Administrator account can currently sign in, and
+            it cannot be deactivated while it is the only one — see the note on its own
+            panel.{% else %}{{ active_admins }} Administrator accounts can currently sign
+            in; the last one to remain active cannot be deactivated.{% endif %}
           </div>
 
           <div style="overflow-x:auto;">
@@ -363,25 +453,310 @@
               enforced, not a copy of it.
             </div>
 
+            {#- Two of these three used to be disabled behind one shared reason.
+                Two still are, and they now quote reasons of their own, because
+                the shared one described three controls and only these two are
+                still true of it. The third is real. #}
             <div class="d-flex gap-2 mt-3">
               <button class="btn-ghost-ids" type="button" style="flex:1; justify-content:center;" disabled
                       title="{{ untracked.reset_password }}">
                 <span class="material-symbols-outlined" style="font-size:18px;">lock_reset</span>Reset Password
               </button>
               <button class="btn-primary-teal" type="button" style="flex:1; justify-content:center;" disabled
-                      title="{{ untracked.write }}">
+                      title="{{ untracked.edit_account }}">
                 <span class="material-symbols-outlined" style="font-size:18px;">edit</span>Edit User
               </button>
             </div>
-            <button class="btn-danger-text w-100 mt-1" type="button" disabled title="{{ untracked.write }}">
+
+            {#- DEACTIVATE / REACTIVATE. One slot, three states.
+
+                The flag behind this button has been enforced since before the
+                button existed: routes/auth.py refuses a deactivated account at
+                the login form even with the correct password, and
+                utils/security.py ends a session it already had open on its next
+                guarded request. What was missing was only the trigger, which is
+                why this is a button wired to a proven mechanism rather than a
+                new one.
+
+                The disabled third state is the last active Administrator. That
+                is a rule rather than a gap, so it is worded here beside the
+                control and not in routes/user_views.py::UNTRACKED — which
+                collects the things this system cannot do, not the things it
+                refuses to. The refusal is enforced in
+                models.users.deactivate_user() regardless of this attribute; a
+                POST that never saw this page meets the same answer in a
+                sentence. #}
+{%- if not user.is_active %}
+            <button class="btn-primary-teal w-100 mt-1" type="button" style="justify-content:center;"
+                    data-bs-toggle="modal" data-bs-target="#statusModal{{ user.id }}"
+                    title="Let this account sign in again, with the password it had before it was deactivated">
+              <span class="material-symbols-outlined" style="font-size:16px;">how_to_reg</span>Reactivate Account
+            </button>
+{%- elif user.is_last_admin %}
+            <button class="btn-danger-ids w-100 mt-1" type="button" disabled
+                    title="This is the last Administrator account that can still sign in. Only an Administrator can open User Management, so deactivating it would leave nobody able to create an account or restore one — the system could then only be recovered by editing the database file by hand. Create or reactivate another Administrator first.">
+              <span class="material-symbols-outlined" style="font-size:16px;">block</span>Deactivate Account
+            </button>
+            <div class="perm-note">
+              This is the only Administrator account that can sign in, so it cannot be
+              deactivated. Create another Administrator first and this one can then be
+              switched off.
+            </div>
+{%- else %}
+            <button class="btn-danger-ids w-100 mt-1" type="button"
+                    data-bs-toggle="modal" data-bs-target="#statusModal{{ user.id }}"
+                    title="Revoke this account's access. Nothing is deleted and it can be reactivated.">
               <span class="material-symbols-outlined" style="font-size:16px;">person_off</span>Deactivate Account
             </button>
+{%- endif %}
           </div>
 {%- endfor %}
         </div>
       </div>
 
     </div>
+
+    <!-- ADD USER DIALOG.
+
+         A dialog rather than a screen of its own, for the reason Check In and
+         New Appointment are dialogs: the roster is the context for the decision,
+         and an administrator creating an account is looking at the accounts that
+         already exist while they choose a username and a role.
+
+         It posts to a route of its own (POST /admin/user_management/add) which
+         carries the same role_required("Admin") guard as this screen. That guard
+         is the enforcement rather than a copy of it: a POST needs no page, and an
+         endpoint any other role could reach would let that role create itself an
+         Administrator account.
+
+         `novalidate` for the reason every other form in this project carries it
+         -- the browser's own checks are a convenience and the server re-checks
+         everything in models.users.validate_new_user_form(), which is what runs
+         when a POST arrives without this page ever having been loaded. -->
+    <div class="modal fade" id="addUserModal" tabindex="-1" aria-labelledby="addUserModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content" style="border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.12);">
+          <div class="modal-header">
+            <h5 class="modal-title" id="addUserModalLabel">Add User</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+
+{%- if add_errors %}
+            <div class="alert-ids alert-danger-ids">
+              <span class="material-symbols-outlined">error</span>
+              <div>
+                <strong>This account was not created</strong>
+                Correct the {{ add_errors|length }} highlighted field{{ '' if add_errors|length == 1 else 's' }} below.
+                The name, username and role you entered have been kept; both password boxes
+                have been cleared and need retyping, so a password is never written back into
+                the page.
+              </div>
+            </div>
+{%- endif %}
+
+            <p style="font-size:13.5px; color:var(--text-muted); margin-bottom:14px;">
+              Creates an account that can sign in immediately. You set its password here and
+              tell the person what it is — there is no email in this system to send it
+              through, and a password sent by email would be a working credential sitting in
+              an inbox nobody controls.
+            </p>
+
+            <form id="addUserForm" method="POST" action="{{ url_for('add_user') }}" novalidate>
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="field-label" for="addFullName">Full Name<span class="req">*</span></label>
+                  <input type="text" class="form-control{% if add_errors.full_name %} is-invalid{% endif %}"
+                         id="addFullName" name="full_name" maxlength="100" autocomplete="off"
+                         value="{{ add_form.full_name or '' }}" placeholder="e.g. Marivic Dela Cruz">
+{%- if add_errors.full_name %}
+                  <div class="field-error">{{ add_errors.full_name }}</div>
+{%- else %}
+                  <div class="form-text-hint">Shown in the sidebar, on the roster, and against everything this account records in the audit trail.</div>
+{%- endif %}
+                </div>
+                <div class="col-md-6">
+                  <label class="field-label" for="addUsername">Username<span class="req">*</span></label>
+                  <input type="text" class="form-control{% if add_errors.username %} is-invalid{% endif %}"
+                         id="addUsername" name="username" maxlength="30" autocomplete="off"
+                         value="{{ add_form.username or '' }}" placeholder="e.g. mdelacruz">
+{%- if add_errors.username %}
+                  <div class="field-error">{{ add_errors.username }}</div>
+{%- else %}
+                  <div class="form-text-hint">3–30 characters. Letters, numbers, dot, underscore or hyphen, starting with a letter. It cannot be changed later, and it must not already be in use.</div>
+{%- endif %}
+                </div>
+
+                <div class="col-md-6">
+                  <label class="field-label" for="addRole">Role<span class="req">*</span></label>
+                  {#- The three roles the schema's CHECK constraint allows, read
+                      from models/users.py::ROLE_CHOICES rather than written out
+                      here, so a role this list offered but the database would
+                      reject cannot exist. The mockup's Nurse, Midwife,
+                      Pharmacist and Barangay Health Worker are not among them
+                      and never were. #}
+                  <select class="form-select{% if add_errors.role %} is-invalid{% endif %}" id="addRole" name="role">
+                    <option value="">Choose a role…</option>
+{%- for value, label in role_choices %}
+                    <option value="{{ value }}"{% if add_form.role == value %} selected{% endif %}>{{ label }}</option>
+{%- endfor %}
+                  </select>
+{%- if add_errors.role %}
+                  <div class="field-error">{{ add_errors.role }}</div>
+{%- else %}
+                  <div class="form-text-hint">Decides which screens the account can open. The list under each account on the right shows exactly what each role reaches.</div>
+{%- endif %}
+                </div>
+                <div class="col-md-6 d-flex align-items-end">
+                  <div class="alert-ids alert-info-ids" style="margin-bottom:0; width:100%;">
+                    <span class="material-symbols-outlined">shield_person</span>
+                    <div>
+                      <strong>An Administrator can manage accounts</strong>
+                      Only this role opens User Management, so only it can create an account or
+                      revoke one.
+                    </div>
+                  </div>
+                </div>
+
+                <div class="col-12">
+                  <div class="rule-box">
+                    <strong>The password you set must meet these rules:</strong>
+                    <ul>
+                      <li>at least 12 characters;</li>
+                      <li>at least 3 of these 4 — a small letter, a capital letter, a number, a symbol;</li>
+                      <li>it must not contain the username or any part of the person's name;</li>
+                      <li>it must not be a commonly-guessed password, with or without numbers on the end.</li>
+                    </ul>
+                    A long phrase is the easiest way to meet all four — “the blue jeepney leaves at Six”
+                    passes. Once saved, the password is stored only as a hash: it cannot be shown,
+                    looked up or reset from anywhere in this system, so write it down or tell the
+                    person before you close this dialog.
+                  </div>
+                </div>
+
+                <div class="col-md-6">
+                  <label class="field-label" for="addPassword">Password<span class="req">*</span></label>
+                  <input type="password" class="form-control{% if add_errors.password %} is-invalid{% endif %}"
+                         id="addPassword" name="password" autocomplete="new-password">
+{%- if add_errors.password %}
+                  <div class="field-error">{{ add_errors.password }}</div>
+{%- else %}
+                  <div class="form-text-hint">{{ password_rule }}</div>
+{%- endif %}
+                </div>
+                <div class="col-md-6">
+                  <label class="field-label" for="addConfirmPassword">Confirm Password<span class="req">*</span></label>
+                  <input type="password" class="form-control{% if add_errors.confirm_password %} is-invalid{% endif %}"
+                         id="addConfirmPassword" name="confirm_password" autocomplete="new-password">
+{%- if add_errors.confirm_password %}
+                  <div class="field-error">{{ add_errors.confirm_password }}</div>
+{%- else %}
+                  <div class="form-text-hint">Typed twice because a mistyped password cannot be discovered later — it would simply refuse the person at the login form with no way to find out why.</div>
+{%- endif %}
+                </div>
+              </div>
+            </form>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" form="addUserForm" class="btn-primary-teal">
+              <span class="material-symbols-outlined" style="font-size:18px;">person_add</span>Create Account
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEACTIVATE / REACTIVATE CONFIRMATION, ONE PER ACCOUNT.
+
+         Rendered per account rather than as one dialog filled in by script, for
+         the same reason the detail panels above are: the roster is small and
+         complete, so the state each dialog needs is already known at render
+         time, and a dialog whose wording is assembled in JavaScript is a dialog
+         that can name the wrong account if a data attribute is ever missed.
+         Here, naming the wrong account would mean revoking the wrong person's
+         access.
+
+         They sit at the end of the content rather than inside the sticky detail
+         column so nothing about their positioning depends on an ancestor. -->
+{%- for user in users %}
+{%- if user.is_active and not user.is_last_admin %}
+    <div class="modal fade" id="statusModal{{ user.id }}" tabindex="-1" aria-labelledby="statusModalLabel{{ user.id }}" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.12);">
+          <div class="modal-header">
+            <h5 class="modal-title" id="statusModalLabel{{ user.id }}">Deactivate Account</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+{%- if user.is_self %}
+            <div class="alert-ids alert-warning-ids">
+              <span class="material-symbols-outlined">warning</span>
+              <div>
+                <strong>This is the account you are signed in as</strong>
+                You will be signed out on your next action and will not be able to sign back
+                in. Another Administrator would have to reactivate this account for you.
+              </div>
+            </div>
+{%- endif %}
+            <p style="margin-bottom:10px;">
+              Revoke access for <strong style="display:inline;">{{ user.full_name }}</strong>
+              ({{ user.username }}, {{ user.role }})?
+            </p>
+            <p style="margin-bottom:0; font-size:13px; color:var(--text-muted);">
+              They will be refused at the login form from now on, even if they type the correct
+              password, and any session they already have open ends on their next click.
+              Nothing is deleted — the account stays on this roster, keeps its history, and
+              reactivating it restores the same password. The attempt, and every later attempt
+              to sign in to it, is recorded in the audit trail.
+            </p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+            <form method="POST" action="{{ url_for('set_user_status') }}" style="display:inline;">
+              <input type="hidden" name="user_id" value="{{ user.id }}">
+              <button type="submit" name="action" value="{{ deactivate_action }}" class="btn-danger-ids">
+                <span class="material-symbols-outlined" style="font-size:18px;">person_off</span>Deactivate Account
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+{%- elif not user.is_active %}
+    <div class="modal fade" id="statusModal{{ user.id }}" tabindex="-1" aria-labelledby="statusModalLabel{{ user.id }}" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.12);">
+          <div class="modal-header">
+            <h5 class="modal-title" id="statusModalLabel{{ user.id }}">Reactivate Account</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p style="margin-bottom:10px;">
+              Let <strong style="display:inline;">{{ user.full_name }}</strong>
+              ({{ user.username }}, {{ user.role }}) sign in again?
+            </p>
+            <p style="margin-bottom:0; font-size:13px; color:var(--text-muted);">
+              The password this account had before it was deactivated works again — deactivating
+              it never changed the stored password, and no new one is set here. If it has been
+              forgotten there is no way to look it up or reset it; the account would have to be
+              replaced.
+            </p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+            <form method="POST" action="{{ url_for('set_user_status') }}" style="display:inline;">
+              <input type="hidden" name="user_id" value="{{ user.id }}">
+              <button type="submit" name="action" value="{{ reactivate_action }}" class="btn-primary-teal">
+                <span class="material-symbols-outlined" style="font-size:18px;">how_to_reg</span>Reactivate Account
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+{%- endif %}
+{%- endfor %}
 {% endblock %}
 
 {% block scripts %}
@@ -393,4 +768,15 @@
     var detail = document.getElementById('userDetail' + row.dataset.user);
     if (detail) { detail.hidden = false; }
   }
+
+  // A submit that did not save comes back with what was typed and the errors
+  // beside the fields; this reopens the dialog on it. The same mechanism
+  // Appointment Scheduling uses for its booking dialog -- the state is already
+  // rendered above, so this only makes it visible again.
+{%- if add_open %}
+  (function(){
+    var dialog = document.getElementById('addUserModal');
+    if (dialog && window.bootstrap) { new bootstrap.Modal(dialog).show(); }
+  })();
+{%- endif %}
 </script>{% endblock %}

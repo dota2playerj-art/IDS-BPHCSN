@@ -25,6 +25,106 @@ So the evidence lives on the machine that produced it. What is committed is this
 file, naming what was captured and how to produce it again, so the absence is
 stated rather than left for someone to trip over.
 
+## add-user/
+
+Verification of **Add User** — an Administrator creating an account with a
+password they set directly, the refusal to deactivate the last remaining active
+Administrator, and the Deactivate / Reactivate controls wired to the `is_active`
+flag the login route and the per-request session check already enforced.
+
+It retained **no images on purpose**, and for a sharper reason than the passes
+below: this screen's subject *is* credentials. A picture of it is a roster of
+every way into the system beside a form with a password in it. The whole run went
+against a throwaway copy of `app.db`, so creating accounts, revoking them and
+signing in as them left nothing in the real database — confirmed afterwards by
+SHA-256 over the whole file against
+`app.db.PRETASK_BACKUP_add-user_20260902_182924`: **byte-identical**, still three
+accounts, still zero `User Management` audit rows.
+
+### The automated suite
+
+**120 checks, all passing.** They cover, in one end-to-end run against a scratch
+copy:
+
+- **Creation.** A real Health Center Staff account (`mdelacruz`) created through
+  the live POST endpoint, then read back out of the database: role stored in the
+  schema's own spelling, active, `email`/`phone` left NULL, the plaintext
+  password absent from every column of the row, and the stored hash verifying
+  that password under the *same* scheme as the seeded accounts.
+- **Every validation rule, one submit each.** Sixteen rejected posts — blank
+  fields, a role outside the schema's `CHECK` list, four username rules, five
+  password rules, a mismatched confirmation, and a duplicate username in both its
+  exact and its differently-capitalised form. After all sixteen: no account
+  created, no audit row written.
+- **What a rejected submit does with what was typed.** Name, username and role
+  come back filled in; the dialog reopens on them; and **neither password is
+  written back into the HTML** — asserted by searching the rendered page for the
+  submitted value.
+- **The new account's own access.** It signs in, reaches a Health Staff screen,
+  is refused User Management, and — the check that matters — is refused when it
+  POSTs directly to the account-creation and account-status endpoints, with the
+  database confirming nothing changed. A role that could reach those could make
+  itself an Administrator.
+- **The last-Administrator guard, attempted for real.** With one active
+  Administrator, a genuine POST to deactivate it is refused; the account is still
+  active afterwards and no deactivation entry was written. The guard is then
+  shown to *follow* the last Administrator rather than a fixed id: with a second
+  Administrator created the first can be deactivated, after which the second
+  becomes the one that cannot. It is also called at the model level — no route,
+  no session, no template — where `deactivate_user()` returns the same refusal,
+  proving the rule protects the table rather than the screen.
+- **Deactivate and reactivate.** A non-Administrator account is deactivated, is
+  then refused at the login form *with the correct password*, and the refusal is
+  audited against it. Reactivating restores the same credential — the stored hash
+  is verified untouched across both transitions, and the account signs back in
+  with its original password. Repeating either action is answered "no change".
+- **Malformed and forged posts** — unknown action, non-numeric id, id that does
+  not exist — each refused with its own sentence rather than a traceback.
+- **The audit trail.** Every creation, deactivation and reactivation writes an
+  entry under the new `User Management` module, attributed to the acting
+  administrator, naming both the account and the administrator in `details`, and
+  reporting how many Administrators can still sign in. **The password appears in
+  none of them** — asserted against the entry, against the whole `audit_logs`
+  table, and against the rendered Audit Logs screen.
+- **No regressions.** A wrong password and an unknown username are still refused
+  and still audited exactly as before; the Barangay Official still reaches its own
+  dashboard and is still refused both other surfaces; the roster and audit exports
+  still build. A sweep rendering every GET route across all three roles returned
+  **no 5xx**.
+
+The route × role matrix was snapshotted before and after: the diff is exactly the
+two new `Admin`-only POST rules and nothing else, with the other 88 unchanged.
+
+### One case the suite asserts against the database rather than the screen
+
+An Administrator may deactivate **their own** account whenever another
+Administrator remains. The flash message that act produces is never displayed,
+and that is correct rather than a defect: the redirect lands on User Management,
+whose guard runs the per-request deactivation check, which calls
+`session.clear()` — and the flash queue lives in the session. The holder arrives
+at the login form, which says only "Invalid security credentials." because
+`utils/security.py` deliberately reveals nothing there about an account's status.
+
+So the outcome is verified where it is actually recorded — the flag in the
+database, the deactivation entry, and the session-revocation entry — and the
+operator is not left uninformed, because the confirmation dialog warns them
+before they confirm. That warning's presence is itself one of the checks.
+
+### Reproducing it
+
+1. Copy `app.db` somewhere scratch and point `app.config["DATABASE"]` at the
+   copy. Do not run this against the real database: it creates accounts and
+   writes audit rows, and both persist.
+2. `python app.py`, sign in as the Administrator, open User Management.
+3. Add User, and try the rules against it — a short password, one containing the
+   username, `staff` and then `STAFF` as the username.
+4. Create a real account, sign out, and sign in as it. Confirm it reaches the
+   Health Staff screens and not User Management.
+5. Back as the Administrator, confirm the sole Administrator's Deactivate button
+   is disabled and says why. Deactivate the new account, try to sign in as it,
+   then reactivate it and sign in again with the same password.
+6. Read the Audit Logs screen filtered to **User Management**.
+
 ## pat029-settings-honesty/
 
 Verification of the removal of a fake patient — `PAT-029` "JOhn asc asdas" — and

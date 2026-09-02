@@ -48,6 +48,26 @@ MODULE_SMS = "SMS Notifications"
 # and who was turned away. Keeping it separate is also what lets the Audit Logs
 # module filter show the authentication trail on its own.
 MODULE_AUTH = "Authentication"
+# Accounts themselves: one created, one deactivated, one switched back on.
+#
+# ITS OWN MODULE RATHER THAN A CORNER OF MODULE_AUTH, AND THE DISTINCTION IS THE
+# SAME ONE THAT SEPARATES A RECORD MODULE FROM AN ACCESS ONE.
+# MODULE_AUTH answers "who was let in and who was turned away" -- it is a trail
+# of attempts, written by people presenting credentials, and the account rows it
+# names are the subject of the attempt rather than the thing that changed.
+# This module answers a different question: "who changed what an account IS".
+# Creating one hands somebody a way into a system holding patient records;
+# deactivating one takes it away. Those are administrative acts with an author
+# who is not the account named in them, and folding them into Authentication
+# would put them in a list whose every other row means somebody typed a password
+# -- where a reader scanning for "when did this account appear, and who made it"
+# would have to read past every sign-in in the trail to find out.
+#
+# It also keeps the module filter useful in both directions. An administrator
+# reviewing access changes selects this and sees three kinds of row and nothing
+# else; one investigating a suspected intrusion selects Authentication and is
+# not shown the account housekeeping that produced the accounts.
+MODULE_USERS = "User Management"
 
 # Activity phrases, in the same voice as the ones on that screen ("Updated
 # patient record", "Updated stock quantity").
@@ -122,6 +142,36 @@ ACTION_LOGIN_BLOCKED = "Blocked sign-in to deactivated account"
 # as the first and conclude the credential is still in circulation.
 ACTION_SESSION_REVOKED = "Ended session on deactivated account"
 
+# The three account-management phrases, written from routes/user_views.py when an
+# Administrator creates an account or changes whether it may sign in.
+#
+# WHY THESE ARE AMONG THE MOST AUDIT-WORTHY ENTRIES IN THE SYSTEM.
+# Every other entry in this table records a change to something the system holds:
+# a temperature, a stock figure, a booking. These record a change to WHO CAN
+# REACH ALL OF IT. An account created here is a new way into a database of
+# patient records, and the account that created it chose its role -- so the two
+# facts a reviewer needs are which account appeared and who decided it should.
+# Both are in `details`, which spells out the new account's username, name and
+# role, and the log_action() call carries the acting administrator as user_id.
+#
+# THE PASSWORD IS NOT IN ANY OF THEM, AND THAT PROHIBITION IS ABSOLUTE.
+# It is the same rule routes/auth.py's module note states for a refused sign-in,
+# and it binds harder here because this is the one place in the application where
+# a password is legitimately in hand as plaintext, having just been typed by an
+# administrator. Nothing about it reaches this table -- not the value, not a
+# hash of it, not its length, not which of the strength rules it passed. What is
+# recorded is that a password was set and that it was stored hashed, which is the
+# fact a reviewer is actually asking about.
+ACTION_USER_CREATED = "Created user account"
+# Two phrases rather than one "Changed account status", for the reason
+# ACTION_LOGIN_BLOCKED is separate from ACTION_LOGIN_FAILED: they are opposite
+# acts, and the one a reviewer scans a list for is the one that took access away.
+# A single phrase would make "six account status changes this month" a number
+# that answers nothing -- six revocations and six restorations read identically
+# in it, and only one of those is a security event.
+ACTION_USER_DEACTIVATED = "Deactivated user account"
+ACTION_USER_REACTIVATED = "Reactivated user account"
+
 # Every action that means somebody was turned away at the login form. Grouped so
 # the Security Events figure counts refusals rather than one particular kind of
 # refusal -- adding a fourth outcome later must not silently shrink that number.
@@ -148,7 +198,7 @@ REFUSAL_ACTIONS = (ACTION_LOGIN_FAILED, ACTION_LOGIN_BLOCKED)
 # went out; a sign-in is an access event. Neither edits a clinical or stock row,
 # and counting them as record updates would inflate the one figure on that screen
 # that is supposed to answer "how much of the data has been altered".
-NON_RECORD_MODULES = (MODULE_SMS, MODULE_AUTH)
+NON_RECORD_MODULES = (MODULE_SMS, MODULE_AUTH, MODULE_USERS)
 
 
 def log_action(user_id, action, module=None, details=None, ip_address=None):

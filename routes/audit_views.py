@@ -69,9 +69,13 @@ from models.audit import (
     ACTION_LOGIN_FAILED,
     ACTION_LOGIN_SUCCESS,
     ACTION_SESSION_REVOKED,
+    ACTION_USER_CREATED,
+    ACTION_USER_DEACTIVATED,
+    ACTION_USER_REACTIVATED,
     MODULE_AUTH,
     MODULE_IMMUNIZATIONS,
     MODULE_SMS,
+    MODULE_USERS,
     count_audit_logs,
     get_audit_logs,
     get_audit_stats,
@@ -223,10 +227,39 @@ _ICONS = {
     # fixed subset and a ligature it does not carry renders as its own literal
     # name, which is the failure mode medicine_inventory.html documents.
     ACTION_SESSION_REVOKED: "link_off",
+    # The three account-management entries. Each gets its own glyph for the
+    # reason the three phrases are separate constants: these are the rows a
+    # reviewer scans a list for rather than reads in order, and an account being
+    # created, revoked and restored must not look alike at a glance.
+    #
+    # `block` rather than the `person_off` above it, deliberately. That one
+    # already means "a deactivated account was refused at the login form" -- a
+    # thing that happened TO the account -- and this means "an administrator
+    # switched the account off". Sharing a glyph would make the cause and its
+    # consequence indistinguishable in exactly the list where telling them apart
+    # is the point.
+    #
+    # All three ligatures are already drawn literally in this project's own
+    # templates -- `person_add` on User Management's own Add User button,
+    # `how_to_reg` on its Active Accounts card, `block` on Medicine Inventory --
+    # which is the only available check that the font subset in static/fonts
+    # carries them: it is a fixed subset, and a ligature it does not hold renders
+    # as its own literal name, the failure mode medicine_inventory.html
+    # documents. The same holds for `manage_accounts` below, drawn in base.html.
+    ACTION_USER_CREATED: "person_add",
+    ACTION_USER_DEACTIVATED: "block",
+    ACTION_USER_REACTIVATED: "how_to_reg",
 }
 _MODULE_ICONS = {
     MODULE_SMS: "campaign",
     MODULE_AUTH: "shield_person",
+    # Distinct from MODULE_AUTH's shield above, because the two modules answer
+    # different questions and the pill is what a reader filters on. The shield is
+    # somebody presenting credentials at the door; this is somebody deciding
+    # which doors exist. Only reached by an entry whose action is not one of the
+    # three above -- so in practice this is the fallback that keeps a future
+    # account action looking like account management rather than like an edit.
+    MODULE_USERS: "manage_accounts",
     # A correction to a vaccination record. The default edit_note pencil would
     # be true but uninformative here -- these entries are the ones a reviewer
     # goes looking for, and the tab they came from is labelled with this same

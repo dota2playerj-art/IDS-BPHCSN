@@ -83,7 +83,11 @@ from routes.roster_export import (
     user_roster_document,
     user_roster_workbook,
 )
-from routes.user_views import user_management_context
+from routes.user_views import (
+    process_account_status,
+    process_create_user,
+    user_management_context,
+)
 from routes.vaccination_correction_views import process_vaccination_correction
 from utils.security import login_required, role_required
 
@@ -722,6 +726,53 @@ def export_reports_analytics_pdf():
 @role_required("Admin")
 def user_management():
     return render_template('user_management.html', **user_management_context())
+
+
+# ADD USER, DEACTIVATE AND REACTIVATE. POST only, and Admin only.
+#
+# THE GUARD ON THESE TWO IS THE MOST LOAD-BEARING ONE IN THE PROJECT, AND IT IS
+# THE SAME GUARD THE SCREEN CARRIES.
+# Every other write in this system changes a record. These change who can reach
+# every record: the first creates a way into a database of patient histories and
+# chooses what that account may open, and the second takes an existing way in
+# away. role_required("Admin") is therefore not a copy of the screen's guard for
+# tidiness -- it is the enforcement, because a POST needs no page. An endpoint
+# that let Health Center Staff through would let them create themselves an
+# Administrator account, which is every access rule in the application at once.
+#
+# There is no GET on either. Both change records, so there is no URL to navigate
+# to and none that could be reached by a link, a bookmark or a prefetch.
+@admin_bp.route('/user_management/add', methods=["POST"])
+@login_required
+@role_required("Admin")
+def add_user():
+    new_id, context, message = process_create_user(
+        request.form, session.get("user_id"), request.remote_addr
+    )
+    if new_id:
+        flash(message)
+        return redirect(url_for("admin.user_management"))
+    # Field errors are shown inside the reopened dialog, next to what they refer
+    # to, rather than as a flash above the page -- the same treatment Register
+    # Patient and the booking dialog give theirs.
+    return render_template('user_management.html', **context)
+
+
+@admin_bp.route('/user_management/status', methods=["POST"])
+@login_required
+@role_required("Admin")
+def set_user_status():
+    """Revoke or restore one account's access.
+
+    Every outcome is a flash and a redirect, including the refusals: the
+    last-administrator refusal and the two "nothing to do" answers are all
+    sentences about an account rather than corrections to something typed, so
+    there is no form state to preserve and nothing to reopen a dialog on.
+    """
+    flash(process_account_status(
+        request.form, session.get("user_id"), request.remote_addr
+    ))
+    return redirect(url_for("admin.user_management"))
 
 
 # Export Excel and Export PDF for the account roster above. Admin and no other

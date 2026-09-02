@@ -1,8 +1,8 @@
 """Why a control on a screen cannot do its job.
 
 Every entry here is the tooltip on a control that is rendered `disabled`. The
-rule this file serves is the one User Management set for Add / Edit User and
-that the rest of the system now follows:
+rule this file serves is the one User Management set for its Add User and Edit
+User buttons and that the rest of the system now follows:
 
     a control either works, or it is visibly disabled and says why.
     It is never left looking live while silently doing nothing when clicked.
@@ -12,6 +12,12 @@ system is unreliable, and in a defence it is the first thing a panel finds by
 clicking. Naming the specific missing piece -- a library, a table, a route --
 also tells the next session what building it would actually take, which
 "Coming soon" does not.
+
+The two buttons that named the rule are now on opposite sides of it, which is
+the rule working rather than the rule breaking. Add User creates a real account
+with a real hashed password, so it carries no `disabled` and no reason at all --
+a working control needs no excuse, and leaving one on it would be the same
+defect as a false reason. Edit User is still not built and still says so.
 
 WHY THESE LIVE HERE AND NOT IN EACH TEMPLATE
 --------------------------------------------
