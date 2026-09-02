@@ -117,11 +117,28 @@
     stored and this note said it again in different words, then named three
     source files. Each now carries a different half -- the shared reason says
     what the screen is, because it is also the tooltip on four disabled buttons
-    and has to stand alone there; this note adds only the live exception. #}
+    and has to stand alone there; this note adds only the live exceptions.
+
+    IT SAID "the one exception", AND THERE HAVE ALWAYS BEEN THREE. The sign-in
+    figures were the newest and so got counted; the other two were already on the
+    screen when that sentence was written and were simply not thought of. Head
+    Physician renders sidebar_user_name, which is whoever is signed in -- and
+    because this screen is Admin-only, that is the administrator its label names.
+    Database renders system.sqlite_version, read from the running interpreter on
+    every load. Both change with the system rather than being typed, which is the
+    whole of what this sentence separates out, so both belong in it.
+
+    A counted word is a liability in a note like this: "one" was wrong the day it
+    was written, and nothing about the screen had to change for it to be wrong. A
+    fourth live value would break the number again, which is what naming them
+    costs. The alternative is a vaguer sentence a reader cannot check against the
+    screen, and this project has consistently preferred the checkable one. #}
     <div class="scope-note">
       <strong>Nothing on this screen is saved.</strong>
       {{ unavailable.settings }}
-      The sign-in figures under Security Settings are the one exception: those are live.
+      Three of its values are read live rather than typed: the sign-in figures under
+      Security Settings, the Head Physician field, which shows the signed-in administrator,
+      and the database version under About System.
     </div>
 
     <!-- SETTINGS PANEL -->
@@ -363,16 +380,28 @@
 
               <button type="button" class="btn-outline-teal" disabled title="{{ unavailable.sms_gateway }}"><span class="material-symbols-outlined" style="font-size:18px;">wifi_tethering</span>Test Connection</button>
 
-              <div class="subsection-divider"></div>
-              <div class="subsection-title"><span class="material-symbols-outlined" style="color:var(--teal-dark); font-size:18px;">payments</span>Billing Info</div>
-              <div class="backup-row">
-                <div class="backup-label">Cost per SMS</div>
-                <div class="backup-value">&#8369;0.50</div>
-              </div>
-              <div class="backup-row">
-                <div class="backup-label">Billing Account</div>
-                <div class="backup-value">Barangay LGU Account</div>
-              </div>
+{#- WAS a "Billing Info" subsection reading "Cost per SMS -- P0.50" and
+    "Billing Account -- Barangay LGU Account". Both were invented, and the second
+    was the worse of the two: it named an account this barangay does not hold.
+
+    No Semaphore account has been opened for this health center. The Connection
+    Status pill a few lines above says Not configured, and it says so because
+    utils/sms.py finds no key in the environment -- so there is nothing to bill
+    against, no contracted rate, and not one centavo has ever been charged for a
+    message this system sent. A peso figure and an account name printed on the
+    same panel as that pill contradicted it outright.
+
+    Removed rather than marked "Not tracked", for the reason the Cache Status
+    field records under System Maintenance: that wording belongs to things this
+    system has and does not record, and a billing relationship is not one of
+    them. There is no cost being incurred and no account incurring it.
+
+    What is genuinely known about what a message costs is already on SMS
+    Notifications, where it is true and where the person spending it is
+    standing: Semaphore charges one message credit per segment per recipient,
+    and the composer counts the segments as the message is typed. Credits are
+    what a sender actually spends. The peso price of one is a matter between the
+    barangay and the provider, and was never something this project knew. #}
             </div>
 
             <!-- NOTIFICATION SETTINGS -->
@@ -571,13 +600,29 @@
                      one. -->
                 <div class="backup-value" style="color:var(--text-muted);" title="No backup routine exists yet — nothing writes or records one.">Not tracked</div>
               </div>
+{#- WAS "248 MB" and "Daily, 3:00 AM", sitting directly under the row above that
+    had already been corrected. Both were mockup figures and both were wrong,
+    each in its own way: app.db is a single file of well under a megabyte, and
+    nothing in this project runs at 3:00 AM or at any other hour -- there is no
+    scheduler, no cron entry, and no job for one to run.
+
+    They get different words on purpose, for the reason the removed Cache Status
+    field records under System Maintenance. "Not tracked" belongs to something
+    this system HAS and does not record. A backup is one of those: the practice
+    today is a hand-made copy of the file with the date in its name, which the
+    reason on the three buttons below already says -- so copies exist and each
+    one has a size, and nothing writes that size down.
+
+    A schedule is not one of those. There is no schedule anywhere, kept or
+    unkept, so "Not tracked" would be asserting one exists that nobody happened
+    to record. The honest value for a thing that does not exist is None. #}
               <div class="backup-row">
                 <div class="backup-label">Backup Size</div>
-                <div class="backup-value">248 MB</div>
+                <div class="backup-value" style="color:var(--text-muted);" title="Backups are hand-made copies of the database file, taken outside the application. Nothing records how large any of them is.">Not tracked</div>
               </div>
               <div class="backup-row">
                 <div class="backup-label">Backup Schedule</div>
-                <div class="backup-value">Daily, 3:00 AM</div>
+                <div class="backup-value" style="color:var(--text-muted);" title="No backup runs on a timer. Nothing in this system schedules one, and the Backup Frequency field below is a disabled control rather than a schedule.">None</div>
               </div>
 
               <div class="row g-3 mt-1 mb-3">

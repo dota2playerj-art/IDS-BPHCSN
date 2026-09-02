@@ -448,10 +448,54 @@ UNAVAILABLE = {
     # setting_value, updated_by, updated_at -- and the gap is that no model
     # function and no route writes to it. A reason that denies an existing
     # structure sends the next session off to build something already there.
+    # REWRITTEN A THIRD TIME, AND THIS TIME THE FALSE PART WAS THE LONGER PART.
+    # The second sentence read "The values shown are the settings the application
+    # actually runs on; they are changed in its own configuration, not on this
+    # screen." That is true of about six values on Screen 13 and false of about
+    # twenty-five, and it was printed above all of them.
+    #
+    # True. The health center's name, which models/appointment_sms.py puts at the
+    # front of every message and every export puts in its header; the barangay,
+    # which is part of that same name; the opening and closing times, which are
+    # models/appointments.py's CLINIC_OPEN_HOUR and CLINIC_CLOSE_HOUR and which
+    # BOOKING_TIME_SLOTS is built from, so a POST outside them is refused; the
+    # gateway provider, which is the Semaphore endpoint utils/sms.py posts to.
+    #
+    # False. The contact number, the email address, the complete address, the DOH
+    # licence number, the date established, the facility description and type,
+    # the language, the records-per-page figure, both dashboard toggles, every
+    # notification channel and reminder, every password rule, the session
+    # timeout, the log and backup retention periods. Nothing reads any of them.
+    # The contact number, the email and the licence number appear nowhere in this
+    # project except on this screen -- they were typed into the mockup and have
+    # sat there since.
+    #
+    # And two that were false in the more damaging direction, because the
+    # sentence was vouching for a rule rather than for a value. "Operating Days:
+    # Monday - Friday": validate_booking() checks that the date is in the future
+    # and inside the horizon and that the time is one of the slots, and never
+    # looks at the day of the week, so a Saturday booking is taken. "Sender Name:
+    # IDS-BPHCSN": utils/sms.py deliberately sends no sender ID, because an
+    # account without an approved one has its messages delivered under
+    # Semaphore's default.
+    #
+    # This is the "mostly right" hazard from the top of this file at a far worse
+    # ratio than the case that section was written about. That one was a single
+    # word. This was a clause that was correct about six fields, wrong about
+    # twenty-five, and load-bearing for a reader deciding whether to believe the
+    # screen.
+    #
+    # What replaces it does not try to list the six. The tooltip has to stand
+    # alone on four buttons, three examples are enough to show what kind of thing
+    # qualifies, and the full inventory is the paragraph above -- which is where
+    # someone maintaining it will look, rather than in a title attribute.
     "settings": (
         "Every field is read-only, because no part of the system stores what is "
-        "typed here. The values shown are the settings the application actually "
-        "runs on; they are changed in its own configuration, not on this screen."
+        "typed here. Most of the values shown are placeholder text and configure "
+        "nothing. A few do match how the system actually runs -- the health "
+        "center's name, the clinic's opening and closing times, the SMS gateway "
+        "provider -- but those are set in its own configuration, not on this "
+        "screen."
     ),
     "backup": (
         "Backup and restore are not built. The database is one file, and the "

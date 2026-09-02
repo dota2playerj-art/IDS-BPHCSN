@@ -25,6 +25,26 @@ So the evidence lives on the machine that produced it. What is committed is this
 file, naming what was captured and how to produce it again, so the absence is
 stated rather than left for someone to trip over.
 
+## pat029-settings-honesty/
+
+Verification of the removal of a fake patient — `PAT-029` "JOhn asc asdas" — and
+the appointment it had Scheduled for the following day, together with the last of
+the invented figures on Settings.
+
+Like the pass below, it retained **no images on purpose**: the whole run was
+driven against a throwaway copy of `app.db`, so signing in three times and
+rendering every screen left nothing in the real database. The live sign-in count
+is unchanged by this work.
+
+What that folder records instead is the evidence that is checkable rather than
+photographable: an independent column-by-column diff of the pre-task backup
+against the live file showing **3 differing rows in the whole database** and
+naming all three, both of the migration's refusal paths exercised on scratch
+copies, and a 49-check suite covering the route sweep, every retired string
+asserted absent from the rendered HTML, every replacement asserted present, and
+the two places `PAT-029` is still allowed to appear — asserted by name rather
+than skipped.
+
 ## appointment-sms/
 
 Verification of the individual appointment SMS confirmation — one text to one
