@@ -142,6 +142,69 @@ def _last_backup():
     return display_timestamp(entry["created_at"]), entry["user_name"]
 
 
+# ---------------------------------------------------------------------------
+# WHICH PANE THE SCREEN OPENS ON
+# ---------------------------------------------------------------------------
+# WHY THIS EXISTS AT ALL. Screen 13 is eight panes behind one URL. Bootstrap
+# switches between them in the browser, so which one is showing was never part
+# of anything the server knew -- settings.html simply hardcoded `active` on the
+# General nav button and `show active` on #pane-general, and every load started
+# there.
+#
+# That was invisible until a pane other than General grew a control that saves.
+# Maintenance Mode did. An administrator pressing "Turn on maintenance mode" was
+# redirected back to /admin/settings and landed on General Settings, several
+# panes away from the switch they had just thrown and with no sight of whether
+# it had worked. The flash message said it had; the screen showed them somewhere
+# else.
+#
+# GENERAL SETTINGS WAS NEVER RIGHT EITHER -- IT WAS LUCKY. Saving it also
+# redirects to a screen that always opens on General, and that looked correct
+# only because General happened to be the hardcoded default. Nothing preserved
+# the tab; the destination and the default coincided. Reordering the panes, or
+# making a different one the default, would have broken it exactly as
+# Maintenance Mode was broken. So the fix is one shared mechanism used by both
+# rather than a redirect patched onto the one that was noticed.
+#
+# WHY A QUERY PARAMETER AND NOT A #FRAGMENT. The obvious alternative is to
+# redirect to /admin/settings#pane-maint. A fragment is never sent to the
+# server, so the page would still be RENDERED with General active and a script
+# would have to switch panes after paint -- a visible flash of the wrong tab,
+# and nothing at all with JavaScript unavailable. A query parameter is resolved
+# before the HTML is built, so the correct pane is active in the first byte the
+# browser receives, and /admin/settings?tab=maint is a real address that can be
+# linked and bookmarked.
+TAB_GENERAL = "general"
+TAB_MAINTENANCE = "maint"
+
+# Slug -> the pane id it activates. The slugs are the pane ids minus their
+# "pane-" prefix, so the URL reads as the thing it selects, and this dict is the
+# only place the two vocabularies meet.
+SETTINGS_TABS = {
+    TAB_GENERAL: "pane-general",
+    "hc": "pane-hc",
+    "sms": "pane-sms",
+    "security": "pane-security",
+    "pwd": "pane-pwd",
+    "backup": "pane-backup",
+    TAB_MAINTENANCE: "pane-maint",
+    "about": "pane-about",
+}
+
+
+def resolve_tab(value):
+    """A ?tab= value -> the slug to open on. Anything unrecognised gives General.
+
+    THE FALLBACK IS NOT POLITENESS, IT IS THE DIFFERENCE BETWEEN A WRONG TAB AND
+    AN EMPTY SCREEN. The template marks exactly the pane this names as `show
+    active`; a value matching no pane would mark none of them, and Bootstrap
+    hides every .tab-pane that is not active -- so a hand-typed ?tab=nonsense
+    would render the nav on the left and a blank panel on the right, which reads
+    as the screen being broken rather than as a bad URL.
+    """
+    return value if value in SETTINGS_TABS else TAB_GENERAL
+
+
 def _maintenance_state():
     """What the Maintenance Mode row shows: the switch, its history, the warning.
 
@@ -192,7 +255,7 @@ def _general_form(values):
     return {key: values[key] for key in GENERAL_KEYS}
 
 
-def settings_context(general_form=None, general_errors=None):
+def settings_context(general_form=None, general_errors=None, active_tab=None):
     """Everything Screen 13 renders beyond the shared role context.
 
     `general_form` and `general_errors` are the form-redisplay pair every other
@@ -201,6 +264,11 @@ def settings_context(general_form=None, general_errors=None):
     the form renders from what is stored; both present means a submit was
     refused, and the form renders from what was typed with the messages beside
     the fields that earned them.
+
+    `active_tab` is which of the eight panes opens. It is resolved here rather
+    than trusted, so no caller can hand the template a pane that does not exist
+    -- see resolve_tab(). A refused General Settings submit does not have to pass
+    it: the default is General, which is the pane that submit came from.
     """
     stats = get_audit_stats()
     users = get_all_users()
@@ -213,6 +281,9 @@ def settings_context(general_form=None, general_errors=None):
     size = database_size_bytes()
 
     return {
+        # The pane that opens. Every render goes through resolve_tab(), so this
+        # is always the id of a pane that exists.
+        "active_pane": SETTINGS_TABS[resolve_tab(active_tab)],
         "general": {
             # What the form draws. Typed values on a refused submit, stored
             # values otherwise -- so nothing an administrator wrote is thrown

@@ -63,6 +63,8 @@ from routes.patient_views import (
     save_and_register_another_requested,
 )
 from routes.settings_views import (
+    TAB_GENERAL,
+    TAB_MAINTENANCE,
     backup_download_response,
     process_general_settings,
     process_maintenance_mode,
@@ -924,7 +926,16 @@ def settings():
     # See routes/settings_views.py for what each pane on this screen now is:
     # one stored form, four panes read live from what the system actually does,
     # and the rest disabled with a reason.
-    return render_template('settings.html', **settings_context())
+    #
+    # `?tab=` decides which of the eight opens. It is what the two POST routes
+    # below redirect back with, so an administrator lands on the pane they acted
+    # from rather than on whichever one the template happened to hardcode. Any
+    # unrecognised value resolves to General rather than to no pane at all --
+    # settings_context() validates it, so nothing here has to.
+    return render_template(
+        'settings.html',
+        **settings_context(active_tab=request.args.get("tab")),
+    )
 
 
 # SAVING GENERAL SETTINGS. POST only, and Admin only.
@@ -957,7 +968,12 @@ def save_general_settings():
     if context is not None:
         return render_template('settings.html', **context)
     flash(message)
-    return redirect(url_for("admin.settings"))
+    # Named rather than left to the default. General is the pane this submit came
+    # from AND the pane the screen opens on when nothing is asked for, so
+    # omitting it would work today by coincidence -- which is exactly how the
+    # maintenance toggle below came to land on the wrong pane. The destination is
+    # stated so it stays correct if the default ever moves.
+    return redirect(url_for("admin.settings", tab=TAB_GENERAL))
 
 
 # DOWNLOADING A BACKUP. Admin only, and a GET, unlike every other route in this
@@ -1005,7 +1021,13 @@ def set_maintenance_mode():
     flash(process_maintenance_mode(
         request.form, session.get("user_id"), request.remote_addr
     ))
-    return redirect(url_for("admin.settings"))
+    # Back to System Maintenance, which is where the switch is. This redirected
+    # to a bare url_for("admin.settings") and dropped the administrator on
+    # General Settings -- six panes from the control they had just thrown, with
+    # the flash claiming success and nothing on screen showing it. The tab is
+    # carried for every outcome, including the refusal of an unrecognised action,
+    # because a refusal has to be read beside the control it refused.
+    return redirect(url_for("admin.settings", tab=TAB_MAINTENANCE))
 
 
 @admin_bp.route('/settings/backup.db')

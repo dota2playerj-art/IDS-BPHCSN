@@ -180,16 +180,32 @@
     <div class="panel-card">
       <div class="row g-0">
         <div class="col-lg-3">
+{#- WHICH PANE IS OPEN IS DECIDED ON THE SERVER NOW, NOT HARDCODED HERE.
+    Every one of the sixteen class attributes below -- eight nav buttons and
+    eight panes -- reads the same `active_pane`, which routes/settings_views.py
+    resolves from ?tab= and validates against the panes that actually exist.
+
+    Before this, `active` and `show active` were typed onto General and nowhere
+    else, so the screen always opened on General whatever had just happened. That
+    was invisible until a pane other than General grew a control that saves:
+    turning maintenance mode on redirected the administrator back here and
+    dropped them on General Settings, several panes from the switch they had just
+    thrown. Saving General Settings looked correct only because its destination
+    and the hardcoded default happened to be the same pane.
+
+    Bootstrap still does the switching when somebody clicks; this only decides
+    where the screen starts. The two cannot disagree, because `active` on the
+    button and `show active` on its pane are written from one value. #}
           <div class="settings-nav">
             <div class="nav flex-column" role="tablist">
-              <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#pane-general" type="button"><span class="material-symbols-outlined">tune</span>General Settings</button>
-              <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-hc" type="button"><span class="material-symbols-outlined">local_hospital</span>Health Center Information</button>
-              <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-sms" type="button"><span class="material-symbols-outlined">sms</span>SMS Gateway Configuration</button>
-              <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-security" type="button"><span class="material-symbols-outlined">shield</span>Security Settings</button>
-              <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-pwd" type="button"><span class="material-symbols-outlined">password</span>Password Policy</button>
-              <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-backup" type="button"><span class="material-symbols-outlined">backup</span>Backup &amp; Restore</button>
-              <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-maint" type="button"><span class="material-symbols-outlined">build</span>System Maintenance</button>
-              <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-about" type="button"><span class="material-symbols-outlined">info</span>About System</button>
+              <button class="nav-link{% if active_pane == 'pane-general' %} active{% endif %}" data-bs-toggle="pill" data-bs-target="#pane-general" type="button"><span class="material-symbols-outlined">tune</span>General Settings</button>
+              <button class="nav-link{% if active_pane == 'pane-hc' %} active{% endif %}" data-bs-toggle="pill" data-bs-target="#pane-hc" type="button"><span class="material-symbols-outlined">local_hospital</span>Health Center Information</button>
+              <button class="nav-link{% if active_pane == 'pane-sms' %} active{% endif %}" data-bs-toggle="pill" data-bs-target="#pane-sms" type="button"><span class="material-symbols-outlined">sms</span>SMS Gateway Configuration</button>
+              <button class="nav-link{% if active_pane == 'pane-security' %} active{% endif %}" data-bs-toggle="pill" data-bs-target="#pane-security" type="button"><span class="material-symbols-outlined">shield</span>Security Settings</button>
+              <button class="nav-link{% if active_pane == 'pane-pwd' %} active{% endif %}" data-bs-toggle="pill" data-bs-target="#pane-pwd" type="button"><span class="material-symbols-outlined">password</span>Password Policy</button>
+              <button class="nav-link{% if active_pane == 'pane-backup' %} active{% endif %}" data-bs-toggle="pill" data-bs-target="#pane-backup" type="button"><span class="material-symbols-outlined">backup</span>Backup &amp; Restore</button>
+              <button class="nav-link{% if active_pane == 'pane-maint' %} active{% endif %}" data-bs-toggle="pill" data-bs-target="#pane-maint" type="button"><span class="material-symbols-outlined">build</span>System Maintenance</button>
+              <button class="nav-link{% if active_pane == 'pane-about' %} active{% endif %}" data-bs-toggle="pill" data-bs-target="#pane-about" type="button"><span class="material-symbols-outlined">info</span>About System</button>
             </div>
           </div>
         </div>
@@ -216,7 +232,7 @@
           <div class="settings-body tab-content">
 
             <!-- GENERAL SETTINGS -->
-            <div class="tab-pane fade show active" id="pane-general">
+            <div class="tab-pane fade{% if active_pane == 'pane-general' %} show active{% endif %}" id="pane-general">
               <div class="section-title">General Settings</div>
               <div class="section-sub">The health center&#39;s own name, where it stands, and the hours it books appointments in</div>
 
@@ -366,7 +382,7 @@
             </div>
 
             <!-- HEALTH CENTER INFORMATION -->
-            <div class="tab-pane fade" id="pane-hc">
+            <div class="tab-pane fade{% if active_pane == 'pane-hc' %} show active{% endif %}" id="pane-hc">
               <div class="section-title">Health Center Information</div>
               <div class="section-sub">Facility identity, licensing, and leadership details</div>
 {#- Its own disabled fieldset, for the reason the note at the top of this tab
@@ -464,7 +480,7 @@
     base.html, neither of which had anything to do with this pane. #}
 
             <!-- SMS GATEWAY CONFIGURATION -->
-            <div class="tab-pane fade" id="pane-sms">
+            <div class="tab-pane fade{% if active_pane == 'pane-sms' %} show active{% endif %}" id="pane-sms">
               <div class="section-title">SMS Gateway Configuration</div>
               <div class="section-sub">Connection settings for outbound SMS notifications</div>
 {#- Its own disabled fieldset now, holding what the page-wide one used to. The
@@ -583,7 +599,7 @@
             </div>
 
             <!-- SECURITY SETTINGS -->
-            <div class="tab-pane fade" id="pane-security">
+            <div class="tab-pane fade{% if active_pane == 'pane-security' %} show active{% endif %}" id="pane-security">
               <div class="section-title">Security Settings</div>
               <div class="section-sub">Session, access, and authentication controls</div>
 
@@ -762,7 +778,7 @@
     can be wrong while the validator is right, which is a stronger claim than
     "these numbers are correct" and is the only one worth making about a screen
     that describes a rule it does not itself enforce. #}
-            <div class="tab-pane fade" id="pane-pwd">
+            <div class="tab-pane fade{% if active_pane == 'pane-pwd' %} show active{% endif %}" id="pane-pwd">
               <div class="section-title">Password Policy</div>
               <div class="section-sub">The rule enforced when an account is created or its password is reset</div>
 
@@ -834,7 +850,7 @@
             </div>
 
             <!-- BACKUP & RESTORE -->
-            <div class="tab-pane fade" id="pane-backup">
+            <div class="tab-pane fade{% if active_pane == 'pane-backup' %} show active{% endif %}" id="pane-backup">
               <div class="section-title">Backup &amp; Restore</div>
               <div class="section-sub">Take a copy of the database, now, from this screen</div>
 
@@ -947,7 +963,7 @@
             </div>
 
             <!-- SYSTEM MAINTENANCE -->
-            <div class="tab-pane fade" id="pane-maint">
+            <div class="tab-pane fade{% if active_pane == 'pane-maint' %} show active{% endif %}" id="pane-maint">
               <div class="section-title">System Maintenance</div>
               <div class="section-sub">Tools for keeping the system running smoothly</div>
 {#- MAINTENANCE MODE IS LIVE. It was a dead switch inside the pane-wide disabled
@@ -1078,7 +1094,7 @@
             </div>
 
             <!-- ABOUT SYSTEM -->
-            <div class="tab-pane fade" id="pane-about">
+            <div class="tab-pane fade{% if active_pane == 'pane-about' %} show active{% endif %}" id="pane-about">
               <div class="section-title">About System</div>
               <div class="section-sub">Version and institution information</div>
 
