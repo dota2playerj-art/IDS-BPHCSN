@@ -1,0 +1,133 @@
+{#- The page a signed-in Health Center Staff or Barangay Official sees while an
+    Administrator has the system closed. Returned by utils/security.py's
+    _maintenance_response(), with a 503, from the same guard that admits every
+    other request.
+
+    WHY IT DOES NOT EXTEND base.html, WHICH EVERY OTHER SCREEN DOES.
+    base.html draws the sidebar: Patient Records, Medicine Inventory,
+    Appointment Scheduling, the low-stock badge, the search box across the top.
+    Every one of those is a link this person cannot follow right now. A page
+    whose whole message is "you cannot use the system at the moment", wrapped in
+    a full working navigation, invites exactly the clicking-around the message
+    is asking them not to do -- and each click would come back here, which reads
+    as the application being broken rather than deliberately closed.
+
+    So this is a standalone page, and it is the second one in the project built
+    that way. The first is login.html, for the same reason: there is nothing to
+    navigate to yet. It borrows that page's shape on purpose -- the same teal
+    ground, the same centred card -- because the two are the only screens in
+    this system that say "not right now", and somebody who has seen one should
+    recognise the other.
+
+    WHAT IT DOES NOT SAY. It does not guess when the system will reopen. Nothing
+    in this project knows: there is no scheduler, no window recorded anywhere,
+    and no field an administrator filled in to say how long they would be. A
+    time printed here would be the sort of invented figure this screen's own
+    Settings pane has spent three passes deleting, and it is the one thing a
+    reader would act on. "Shortly" is the honest length of an interval nobody
+    measured.
+
+    It also does not name the administrator who closed it. That is in the audit
+    trail, where an Administrator can read it, and putting it here would send a
+    health worker to knock on one particular door -- which may be the wrong one,
+    since any Administrator can reopen the system. #}
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IDS-BPHCSN | Maintenance</title>
+<link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/fonts.css') }}" rel="stylesheet">
+<style>
+  :root{
+    --teal:#169B92;
+    --teal-dark:#0F6E56;
+    --teal-light:#E1F5EE;
+    --bg:#F5F7FA;
+    --text-dark:#1F2937;
+    --text-muted:#6B7280;
+    --border-color:#E5E7EB;
+  }
+  *{font-family:'Inter',Arial,sans-serif;}
+  body{
+    margin:0; min-height:100vh; background:var(--bg); color:var(--text-dark);
+    display:flex; align-items:center; justify-content:center; padding:24px;
+  }
+  .maint-card{
+    background:#fff; border-radius:18px; box-shadow:0 2px 14px rgba(0,0,0,0.07);
+    max-width:560px; width:100%; padding:40px 40px 32px; text-align:center;
+  }
+  .maint-mark{
+    width:64px; height:64px; border-radius:50%; background:var(--teal-light);
+    display:flex; align-items:center; justify-content:center; margin:0 auto 20px;
+  }
+  .maint-mark .material-symbols-outlined{font-size:30px; color:var(--teal-dark);}
+  .maint-brand{
+    font-size:12px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase;
+    color:var(--teal-dark); margin-bottom:6px;
+  }
+  .maint-title{font-size:23px; font-weight:700; margin-bottom:12px;}
+  .maint-lead{font-size:14.5px; color:var(--text-muted); line-height:1.65; margin-bottom:22px;}
+  .maint-note{
+    background:var(--bg); border:1px solid var(--border-color); border-radius:12px;
+    padding:14px 16px; font-size:12.5px; color:var(--text-muted); line-height:1.6;
+    text-align:left; margin-bottom:22px;
+  }
+  .maint-note strong{color:var(--text-dark); font-weight:600;}
+  .maint-actions{display:flex; gap:10px; justify-content:center; flex-wrap:wrap;}
+  .btn-teal{
+    background:var(--teal); color:#fff; border:none; border-radius:10px;
+    padding:11px 20px; font-size:14px; font-weight:600; text-decoration:none;
+    display:inline-flex; align-items:center; gap:7px;
+  }
+  .btn-teal:hover{background:var(--teal-dark); color:#fff;}
+  .btn-ghost{
+    background:transparent; color:var(--text-dark); border:1px solid var(--border-color);
+    border-radius:10px; padding:11px 20px; font-size:14px; font-weight:500;
+    text-decoration:none; display:inline-flex; align-items:center; gap:7px;
+  }
+  .btn-ghost:hover{background:var(--bg); color:var(--text-dark);}
+  .maint-foot{font-size:11.5px; color:var(--text-muted); margin-top:24px;}
+</style>
+</head>
+<body>
+  <div class="maint-card">
+    <div class="maint-mark"><span class="material-symbols-outlined">build</span></div>
+
+    <div class="maint-brand">{{ health_center.name }}</div>
+    <div class="maint-title">The system is temporarily in maintenance mode</div>
+    <div class="maint-lead">
+      An Administrator has closed the system for a short time. Please try again shortly &mdash;
+      you do not need to do anything, and you do not need to sign in again.
+    </div>
+
+{#- Said plainly because the two things a person actually worries about here are
+    "have I been locked out" and "did I lose my work". Neither has happened, and
+    neither is obvious from a maintenance message on its own. #}
+    <div class="maint-note">
+      <strong>Your account is fine and you are still signed in.</strong>
+{#- The name and the role are printed as one phrase only when they differ. On
+    the seeded demo accounts they do not -- the Health Center Staff account's
+    full_name IS "Health Center Staff" -- and the naive version rendered "signed
+    in as Health Center Staff, Health Center Staff", which reads as a bug on the
+    one screen whose whole job is to reassure somebody that nothing is broken. #}
+      Nothing has been changed about your access{% if blocked_name %} &mdash; you are still signed in as
+      {{ blocked_name }}{% if blocked_role and blocked_role != blocked_name %}, {{ blocked_role }}{% endif %}{% endif %}. Refreshing this page once the maintenance
+      window ends puts you straight back to work. Anything you had already saved is saved;
+      anything you were part-way through typing when this appeared was not submitted.
+    </div>
+
+    <div class="maint-actions">
+      <a class="btn-teal" href="{{ url_for('auth.dashboard') }}"><span class="material-symbols-outlined" style="font-size:18px;">refresh</span>Try again</a>
+{#- Kept available on purpose. Signing out is one of the few things a blocked
+    person may legitimately want to do -- a shared desk at a health center is
+    the ordinary case -- and /logout carries no guard, so it works while the
+    system is closed. #}
+      <a class="btn-ghost" href="{{ url_for('auth.logout') }}"><span class="material-symbols-outlined" style="font-size:18px;">logout</span>Sign out</a>
+    </div>
+
+    <div class="maint-foot">IDS-BPHCSN &middot; If this lasts longer than you expect, ask an Administrator.</div>
+  </div>
+</body>
+</html>

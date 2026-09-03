@@ -65,6 +65,7 @@ from routes.patient_views import (
 from routes.settings_views import (
     backup_download_response,
     process_general_settings,
+    process_maintenance_mode,
     settings_context,
 )
 from routes.report_export import (
@@ -978,6 +979,35 @@ def save_general_settings():
 # The download is recorded in the audit trail even though no record changed --
 # see ACTION_BACKUP_DOWNLOADED in models/audit.py for why that is the one read in
 # this system worth an entry.
+# MAINTENANCE MODE. POST only, and Admin only.
+#
+# THIS IS THE MOST CONSEQUENTIAL WRITE ON THE SCREEN AND THE SMALLEST PAYLOAD.
+# One field with two possible values, and one of them closes the system to every
+# Health Center Staff and Barangay Official account in the barangay. The guard is
+# the enforcement rather than a copy of the screen's: an endpoint another role
+# could reach would let a health worker close the health center out of its own
+# patient records, or -- worse and quieter -- reopen a system an administrator
+# had deliberately shut.
+#
+# It redirects on every outcome, including refusal, because there is nothing
+# typed here to preserve. That is the one way this route differs from
+# save_general_settings() above, and the reason process_maintenance_mode()
+# returns a message where process_general_settings() can return a context.
+#
+# No GET. It changes who may use the system, so there is no URL to navigate to
+# and none a link, a bookmark or a prefetch could reach -- which matters more
+# here than anywhere else in this file, because a GET that closed the system
+# could be triggered by a browser preloading a link.
+@admin_bp.route('/settings/maintenance', methods=["POST"])
+@login_required
+@role_required("Admin")
+def set_maintenance_mode():
+    flash(process_maintenance_mode(
+        request.form, session.get("user_id"), request.remote_addr
+    ))
+    return redirect(url_for("admin.settings"))
+
+
 @admin_bp.route('/settings/backup.db')
 @login_required
 @role_required("Admin")

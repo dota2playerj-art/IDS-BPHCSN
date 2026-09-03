@@ -950,17 +950,90 @@
             <div class="tab-pane fade" id="pane-maint">
               <div class="section-title">System Maintenance</div>
               <div class="section-sub">Tools for keeping the system running smoothly</div>
-{#- Its own disabled fieldset, holding what the page-wide one used to. Nothing in
-    this pane is built: there is no maintenance mode, nothing prunes the audit
-    trail on any retention period, and there is no application cache to clear. #}
-              <fieldset class="unavailable-form" disabled>
+{#- MAINTENANCE MODE IS LIVE. It was a dead switch inside the pane-wide disabled
+    fieldset, beside a System Log Retention dropdown and a Clear Cache button,
+    and it is the only one of the three that had anything real behind it.
 
-              <div class="toggle-row">
-                <div><div class="toggle-row-label">Maintenance Mode</div><div class="toggle-row-desc">Temporarily restrict access to Administrators only</div></div>
-                <label class="switch"><input type="checkbox"><span class="slider"></span></label>
+    It is a form rather than a checkbox, and that is the point of the shape.
+    A switch that flips when you touch it is the wrong control for an action
+    that closes the health center out of its own patient records: it can be hit
+    by a stray click and it gives no moment in which to read what is about to
+    happen. So the state is shown as a pill and the change is a submit with the
+    consequence written on the button.
+
+    The two buttons post to the same route with different `action` values, which
+    is the arrangement User Management's Deactivate / Reactivate pair uses -- the
+    other place in this project where a control decides who can use the system.
+
+    WHY THIS IS SAFE TO OPERATE, IN ONE SENTENCE FOR SOMEBODY STANDING HERE:
+    the guard in utils/security.py admits every Administrator whatever this says,
+    so the person who closes the system is never the person locked out of
+    reopening it. #}
+              <div class="toggle-row" style="align-items:flex-start;">
+                <div>
+                  <div class="toggle-row-label">Maintenance Mode</div>
+                  <div class="toggle-row-desc" style="max-width:560px;">
+                    Temporarily restrict access to Administrators only. Health Center Staff and
+                    Barangay Officials are shown a page saying the system is briefly closed &mdash;
+                    they stay signed in and resume where they were when it is turned off.
+                    Your own access is never affected.
+                  </div>
+                </div>
+{%- if maintenance.on %}
+                <span class="status-pill" style="background:#FEF2F2; color:#991B1B;"><span class="status-dot-sm" style="background:#991B1B;"></span>On &mdash; system closed</span>
+{%- else %}
+                <span class="status-pill" style="background:#F0FDF4; color:#166534;"><span class="status-dot-sm" style="background:#15803D;"></span>Off &mdash; system open</span>
+{%- endif %}
               </div>
 
+{#- The warning that decides whether an administrator should press this NOW, and
+    it is deliberately a warning rather than a refusal. Closing the system during
+    a consultation is a legitimate thing to want to do -- that is what an urgent
+    problem looks like -- so the screen owes them the fact before they press it,
+    not a veto. Read from get_active_consultation(), the same call Appointment
+    Scheduling asks "is the room free?" with. #}
+{%- if maintenance.in_consultation and not maintenance.on %}
+              <div class="alert-ids alert-warning-ids" style="margin-top:14px;">
+                <span class="material-symbols-outlined">warning</span>
+                <div>
+                  <strong>A consultation is in progress right now</strong>
+                  {{ maintenance.in_consultation }}{% if maintenance.in_consultation_reference %} ({{ maintenance.in_consultation_reference }}){% endif %}
+                  is In Consultation. Turning maintenance mode on stops the staff member with them
+                  from writing that visit up until you turn it off, and no other patient can be
+                  brought in meanwhile. Nothing is lost either way &mdash; the record stays open
+                  and can be completed as soon as the system reopens.
+                </div>
+              </div>
+{%- endif %}
+
+              <form method="post" action="{{ url_for('admin.set_maintenance_mode') }}" style="margin-top:16px;">
+{%- if maintenance.on %}
+                <button type="submit" name="action" value="disable" class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">lock_open</span>Turn off maintenance mode</button>
+{%- else %}
+                <button type="submit" name="action" value="enable" class="btn-ghost-ids"><span class="material-symbols-outlined" style="font-size:18px;">lock</span>Turn on maintenance mode</button>
+{%- endif %}
+              </form>
+
+{%- if maintenance.changed_at %}
+              <div class="form-text-hint" style="margin-top:10px;">
+                Last changed {{ maintenance.changed_at }}{% if maintenance.changed_by %} by {{ maintenance.changed_by }}{% endif %}.
+                Both changes are recorded in
+                <a href="{{ url_for('admin.audit_logs', module='Settings') }}">Audit Logs</a>;
+                being turned away while it is on is not, because that would write a row per click
+                and add nothing this pair of entries does not already say.
+              </div>
+{%- else %}
+              <div class="form-text-hint" style="margin-top:10px;" title="No row has been written under this key. The system has been open since it was installed.">
+                Never used. The system has been open since it was installed.
+              </div>
+{%- endif %}
+
               <div class="subsection-divider"></div>
+{#- What is left in this pane's disabled fieldset after the switch above came
+    out of it and Clear Cache was deleted: one dropdown, for a retention policy
+    nothing applies. Nothing prunes the audit trail on any schedule, or at all --
+    models/audit.py is append-only by design and has no delete in it. #}
+              <fieldset class="unavailable-form" disabled>
               <div class="row g-3 mb-3">
                 <div class="col-md-6">
                   <label class="field-label">System Log Retention</label>
@@ -970,17 +1043,37 @@
                     <option>2 years</option>
                   </select>
                 </div>
-{#- WAS a "Cache Status" field reading "Healthy - 42 MB" on a green pill. The
-    figure was mockup residue, like the API key that used to sit on this screen,
-    but the field was worse than an invented number: there is no cache here to
-    have a status at all. Pages are sent no-store and every figure is read from
-    the database on each request -- which is what the disabled Clear Cache
-    button below already tells anyone who hovers it. Removed rather than marked
-    "Not tracked", because that wording belongs to things this system has and
-    does not record; an application cache is not one of them. #}
-              </div>
+{#- CACHE STATUS WENT FIRST, AND NOW CLEAR CACHE HAS GONE AFTER IT.
 
-              <button type="button" class="btn-ghost-ids" title="{{ unavailable.settings }} There is also no application cache to clear: pages are served with no-store and every figure is read from the database on each request."><span class="material-symbols-outlined" style="font-size:18px;">cleaning_services</span>Clear Cache</button>
+    The field here read "Healthy - 42 MB" on a green pill and was removed as
+    mockup residue; the note left behind said the figure was "worse than an
+    invented number: there is no cache here to have a status at all", and then
+    pointed at the Clear Cache button below as the thing that already told
+    anyone who hovered it so.
+
+    That pointer was the tell. A removed field explaining itself by referring to
+    a button that exists only to say the same absence is one absence stated
+    twice, and the button was the worse of the two: a field reports, a button
+    offers. This one offered an operation on a thing that does not exist. Pages
+    are served with no-store (see app.py's no_store()), every figure on every
+    screen is read from the database on the request that draws it, and the only
+    thing in this project called a cache is models/settings.py's one-request
+    memo on flask.g -- which is discarded when the request ends and could not be
+    cleared by a button that would have to finish its own request to do it.
+
+    So it is deleted rather than left disabled, on the precedent this screen has
+    now set four times: Billing Info under SMS Gateway, Cache Status here, and
+    the User Preferences and Notification Settings panes. A disabled control is
+    honest when the feature is real and unbuilt -- the SMS gateway's buttons are
+    exactly that, and they stay. This one was not waiting for anything: nothing
+    in this project caches, nothing ever has, and no cache is planned, so the
+    button was a permanent placeholder for a feature that will never arrive.
+
+    Nothing referenced it. Checked before removing: no route, no template, no
+    model and no reason in utils/unavailable.py mentions cache clearing, and the
+    shared `settings` reason it quoted is still quoted by the two fieldsets on
+    Health Center Information and Security Settings. #}
+              </div>
               </fieldset>
             </div>
 

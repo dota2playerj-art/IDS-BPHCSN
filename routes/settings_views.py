@@ -62,8 +62,11 @@ file the backup would be taken from. Nothing is counted locally here.
 """
 import sqlite3
 
+from models.appointments import get_active_consultation
 from models.audit import (
     ACTION_BACKUP_DOWNLOADED,
+    ACTION_MAINTENANCE_DISABLED,
+    ACTION_MAINTENANCE_ENABLED,
     ACTION_SETTINGS_UPDATED,
     MODULE_SETTINGS,
     get_audit_stats,
@@ -82,7 +85,10 @@ from models.settings import (
     display_time,
     get_settings,
     last_updated,
+    maintenance_changed_at,
+    maintenance_mode,
     save_general_settings,
+    set_maintenance_mode,
     validate_general_settings,
 )
 from models.users import get_all_users, get_user_by_id, password_policy
@@ -134,6 +140,46 @@ def _last_backup():
     if entry is None:
         return None, None
     return display_timestamp(entry["created_at"]), entry["user_name"]
+
+
+def _maintenance_state():
+    """What the Maintenance Mode row shows: the switch, its history, the warning.
+
+    `in_consultation` is the one thing on this screen that is about clinical
+    work rather than configuration, and it is here because it is the only real
+    cost of closing the system. A visit that is In Consultation can only be
+    written up by the person holding it, and that person is Health Center Staff
+    -- so switching the system off mid-consultation leaves the appointment open
+    until the window ends. Nothing is corrupted and nothing is lost, but the
+    record stays In Consultation meanwhile, and models/appointments.py's
+    single-active-consultation guard is not date-scoped, so nobody else can be
+    brought in either.
+
+    It is shown as a warning and NOT as a refusal. Closing the system is an
+    administrator's decision and there are good reasons to make it during a
+    consultation -- that is what an emergency is. What the screen owes them is
+    the fact, before they press it, rather than a veto.
+
+    get_active_consultation() is the same call Appointment Scheduling asks "is
+    the room free?" with, so this cannot report a consultation the queue screen
+    does not show, or miss one it does.
+    """
+    changed_at, changed_by = maintenance_changed_at()
+    active = get_active_consultation()
+    return {
+        "on": maintenance_mode(),
+        "changed_at": display_timestamp(changed_at) if changed_at else None,
+        "changed_by": changed_by,
+        # first + last, the same pair Appointment Scheduling's queue prints on
+        # its rows. There is no full_name on a queue entry -- the appointment
+        # join carries the patient's three name columns separately -- so the
+        # middle name is left out here for the same reason that screen leaves it
+        # out of its own heading: one line naming who is in the room.
+        "in_consultation": (
+            f'{active["first_name"]} {active["last_name"]}' if active else None
+        ),
+        "in_consultation_reference": active["patient_reference"] if active else None,
+    }
 
 
 def _general_form(values):
@@ -213,6 +259,11 @@ def settings_context(general_form=None, general_errors=None):
             "last_at": backup_at,
             "last_by": backup_by,
         },
+        # The one live control outside General Settings. Read from the same
+        # settings row utils/security.py's guard reads on every request, so the
+        # switch on the screen cannot show one state while the system enforces
+        # the other.
+        "maintenance": _maintenance_state(),
         "system": {
             # Not the sqlite3 module's own version: this is the SQLite library
             # the interpreter is linked against, which is what actually stores
@@ -388,3 +439,133 @@ def backup_download_response(actor_id, ip_address=None):
     log_backup_download(actor_id, len(payload), filename, ip_address)
 
     return _download((payload, filename), SQLITE_MIMETYPE)
+
+
+# ---------------------------------------------------------------------------
+# MAINTENANCE MODE
+# ---------------------------------------------------------------------------
+# The two things the switch can be asked for. Constants rather than literals so
+# the template's button values and the branch below cannot drift apart -- the
+# same arrangement DEACTIVATE / REACTIVATE have in routes/user_views.py, and for
+# the same reason: these are the other pair of controls in this project that
+# decide who can use the system.
+MAINTENANCE_ENABLE = "enable"
+MAINTENANCE_DISABLE = "disable"
+MAINTENANCE_ACTIONS = (MAINTENANCE_ENABLE, MAINTENANCE_DISABLE)
+
+
+def process_maintenance_mode(form_data, actor_id, ip_address=None):
+    """Open or close the system. Returns the message to flash.
+
+    A message and never a context, unlike process_general_settings(): there is
+    nothing typed here to preserve on a refusal. A switch has two positions and
+    the form carries which one was asked for, so every failure is "that was not
+    a valid request" rather than "fix this field".
+
+    THE REQUESTED ACTION IS VALIDATED AGAINST MAINTENANCE_ACTIONS RATHER THAN
+    TRUSTED. A POST can be made without ever loading the page, and this is the
+    one form in the project whose payload could close the system to every health
+    worker in the barangay -- so an unrecognised value is refused outright
+    rather than being read as falsy and quietly interpreted as "disable".
+
+    NOTHING HERE HAS TO PROTECT THE ADMINISTRATOR FROM LOCKING THEMSELVES OUT,
+    and that is worth stating because it is the first thing anybody asks of this
+    feature. The guard in utils/security.py admits every Administrator whatever
+    the switch says -- the condition it tests is "not an Administrator", which
+    for them is not a branch that exists. Compare the last-administrator rule in
+    models/users.py, which genuinely needs a count inside a transaction to be
+    sure of its answer. This needs neither, and the two together are what make
+    the lockout unrecoverable-proof: an Administrator can always sign in, and
+    there is always at least one active Administrator account to sign in as,
+    because deactivate_user() and update_user() refuse to remove the last one.
+    """
+    action = (form_data.get("action") or "").strip()
+    if action not in MAINTENANCE_ACTIONS:
+        return "Choose whether to turn maintenance mode on or off."
+
+    enabling = action == MAINTENANCE_ENABLE
+
+    # Captured BEFORE the write, so the entry describes the room as it stood at
+    # the moment the system was closed rather than as it stands afterwards.
+    active = get_active_consultation() if enabling else None
+
+    changed = set_maintenance_mode(enabling, actor_id)
+    if not changed:
+        # Pressed twice, or two administrators pressed it at once. Not an error
+        # and not worth an audit entry -- nothing moved -- but saying "saved"
+        # would imply something did.
+        return (
+            "Maintenance mode was already on; nothing changed."
+            if enabling else
+            "Maintenance mode was already off; nothing changed."
+        )
+
+    actor = get_user_by_id(actor_id) if actor_id else None
+    actor_phrase = (
+        f'{actor["full_name"]} ("{actor["username"]}", {actor["role"]})'
+        if actor is not None else
+        "an administrator whose account row could not be read"
+    )
+
+    if enabling:
+        consultation_note = (
+            f'; a consultation was in progress at the time -- '
+            f'{active["first_name"]} {active["last_name"]} '
+            f'({active["patient_reference"]}), appointment '
+            f'{active["reference"]} -- and the staff member holding it cannot '
+            "write it up until the system is reopened, so the appointment stays "
+            "In Consultation and no other patient can be brought in meanwhile"
+            if active is not None else
+            "; no consultation was in progress at the time"
+        )
+        log_action(
+            actor_id,
+            ACTION_MAINTENANCE_ENABLED,
+            module=MODULE_SETTINGS,
+            details=(
+                f"Maintenance mode turned ON by {actor_phrase}. Health Center "
+                "Staff and Barangay Official accounts are refused on every "
+                "screen and at the sign-in form for as long as it stays on, and "
+                "are shown a page saying the system is temporarily closed rather "
+                "than being signed out — their sessions are left intact, so they "
+                "resume where they were when it is turned off. Administrator "
+                "access is unaffected, which is what guarantees the system can "
+                "be reopened. Nothing is recorded when a blocked person is "
+                "turned away; this entry and the matching one that reopens the "
+                f"system are the whole record of the window{consultation_note}"
+            ),
+            ip_address=ip_address,
+        )
+        if active is not None:
+            return (
+                "Maintenance mode is ON. Only Administrators can use the system "
+                f'now. Note that {active["first_name"]} {active["last_name"]} is '
+                "still In Consultation — the staff member with them cannot "
+                "complete that record until you turn this off."
+            )
+        return (
+            "Maintenance mode is ON. Only Administrators can use the system now. "
+            "Everyone else sees a page saying it is temporarily closed; they stay "
+            "signed in and resume where they were when you turn it off. Your own "
+            "access is unaffected."
+        )
+
+    log_action(
+        actor_id,
+        ACTION_MAINTENANCE_DISABLED,
+        module=MODULE_SETTINGS,
+        details=(
+            f"Maintenance mode turned OFF by {actor_phrase}. Health Center Staff "
+            "and Barangay Official accounts can sign in and use every screen "
+            "their role admits them to again, with immediate effect: the check "
+            "runs on each request rather than at sign-in, so anyone who was "
+            "sitting on the maintenance page is back at work on their next "
+            "click without signing in again"
+        ),
+        ip_address=ip_address,
+    )
+    return (
+        "Maintenance mode is OFF. Health Center Staff and Barangay Officials can "
+        "use the system again — anyone still holding the maintenance page is back "
+        "at work on their next click, without signing in again."
+    )

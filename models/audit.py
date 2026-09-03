@@ -249,6 +249,25 @@ ACTION_SETTINGS_UPDATED = "Updated general settings"
 # only place the answer could come from.
 ACTION_BACKUP_DOWNLOADED = "Downloaded a database backup"
 
+# Maintenance mode, closing and opening the system.
+#
+# TWO PHRASES RATHER THAN ONE "Changed maintenance mode", for the reason
+# ACTION_USER_DEACTIVATED and ACTION_USER_REACTIVATED are two rather than one
+# "changed account status": they are opposite acts, and only one of them takes
+# access away. A single phrase would make "four maintenance changes this month"
+# a number that answers nothing -- two closures and two reopenings read
+# identically in it, and the question a reviewer is actually asking is when the
+# health center could not reach its own records.
+#
+# THIS IS THE ONE ENTRY THAT EXPLAINS A WHOLE WINDOW OF REFUSALS. Nothing is
+# written when a blocked health worker is turned away -- utils/security.py's
+# _maintenance_response() says why -- so these two entries and the times on them
+# are the entire record of why nobody but an Administrator could work between
+# them. `details` therefore carries who closed it, and how many consultations
+# were open at that moment, because that is the fact somebody will want back.
+ACTION_MAINTENANCE_ENABLED = "Enabled maintenance mode"
+ACTION_MAINTENANCE_DISABLED = "Disabled maintenance mode"
+
 # Every action that means somebody was turned away at the login form. Grouped so
 # the Security Events figure counts refusals rather than one particular kind of
 # refusal -- adding a fourth outcome later must not silently shrink that number.

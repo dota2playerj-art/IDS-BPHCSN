@@ -9,7 +9,7 @@ rewritten twice to say exactly that, because a reason denying an existing
 structure sends the next session off to build something already there. This is
 the wiring that reason was describing the absence of.
 
-It stores six values and no others:
+It stores seven values and no others. Six describe the health center:
 
     health_center_name   what the facility calls itself
     barangay             the barangay it stands in
@@ -17,6 +17,13 @@ It stores six values and no others:
     province             the province
     opening_time         when the clinic opens, "HH:MM"
     closing_time         when it closes, "HH:MM"
+
+and one is a switch that decides who may use the system at all:
+
+    maintenance_mode     "on" closes it to everyone but an Administrator
+
+The switch is described where it is defined below, including why it is kept out
+of GENERAL_KEYS and why it fails open. The rest of this note is about the six.
 
 Six rather than the twenty-odd fields Screen 13 draws, and the line between them
 is not taste. Each of these six is a value some OTHER part of the running system
@@ -88,6 +95,30 @@ GENERAL_KEYS = (
     KEY_CLOSING,
 )
 
+# MAINTENANCE MODE, AND WHY IT IS DELIBERATELY NOT ONE OF THE SIX ABOVE.
+# It is stored in the same table by the same mechanism, but it is not a General
+# Setting and must never be written by that form. GENERAL_KEYS is what
+# save_general_settings() writes -- all six, every time, so `updated_by` on each
+# row means "who last confirmed this value". Folding a switch into that set
+# would mean every save of the health center's name also re-asserted whether the
+# system is open, and a validation error on the barangay would sit on a form
+# that had a live lockout toggle in it.
+#
+# It is its own key, its own route, and its own writer for the same reason
+# deactivating an account is not part of Edit User: one changes a detail, the
+# other changes who can get in.
+KEY_MAINTENANCE = "maintenance_mode"
+
+# Everything with a row in the settings table, which is the six plus the switch.
+# _read_stored() selects on this; GENERAL_KEYS stays the form's set.
+STORED_KEYS = GENERAL_KEYS + (KEY_MAINTENANCE,)
+
+# The two values maintenance mode is ever stored as. Explicit strings rather
+# than "1"/"0" or a bare truth test, because the column is TEXT and a truth test
+# over TEXT is how "0" comes to be true.
+MAINTENANCE_ON = "on"
+MAINTENANCE_OFF = "off"
+
 # Every one of these is the literal the application used before it could store
 # anything, copied from the file that held it:
 #
@@ -109,6 +140,12 @@ DEFAULTS = {
     KEY_PROVINCE: "Surigao del Norte",
     KEY_OPENING: "08:00",
     KEY_CLOSING: "17:00",
+    # OFF, AND THE DIRECTION OF THIS DEFAULT IS THE SAFETY PROPERTY.
+    # Every existing copy of app.db has no row under this key, and so does a
+    # fresh install -- so the system is open until an administrator deliberately
+    # closes it, and a database that has never seen this feature behaves exactly
+    # as it did before the feature existed.
+    KEY_MAINTENANCE: MAINTENANCE_OFF,
 }
 
 # What each field is called on the form, used in its own error messages so the
@@ -164,18 +201,19 @@ _CACHE_ATTRIBUTE = "_general_settings"
 # ---------------------------------------------------------------------------
 
 def _read_stored():
-    """{key: value} for the six keys that have a stored row. Missing keys absent.
+    """{key: value} for the keys that have a stored row. Missing keys absent.
 
-    Only the six are selected. A row under any other key -- there are none today,
-    and nothing in this module writes one -- is left alone rather than being read
-    into a dict the rest of the application would then be able to see.
+    Only the keys this module owns are selected. A row under any other key --
+    there are none today, and nothing in this module writes one -- is left alone
+    rather than being read into a dict the rest of the application would then be
+    able to see.
     """
     conn = get_db()
-    placeholders = ", ".join("?" for _ in GENERAL_KEYS)
+    placeholders = ", ".join("?" for _ in STORED_KEYS)
     rows = conn.execute(
         f"SELECT setting_key, setting_value FROM settings "
         f"WHERE setting_key IN ({placeholders})",
-        GENERAL_KEYS,
+        STORED_KEYS,
     ).fetchall()
     conn.close()
 
@@ -193,11 +231,11 @@ def _read_stored():
 
 
 def get_settings():
-    """The six values in force, defaults filled in. Never returns a partial dict.
+    """Every stored value in force, defaults filled in. Never returns a partial dict.
 
-    Every caller can index all six keys without checking, which is why no
-    consumer in this project has a fallback of its own -- a second fallback is a
-    second place for the default to be written down and to go stale.
+    Every caller can index any key without checking, which is why no consumer in
+    this project has a fallback of its own -- a second fallback is a second place
+    for the default to be written down and to go stale.
     """
     if not has_request_context():
         return {**DEFAULTS, **_read_stored()}
@@ -249,6 +287,94 @@ def address_line():
         values[KEY_PROVINCE],
     ]
     return ", ".join(part for part in parts if part)
+
+
+# ---------------------------------------------------------------------------
+# MAINTENANCE MODE
+# ---------------------------------------------------------------------------
+
+def maintenance_mode():
+    """True when the system is closed to everyone but an Administrator.
+
+    IT FAILS OPEN, AND THAT DIRECTION IS A DECISION RATHER THAN AN OVERSIGHT.
+    Anything that is not exactly the stored word "on" reads as off: a missing
+    row, an empty string, a hand-edited "1", "true", "yes", or a value nobody
+    anticipated. So the only way this returns True is a row that says so
+    exactly, written by the one route that writes it.
+
+    The alternative -- treating anything unrecognised as "on" -- would mean a
+    single malformed row in a settings table locking every health worker and
+    barangay official out of the patient register until an administrator noticed
+    and could sign in to fix it. In a clinic that is a far worse failure than a
+    maintenance window that quietly did not engage, and the one an operator has
+    no way to diagnose from the screen they are looking at. A lockout must be
+    something somebody chose, never something a database fell into.
+    """
+    return get_settings()[KEY_MAINTENANCE] == MAINTENANCE_ON
+
+
+def set_maintenance_mode(enabled, actor_id):
+    """Turn the switch on or off. Returns True if the stored value actually moved.
+
+    Written on its own rather than through save_general_settings(), for the
+    reason KEY_MAINTENANCE is not in GENERAL_KEYS: this is the one stored value
+    that decides who may use the system at all, and it must not be reachable by
+    a form whose subject is the health center's postal address.
+
+    Returns whether anything changed so the caller can word an honest message
+    and decide whether an audit entry is worth writing -- pressing "enable" on a
+    system that is already closed is not a second closure.
+    """
+    desired = MAINTENANCE_ON if enabled else MAINTENANCE_OFF
+    if get_settings()[KEY_MAINTENANCE] == desired:
+        return False
+
+    conn = get_db()
+    conn.execute(
+        """
+        INSERT INTO settings (setting_key, setting_value, updated_by, updated_at)
+             VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(setting_key) DO UPDATE SET
+             setting_value = excluded.setting_value,
+                updated_by = excluded.updated_by,
+                updated_at = CURRENT_TIMESTAMP
+        """,
+        (KEY_MAINTENANCE, desired, actor_id),
+    )
+    conn.commit()
+    conn.close()
+
+    # The guard in utils/security.py reads this on the very next request, and
+    # the redirect that follows this call IS the next request. Without this the
+    # administrator who just closed the system would be shown a screen still
+    # saying it was open.
+    clear_cache()
+    return True
+
+
+def maintenance_changed_at():
+    """(when, who) for the last time the switch moved, or (None, None).
+
+    Read off the settings row itself rather than the audit trail, so the screen
+    reports the state of the stored value even if the entry that should
+    accompany it was never written -- log_action() declines an entry it cannot
+    attribute to a real account, and a switch whose history disagreed with its
+    own row would be the more misleading of the two.
+    """
+    conn = get_db()
+    row = conn.execute(
+        """
+        SELECT s.updated_at, u.full_name
+          FROM settings s
+          LEFT JOIN users u ON u.id = s.updated_by
+         WHERE s.setting_key = ?
+        """,
+        (KEY_MAINTENANCE,),
+    ).fetchone()
+    conn.close()
+    if row is None:
+        return None, None
+    return row["updated_at"], row["full_name"]
 
 
 # ---------------------------------------------------------------------------

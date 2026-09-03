@@ -69,6 +69,8 @@ from models.audit import (
     ACTION_LOGIN_FAILED,
     ACTION_BACKUP_DOWNLOADED,
     ACTION_LOGIN_SUCCESS,
+    ACTION_MAINTENANCE_DISABLED,
+    ACTION_MAINTENANCE_ENABLED,
     ACTION_SESSION_REVOKED,
     ACTION_SETTINGS_UPDATED,
     ACTION_PASSWORD_RESET,
@@ -292,6 +294,22 @@ _ICONS = {
     # own literal name.
     ACTION_SETTINGS_UPDATED: "tune",
     ACTION_BACKUP_DOWNLOADED: "backup",
+    # The two maintenance entries, and they are given OPPOSITE glyphs rather
+    # than one shared "maintenance" one. These are the only entries in the trail
+    # that describe the whole system being shut to most of the people who use
+    # it, and the pair reads as a window -- a reviewer scanning for "when could
+    # nobody work" is looking for the closing and the opening, and a padlock
+    # against an open padlock says which is which without reading either row.
+    #
+    # `lock` is already drawn on the sign-in form. `lock_open` is not drawn
+    # anywhere else in this project, so the usual check -- "it renders somewhere
+    # already" -- was not available for it and the font subset was read directly
+    # instead: static/fonts/material-symbols-outlined.woff2 carries 4010 glyphs
+    # and both of these are among them. That matters because the subset is fixed
+    # and a ligature it does not hold renders as its own literal name, so an
+    # unverified glyph would have put the word "lock_open" in the trail.
+    ACTION_MAINTENANCE_ENABLED: "lock",
+    ACTION_MAINTENANCE_DISABLED: "lock_open",
 }
 _MODULE_ICONS = {
     MODULE_SMS: "campaign",

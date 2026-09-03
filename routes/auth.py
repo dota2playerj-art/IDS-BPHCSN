@@ -91,7 +91,9 @@ NEXT guarded request, not at the instant an administrator sets the flag. There i
 no push, and a browser sitting on an already-rendered page has already been sent
 that page. The window is one click long.
 """
-from flask import Blueprint, redirect, render_template, request, session, url_for
+from flask import (
+    Blueprint, flash, redirect, render_template, request, session, url_for,
+)
 from werkzeug.security import check_password_hash
 
 from models.audit import (
@@ -101,6 +103,7 @@ from models.audit import (
     MODULE_AUTH,
     log_action,
 )
+from models.settings import maintenance_mode
 from models.users import get_user_by_username
 from utils.roles import normalize_role
 from utils.security import get_current_user, login_required, refuse_credentials
@@ -245,6 +248,21 @@ def _log_refused_sign_in(user, ip_address):
 # audit trail, where only a signed-in Admin can read it.
 _refuse = refuse_credentials
 
+# The maintenance window's own refusal at the login form. Built the same shape
+# _refuse is -- flash, then redirect to the form with the message on the query
+# string -- so it renders in the same alert box login.html already draws and no
+# template change is needed to show it.
+MAINTENANCE_SIGN_IN_MESSAGE = (
+    "The system is temporarily in maintenance mode and is open to "
+    "Administrators only. Your username and password are correct. Please try "
+    "again shortly."
+)
+
+
+def _refuse_maintenance():
+    flash(MAINTENANCE_SIGN_IN_MESSAGE)
+    return redirect(url_for("auth.login", error=MAINTENANCE_SIGN_IN_MESSAGE))
+
 
 @auth_bp.route("/")
 def index():
@@ -290,6 +308,50 @@ def login():
             # application did not keep that promise.
             _log_blocked_sign_in(user, ip_address, password_verified)
             return _refuse()
+
+        # MAINTENANCE MODE, CHECKED AFTER THE PASSWORD AND AFTER DEACTIVATION.
+        #
+        # The order is the same one the deactivation branch above is placed by,
+        # and for the same reason in both directions. It is AFTER the password
+        # comparison so that a wrong password during a maintenance window is
+        # still a wrong password -- telling somebody the system is closed would
+        # otherwise confirm that the credentials they guessed were right. It is
+        # AFTER the deactivation branch so a revoked account is refused as
+        # revoked whatever the switch says; that is a security decision about
+        # one account and must not be masked by a message about the whole
+        # system.
+        #
+        # AN ADMINISTRATOR IS NEVER STOPPED HERE. The condition is "not admin",
+        # so there is no branch for them to fall down -- the same structural
+        # property utils/security.py's guard has, and the reason an
+        # administrator can always sign in and switch the system back on even
+        # if their session expired while it was closed.
+        #
+        # IT DOES NOT REUSE refuse_credentials(). That function says "Invalid
+        # security credentials", which is deliberately vague because at the
+        # login form the truth would be an account-enumeration oracle. Here the
+        # credentials were correct and vagueness would be a lie -- it would send
+        # a health worker to find an administrator to reset a password that
+        # works. This is the one refusal at this form that can safely say what
+        # actually happened, because it reveals nothing about the account: the
+        # answer is the same for every non-Administrator username, existing or
+        # not... which is exactly why it is asked only after the password check,
+        # where an unknown username has already been turned away.
+        #
+        # NOTHING IS LOGGED. _log_refused_sign_in() means "these credentials
+        # were wrong" and writing it here would put a false statement in the
+        # trail; ACTION_LOGIN_BLOCKED means "this account is deactivated" and is
+        # equally untrue. The fact a reviewer needs is already recorded exactly
+        # once -- who closed the system and when -- and every refusal in the
+        # window follows from that single entry.
+        maintenance_blocked = (
+            user is not None
+            and password_verified
+            and maintenance_mode()
+            and normalize_role(user["role"]) != "admin"
+        )
+        if maintenance_blocked:
+            return _refuse_maintenance()
 
         if user is not None and password_verified:
             session.clear()

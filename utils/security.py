@@ -11,16 +11,33 @@ said closing it "would mean a lookup on every guarded request rather than a
 change to this file". This is that change, and the lookup turned out to be one
 the request was already making twice.
 
-A guarded request now asks three questions, in this order:
+A guarded request now asks four questions, in this order:
 
     1. is there a session at all           session["user_id"]
     2. does the account still exist        get_current_user()
     3. is the account still active         user["is_active"]
+    4. is the system open to this role     maintenance_mode()
 
 Failing 2 or 3 clears the session and returns the same refusal the login form
 gives, so the next request arrives as an anonymous one and the holder has to
 sign in again -- where routes/auth.py's existing deactivation branch refuses
 them properly. The revocation therefore takes effect at the holder's next click.
+
+Failing 4 does NOT clear the session, and that difference is the whole of what
+separates the two. A revoked account has had its access taken away and should
+arrive at the next request as a stranger. A health worker during a maintenance
+window has done nothing wrong and is not losing anything -- the system is
+briefly closed and will open again -- so they keep their session, are shown a
+page that says so, and are back where they were on their next click once it is
+lifted. Clearing it would also be self-defeating: they would land on the login
+form, sign in with correct credentials, and be turned away again by the branch
+in routes/auth.py, which reads as the password having stopped working.
+
+QUESTION 4 IS LAST ON PURPOSE. A deactivated account must still be revoked
+during a maintenance window: the revocation is a security action and must not be
+masked by a message saying the system is temporarily closed. Asking 3 before 4
+means an account that has lost its access is told so, in the same words as
+always, whatever the switch says.
 
 WHY THIS COSTS LESS THAN IT DID BEFORE, NOT MORE
 -------------------------------------------------
@@ -72,9 +89,13 @@ deactivated account may do belongs to the guards below, where it can be seen.
 """
 from functools import wraps
 
-from flask import flash, g, has_request_context, redirect, request, session, url_for
+from flask import (
+    flash, g, has_request_context, redirect, render_template, request, session,
+    url_for,
+)
 
 from models.audit import ACTION_SESSION_REVOKED, MODULE_AUTH, log_action
+from models.settings import maintenance_mode
 from models.users import get_user_by_id
 from utils.roles import normalize_role
 
@@ -192,6 +213,37 @@ def _end_revoked_session(user):
     return refuse_credentials()
 
 
+def _maintenance_response(user):
+    """The page a signed-in non-Administrator sees while the system is closed.
+
+    NOTHING IS WRITTEN TO THE AUDIT TRAIL HERE, AND THAT IS DELIBERATE.
+    _log_revoked_session() above writes one entry per revocation and can do so
+    safely because the session is cleared in the same breath -- the holder's next
+    request is anonymous and never reaches that code again. This branch clears
+    nothing, so a blocked health worker clicking around a closed system would
+    write a row per click and bury the trail under an event that is not news.
+
+    The fact a reviewer actually needs is already recorded exactly once: who
+    closed the system and when (ACTION_MAINTENANCE_ENABLED, in models/audit.py).
+    Every refusal in the window follows from that one entry, and a row per click
+    would add no information to it.
+
+    503 rather than 200 or 403. From this person's side the service genuinely is
+    temporarily unavailable, which is what 503 means and what 403 does not -- 403
+    says "not for you", and this is "not now". It also stops any intermediary
+    storing the page as though it were the screen that was asked for, which
+    matters because the request that produced it is one the operator will repeat
+    the moment the window ends. Retry-After is deliberately absent: nothing in
+    this system knows when an administrator will switch it back, and a guessed
+    number would be the sort of invented figure this project keeps deleting.
+    """
+    return render_template(
+        "maintenance.html",
+        blocked_name=(user["full_name"] if user is not None else ""),
+        blocked_role=(user["role"] if user is not None else ""),
+    ), 503
+
+
 def _signed_in_account():
     """The account this request may act as, or the response refusing it.
 
@@ -219,6 +271,37 @@ def _signed_in_account():
     # column, at the other end of the session's life.
     if not bool(user["is_active"]):
         return None, _end_revoked_session(user)
+
+    # MAINTENANCE MODE, ASKED ONCE HERE AND THEREFORE ASKED ON EVERY GUARDED
+    # ROUTE IN THE APPLICATION.
+    #
+    # This is the reason the feature is four lines rather than a project. There
+    # are 89 guarded routes and this function is the only way any of them is
+    # reached, so the switch covers all of them by construction -- not because
+    # somebody remembered to decorate them, and not by a list that a route added
+    # next month could be left off. A new route inherits the restriction by
+    # carrying @login_required or @role_required, which it must carry anyway.
+    #
+    # THE ADMINISTRATOR CANNOT BE LOCKED OUT BY THIS, AND NOT BECAUSE A GUARD
+    # PREVENTS IT.
+    # The condition below is `role is not admin`. For an Administrator it is
+    # false, so there is no branch for them to fall down -- the lockout is not
+    # something they are exempted from, it is something that cannot be expressed
+    # about them. That is a stronger property than the last-administrator check
+    # in models/users.py, which has to count rows inside a transaction to be
+    # sure of its answer; this one needs no count and no transaction.
+    #
+    # And there is always somebody who can turn it off, which is the other half
+    # of "no self-lockout". deactivate_user() and update_user() both refuse to
+    # remove the last Administrator that can sign in, so an active Administrator
+    # account always exists -- the account that could reopen the system cannot be
+    # the one that was switched off or demoted while the system was closed.
+    #
+    # It costs no query. models/settings.py resolves the settings dict once per
+    # request onto flask.g, and utils/context.py has already asked for it to draw
+    # the page header, so by the time a guarded view runs this is a dict lookup.
+    if maintenance_mode() and normalize_role(user["role"]) != "admin":
+        return None, _maintenance_response(user)
 
     return user, None
 
