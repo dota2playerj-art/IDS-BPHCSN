@@ -213,7 +213,23 @@
 
   /* CHECK-IN DIALOG */
   .patient-pick{max-height:280px; overflow-y:auto; border:1px solid var(--border-color); border-radius:12px;}
-  .patient-option{display:block; border-bottom:1px solid var(--border-color);}
+  /* position:relative is load-bearing, not decoration. The radio below is
+     position:absolute so the visible row is drawn entirely by .po-body, and an
+     absolutely positioned box is placed against its nearest POSITIONED
+     ancestor. Without this line .patient-option is not one, and neither is
+     .patient-pick, so the whole stack of radios escaped the scrolling list and
+     was laid out against Bootstrap's .modal-body -- which IS positioned.
+     Nothing looked wrong, because the radios are opacity:0. What they did was
+     contribute their full unclipped length to .modal-body's scroll height: 22
+     rows of them, ~670px past the end of the form. The dialog gained a large
+     empty scroll region below the last field, and anything that scrolled it --
+     a wheel, or the browser bringing an invalid field into view on a rejected
+     submit -- left the operator looking at the Note box, or at nothing at all,
+     with every field above it out of sight. This makes each row its own
+     containing block, so the radio stays inside the row it belongs to and the
+     list clips it like any other content. Same rule serves the check-in
+     dialog, which is built from the same markup. */
+  .patient-option{position:relative; display:block; border-bottom:1px solid var(--border-color);}
   .patient-option:last-child{border-bottom:none;}
   .patient-option input{position:absolute; opacity:0; pointer-events:none;}
   .patient-option .po-body{display:flex; align-items:center; gap:10px; padding:10px 14px; cursor:pointer;}

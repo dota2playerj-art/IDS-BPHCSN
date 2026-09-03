@@ -25,6 +25,18 @@ So the evidence lives on the machine that produced it. What is committed is this
 file, naming what was captured and how to produce it again, so the absence is
 stated rather than left for someone to trip over.
 
+## booking-dialog-gap/
+
+Verification that the Schedule Appointment dialog no longer carries an empty
+scrollable region below its last field. The fields were never missing: the hidden
+`position:absolute` radios in the patient list had no positioned ancestor of their
+own, so they were laid out against Bootstrap's positioned `.modal-body` instead of
+inside the list that clips them, and added their whole unclipped length to that
+element's scroll height -- 1542px of scroll for 871px of form. `position:relative`
+on `.patient-option` fixes both this dialog and Check In Patient. Confirmed in the
+browser, including a real appointment booked end to end and the form-redisplay
+path re-checked, with the route x role matrix identical across 210 pairs.
+
 ## view-icon-removal/
 
 Verification that User Management's View icon and its Actions column are gone —
