@@ -6,7 +6,13 @@ the same data. The queries live here so the two role variants cannot drift
 apart; the routes stay thin and each keeps its own role_required guard and its
 own redirect target.
 """
-from models.appointments import get_appointments_for_patient, get_next_appointment_for_patient
+from models.appointments import (
+    IN_CONSULTATION,
+    WAITING,
+    find_active_queue_entry,
+    get_appointments_for_patient,
+    get_next_appointment_for_patient,
+)
 from models.consultations import get_consultations_for_patient
 from models.dispensing import get_dispensing_for_patient
 from models.general_vaccinations import get_general_vaccinations_for_patient
@@ -411,6 +417,90 @@ def process_archive_patients(form_data):
     return f"{changed} patient {noun} marked {status}. Nothing was deleted."
 
 
+def immunization_next_step(patient, immunization):
+    """What to actually do about this patient's Due/Overdue doses, or None.
+
+    A dose that is merely Due or Overdue is not a record -- it is the schedule
+    saying the dose has not happened yet -- so the Immunization Record tab
+    deliberately offers no way to mark it given. That is the correct clinical
+    rule: a vaccination is recorded during the visit it was given in, on the
+    consultation form, against a real queue entry. What the tab used to do,
+    though, was leave those rows blank, which reads as a dead end rather than as
+    a rule. This says what the next step is instead.
+
+    The step depends on where the child actually is right now, which is read from
+    today's queue:
+
+        "in_consultation"   they are with a clinician now, and that visit's
+                            write-up is the screen the dose belongs on -- so the
+                            row links straight to Record Consultation for that
+                            appointment id.
+        "waiting"           they are here and in today's queue, but the visit has
+                            not been started. Record Consultation refuses a
+                            Waiting row by design (see
+                            record_consultation_context), so linking there would
+                            hand over an error message. The row links to the
+                            queue, where the consultation is started, which is
+                            the real next action.
+        "none"             they are not at the health center, and no link could
+                            be honest about a visit that is not happening. The
+                            row says to record it at the next consultation.
+
+    Returns None when nothing is outstanding, so the template renders nothing
+    rather than an empty panel.
+    """
+    if not immunization["attention_count"]:
+        return None
+
+    name = patient["first_name"]
+    entry = find_active_queue_entry(patient["id"])
+    status = entry["status"] if entry else None
+
+    if status == IN_CONSULTATION:
+        return {
+            "state": "in_consultation",
+            "appointment_id": entry["id"],
+            "label": "Record now",
+            "detail": (
+                f"{name} is In Consultation now. Open Record Consultation for "
+                "this visit and record the dose there."
+            ),
+            "banner": (
+                f"{name} is In Consultation now. Record any dose given on that "
+                "visit's consultation form."
+            ),
+        }
+
+    if status == WAITING:
+        return {
+            "state": "waiting",
+            "appointment_id": entry["id"],
+            "label": "In today's queue",
+            "detail": (
+                f"{name} is Waiting in today's queue. Start the consultation from "
+                "the queue, then record the dose on the consultation form."
+            ),
+            "banner": (
+                f"{name} is Waiting in today's queue. Start that consultation, "
+                "then record any dose given on its form."
+            ),
+        }
+
+    return {
+        "state": "none",
+        "appointment_id": None,
+        "label": "At next visit",
+        "detail": (
+            f"{name} is not at the health center today. Record this during their "
+            "next consultation."
+        ),
+        "banner": (
+            f"{name} is not in today's queue. These doses are recorded during a "
+            "consultation, so they are given and recorded at the next visit."
+        ),
+    }
+
+
 def patient_profile_context(patient_id):
     """Everything Screen 04 renders, or None if no such patient exists.
 
@@ -442,6 +532,11 @@ def patient_profile_context(patient_id):
 
     return {
         "patient": patient,
+        # What a Due/Overdue row should tell staff to do next. None when nothing
+        # is outstanding. Deliberately not a way to record a dose from here --
+        # see immunization_next_step() for why the schedule half of this tab
+        # carries guidance rather than an action.
+        "immunization_next_step": immunization_next_step(patient, immunization),
         "consultations": get_consultations_for_patient(patient_id),
         "appointments": get_appointments_for_patient(patient_id),
         "next_appointment": get_next_appointment_for_patient(patient_id),

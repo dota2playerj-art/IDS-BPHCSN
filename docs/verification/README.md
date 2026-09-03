@@ -25,6 +25,17 @@ So the evidence lives on the machine that produced it. What is committed is this
 file, naming what was captured and how to produce it again, so the absence is
 stated rather than left for someone to trip over.
 
+## immunization-next-step/
+
+Verification that every Due and Overdue row on the Immunization Record tab now
+says what to do next -- a link to the visit being written up, a link to the queue
+that visit has to be started from, or the plain fact that the dose is given at the
+child's next consultation -- and that **no way to record a vaccination from that
+screen was added**, which is the point of the change rather than an omission from
+it. 66 checks over both roles and all three states, plus a live browser pass in
+which the consultation was actually started from the queue and the row's link
+followed to the right write-up.
+
 ## form-redisplay/
 
 Verification that a form which fails validation redisplays **itself**, with the

@@ -848,7 +848,28 @@
             <div>
               <strong style="display:block; margin-bottom:2px;">{{ immunization.attention_count }} dose{{ '' if immunization.attention_count == 1 else 's' }} outstanding</strong>
               {% for item in immunization.attention_items %}{{ item.label }} ({{ item.status | lower }}{% if item.due_date %}, due {{ item.due_date | display_date }}{% endif %}){{ "; " if not loop.last else "" }}{% endfor %}.
+{#- The line under the list used to read "Record these during the child's next
+    consultation" on every render, which is wrong on the one render where it
+    matters most: if the child is with a clinician right now, the next
+    consultation is this one. It now says where the child actually is, and links
+    to the screen the dose gets recorded on -- the visit's write-up when there is
+    one, the queue the visit has to be started from when there is not. #}
+{%- if immunization_next_step %}
+              {{ immunization_next_step.banner }}
+{%- if immunization_next_step.state == 'in_consultation' %}
+              <a href="{{ url_for(record_consultation_endpoint, appointment_id=immunization_next_step.appointment_id) }}"
+                 style="display:inline-flex; align-items:center; gap:4px; margin-top:6px; font-size:13px; font-weight:600; color:inherit;"
+                 title="{{ immunization_next_step.detail }}">Open Record Consultation
+                <span class="material-symbols-outlined" style="font-size:16px;">arrow_forward</span></a>
+{%- elif immunization_next_step.state == 'waiting' %}
+              <a href="{{ url_for(appointment_scheduling_endpoint) }}"
+                 style="display:inline-flex; align-items:center; gap:4px; margin-top:6px; font-size:13px; font-weight:600; color:inherit;"
+                 title="{{ immunization_next_step.detail }}">Open today's queue
+                <span class="material-symbols-outlined" style="font-size:16px;">arrow_forward</span></a>
+{%- endif %}
+{%- else %}
               Record these during the child's next consultation.
+{%- endif %}
             </div>
           </div>
 {%- elif immunization.applicable %}
@@ -908,6 +929,28 @@
                             data-vaccine="{{ item.code }}:{{ item.dose_number }}"
                             data-date="{{ item.date_administered }}"
                             data-recorded-by="{{ item.administered_by_name or '' }}"><span class="material-symbols-outlined" style="font-size:18px;">edit</span></button>
+{%- elif item.needs_attention and immunization_next_step %}
+{#- A Due or Overdue row still has no action -- there is nothing recorded to
+    correct, and a dose cannot be created from a static profile screen with no
+    visit behind it. What it now has is the next step, which depends on whether
+    the child is actually at the health center: a link to the visit being written
+    up, a link to the queue the visit has to be started from, or the plain fact
+    that it happens at their next consultation. Never a bare dash, which read as
+    a dead end rather than as the rule it is. #}
+{%- if immunization_next_step.state == 'in_consultation' %}
+                    <a href="{{ url_for(record_consultation_endpoint, appointment_id=immunization_next_step.appointment_id) }}"
+                       style="font-size:12px; font-weight:600; color:var(--teal-dark); text-decoration:none; white-space:nowrap;"
+                       title="{{ immunization_next_step.detail }}">{{ immunization_next_step.label }}
+                      <span class="material-symbols-outlined" style="font-size:14px; vertical-align:-2px;">arrow_forward</span></a>
+{%- elif immunization_next_step.state == 'waiting' %}
+                    <a href="{{ url_for(appointment_scheduling_endpoint) }}"
+                       style="font-size:12px; font-weight:600; color:#B45309; text-decoration:none; white-space:nowrap;"
+                       title="{{ immunization_next_step.detail }}">{{ immunization_next_step.label }}
+                      <span class="material-symbols-outlined" style="font-size:14px; vertical-align:-2px;">arrow_forward</span></a>
+{%- else %}
+                    <span style="color:var(--text-muted); font-size:12px; white-space:nowrap;"
+                          title="{{ immunization_next_step.detail }}">{{ immunization_next_step.label }}</span>
+{%- endif %}
 {%- else %}
                     <span style="color:var(--text-muted); font-size:12px;">&mdash;</span>
 {%- endif %}
