@@ -495,19 +495,70 @@ UNAVAILABLE = {
     # alone on four buttons, three examples are enough to show what kind of thing
     # qualifies, and the full inventory is the paragraph above -- which is where
     # someone maintaining it will look, rather than in a title attribute.
+    # REWRITTEN A FOURTH TIME, AND THIS TIME THE OPENING CLAUSE WENT FALSE RATHER
+    # THAN A DETAIL INSIDE IT. It began "Every field is read-only, because no
+    # part of the system stores what is typed here", which was the premise the
+    # whole reason rested on and the premise every earlier rewrite preserved.
+    # General Settings now stores six values in the settings table and the rest
+    # of the application reads them, so that sentence is no longer true of the
+    # screen -- and this string is the tooltip on the controls that ARE still
+    # dead, printed beside a pane that saves.
+    #
+    # THE FIX IS THAT IT STOPPED DESCRIBING THE SCREEN AND STARTED DESCRIBING THE
+    # CONTROL IT IS ON. That is what a shared reason is for. Every earlier
+    # version tried to characterise Screen 13 as a whole -- "nothing is stored",
+    # "most of the values are placeholder text", then a list of the few that were
+    # not -- and each of those characterisations went stale the moment one pane
+    # changed, which has now happened three times. A sentence about the specific
+    # dead control cannot go stale when a different pane comes alive.
+    #
+    # The old inventory paragraph above is kept because it is still the record of
+    # what each field on that screen was, and because half of what it listed as
+    # "True" is exactly what has now been made storable. What it called False is
+    # what these controls still are.
     "settings": (
-        "Every field is read-only, because no part of the system stores what is "
-        "typed here. Most of the values shown are placeholder text and configure "
-        "nothing. A few do match how the system actually runs -- the health "
-        "center's name, the clinic's opening and closing times, the SMS gateway "
-        "provider -- but those are set in its own configuration, not on this "
-        "screen."
+        "This control is not connected to anything. The feature behind it is "
+        "not built, and what is shown in it is placeholder text rather than a "
+        "value the system is using. The panes that ARE live say so on "
+        "themselves: General Settings saves, and Password Policy, the sign-in "
+        "figures and the database rows are read from the running system."
     ),
+    # REWRITTEN, BECAUSE THE THING IT SAID WAS NOT BUILT HAS BEEN BUILT.
+    # It read "Backup and restore are not built ... Doing it from this screen
+    # needs a job that can copy the file safely while the system is running."
+    # models/backup.py is that job -- SQLite's own online backup interface,
+    # verified with PRAGMA integrity_check before the file is served -- and
+    # Download Backup on Screen 13 is a live link that uses it. A reason denying
+    # a working feature is the same defect the deleted "medicine_archive" entry
+    # had, and it was about to be worse here: it would have been the stated
+    # grounds for disabling a button that works.
+    #
+    # What is left is the half that is still true, and it is now specifically
+    # about scheduling rather than about backup in general. Restore has its own
+    # entry below, because it is not unbuilt for the same reason.
     "backup": (
-        "Backup and restore are not built. The database is one file, and the "
-        "practice today is to copy it, with the date in the name, outside the "
-        "application. Doing it from this screen needs a job that can copy the "
-        "file safely while the system is running."
+        "Backups are taken by hand, not on a timer. Nothing in this system runs "
+        "a scheduled job, so there is no frequency to set and no retention "
+        "period to apply. Download Backup above takes a copy immediately, and "
+        "that is the whole of how a backup happens here."
+    ),
+    # A NEW REASON, AND IT EXISTS BECAUSE RESTORE IS NOT MERELY THE OTHER HALF OF
+    # A BACKUP. Reading the database out is a copy and nothing is at risk;
+    # writing one back in replaces every patient record in the system with
+    # whatever was in the uploaded file. Doing that from a web form means
+    # accepting an arbitrary upload as the new database, with no way to undo it,
+    # while the application is holding open connections to the file being
+    # replaced. That is a different and far more dangerous piece of work than the
+    # download, and saying so is more useful than "not built" -- a reader who is
+    # told only that it is missing will reasonably ask why it was not done in the
+    # same pass as the button beside it.
+    "restore": (
+        "Restore is not built, and it is deliberately the harder half. A backup "
+        "is a copy and risks nothing; restoring replaces every record in the "
+        "system with whatever is in the file, with no way to undo it. Doing it "
+        "safely means stopping the application first, which is not something a "
+        "screen inside that application can do. Today it is done by replacing "
+        "the database file while the system is shut down."
     ),
     # REWRITTEN: THIS ONE HAD GONE FALSE, NOT MERELY IMPRECISE.
     # It said utils/sms.py records a broadcast "without contacting a provider",

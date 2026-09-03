@@ -67,8 +67,10 @@ reason is deleted the moment the gap it describes is closed.
 from models.audit import (
     ACTION_LOGIN_BLOCKED,
     ACTION_LOGIN_FAILED,
+    ACTION_BACKUP_DOWNLOADED,
     ACTION_LOGIN_SUCCESS,
     ACTION_SESSION_REVOKED,
+    ACTION_SETTINGS_UPDATED,
     ACTION_PASSWORD_RESET,
     ACTION_USER_CREATED,
     ACTION_USER_DEACTIVATED,
@@ -77,6 +79,7 @@ from models.audit import (
     ACTION_USER_REACTIVATED,
     MODULE_AUTH,
     MODULE_IMMUNIZATIONS,
+    MODULE_SETTINGS,
     MODULE_SMS,
     MODULE_USERS,
     count_audit_logs,
@@ -274,6 +277,21 @@ _ICONS = {
     ACTION_USER_EDITED: "edit",
     ACTION_USER_ROLE_CHANGED: "shield",
     ACTION_PASSWORD_RESET: "lock_reset",
+    # The two Settings entries, given separate glyphs rather than sharing the
+    # module's, because they are opposite kinds of event under one pill: one
+    # changed how the system is configured, the other took a complete copy of
+    # everything in it away. A reviewer scanning for the second must not have to
+    # read the text of the first to tell them apart -- the same reasoning that
+    # keeps deactivation and reactivation on separate phrases above.
+    #
+    # `tune` is the glyph Settings' own General pane carries in its left-hand
+    # nav and `backup` the one on the download button, so each entry and the
+    # control that wrote it read as one place. Both are already drawn in this
+    # project's templates, which is the available check that the fixed font
+    # subset in static/fonts carries them; one it does not hold renders as its
+    # own literal name.
+    ACTION_SETTINGS_UPDATED: "tune",
+    ACTION_BACKUP_DOWNLOADED: "backup",
 }
 _MODULE_ICONS = {
     MODULE_SMS: "campaign",
@@ -293,6 +311,11 @@ _MODULE_ICONS = {
     # fixed subset and a ligature it does not carry renders as its own literal
     # name, and `vaccines` is already drawn on the profile's tab strip.
     MODULE_IMMUNIZATIONS: "vaccines",
+    # Reached only by a future Settings action that is not one of the two above.
+    # `settings` rather than either of their glyphs, so a third kind of entry
+    # arrives looking like configuration rather than like a save or a download it
+    # is not.
+    MODULE_SETTINGS: "settings",
 }
 
 

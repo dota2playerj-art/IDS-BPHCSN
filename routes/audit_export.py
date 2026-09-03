@@ -57,6 +57,7 @@ that left that out would let a reader take the entries it holds for the whole of
 what the system does. Those reasons are looked up from audit_views.UNTRACKED, so
 the file and the screen state them in one wording.
 """
+from models.settings import health_center_name
 from routes.audit_views import PAGE_SIZE
 from routes.report_export import _download  # noqa: F401  (re-exported below)
 from utils.dates import now
@@ -130,7 +131,7 @@ def audit_document(context, produced_by=""):
 
     payload = render(
         sheets,
-        org="Barangay Poblacion Health Center",
+        org=health_center_name(),
         org_sub="Integrated Data System (IDS-BPHCSN)",
         doc_title="Audit Logs — System Activity Trail",
         range_label=_scope_label(context),
@@ -182,7 +183,7 @@ def _cover_sheet(context, produced_by):
         ("Entries in this file", total),
         ("Exported", stamped.strftime("%B %d, %Y at %I:%M %p")),
         ("Exported by", produced_by or "—"),
-        ("Source", "Barangay Poblacion Health Center records, via IDS-BPHCSN"),
+        ("Source", f"{health_center_name()} records, via IDS-BPHCSN"),
     ]
 
     scope = [
@@ -214,7 +215,7 @@ def _cover_sheet(context, produced_by):
                 ],
             ),
         ],
-        heading="Barangay Poblacion Health Center",
+        heading=health_center_name(),
         intro=(
             "The recorded history of who changed what in this system, taken off "
             f"on {stamped.strftime('%B %d, %Y')}. Entries are listed newest first, "

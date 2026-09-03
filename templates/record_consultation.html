@@ -178,7 +178,7 @@
     </div>{% endblock %}
 
 {% block content %}
-    <div class="eyebrow">Barangay Poblacion Health Center</div>
+    <div class="eyebrow">{{ health_center.name }}</div>
     <div class="page-title">{% if consultation %}Edit Consultation{% else %}Record Consultation{% endif %}</div>
     {%- if consultation %}
     <div class="page-desc">Correct what was written about this visit. The patient and the visit date cannot be changed — every other change is saved to the audit log with your name against it.</div>

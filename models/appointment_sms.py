@@ -68,6 +68,7 @@ from models.appointments import (
     get_appointment_by_id,
 )
 from models.patients import get_patient_by_id
+from models.settings import health_center_name
 from utils.dates import display_date, display_timestamp, today
 from utils.phone import is_valid_ph_mobile, to_local_ph_mobile
 from utils.sms import (
@@ -78,11 +79,21 @@ from utils.sms import (
     message_metrics,
 )
 
-# The facility as it names itself to a patient. 06_DESIGN_CONTENT_LIBRARY.md is
-# the authority on this string and defers to nothing; it is written out here
-# rather than assembled from barangay + "Health Center" so a message cannot end
-# up naming a place that does not exist.
-HEALTH_CENTER = "Barangay Poblacion Health Center"
+# THE FACILITY AS IT NAMES ITSELF TO A PATIENT, AND IT IS NO LONGER A CONSTANT.
+# This was HEALTH_CENTER = "Barangay Poblacion Health Center", written out here
+# on the reasoning that 06_DESIGN_CONTENT_LIBRARY.md was the authority on the
+# string. It is now read from the settings table through models/settings.py,
+# where an administrator sets it on Screen 13 -- one value, and the same one
+# every export letterhead prints, rather than the five separate copies of the
+# same words this project used to hold in five files.
+#
+# It is still not assembled from barangay + "Health Center". The stored name is
+# a name, typed as a whole, so a message cannot end up announcing a facility
+# that does not exist because two fields were concatenated.
+#
+# READ AT COMPOSE TIME, NOT AT IMPORT. A module constant would be fixed for the
+# life of the process, so a name corrected at 10am would keep going out wrong on
+# every message until a restart. compose_message() asks for it per message.
 
 # The three things worth telling one patient about one appointment.
 #
@@ -160,10 +171,13 @@ def compose_message(event, patient, appointment):
     here truncates a message to hit a number, because a confirmation missing its
     date would be worse than a confirmation costing two credits.
 
-    Every value in the text is read off the stored appointment and the stored
-    patient. Nothing is passed in by the screen, so a message cannot state a date
-    the record does not hold.
+    Every value in the text is read off the stored appointment, the stored
+    patient and the stored settings. Nothing is passed in by the screen, so a
+    message cannot state a date the record does not hold, and the facility it
+    names is the one Screen 13 currently holds rather than one typed into this
+    file.
     """
+    center = health_center_name()
     first_name = (patient.get("first_name") or "").strip()
     greeting = f"Hi {first_name}, " if first_name else ""
     when = _appointment_when(appointment)
@@ -171,17 +185,17 @@ def compose_message(event, patient, appointment):
 
     if event == BOOKED:
         return (
-            f"{HEALTH_CENTER}: {greeting}your {service} is booked for {when}. "
+            f"{center}: {greeting}your {service} is booked for {when}. "
             "Please arrive on time. Thank you."
         )
     if event == RESCHEDULED:
         return (
-            f"{HEALTH_CENTER}: {greeting}your {service} has moved to {when}. "
+            f"{center}: {greeting}your {service} has moved to {when}. "
             "Please note the new schedule. Thank you."
         )
     if event == CANCELLED_EVENT:
         return (
-            f"{HEALTH_CENTER}: {greeting}your {service} on {when} is cancelled. "
+            f"{center}: {greeting}your {service} on {when} is cancelled. "
             "Visit the health center to book again. Thank you."
         )
     return ""

@@ -68,6 +68,20 @@ MODULE_AUTH = "Authentication"
 # else; one investigating a suspected intrusion selects Authentication and is
 # not shown the account housekeeping that produced the accounts.
 MODULE_USERS = "User Management"
+# Changes to the system's own configuration, and copies of the database taken
+# off it. Its own module rather than a corner of MODULE_USERS, on the same
+# distinction that separates User Management from Authentication: that one
+# answers "who changed what an account IS", this one answers "who changed how the
+# system itself is set up, and who took a copy of everything in it".
+#
+# Both kinds of entry here reach further than any single record. A settings save
+# changes the facility name at the front of every appointment SMS and on every
+# export letterhead, and the clinic hours every booking is validated against -- so
+# a message a patient disputes months later has to be explainable from this
+# trail. A backup download puts every patient record in the system into one file
+# on somebody's laptop, which is the single most consequential read this
+# application offers and the one a reviewer most needs to be able to enumerate.
+MODULE_SETTINGS = "Settings"
 
 # Activity phrases, in the same voice as the ones on that screen ("Updated
 # patient record", "Updated stock quantity").
@@ -211,6 +225,30 @@ ACTION_USER_ROLE_CHANGED = "Changed user account role"
 # every fact about it a reviewer can act on.
 ACTION_PASSWORD_RESET = "Reset user account password"
 
+# The two Settings actions.
+#
+# ACTION_SETTINGS_UPDATED covers the six General Settings values -- the health
+# center's name, its barangay, municipality and province, and the clinic's
+# opening and closing times. `details` names every value that actually moved,
+# with what it was and what it became, because these are the only stored values
+# in the system that nothing else records the history of: a patient record shows
+# its own updated_at, an appointment shows its status, but a facility name that
+# was corrected leaves no trace on any row it went out on. The SMS a patient
+# received last month says what the name was; only this entry says when it
+# changed and who decided it.
+ACTION_SETTINGS_UPDATED = "Updated general settings"
+
+# ACTION_BACKUP_DOWNLOADED is a read, and it is the only read in this entire
+# trail. Nothing else here records somebody merely looking -- opening a patient
+# record writes no row, and neither does exporting one screen's worth of
+# figures. This one does, because what leaves is not a screen's worth of
+# anything: it is the whole database, every patient, every consultation, every
+# account hash, in one file that then exists outside this system entirely and
+# cannot be recalled. "Who has a complete copy of the register, and since when"
+# is a question a health center has to be able to answer, and this entry is the
+# only place the answer could come from.
+ACTION_BACKUP_DOWNLOADED = "Downloaded a database backup"
+
 # Every action that means somebody was turned away at the login form. Grouped so
 # the Security Events figure counts refusals rather than one particular kind of
 # refusal -- adding a fourth outcome later must not silently shrink that number.
@@ -237,7 +275,16 @@ REFUSAL_ACTIONS = (ACTION_LOGIN_FAILED, ACTION_LOGIN_BLOCKED)
 # went out; a sign-in is an access event. Neither edits a clinical or stock row,
 # and counting them as record updates would inflate the one figure on that screen
 # that is supposed to answer "how much of the data has been altered".
-NON_RECORD_MODULES = (MODULE_SMS, MODULE_AUTH, MODULE_USERS)
+#
+# MODULE_SETTINGS joins them for the same reason and needs saying out loud,
+# because one of its two entries is a read rather than a write: a settings save
+# changes configuration and not a clinical or stock row, and a backup download
+# changes nothing at all. Counting either as a "record update" would inflate the
+# one figure on Audit Logs that is supposed to answer "how much of the data has
+# been altered" -- and counting a download as an alteration would be the worst
+# kind of wrong, because it would report data as having changed when what
+# happened was that a copy of it left unchanged.
+NON_RECORD_MODULES = (MODULE_SMS, MODULE_AUTH, MODULE_USERS, MODULE_SETTINGS)
 
 
 def log_action(user_id, action, module=None, details=None, ip_address=None):
@@ -298,6 +345,36 @@ def get_audit_logs(module=None, limit=100):
     ).fetchall()
     conn.close()
     return [dict(row) for row in rows]
+
+
+def get_latest_entry(module, action):
+    """The newest entry with this module and action, or None. Names its author.
+
+    Its own query rather than get_audit_logs(module=...) with the caller picking
+    through the result: that function filters on module only, so answering "when
+    was the last backup downloaded" through it would mean fetching every Settings
+    entry -- saves included -- and scanning them in Python for the right action.
+    The answer is one row and the database can find it directly.
+
+    Used by Settings' Backup pane for the only record that a backup was ever
+    taken. models/backup.py writes no file and keeps no history of its own, by
+    design, so the trail is not one source among several here -- it is the source.
+    """
+    conn = get_db()
+    row = conn.execute(
+        """
+        SELECT a.id, a.action, a.module, a.details, a.ip_address, a.created_at,
+               u.full_name AS user_name, u.role AS user_role
+          FROM audit_logs a
+          JOIN users u ON u.id = a.user_id
+         WHERE a.module = ? AND a.action = ?
+      ORDER BY a.created_at DESC, a.id DESC
+         LIMIT 1
+        """,
+        (module, action),
+    ).fetchone()
+    conn.close()
+    return dict(row) if row is not None else None
 
 
 def count_audit_logs(module=None):

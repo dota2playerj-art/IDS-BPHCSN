@@ -261,7 +261,7 @@
         <span class="material-symbols-outlined" style="font-size:26px;">health_metrics</span>
       </div>
       <div>
-        <div class="brand-eyebrow">Barangay Poblacion Health Center</div>
+        <div class="brand-eyebrow">{{ health_center.name }}</div>
         <div class="brand-name">IDS-BPHCSN</div>
       </div>
     </div>
@@ -307,7 +307,12 @@
     <div class="brand-footer">
       <hr class="brand-divider">
       <div class="brand-footer-title">Integrated Digital System for Barangay Poblacion Health Center Services and Community Notifications</div>
-      <div class="brand-footer-location"><span class="dash"></span>Barangay Poblacion Health Center, San Francisco, Surigao del Norte, Philippines</div>
+      {#- The facility and where it stands, both read from the stored settings
+          (models/settings.py) rather than typed here. The line above it is NOT:
+          that is the system's own name, which the acronym IDS-BPHCSN beside the
+          logo is made of, and renaming the health center does not rename the
+          software. #}
+      <div class="brand-footer-location"><span class="dash"></span>{{ health_center.name }}, {{ health_center.municipality }}, {{ health_center.province }}, Philippines</div>
       <div class="brand-tags">
         <span class="brand-tag">Patient Records</span>
         <span class="brand-tag">Inventory</span>
@@ -424,7 +429,7 @@
         </div>
 
         <div class="login-card-footer">
-          Version 1.0 &middot; &copy; 2026 Barangay Poblacion Health Center<br>
+          Version 1.0 &middot; &copy; 2026 {{ health_center.name }}<br>
           Powered by <b>IDS-BPHCSN</b>
         </div>
       </div>

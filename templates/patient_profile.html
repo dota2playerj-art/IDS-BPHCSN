@@ -318,7 +318,7 @@
     yesterday's date. #}
     <div class="print-only print-head">
       <div>
-        <div class="print-org-name">Barangay Poblacion Health Center</div>
+        <div class="print-org-name">{{ health_center.name }}</div>
         <div class="print-org-sub">Integrated Data System &mdash; IDS-BPHCSN</div>
       </div>
       <div class="print-doc">
@@ -1339,7 +1339,7 @@
 {%- endif %}
 
     <div class="print-only print-foot">
-      Printed from IDS-BPHCSN, Barangay Poblacion Health Center. This is a copy of
+      Printed from IDS-BPHCSN, {{ health_center.name }}. This is a copy of
       {{ patient.full_name }}'s record ({{ patient.patient_id }}) as held at the time of printing;
       the system remains the record of authority.
     </div>

@@ -66,6 +66,7 @@ from io import BytesIO
 
 from flask import send_file
 
+from models.settings import health_center_name
 from utils.dates import display_date, long_date, now, today
 from utils.document import PDF_MIMETYPE, render
 from utils.security import get_current_user
@@ -247,7 +248,7 @@ def _document(context, screen, produced_by):
         footer_left += f" by {produced_by}"
     payload = render(
         sheets,
-        org="Barangay Poblacion Health Center",
+        org=health_center_name(),
         org_sub="Integrated Data System (IDS-BPHCSN)",
         doc_title=f"{screen} — {selection['type_label']}",
         range_label=f"{long_date(window['start'])} to {long_date(window['end'])}",
@@ -328,7 +329,7 @@ def _cover_sheet(context, screen, sections, produced_by):
         ),
         ("Exported", stamped.strftime("%B %d, %Y at %I:%M %p")),
         ("Exported by", produced_by or "—"),
-        ("Source", "Barangay Poblacion Health Center records, via IDS-BPHCSN"),
+        ("Source", f"{health_center_name()} records, via IDS-BPHCSN"),
     ]
 
     index = [
@@ -359,8 +360,15 @@ def _cover_sheet(context, screen, sections, produced_by):
     return sheet(
         "Report",
         blocks,
-        heading="Barangay Poblacion Health Center",
+        heading=health_center_name(),
         intro=(
+            # NOT SWITCHED TO THE STORED NAME, AND THAT IS THE DELIBERATE HALF OF
+            # THIS CHANGE. Every letterhead line above now reads the health
+            # center's stored name, but this one is the SYSTEM's own title -- the
+            # words IDS-BPHCSN is an acronym of. Renaming the facility does not
+            # rename the software, and rewriting this from a setting would
+            # produce an expansion whose initials no longer spell the acronym
+            # printed beside it.
             "Integrated Data System for Barangay Poblacion Health Center "
             "Networking (IDS-BPHCSN).\n"
             + context["snapshot_note"]

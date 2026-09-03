@@ -127,7 +127,7 @@
     from the one on the page. #}
     <div class="print-only print-head">
       <div>
-        <div class="print-org-name">Barangay Poblacion Health Center</div>
+        <div class="print-org-name">{{ health_center.name }}</div>
         <div class="print-org-sub">Integrated Data System &mdash; IDS-BPHCSN</div>
       </div>
       <div class="print-doc">
@@ -138,9 +138,9 @@
     </div>
 
     <div class="no-print">
-      <div class="eyebrow">Barangay Poblacion Health Center</div>
+      <div class="eyebrow">{{ health_center.name }}</div>
       <div class="page-title">Community Reports</div>
-      <div class="page-desc">{{ clinic_today | full_date }} &middot; Community-wide health statistics and reports for Barangay Poblacion.</div>
+      <div class="page-desc">{{ clinic_today | full_date }} &middot; Community-wide health statistics and reports for {{ health_center.barangay }}.</div>
     </div>
     {#- WAS "All Systems Operational" (green dot) and "Secure Connection" (wifi
         icon) here. Both were fixed text, on this screen and six others. Nothing in
@@ -602,7 +602,7 @@
     of barangay figures is a page of numbers with no provenance. #}
     <div class="print-only print-foot">
       {{ selection.type_label }} &middot; {{ window.start | long_date }} to {{ window.end | long_date }}
-      &middot; generated from Barangay Poblacion Health Center records by IDS-BPHCSN.
+      &middot; generated from {{ health_center.name }} records by IDS-BPHCSN.
       Figures are counted from stored consultations, registrations, appointments, immunisation
       doses and SMS broadcasts. Immunisation coverage is the position as of {{ window.end | long_date }}.
     </div>

@@ -91,7 +91,7 @@
     </div>{% endblock %}
 
 {% block content %}
-    <div class="eyebrow">Barangay Poblacion Health Center</div>
+    <div class="eyebrow">{{ health_center.name }}</div>
     <div class="page-title">{% if patient %}Edit Patient{% else %}Register Patient{% endif %}</div>
     {%- if patient %}
     <div class="page-desc">Update {{ patient.full_name }}'s details below. Fields marked with <span style="color:var(--danger);">*</span> are required.</div>
@@ -287,9 +287,14 @@
             {%- if errors.address %}<div class="invalid-feedback d-block">{{ errors.address }}</div>{% endif %}
           </div>
           <div class="col-md-6">
-            <!-- Fixed for this health center, so it is shown but never submitted. -->
+            <!-- Fixed for this health center, so it is shown but never submitted:
+                 there is no barangay column on patients, and every patient this
+                 register holds lives in the one barangay the center serves. The
+                 value is the stored setting (models/settings.py) rather than a
+                 literal, so renaming the barangay on Settings renames it here
+                 too instead of leaving this box naming the old one. -->
             <label class="field-label">Barangay<span class="req">*</span></label>
-            <input type="text" class="form-control" value="Barangay Poblacion" disabled>
+            <input type="text" class="form-control" value="{{ health_center.barangay }}" disabled>
           </div>
         </div>
 

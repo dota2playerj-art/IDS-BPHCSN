@@ -2,6 +2,17 @@
 from flask import session
 
 from models.inventory import get_low_stock_alert
+from models.settings import (
+    KEY_BARANGAY,
+    KEY_CLOSING,
+    KEY_MUNICIPALITY,
+    KEY_NAME,
+    KEY_OPENING,
+    KEY_PROVINCE,
+    address_line,
+    display_time,
+    get_settings,
+)
 from routes.appointment_views import take_appointment_sms_offer
 from utils.dates import now, today
 from utils.roles import normalize_role
@@ -242,6 +253,36 @@ def inject_role_context():
     # so the message previewed on screen is composed from the record as it stands
     # at render time rather than from what the form said.
     context["appointment_sms_offer"] = take_appointment_sms_offer()
+
+    # THE HEALTH CENTER'S OWN IDENTITY, ON EVERY RENDER.
+    #
+    # Here rather than in each route for the reason low_stock_count and
+    # clinic_today are here: the facility's name is drawn by base.html and by the
+    # eyebrow line on every screen that extends it, so a per-route context could
+    # not reach all of them, and thirteen templates would each need it passed in.
+    #
+    # Before this it was not passed in at all -- it was the literal string
+    # "Barangay Poblacion Health Center", typed into fourteen templates and five
+    # Python modules. Correcting the facility's name meant finding all nineteen.
+    # It is now one stored value (models/settings.py), read once per request and
+    # handed to every template, and it is the SAME value models/appointment_sms.py
+    # puts at the front of a text message and the three export modules print on a
+    # letterhead -- so a printed record, a downloaded workbook, a screen header
+    # and a patient's phone cannot name the facility differently.
+    #
+    # `hours` is a rendered label rather than the stored 24-hour strings, because
+    # nothing on a page shows a time as "17:00"; the stored pair is what
+    # models/appointments.py builds the bookable slots from.
+    settings_values = get_settings()
+    context["health_center"] = {
+        "name": settings_values[KEY_NAME],
+        "barangay": settings_values[KEY_BARANGAY],
+        "municipality": settings_values[KEY_MUNICIPALITY],
+        "province": settings_values[KEY_PROVINCE],
+        "address": address_line(),
+        "opening": display_time(settings_values[KEY_OPENING]),
+        "closing": display_time(settings_values[KEY_CLOSING]),
+    }
 
     # Why each deliberately disabled control is disabled. On every render rather
     # than per route, because the same reasons are quoted by screens built from

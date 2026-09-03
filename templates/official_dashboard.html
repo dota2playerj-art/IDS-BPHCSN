@@ -121,7 +121,7 @@
 
 {% block content %}
     <div class="mb-1">
-      <div class="eyebrow">Barangay Poblacion Health Center</div>
+      <div class="eyebrow">{{ health_center.name }}</div>
       <div class="page-title">Barangay Official Dashboard</div>
     </div>
     {#- WAS "All Systems Operational" (green dot) and "Secure Connection" (wifi
@@ -136,7 +136,7 @@
         Removed rather than reworded, for the same reason the header's "Synced just
         now" pill and the SMS "Connected" badge went before them: an honest version
         of either would need a real check behind it, and there is none to attach. #}
-    <div style="font-size:14px; color:var(--text-muted); margin-bottom:20px;">{{ clinic_today | full_date }} &middot; Community health overview for Barangay Poblacion.</div>
+    <div style="font-size:14px; color:var(--text-muted); margin-bottom:20px;">{{ clinic_today | full_date }} &middot; Community health overview for {{ health_center.barangay }}.</div>
 
     <!-- STAT CARDS — every value below is read from a call this role already
          reads elsewhere: get_broadcast_stats() behind Screen 09's cards,

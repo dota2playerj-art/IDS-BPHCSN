@@ -1,63 +1,94 @@
-"""Context for Screen 13, Settings.
+"""Context and form handling for Screen 13, Settings.
 
-This screen had no context at all until now, which was correct while there was
-nothing to give it: `settings()` in routes/admin.py rendered the template bare,
-and every field on it is a disabled control quoting utils/unavailable.py's
-`settings` reason. Nothing was stored, so nothing was read.
+WHAT CHANGED, AND WHY THE OLD NOTE AT THE TOP OF THIS FILE IS GONE
+-------------------------------------------------------------------
+Everything this file used to say about itself opened on the same premise:
+"nothing on this screen is stored -- the settings table is still empty and no
+route writes it". That premise is what has just stopped being true, so the note
+that rested on it is replaced rather than amended. It said, correctly for its
+time, that turning any field on the screen into a stored value "is a different
+and much larger task than the one that closed the sign-in gap". This is that
+task, done for the fields that had somewhere to be read.
 
+THE SCREEN NOW HAS FOUR KINDS OF PANE, AND THE DIFFERENCE BETWEEN THEM IS THE
+WHOLE DESIGN.
 
-WHY IT HAS A CONTEXT NOW, AND WHY ONLY THIS MUCH
-------------------------------------------------
-Nothing on this screen is stored yet -- the settings table is still empty and no
-route writes it, so the reason above still stands over every input. What changed
-is narrower and lives in one pane.
+1. STORED AND READ BACK -- General Settings.
+   Six values in the settings table (models/settings.py), written by
+   process_general_settings() below and read by the SMS composer, all three
+   export modules, the booking slot generator and every template's header. This
+   is the only pane with a live control on it.
 
-The Security Settings pane made a claim it could not keep. Under "Login Attempt
-Limit" it said "Account locks after this many failed attempts", which was false
-twice over: nothing counted the attempts, and nothing locked anything. Now that
-routes/auth.py records every sign-in and every refusal, the first half is no
-longer false -- the attempts are counted, and counted accurately -- while the
-second half remains false and always was. A pane that says "5" beside a sentence
-promising a lockout is worse for having real data behind half of it, because the
-number now looks live.
+2. READ FROM WHAT THE SYSTEM ACTUALLY DOES -- Security Settings' sign-in
+   figures, Password Policy, Backup's size and last-download rows, About
+   System's database version.
+   Nothing here is typed and nothing here is stored. Each is read from the thing
+   it describes, on every load, which is the property that makes it impossible
+   for the display to drift from the fact. Password Policy is the sharpest case
+   and the reason it is worth stating as a category: it reports the rule
+   check_password_strength() enforces by reading the constants that function
+   branches on, so a change to the rule changes this screen in the same edit.
+   The five controls it replaced described a different policy entirely -- eight
+   characters, a 90-day expiry, a reuse history -- none of which this system has
+   ever applied.
 
-So the pane keeps its disabled inputs and gains one block below them separating
-the two: what this system actually records about sign-ins, with the real figures,
-and the plain statement that no setting above is enforced. That is the whole of
-what this file provides. It deliberately does not turn Session Timeout, Two-Factor
-Authentication or any password rule into a stored value -- those are unbuilt
-features, not unwired displays, and inventing storage for them is a different and
-much larger task than the one that closed the sign-in gap.
+3. DISABLED, WITH A REASON -- Health Center Information, SMS Gateway, the rest
+   of Security Settings, Backup's frequency and retention, System Maintenance.
+   Real features that are not built. Each pane carries its own `disabled`
+   fieldset now rather than the single one that used to wrap all ten, because a
+   fieldset around everything cannot admit one live form inside it.
 
+4. GONE -- User Preferences and Notification Settings.
+   Removed outright rather than left disabled. See the note in settings.html.
 
-AND WHY THERE IS NOW A SECOND KEY
----------------------------------
-`system`, read by the About System pane, which said "PostgreSQL 15.4". This
-project has never used PostgreSQL: database/connection.py opens the file named
-by config.DATABASE with sqlite3, and that file begins with the bytes "SQLite
-format 3". The pane was naming a database the system does not have.
-
-It is read live rather than corrected to a fixed string. A hard-coded "SQLite
-3.50.4" would be true on the machine it was typed on and quietly wrong on the
-next one, which is how the PostgreSQL line got there in the first place;
-sqlite3.sqlite_version is whatever the interpreter serving the request is
-actually linked against, so it cannot drift out of step with the thing it
-describes. This is not the disabled-input problem the section above refuses:
-nothing in the About pane is a control, and the version is a fact about the
-running system rather than a figure sitting under a dead field.
-
+WHY THE GENERAL FORM IS THE ONLY LIVE ONE, AND WHY THAT IS NOT ARBITRARY
+--------------------------------------------------------------------------
+The line is not "which fields would be nice to store". It is "which fields does
+some other part of the running system already read". Six do -- the facility name
+is at the front of every appointment SMS and on every export letterhead, the
+three place names make up the address those letterheads print, and the two times
+are what the bookable slots are built from. Storing the contact number or the
+DOH licence number would produce a control that accepts input and changes
+nothing, which is the exact defect utils/unavailable.py exists to keep off this
+project's screens.
 
 WHERE THE FIGURES COME FROM
 ---------------------------
-models/audit.py, the same two functions Audit Logs and User Management read, so
-this screen cannot report a different number of sign-ins from the screen whose
-job it is to report them. Nothing is counted locally here.
+The sign-in counts are models/audit.py's, the same two functions Audit Logs and
+User Management read, so this screen cannot report a different number of
+sign-ins from the screen whose job it is to report them. The password rule is
+models/users.py's. The database size is models/backup.py's, measured off the
+file the backup would be taken from. Nothing is counted locally here.
 """
 import sqlite3
 
-from models.audit import get_audit_stats, get_last_logins
-from models.users import get_all_users
-from utils.dates import display_timestamp
+from models.audit import (
+    ACTION_BACKUP_DOWNLOADED,
+    ACTION_SETTINGS_UPDATED,
+    MODULE_SETTINGS,
+    get_audit_stats,
+    get_last_logins,
+    get_latest_entry,
+    log_action,
+)
+from models.backup import create_backup_bytes, database_size_bytes, format_size
+from models.settings import (
+    GENERAL_KEYS,
+    KEY_CLOSING,
+    KEY_NAME,
+    KEY_OPENING,
+    address_line,
+    describe_changes,
+    display_time,
+    get_settings,
+    last_updated,
+    save_general_settings,
+    validate_general_settings,
+)
+from models.users import get_all_users, get_user_by_id, password_policy
+from routes.report_export import _download
+from utils.dates import display_timestamp, now
+from utils.workbook import safe_filename
 
 
 def _most_recent_sign_in(last_logins, users):
@@ -84,21 +115,78 @@ def _most_recent_sign_in(last_logins, users):
     return name, display_timestamp(stamp)
 
 
-def settings_context():
+def _last_backup():
+    """(rendered timestamp, who) for the last backup taken FROM THIS SCREEN.
+
+    Read out of the audit trail, because the trail is the only record that one
+    was taken -- models/backup.py writes no file anywhere and keeps no history of
+    its own, by design: what it produces goes straight to the browser that asked
+    for it.
+
+    THE LABEL ON THE SCREEN SAYS "FROM THIS SCREEN", AND THAT QUALIFIER IS LOAD-
+    BEARING. The practice at this health center has been to copy app.db by hand
+    with the date in the filename, and this system cannot see that those copies
+    exist. A row reading "Last backup" with a date beside it would claim to be
+    the answer to "when was this system last backed up", which it is not and
+    cannot be. It answers the narrower question it is labelled with.
+    """
+    entry = get_latest_entry(MODULE_SETTINGS, ACTION_BACKUP_DOWNLOADED)
+    if entry is None:
+        return None, None
+    return display_timestamp(entry["created_at"]), entry["user_name"]
+
+
+def _general_form(values):
+    """The six stored values in the shape the form re-renders from.
+
+    Used when the page is loaded normally. A failed submit passes what was typed
+    instead -- see process_general_settings() -- so the two paths hand the
+    template the same dict shape and it needs no conditional of its own.
+    """
+    return {key: values[key] for key in GENERAL_KEYS}
+
+
+def settings_context(general_form=None, general_errors=None):
     """Everything Screen 13 renders beyond the shared role context.
 
-    Two keys. `security` is the sign-in trail; `system` is the database the
-    request is being served from. Neither sits under a disabled control -- a
-    live number beneath a dead input is the confusion the disabled fieldset
-    exists to avoid, and adding figures for the panes that do still have dead
-    inputs would be wrong for exactly that reason.
+    `general_form` and `general_errors` are the form-redisplay pair every other
+    form in this project uses (`add_form`/`add_errors` on User Management,
+    `form`/`errors` on Register Patient). Both absent means an ordinary load, and
+    the form renders from what is stored; both present means a submit was
+    refused, and the form renders from what was typed with the messages beside
+    the fields that earned them.
     """
     stats = get_audit_stats()
     users = get_all_users()
     last_logins = get_last_logins()
     recent_name, recent_stamp = _most_recent_sign_in(last_logins, users)
 
+    stored = get_settings()
+    saved_at, saved_by = last_updated()
+    backup_at, backup_by = _last_backup()
+    size = database_size_bytes()
+
     return {
+        "general": {
+            # What the form draws. Typed values on a refused submit, stored
+            # values otherwise -- so nothing an administrator wrote is thrown
+            # away by a validation error.
+            "form": general_form if general_form is not None else _general_form(stored),
+            "errors": general_errors or {},
+            # The address the three place names make. Derived, not stored, so it
+            # cannot disagree with the fields above it -- see address_line().
+            "address": address_line(),
+            # Rendered 12-hour, for the sentence under the two time inputs that
+            # says what the clinic day currently is.
+            "opening_label": display_time(stored[KEY_OPENING]),
+            "closing_label": display_time(stored[KEY_CLOSING]),
+            "name": stored[KEY_NAME],
+            # None until the first save. An untouched installation is running on
+            # the defaults in models/settings.py, and saying "never saved" is the
+            # true answer rather than a date invented for the row.
+            "saved_at": display_timestamp(saved_at) if saved_at else None,
+            "saved_by": saved_by,
+        },
         "security": {
             "sign_ins": stats["logins"],
             "sign_ins_today": stats["logins_today"],
@@ -114,6 +202,17 @@ def settings_context():
             "most_recent_name": recent_name,
             "most_recent_at": recent_stamp,
         },
+        # The password rule as the validator actually holds it. Not a description
+        # maintained here -- every figure in this dict is read from the constants
+        # check_password_strength() branches on, so the pane cannot state a rule
+        # the system does not enforce. See models/users.password_policy().
+        "password_policy": password_policy(),
+        "backup": {
+            "size": format_size(size),
+            "size_bytes": size,
+            "last_at": backup_at,
+            "last_by": backup_by,
+        },
         "system": {
             # Not the sqlite3 module's own version: this is the SQLite library
             # the interpreter is linked against, which is what actually stores
@@ -121,3 +220,171 @@ def settings_context():
             "sqlite_version": sqlite3.sqlite_version,
         },
     }
+
+
+# ---------------------------------------------------------------------------
+# SAVING GENERAL SETTINGS
+# ---------------------------------------------------------------------------
+
+def process_general_settings(form_data, actor_id, ip_address=None):
+    """Validate and save the six General Settings. Returns (context, message).
+
+    The two are mutually exclusive, the same contract process_create_user() and
+    process_add_edit_medicine() use: a context means the caller should re-render
+    Settings with the errors beside the fields and what was typed still in them,
+    a message means it should redirect and flash.
+
+    EVERY VALUE IS RE-VALIDATED HERE REGARDLESS OF WHAT THE BROWSER DID.
+    The form carries `novalidate` like every other form in this project, and a
+    POST can arrive without the page ever having been loaded -- so the required
+    fields, the lengths and the ordering of the two times are all decided by
+    validate_general_settings() and not by the input types on the page.
+
+    THE AUDIT ENTRY NAMES WHAT MOVED, NOT WHAT WAS SUBMITTED.
+    save_general_settings() returns the list of values that actually changed, and
+    the entry is written from that -- so a save that confirmed the existing
+    values reads as having confirmed them rather than as six changes. Both cases
+    are recorded: "this was reviewed and left alone" is a fact worth being able
+    to see in the trail, and it is also the honest thing to write when somebody
+    pressed Save.
+    """
+    values = {key: (form_data.get(key) or "").strip() for key in GENERAL_KEYS}
+
+    errors = validate_general_settings(values)
+    if errors:
+        return settings_context(general_form=values, general_errors=errors), None
+
+    changed = save_general_settings(values, actor_id)
+
+    actor = get_user_by_id(actor_id) if actor_id else None
+    actor_phrase = (
+        f'{actor["full_name"]} ("{actor["username"]}", {actor["role"]})'
+        if actor is not None else
+        "an administrator whose account row could not be read"
+    )
+
+    log_action(
+        actor_id,
+        ACTION_SETTINGS_UPDATED,
+        module=MODULE_SETTINGS,
+        details=(
+            f"General Settings saved by {actor_phrase}: {describe_changes(changed)}"
+            ". These six values are read by the rest of the system rather than "
+            "only displayed: the health center's name is the first thing in "
+            "every appointment SMS and the heading on every PDF and Excel "
+            "export, the barangay, municipality and province make up the "
+            "address those exports and the sign-in page print, and the opening "
+            "and closing times are what the bookable appointment slots are "
+            "generated from — so a change to the times changes which times "
+            "Appointment Scheduling will accept. Messages already sent and files "
+            "already downloaded are unaffected; they carry the values that were "
+            "in force when they were produced"
+        ),
+        ip_address=ip_address,
+    )
+
+    if not changed:
+        return None, (
+            "General Settings saved. Nothing was different from what was already "
+            "stored, so no value changed."
+        )
+
+    if len(changed) == 1:
+        key, _was, _now = changed[0]
+        if key in (KEY_OPENING, KEY_CLOSING):
+            return None, (
+                "General Settings saved. The clinic day is now "
+                f"{display_time(values[KEY_OPENING])} to "
+                f"{display_time(values[KEY_CLOSING])}, and Appointment "
+                "Scheduling offers and accepts times inside it."
+            )
+
+    return None, (
+        f"General Settings saved. The health center is now named "
+        f'"{values[KEY_NAME]}" on every screen, on every export, and in every '
+        "appointment SMS sent from now on."
+    )
+
+
+# ---------------------------------------------------------------------------
+# RECORDING A BACKUP DOWNLOAD
+# ---------------------------------------------------------------------------
+
+def log_backup_download(actor_id, size, filename, ip_address=None):
+    """Record that a complete copy of the database left the system.
+
+    Written AFTER the copy has been made and verified, so the entry describes a
+    file that exists and passed its integrity check rather than an attempt that
+    may have failed -- an audit row saying a backup was taken, when it was not,
+    would be worse than no row at all.
+
+    The entry says what the file contains in plain terms rather than naming
+    tables, because the question it answers months later is "what did somebody
+    walk away with", and the answer is: everything.
+    """
+    actor = get_user_by_id(actor_id) if actor_id else None
+    actor_phrase = (
+        f'{actor["full_name"]} ("{actor["username"]}", {actor["role"]})'
+        if actor is not None else
+        "an administrator whose account row could not be read"
+    )
+
+    return log_action(
+        actor_id,
+        ACTION_BACKUP_DOWNLOADED,
+        module=MODULE_SETTINGS,
+        details=(
+            f"{actor_phrase} downloaded a backup of the database as "
+            f'"{filename}" ({format_size(size)}). The file is a complete copy of '
+            "every record this system holds — every patient, consultation, "
+            "immunisation, appointment, stock movement, SMS broadcast, audit "
+            "entry and user account — taken with SQLite's own online backup "
+            "interface while the system was running, and checked with PRAGMA "
+            "integrity_check before it was sent. Account passwords are in it "
+            "only as the salted hashes they are stored as; nothing in the file "
+            "reveals a password. The copy now exists outside this system and "
+            "cannot be recalled or tracked from here, which is why the download "
+            "is recorded even though it changed no record"
+        ),
+        ip_address=ip_address,
+    )
+
+
+# The MIME type for a SQLite database file. Registered with IANA in 2021, and
+# the correct answer for what this download is -- not application/octet-stream,
+# which is what a server says when it does not know. A browser has no viewer for
+# either, so both produce a save; the difference is what the file is labelled as
+# when it lands, and one of the two is true.
+SQLITE_MIMETYPE = "application/vnd.sqlite3"
+
+
+def backup_download_response(actor_id, ip_address=None):
+    """Make a verified copy of the database and serve it as a download.
+
+    ORDER MATTERS AND IS THE POINT OF THIS FUNCTION.
+    The copy is taken and passes PRAGMA integrity_check (models/backup.py) BEFORE
+    the audit entry is written and before any response is built. A failed backup
+    therefore raises, writes no entry, and serves nothing -- rather than leaving
+    a trail claiming a backup exists and a browser holding a file that will not
+    open. The trail is the only record this system keeps that a backup was ever
+    taken, so an entry for one that failed would corrupt the one figure the
+    Backup pane reports.
+
+    The filename carries the date and time to the minute, matching the practice
+    the `backup` reason on this screen describes -- a copy of the file with the
+    date in its name -- so a folder of these sorts chronologically and two taken
+    on the same day do not overwrite each other.
+
+    Routed through report_export._download(), the same helper the eleven export
+    routes use, so the attachment header and the filename are decided in one
+    place for every file this application hands out.
+    """
+    payload = create_backup_bytes()
+    stamped = now()
+    filename = safe_filename(
+        f"IDS-BPHCSN backup {stamped.strftime('%Y-%m-%d %H%M')}.db"
+    )
+
+    log_backup_download(actor_id, len(payload), filename, ip_address)
+
+    return _download((payload, filename), SQLITE_MIMETYPE)

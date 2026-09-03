@@ -68,7 +68,7 @@
 {# content: no breadcrumb, per instruction (audit 4.1b - deliberate, do not re-add) #}
 {% block content %}
     <div>
-      <div class="eyebrow">Barangay Poblacion Health Center</div>
+      <div class="eyebrow">{{ health_center.name }}</div>
       <div class="page-title">Notifications</div>
       <div class="page-desc">{{ clinic_today | full_date }}</div>
     </div>

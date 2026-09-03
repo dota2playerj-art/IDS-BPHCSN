@@ -89,6 +89,31 @@
     display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;
   }
   .req-legend{font-size:12.5px; color:var(--text-muted);}
+
+  /* The refused-field treatment every other form in this project uses --
+     Register Patient, Add/Edit Medicine and User Management each carry this same
+     rule. General Settings is the first live form on this screen and gets the
+     same one, so a field refused here looks like a field refused anywhere else. */
+  .form-control.is-invalid, .form-select.is-invalid{border-color:var(--danger);}
+  .field-error{font-size:12.5px; color:var(--danger); margin-top:4px;}
+  .alert-danger-ids{background:#FEF2F2; border-color:#FECACA; color:#991B1B;}
+
+  /* The bar at the foot of the one pane that saves. Not the page-wide bar this
+     screen used to end with -- see the note where that was removed. */
+  .pane-actions{
+    display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;
+    border-top:1px solid var(--border-color); margin-top:24px; padding-top:18px;
+  }
+
+  /* A value this screen states rather than accepts. Reads as a fact on the page,
+     not as an input somebody forgot to enable -- which is the whole reason the
+     Password Policy pane no longer draws boxes and switches. */
+  .fact-row{display:flex; align-items:flex-start; justify-content:space-between; gap:16px; padding:13px 0; border-bottom:1px solid var(--border-color);}
+  .fact-row:last-child{border-bottom:none;}
+  .fact-label{font-size:13.5px; font-weight:600; color:var(--text-dark);}
+  .fact-desc{font-size:12.5px; color:var(--text-muted); margin-top:2px; max-width:520px;}
+  .fact-value{font-size:14px; font-weight:600; color:var(--text-dark); white-space:nowrap;}
+  .fact-list{margin:0; padding-left:18px; font-size:13px; color:var(--text-dark); line-height:1.75;}
 {% endblock %}
 
 {% block breadcrumb %}
@@ -100,9 +125,13 @@
     </div>{% endblock %}
 
 {% block content %}
-    <div class="eyebrow">Barangay Poblacion Health Center</div>
+    <div class="eyebrow">{{ health_center.name }}</div>
     <div class="page-title">Settings</div>
-    <div class="page-desc">Configure health center information, SMS gateway, security, notifications, and system preferences.</div>
+{#- The old description listed "notifications, and system preferences", two of
+    the panes this screen no longer has, and promised the reader could
+    "configure" all of it -- which was true of none of it at the time and is now
+    true of exactly one pane. #}
+    <div class="page-desc">Set the health center's name, location and clinic hours; read the security, password and database facts this system can report; and download a backup.</div>
 
     <div style="height:16px;"></div>
 
@@ -112,35 +141,41 @@
          asserted an event that had not happened and could not happen, the
          second one describing a save this screen cannot perform. They are
          replaced by the note below, which states what this screen actually is. -->
-{#- Written as one statement with unavailable["settings"], which prints in the
-    middle of it. The two used to overlap: the shared reason said nothing is
-    stored and this note said it again in different words, then named three
-    source files. Each now carries a different half -- the shared reason says
-    what the screen is, because it is also the tooltip on four disabled buttons
-    and has to stand alone there; this note adds only the live exceptions.
+{#- REWRITTEN, AND THE HEADLINE IT OPENED WITH WAS THE PART THAT WENT FALSE.
+    It said "Nothing on this screen is saved", then named the three values that
+    were read live rather than typed. Both halves are now wrong in the same
+    direction: General Settings saves six values into the settings table, and
+    four separate panes read live figures rather than three.
 
-    IT SAID "the one exception", AND THERE HAVE ALWAYS BEEN THREE. The sign-in
-    figures were the newest and so got counted; the other two were already on the
-    screen when that sentence was written and were simply not thought of. Head
-    Physician renders sidebar_user_name, which is whoever is signed in -- and
-    because this screen is Admin-only, that is the administrator its label names.
-    Database renders system.sqlite_version, read from the running interpreter on
-    every load. Both change with the system rather than being typed, which is the
-    whole of what this sentence separates out, so both belong in it.
+    The counted word is gone with it, and its own predecessor said why it would
+    be: "A counted word is a liability in a note like this -- 'one' was wrong the
+    day it was written". It was right, and "Three" lasted one task. What replaces
+    it does not count anything. It names the one pane that stores, points at the
+    kind of thing the read-only panes report, and leaves the rest to the
+    per-pane wording -- which is where a reader is standing when it matters, and
+    which cannot go stale for a pane that was not the one they are looking at.
 
-    A counted word is a liability in a note like this: "one" was wrong the day it
-    was written, and nothing about the screen had to change for it to be wrong. A
-    fourth live value would break the number again, which is what naming them
-    costs. The alternative is a vaguer sentence a reader cannot check against the
-    screen, and this project has consistently preferred the checkable one. #}
+    THE SHARED REASON NO LONGER PRINTS INSIDE THIS NOTE, AND THAT IS THE OTHER
+    HALF OF THE SAME CHANGE. It used to, on the arrangement that the two carried
+    different halves of one statement -- the reason saying what the screen is,
+    the note adding the live exceptions. That arrangement rested on the reason
+    being about the SCREEN, and unavailable["settings"] has just stopped being:
+    it now describes the individual dead control it is the tooltip on, because a
+    sentence characterising the whole of Screen 13 has gone stale three times in
+    three tasks. A control-level sentence read aloud in a screen-level note would
+    open "This control is not connected to anything" above nine panes, one of
+    which saves. So the note says its own piece, and the reason stays where it
+    is true -- on the controls. #}
     <div class="scope-note">
-      <strong>Nothing on this screen is saved.</strong>
-      {{ unavailable.settings }}
-      Three of its values are read live rather than typed: the sign-in figures under
-      Security Settings, the Head Physician field, which shows the signed-in administrator,
-      and the database version under About System.
+      <strong>Some of this screen is live, and each pane says which it is.</strong>
+      <strong style="display:inline; font-weight:600;">General Settings</strong> is saved and read
+      back — the health center's name, where it stands and the hours it books appointments in are
+      stored here and used by the rest of the system. Password Policy, the sign-in figures under
+      Security Settings, the database rows under Backup &amp; Restore and About System are read from
+      what this system actually does, on every load, and are not editable anywhere.
+      Every remaining field is a control for a feature this system does not have. Each one says so on
+      itself when you hover it, and the pane it sits in says what is missing.
     </div>
-
     <!-- SETTINGS PANEL -->
     <div class="panel-card">
       <div class="row g-0">
@@ -149,9 +184,7 @@
             <div class="nav flex-column" role="tablist">
               <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#pane-general" type="button"><span class="material-symbols-outlined">tune</span>General Settings</button>
               <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-hc" type="button"><span class="material-symbols-outlined">local_hospital</span>Health Center Information</button>
-              <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-prefs" type="button"><span class="material-symbols-outlined">person</span>User Preferences</button>
               <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-sms" type="button"><span class="material-symbols-outlined">sms</span>SMS Gateway Configuration</button>
-              <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-notif" type="button"><span class="material-symbols-outlined">notifications_active</span>Notification Settings</button>
               <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-security" type="button"><span class="material-symbols-outlined">shield</span>Security Settings</button>
               <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-pwd" type="button"><span class="material-symbols-outlined">password</span>Password Policy</button>
               <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-backup" type="button"><span class="material-symbols-outlined">backup</span>Backup &amp; Restore</button>
@@ -162,81 +195,188 @@
         </div>
 
         <div class="col-lg-9">
-          <!-- One disabled fieldset around every pane, rather than `disabled` on
-               each of the fifty-odd inputs inside them: a fieldset disables its
-               whole subtree natively, so no control can be missed here and none
-               can be added later that is live by accident. The nav pills on the
-               left stay outside it -- moving between panes is reading, not
-               entry, and remains available. -->
-          <fieldset class="unavailable-form" disabled>
+          <!-- THE ONE DISABLED FIELDSET THAT USED TO WRAP EVERY PANE IS NOW ONE
+               PER PANE, AND IT HAD TO MOVE.
+
+               The reasoning behind wrapping all ten at once still stands and is
+               unchanged: a fieldset disables its whole subtree natively, so no
+               control inside it can be missed and none can be added later that
+               is live by accident. What changed is that one pane -- General
+               Settings -- now saves, and a live form cannot sit inside a
+               disabled fieldset. A fieldset around a subset of the panes is not
+               an option either: Bootstrap shows and hides tab panes with
+               `.tab-content > .tab-pane`, so a pane that is not a direct child
+               of this div stops being shown at all.
+
+               So each pane that has nothing live in it opens its own
+               `<fieldset class="unavailable-form" disabled>` immediately inside
+               itself, and the guarantee is per pane rather than per screen. The
+               panes with no control at all -- Password Policy, About System --
+               have no fieldset, because there is nothing in them to disable. -->
           <div class="settings-body tab-content">
 
             <!-- GENERAL SETTINGS -->
             <div class="tab-pane fade show active" id="pane-general">
               <div class="section-title">General Settings</div>
-              <div class="section-sub">Basic identity and contact details for the health center</div>
+              <div class="section-sub">The health center&#39;s own name, where it stands, and the hours it books appointments in</div>
+
+{#- THE ONE FORM ON THIS SCREEN THAT SAVES.
+
+    WHAT WAS HERE BEFORE. Ten inputs inside the page-wide disabled fieldset,
+    every one of them holding a value typed into the mockup: the name, a contact
+    number, the barangay, the municipality, the province, a complete address, an
+    email address, an operating-days dropdown, and the two times.
+
+    WHAT IS HERE NOW, AND WHY IT IS SIX AND NOT TEN. The line is not which fields
+    would be nice to store -- it is which fields some other part of this system
+    already reads. Six do, and each of the six says on the field itself what a
+    change to it will move. The four that are gone had no reader anywhere in
+    this project:
+
+    * Contact Number and Email Address appear in no other file. They were typed
+      into the mockup, and utils/unavailable.py's own inventory of this screen
+      already listed them as such. Storing them would have produced exactly the
+      defect this project keeps removing -- a control that accepts input and
+      changes nothing.
+    * Complete Address is not gone but is no longer typed. It is DERIVED from the
+      barangay, municipality and province below, and shown as a fact under them.
+      A stored address would be a fourth string that could disagree with the
+      three it is made of, and the first time somebody corrected the municipality
+      in one place and not the other, this screen would name two municipalities.
+    * Operating Days was the most misleading of the four, because it was a rule
+      rather than a value. validate_booking() checks that the date is in the
+      future, inside the horizon, and that the time is one of the slots -- it
+      never looks at the day of the week, so a Saturday booking is taken.
+      "Monday - Friday" in a dropdown claimed a restriction that does not exist.
+      Storing it would not have created one; enforcing days is a real change to
+      booking validation and not a settings field. #}
+              <form method="post" action="{{ url_for('admin.save_general_settings') }}" novalidate>
+
+{#- The whole-form banner, in the same place and the same words as User
+    Management's: the field messages say what to fix, this says what did not
+    happen. Both are needed -- a page that only marks fields red is a page an
+    operator can scroll past believing the save went through. #}
+{%- if general.errors %}
+              <div class="alert-ids alert-danger-ids">
+                <span class="material-symbols-outlined">error</span>
+                <div>
+                  <strong>These settings were not saved</strong>
+                  Correct the {{ general.errors|length }} highlighted field{{ '' if general.errors|length == 1 else 's' }} below.
+                  Everything you typed is still here, and the values the system is using have not changed.
+                </div>
+              </div>
+{%- endif %}
 
               <div class="row g-3 mb-3">
-                <div class="col-md-6">
-                  <label class="field-label">Health Center Name<span class="req">*</span></label>
-                  <input type="text" class="form-control" value="Barangay Poblacion Health Center">
-                </div>
-                <div class="col-md-6">
-                  <label class="field-label">Contact Number<span class="req">*</span></label>
-                  <input type="text" class="form-control" value="(086) 343-2210">
+                <div class="col-md-7">
+                  <label class="field-label" for="hcName">Health Center Name<span class="req">*</span></label>
+                  <input type="text" class="form-control{% if general.errors.health_center_name %} is-invalid{% endif %}"
+                         id="hcName" name="health_center_name" maxlength="60"
+                         value="{{ general.form.health_center_name or '' }}">
+{%- if general.errors.health_center_name %}
+                  <div class="field-error">{{ general.errors.health_center_name }}</div>
+{%- endif %}
+                  <div class="form-text-hint">Printed at the top of every PDF and Excel export, shown in the header of every screen, and the first thing in every appointment SMS.</div>
                 </div>
               </div>
 
-              <div class="row g-3 mb-3">
+              <div class="row g-3 mb-1">
                 <div class="col-md-4">
-                  <label class="field-label">Barangay<span class="req">*</span></label>
-                  <input type="text" class="form-control" value="Barangay Poblacion">
+                  <label class="field-label" for="hcBarangay">Barangay<span class="req">*</span></label>
+                  <input type="text" class="form-control{% if general.errors.barangay %} is-invalid{% endif %}"
+                         id="hcBarangay" name="barangay" maxlength="100"
+                         value="{{ general.form.barangay or '' }}">
+{%- if general.errors.barangay %}
+                  <div class="field-error">{{ general.errors.barangay }}</div>
+{%- endif %}
                 </div>
                 <div class="col-md-4">
-                  <label class="field-label">Municipality / City<span class="req">*</span></label>
-                  <input type="text" class="form-control" value="San Francisco">
+                  <label class="field-label" for="hcMunicipality">Municipality / City<span class="req">*</span></label>
+                  <input type="text" class="form-control{% if general.errors.municipality %} is-invalid{% endif %}"
+                         id="hcMunicipality" name="municipality" maxlength="100"
+                         value="{{ general.form.municipality or '' }}">
+{%- if general.errors.municipality %}
+                  <div class="field-error">{{ general.errors.municipality }}</div>
+{%- endif %}
                 </div>
                 <div class="col-md-4">
-                  <label class="field-label">Province<span class="req">*</span></label>
-                  <input type="text" class="form-control" value="Surigao del Norte">
+                  <label class="field-label" for="hcProvince">Province<span class="req">*</span></label>
+                  <input type="text" class="form-control{% if general.errors.province %} is-invalid{% endif %}"
+                         id="hcProvince" name="province" maxlength="100"
+                         value="{{ general.form.province or '' }}">
+{%- if general.errors.province %}
+                  <div class="field-error">{{ general.errors.province }}</div>
+{%- endif %}
                 </div>
               </div>
-
-              <div class="row g-3 mb-3">
-                <div class="col-md-8">
-                  <label class="field-label">Complete Address<span class="req">*</span></label>
-                  <input type="text" class="form-control" value="Purok 2, Barangay Poblacion, San Francisco, Surigao del Norte 8401">
-                </div>
-                <div class="col-md-4">
-                  <label class="field-label">Email Address<span class="req">*</span></label>
-                  <input type="email" class="form-control" value="bphcsn.poblacion@doh.gov.ph">
-                </div>
+{#- The derived address, shown as a fact rather than as a field. It reports the
+    STORED three rather than whatever is in the boxes above, so after a refused
+    submit it still says what the system is actually using -- which is the honest
+    answer while a correction is being typed. #}
+              <div class="form-text-hint" style="margin-bottom:18px;">
+                Address in use: <strong style="color:var(--text-dark);">{{ general.address }}</strong>
+                &middot; made from the three fields above, and shown on the sign-in page and in the header of every export.
               </div>
 
+              <div class="subsection-divider"></div>
+              <div class="subsection-title"><span class="material-symbols-outlined" style="color:var(--teal-dark); font-size:18px;">schedule</span>Clinic hours</div>
               <div class="row g-3">
                 <div class="col-md-4">
-                  <label class="field-label">Operating Days</label>
-                  <select class="form-select">
-                    <option selected>Monday &ndash; Friday</option>
-                    <option>Monday &ndash; Saturday</option>
-                    <option>Every day</option>
-                  </select>
+                  <label class="field-label" for="hcOpening">Opening Time<span class="req">*</span></label>
+                  <input type="time" class="form-control{% if general.errors.opening_time %} is-invalid{% endif %}"
+                         id="hcOpening" name="opening_time" value="{{ general.form.opening_time or '' }}">
+{%- if general.errors.opening_time %}
+                  <div class="field-error">{{ general.errors.opening_time }}</div>
+{%- endif %}
                 </div>
                 <div class="col-md-4">
-                  <label class="field-label">Opening Time</label>
-                  <input type="time" class="form-control" value="08:00">
-                </div>
-                <div class="col-md-4">
-                  <label class="field-label">Closing Time</label>
-                  <input type="time" class="form-control" value="17:00">
+                  <label class="field-label" for="hcClosing">Closing Time<span class="req">*</span></label>
+                  <input type="time" class="form-control{% if general.errors.closing_time %} is-invalid{% endif %}"
+                         id="hcClosing" name="closing_time" value="{{ general.form.closing_time or '' }}">
+{%- if general.errors.closing_time %}
+                  <div class="field-error">{{ general.errors.closing_time }}</div>
+{%- endif %}
                 </div>
               </div>
+{#- Said plainly because changing these two changes what Appointment Scheduling
+    will ACCEPT, not merely what it offers -- validate_booking() refuses a time
+    outside the generated slots, and it reads the same slots the dropdown is
+    built from. An administrator moving the closing time an hour earlier is
+    narrowing the bookable day, and should know that before pressing Save rather
+    than when an operator cannot book a four o'clock. #}
+              <div class="form-text-hint" style="margin-top:8px;">
+                Currently {{ general.opening_label }} to {{ general.closing_label }}.
+                Appointment slots are generated from the opening time in 30-minute steps, and the last one
+                starts a slot before closing &mdash; so these two times decide which times Appointment Scheduling
+                offers <em>and</em> which it will accept. Appointments already booked keep their times.
+              </div>
+
+              <div class="pane-actions">
+                <div class="req-legend">
+                  Fields marked <span style="color:var(--danger);">*</span> are required.
+{%- if general.saved_at %}
+                  Last saved {{ general.saved_at }}{% if general.saved_by %} by {{ general.saved_by }}{% endif %}.
+{%- else %}
+                  <span title="No row has been written to the settings table yet. The values above are the defaults in models/settings.py &mdash; the same values the application used as constants before this screen could store anything.">Never saved; these are the system&#39;s defaults.</span>
+{%- endif %}
+                </div>
+                <button type="submit" class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">save</span>Save General Settings</button>
+              </div>
+              </form>
             </div>
 
             <!-- HEALTH CENTER INFORMATION -->
             <div class="tab-pane fade" id="pane-hc">
               <div class="section-title">Health Center Information</div>
               <div class="section-sub">Facility identity, licensing, and leadership details</div>
+{#- Its own disabled fieldset, for the reason the note at the top of this tab
+    strip gives. Nothing in this pane has a reader anywhere in the project: no
+    file asks what the facility type is, none reads a DOH licence number, and
+    none reads a date established or a description. The Head Physician box is the
+    exception that proves it -- it shows the signed-in administrator, which is
+    live, and is a display of who is looking rather than a stored fact about the
+    facility. #}
+              <fieldset class="unavailable-form" disabled title="{{ unavailable.settings }}">
 
               <div class="row g-3 mb-3">
                 <div class="col-md-6">
@@ -267,59 +407,72 @@
               <div class="row g-3">
                 <div class="col-12">
                   <label class="field-label">Facility Description</label>
-                  <textarea class="form-control" style="min-height:96px;">Serves the residents of Barangay Poblacion and surrounding puroks with primary care, maternal and child health services, immunization, and chronic disease monitoring.</textarea>
+                  <textarea class="form-control" style="min-height:96px;">Serves the residents of {{ health_center.barangay }} and surrounding puroks with primary care, maternal and child health services, immunization, and chronic disease monitoring.</textarea>
                 </div>
               </div>
+              </fieldset>
             </div>
 
-            <!-- USER PREFERENCES -->
-            <div class="tab-pane fade" id="pane-prefs">
-              <div class="section-title">User Preferences</div>
-              <div class="section-sub">Personal display and locale preferences for your account</div>
+{#- USER PREFERENCES AND NOTIFICATION SETTINGS ARE BOTH GONE FROM THIS FILE.
 
-              <div class="row g-3 mb-3">
-                <div class="col-md-4">
-                  <label class="field-label">Language</label>
-                  <select class="form-select">
-                    <option selected>English</option>
-                    <option>Filipino</option>
-                  </select>
-                </div>
-                <div class="col-md-4">
-                  <label class="field-label">Date Format</label>
-                  <select class="form-select">
-                    <option selected>Month DD, YYYY</option>
-                    <option>DD/MM/YYYY</option>
-                    <option>MM/DD/YYYY</option>
-                  </select>
-                </div>
-                <div class="col-md-4">
-                  <label class="field-label">Records Per Page</label>
-                  <select class="form-select">
-                    <option>10</option>
-                    <option selected>25</option>
-                    <option>50</option>
-                    <option>100</option>
-                  </select>
-                </div>
-              </div>
+    They were two panes and eleven controls: a language dropdown, a date format,
+    a records-per-page figure, two dashboard toggles, three notification channel
+    switches, and two reminder-timing dropdowns. Every one of them sat inside the
+    page-wide disabled fieldset, and every one of them described a feature this
+    project does not have.
 
-              <div class="subsection-divider"></div>
-              <div class="subsection-title"><span class="material-symbols-outlined" style="color:var(--teal-dark); font-size:18px;">dashboard_customize</span>Dashboard Preferences</div>
-              <div class="toggle-row">
-                <div><div class="toggle-row-label">Show Low Stock Alerts on Dashboard</div><div class="toggle-row-desc">Display medicine low-stock warnings on the home dashboard</div></div>
-                <label class="switch"><input type="checkbox" checked><span class="slider"></span></label>
-              </div>
-              <div class="toggle-row">
-                <div><div class="toggle-row-label">Show Today's Appointments Widget</div><div class="toggle-row-desc">Pin the day's appointment count to the dashboard</div></div>
-                <label class="switch"><input type="checkbox" checked><span class="slider"></span></label>
-              </div>
-            </div>
+    REMOVED RATHER THAN LEFT DISABLED, which is a different decision from the one
+    made about SMS Gateway or System Maintenance a few panes down, and the
+    difference is what the control is waiting for. A disabled control is honest
+    when the feature is real and unbuilt: the SMS gateway exists, the key is
+    genuinely read from the server, and the Test Connection button has something
+    real to test the day that key is set. These eleven were not waiting for
+    anything.
+
+    * Language and Date Format: this system renders one language and one date
+      format, through utils/dates.py's filters, for every screen. There is no
+      second rendering for a switch to choose between.
+    * Records Per Page: no list in this project pages. Patient Records and
+      Medicine Inventory filter in the browser over the whole set, and Audit
+      Logs caps at a fixed PAGE_SIZE that the screen states in its own footer.
+    * The two dashboard toggles: both widgets they name are unconditional in
+      admin_dashboard.html and staff_dashboard.html, and the low-stock figure is
+      also a badge in the sidebar on every screen.
+    * The three notification channels: this system sends no email at all -- no
+      address is stored for any account and no mail is configured. SMS is not a
+      channel that can be switched off here; it is a send an operator performs on
+      SMS Notifications, one message at a time, and it is recorded whether or not
+      a gateway key is present. And "system alerts" are not written, stored or
+      cleared anywhere -- utils/unavailable.py's `notifications` reason says so,
+      and Screen 14 prints that reason.
+    * Both reminder timings: nothing in this project runs on a timer. There is
+      no scheduler and no job for one to run, so "1 day before" is not a setting
+      that is off -- it is a description of a mechanism that does not exist.
+
+    This follows the precedent already set on this screen twice: the Billing Info
+    subsection under SMS Gateway and the Cache Status field under System
+    Maintenance were both deleted rather than marked "Not tracked", because that
+    wording belongs to things this system HAS and does not record. A permanent
+    disabled placeholder for a feature nobody is building is a promise the
+    project has no intention of keeping, and it is read as a roadmap.
+
+    Nothing else references either pane. Checked before removing: the strings
+    "pane-prefs", "pane-notif", "Records Per Page", "Date Format", "Show Low
+    Stock Alerts", "Show Today's Appointments", "Appointment Reminder" and
+    "Immunization Reminder" appear nowhere else in the project, and
+    unavailable.notifications -- which survives -- is quoted by Screen 14 and
+    base.html, neither of which had anything to do with this pane. #}
 
             <!-- SMS GATEWAY CONFIGURATION -->
             <div class="tab-pane fade" id="pane-sms">
               <div class="section-title">SMS Gateway Configuration</div>
               <div class="section-sub">Connection settings for outbound SMS notifications</div>
+{#- Its own disabled fieldset now, holding what the page-wide one used to. The
+    controls here are disabled for the reason quoted on them rather than for the
+    reason the rest of the screen was: the gateway is real and utils/sms.py is a
+    working Semaphore client -- what is missing is the API key on the server, and
+    nothing typed on this screen is part of setting it. #}
+              <fieldset class="unavailable-form" disabled>
 
               <div class="row g-3 mb-3">
                 <div class="col-md-6">
@@ -426,47 +579,7 @@
     and the composer counts the segments as the message is typed. Credits are
     what a sender actually spends. The peso price of one is a matter between the
     barangay and the provider, and was never something this project knew. #}
-            </div>
-
-            <!-- NOTIFICATION SETTINGS -->
-            <div class="tab-pane fade" id="pane-notif">
-              <div class="section-title">Notification Settings</div>
-              <div class="section-sub">Control which alerts are sent and how</div>
-
-              <div class="subsection-title"><span class="material-symbols-outlined" style="color:var(--teal-dark); font-size:18px;">tune</span>Channels</div>
-              <div class="toggle-row">
-                <div><div class="toggle-row-label">Email Notifications</div><div class="toggle-row-desc">Send system alerts and reports to staff email addresses</div></div>
-                <label class="switch"><input type="checkbox" checked><span class="slider"></span></label>
-              </div>
-              <div class="toggle-row">
-                <div><div class="toggle-row-label">SMS Notifications</div><div class="toggle-row-desc">Send patient reminders and advisories via SMS Gateway</div></div>
-                <label class="switch"><input type="checkbox" checked><span class="slider"></span></label>
-              </div>
-              <div class="toggle-row">
-                <div><div class="toggle-row-label">System Alerts</div><div class="toggle-row-desc">In-app notifications for low stock, failed SMS, and security events</div></div>
-                <label class="switch"><input type="checkbox" checked><span class="slider"></span></label>
-              </div>
-
-              <div class="subsection-divider"></div>
-              <div class="subsection-title"><span class="material-symbols-outlined" style="color:var(--teal-dark); font-size:18px;">alarm</span>Reminder Settings</div>
-              <div class="row g-3">
-                <div class="col-md-6">
-                  <label class="field-label">Appointment Reminder</label>
-                  <select class="form-select">
-                    <option>Same day, 6:00 AM</option>
-                    <option selected>1 day before</option>
-                    <option>2 days before</option>
-                  </select>
-                </div>
-                <div class="col-md-6">
-                  <label class="field-label">Immunization Reminder</label>
-                  <select class="form-select">
-                    <option>1 day before</option>
-                    <option selected>3 days before</option>
-                    <option>1 week before</option>
-                  </select>
-                </div>
-              </div>
+              </fieldset>
             </div>
 
             <!-- SECURITY SETTINGS -->
@@ -474,11 +587,21 @@
               <div class="section-title">Security Settings</div>
               <div class="section-sub">Session, access, and authentication controls</div>
 
+{#- THE DISABLED CONTROLS IN THIS PANE, INSIDE THEIR OWN FIELDSET. The block of
+    live sign-in figures below is deliberately OUTSIDE it -- it contains no
+    control, only counts, and a fieldset over it would be disabling nothing while
+    implying the numbers were inert.
+
+    "MINIMUM PASSWORD LENGTH: 8" IS GONE FROM HERE, AND IT HAD TO GO RATHER THAN
+    BE CORRECTED. It was wrong twice: the real minimum is 12, and this pane was
+    never where the rule lives -- Password Policy is. Leaving a corrected "12" in
+    a dead box here would put the same number in two panes, which is how one of
+    them comes to be updated and the other not; and this project has just spent
+    the Password Policy pane making sure that number can only be read from the
+    validator. A second copy in a disabled input a tab away would defeat exactly
+    that. The rule is stated once, on the pane named after it. #}
+              <fieldset class="unavailable-form" disabled title="{{ unavailable.settings }}">
               <div class="row g-3 mb-3">
-                <div class="col-md-4">
-                  <label class="field-label">Minimum Password Length</label>
-                  <input type="number" class="form-control" value="8">
-                </div>
                 <div class="col-md-4">
                   <label class="field-label">Session Timeout (minutes)</label>
                   <input type="number" class="form-control" value="30">
@@ -507,6 +630,30 @@
               <div class="toggle-row">
                 <div><div class="toggle-row-label">Auto Logout on Inactivity</div><div class="toggle-row-desc">Automatically sign users out after the session timeout period &mdash; not implemented; a session ends when the browser is closed or Logout is used</div></div>
                 <label class="switch"><input type="checkbox" checked><span class="slider"></span></label>
+              </div>
+              </fieldset>
+
+{#- THE ONE THING THIS PANE DOES ENFORCE, SAID WHERE THE DEAD CONTROLS ARE.
+    Every switch above is off in fact whatever it shows, and a reader who has
+    just been told that three times could reasonably conclude the system enforces
+    nothing about access. It enforces the two things below, and both are real
+    guards with code behind them -- so they are stated here rather than left for
+    somebody to discover, and stated as facts rather than as controls. #}
+              <div class="subsection-divider"></div>
+              <div class="subsection-title"><span class="material-symbols-outlined" style="color:var(--teal-dark); font-size:18px;">verified_user</span>What is actually enforced</div>
+              <div class="fact-row">
+                <div>
+                  <div class="fact-label">Every screen checks the role that opens it</div>
+                  <div class="fact-desc">Not only the sidebar: each route carries its own guard, so a link typed by hand into the address bar is refused the same way a hidden menu item would have been. User Management lists what each role may open, read off those same guards.</div>
+                </div>
+                <div class="fact-value" style="color:#15803D;">Enforced</div>
+              </div>
+              <div class="fact-row">
+                <div>
+                  <div class="fact-label">A deactivated account loses its session at the next click</div>
+                  <div class="fact-desc">The account is re-read on every guarded request rather than only at sign-in, so switching an account off on User Management ends the session its holder is already using instead of waiting for them to log out.</div>
+                </div>
+                <div class="fact-value" style="color:#15803D;">Enforced</div>
               </div>
 
               {#- THE ONE BLOCK ON THIS SCREEN THAT READS REAL DATA.
@@ -576,83 +723,209 @@
             </div>
 
             <!-- PASSWORD POLICY -->
+{#- THE WHOLE PANE IS A DISPLAY NOW, AND EVERY FIGURE IN IT IS READ FROM THE
+    VALIDATOR RATHER THAN TYPED HERE.
+
+    WHAT WAS HERE. Five controls: "Minimum Length 8" in a number box, "Password
+    Expiry (days) 90" with the hint "0 = never expires", and four switches --
+    Require Uppercase Letter (on), Require Number (on), Require Special Character
+    (off), Prevent Password Reuse (on, "Disallow reusing the last 3 passwords").
+
+    EVERY ONE OF THE FIVE WAS FALSE, AND FALSE IN A DIFFERENT WAY.
+    * The length was understated. The rule refuses anything under 12; the box
+      said 8, so an administrator reading this pane and setting a nine-character
+      password would have been refused by a system they had just been told
+      allowed it.
+    * The three complexity switches described a rule of a different SHAPE. The
+      validator does not require any single kind of character. It counts how many
+      of four kinds appear and asks for three of them, which is why a long
+      passphrase with no symbol passes -- so "Require Uppercase Letter: on" and
+      "Require Special Character: off" were not merely miscalibrated, they
+      described a mechanism that is not the one running.
+    * Expiry and reuse-prevention are features that do not exist anywhere in this
+      system. No password has an age recorded against it and only the current
+      hash is stored, so there is nothing to expire and no history to compare
+      against.
+
+    WHY IT IS NOT SIMPLY THE CORRECT NUMBERS IN THE SAME BOXES. That is the
+    obvious repair and it is the one this pane exists to refuse. Retyping "12"
+    into a disabled input creates a SECOND copy of the rule -- and a second copy
+    is precisely how the first one came to be wrong. Somebody wrote the validator
+    and this screen went on describing something else, and nothing about that is
+    prevented by the new numbers being right on the day they are typed.
+
+    So every figure below comes from models/users.password_policy(), which reads
+    the constants check_password_strength() itself branches on and the very list
+    _character_kinds() iterates. Raising PASSWORD_MIN_LENGTH to 14 changes this
+    pane in the same edit. Adding a fifth character kind adds a line to the list
+    below without anyone touching this file. There is no path by which this pane
+    can be wrong while the validator is right, which is a stronger claim than
+    "these numbers are correct" and is the only one worth making about a screen
+    that describes a rule it does not itself enforce. #}
             <div class="tab-pane fade" id="pane-pwd">
               <div class="section-title">Password Policy</div>
-              <div class="section-sub">Rules enforced when staff create or change passwords</div>
+              <div class="section-sub">The rule enforced when an account is created or its password is reset</div>
 
-              <div class="row g-3 mb-3">
-                <div class="col-md-6">
-                  <label class="field-label">Minimum Length</label>
-                  <input type="number" class="form-control" value="8">
+              <div class="scope-note" style="margin-top:0;">
+                <strong>This is a display, not a setting.</strong>
+                Nothing on this pane can be changed here or anywhere else in the system &mdash; the rule is
+                part of how the application works, and it is shown here read from the code that enforces it
+                rather than described separately. It applies on
+                <a href="{{ url_for('admin.user_management') }}">User Management</a>, to both Add User and Reset Password.
+              </div>
+
+              <div class="fact-row">
+                <div>
+                  <div class="fact-label">Minimum length</div>
+                  <div class="fact-desc">Refused below this. Length is the only one of these rules that costs an attacker anything, which is why it is the one set well above the usual eight.</div>
                 </div>
-                <div class="col-md-6">
-                  <label class="field-label">Password Expiry (days)</label>
-                  <input type="number" class="form-control" value="90">
-                  <div class="form-text-hint">0 = never expires</div>
+                <div class="fact-value">{{ password_policy.min_length }} characters</div>
+              </div>
+              <div class="fact-row">
+                <div>
+                  <div class="fact-label">Kinds of character</div>
+                  <div class="fact-desc">
+                    At least {{ password_policy.min_kinds }} of these {{ password_policy.kinds|length }} must appear. Not each one
+                    individually &mdash; a long passphrase with no symbol in it passes, and so does one with no capital letter.
+                    <ul class="fact-list" style="margin-top:6px;">
+{%- for kind in password_policy.kinds %}
+                      <li>{{ kind }}</li>
+{%- endfor %}
+                    </ul>
+                  </div>
                 </div>
+                <div class="fact-value">{{ password_policy.min_kinds }} of {{ password_policy.kinds|length }}</div>
+              </div>
+              <div class="fact-row">
+                <div>
+                  <div class="fact-label">Must not contain the username or the person&#39;s name</div>
+                  <div class="fact-desc">Checked without regard to capitals, against the username and against each part of the full name of {{ password_policy.min_banned_word }} letters or more. Shorter parts are skipped: banning a two-letter particle would refuse ordinary words for containing it.</div>
+                </div>
+                <div class="fact-value">Enforced</div>
+              </div>
+              <div class="fact-row">
+                <div>
+                  <div class="fact-label">Must not be a commonly-guessed password</div>
+                  <div class="fact-desc">Compared after lower-casing and after stripping digits and punctuation off the end, so &ldquo;password2026&rdquo; is refused by the same entry as the bare word. The list is short and is not pretending otherwise &mdash; a real deployment would check against a downloaded corpus of the most common few hundred thousand.</div>
+                </div>
+                <div class="fact-value">{{ password_policy.blocklist_size }} entries</div>
               </div>
 
               <div class="subsection-divider"></div>
-              <div class="subsection-title"><span class="material-symbols-outlined" style="color:var(--teal-dark); font-size:18px;">rule</span>Complexity Requirements</div>
-              <div class="toggle-row">
-                <div><div class="toggle-row-label">Require Uppercase Letter</div></div>
-                <label class="switch"><input type="checkbox" checked><span class="slider"></span></label>
+              <div class="subsection-title"><span class="material-symbols-outlined" style="color:var(--teal-dark); font-size:18px;">info</span>What this rule does not do</div>
+{#- Said out loud rather than left out. Two of the four below are the features
+    the deleted switches claimed, and a pane that simply stopped mentioning them
+    would leave an administrator to assume they are handled somewhere else. They
+    are handled nowhere. Read from password_policy() like everything above it. #}
+{%- for heading, detail in password_policy.not_enforced %}
+              <div class="fact-row">
+                <div>
+                  <div class="fact-label">{{ heading }}</div>
+                  <div class="fact-desc">{{ detail }}</div>
+                </div>
+                <div class="fact-value" style="color:var(--text-muted); font-weight:500;">Not enforced</div>
               </div>
-              <div class="toggle-row">
-                <div><div class="toggle-row-label">Require Number</div></div>
-                <label class="switch"><input type="checkbox" checked><span class="slider"></span></label>
-              </div>
-              <div class="toggle-row">
-                <div><div class="toggle-row-label">Require Special Character</div></div>
-                <label class="switch"><input type="checkbox"><span class="slider"></span></label>
-              </div>
-              <div class="toggle-row">
-                <div><div class="toggle-row-label">Prevent Password Reuse</div><div class="toggle-row-desc">Disallow reusing the last 3 passwords</div></div>
-                <label class="switch"><input type="checkbox" checked><span class="slider"></span></label>
+{%- endfor %}
+
+              <div class="form-text-hint" style="margin-top:14px;">
+                The one-sentence version, which is the same sentence Add User prints above its password box and
+                the same one a refused password is given: &ldquo;{{ password_policy.rule_text }}&rdquo;
               </div>
             </div>
 
             <!-- BACKUP & RESTORE -->
             <div class="tab-pane fade" id="pane-backup">
               <div class="section-title">Backup &amp; Restore</div>
-              <div class="section-sub">Protect patient and system data with regular backups</div>
+              <div class="section-sub">Take a copy of the database, now, from this screen</div>
 
-              <div class="backup-row">
-                <div class="backup-label">Last Backup Date</div>
-                <!-- Nothing in this system takes a backup, so there is no date
-                     to print. A frozen timestamp sat here and read as a real
-                     one. -->
-                <div class="backup-value" style="color:var(--text-muted);" title="No backup routine exists yet — nothing writes or records one.">Not tracked</div>
-              </div>
-{#- WAS "248 MB" and "Daily, 3:00 AM", sitting directly under the row above that
-    had already been corrected. Both were mockup figures and both were wrong,
-    each in its own way: app.db is a single file of well under a megabyte, and
-    nothing in this project runs at 3:00 AM or at any other hour -- there is no
-    scheduler, no cron entry, and no job for one to run.
+{#- DOWNLOAD BACKUP IS REAL NOW. The three buttons here used to be disabled
+    together under one reason that said backup and restore "are not built" and
+    that doing it from this screen "needs a job that can copy the file safely
+    while the system is running". That job is models/backup.py: SQLite's own
+    online backup interface, which copies page by page from inside the database
+    engine and restarts if another connection writes during the copy, so what
+    comes out is a complete database as of one consistent moment rather than a
+    file assembled from two. The copy is then checked with PRAGMA
+    integrity_check before it is served, because the whole danger of a naive copy
+    is that its damage is invisible until the file is needed.
 
-    They get different words on purpose, for the reason the removed Cache Status
-    field records under System Maintenance. "Not tracked" belongs to something
-    this system HAS and does not record. A backup is one of those: the practice
-    today is a hand-made copy of the file with the date in its name, which the
-    reason on the three buttons below already says -- so copies exist and each
-    one has a size, and nothing writes that size down.
-
-    A schedule is not one of those. There is no schedule anywhere, kept or
-    unkept, so "Not tracked" would be asserting one exists that nobody happened
-    to record. The honest value for a thing that does not exist is None. #}
-              <div class="backup-row">
-                <div class="backup-label">Backup Size</div>
-                <div class="backup-value" style="color:var(--text-muted);" title="Backups are hand-made copies of the database file, taken outside the application. Nothing records how large any of them is.">Not tracked</div>
-              </div>
-              <div class="backup-row">
-                <div class="backup-label">Backup Schedule</div>
-                <div class="backup-value" style="color:var(--text-muted);" title="No backup runs on a timer. Nothing in this system schedules one, and the Backup Frequency field below is a disabled control rather than a schedule.">None</div>
+    Restore stays disabled, and the reason on it now says why it is the harder
+    half rather than lumping it in with a download that works. #}
+              <div class="scope-note" style="margin-top:0;">
+                <strong>Download Backup takes a real copy, right now.</strong>
+                It uses SQLite&#39;s own backup interface rather than copying the file, so it is safe to press
+                while other people are using the system, and the copy is checked before it is sent.
+                What you get is one file containing every record this system holds. Keep it somewhere safe:
+                it holds patient records, and this system cannot track it once it leaves.
               </div>
 
+              <div class="backup-row">
+                <div class="backup-label">Database size</div>
+{#- WAS "Backup Size — 248 MB", a mockup figure on a file of well under a
+    megabyte. It is the size of the LIVE database rather than of any copy, and
+    the label says so: the backup is the same set of pages, so this is within a
+    page or two of what the download will weigh, but only one of the two is a
+    thing this screen can actually measure. #}
+{%- if backup.size %}
+                <div class="backup-value" title="Measured from the database file this system is serving your request from, at the moment this page was built.">{{ backup.size }}</div>
+{%- else %}
+                <div class="backup-value" style="color:var(--text-muted);" title="The database file could not be measured. This does not mean a backup would fail — the copy is taken through SQLite rather than through the file system.">Could not be read</div>
+{%- endif %}
+              </div>
+              <div class="backup-row">
+                <div class="backup-label">Last backup downloaded from this screen</div>
+{#- WAS "Last Backup Date", which had a frozen timestamp on it and then read
+    "Not tracked". Now it is tracked, but only for backups taken HERE -- and the
+    label carries that qualifier because it is load-bearing. The practice at this
+    health center has been to copy app.db by hand with the date in its name, and
+    this system cannot see that those copies exist. A row labelled "Last backup"
+    would be claiming to answer a question it cannot.
+
+    The figure comes out of the audit trail, which is the only record that a
+    download happened: models/backup.py writes no file and keeps no history of
+    its own, by design -- what it makes goes straight to the browser that asked
+    for it. #}
+{%- if backup.last_at %}
+                <div class="backup-value">{{ backup.last_at }}{% if backup.last_by %} <span style="color:var(--text-muted); font-weight:400;">&middot; {{ backup.last_by }}</span>{% endif %}</div>
+{%- else %}
+                <div class="backup-value" style="color:var(--text-muted);" title="No download has been recorded. Copies made by hand outside the application are not visible to this system, so this row is only about backups taken from this button.">None yet</div>
+{%- endif %}
+              </div>
+              <div class="backup-row">
+                <div class="backup-label">Backup schedule</div>
+{#- Unchanged, and still None rather than "Not tracked". A schedule is not
+    something this system has and fails to record -- there is no scheduler here,
+    no cron entry and no job for one to run, so "Not tracked" would be asserting
+    a schedule exists that nobody wrote down. The honest value for a thing that
+    does not exist is None. Pressing the button below is the whole of how a
+    backup is taken. #}
+                <div class="backup-value" style="color:var(--text-muted);" title="No backup runs on a timer. Nothing in this system schedules one; a backup happens when somebody presses Download Backup.">None &mdash; backups are taken by hand</div>
+              </div>
+
+              <div class="d-flex gap-2 flex-wrap" style="margin-top:20px;">
+{#- An anchor with `download`, not a button, and a GET, exactly like the eleven
+    export links elsewhere in this project: it changes nothing, and a download is
+    a link. The route is Admin-only all the same -- what leaves is every patient
+    record in the system in one file, which makes it the most consequential read
+    this application offers. The download is recorded in Audit Logs for that
+    reason, even though no record changed. #}
+                <a class="btn-primary-teal" href="{{ url_for('admin.download_backup') }}" download
+                   title="Take a copy of the database now and download it. Safe to press while the system is in use — the copy is made through SQLite's own backup interface and checked before it is sent. The download is recorded in Audit Logs.">
+                  <span class="material-symbols-outlined" style="font-size:18px;">download</span>Download Backup
+                </a>
+              </div>
+
+              <div class="subsection-divider"></div>
+              <div class="subsection-title"><span class="material-symbols-outlined" style="color:var(--teal-dark); font-size:18px;">pending</span>Not built</div>
+{#- The three controls that are still not real, in their own fieldset now that
+    the button above them is. Keeping them beside a working download would be
+    misleading if they were not visibly separated from it, which is what this
+    subheading and the fieldset are for. #}
+              <fieldset class="unavailable-form" disabled>
               <div class="row g-3 mt-1 mb-3">
                 <div class="col-md-6">
                   <label class="field-label">Backup Frequency</label>
-                  <select class="form-select">
+                  <select class="form-select" title="{{ unavailable.backup }}">
                     <option selected>Daily</option>
                     <option>Weekly</option>
                     <option>Monthly</option>
@@ -660,7 +933,7 @@
                 </div>
                 <div class="col-md-6">
                   <label class="field-label">Retention Period</label>
-                  <select class="form-select">
+                  <select class="form-select" title="{{ unavailable.backup }}">
                     <option>30 days</option>
                     <option selected>90 days</option>
                     <option>1 year</option>
@@ -668,17 +941,19 @@
                 </div>
               </div>
 
-              <div class="d-flex gap-2 flex-wrap">
-                <button type="button" class="btn-primary-teal" disabled title="{{ unavailable.backup }}"><span class="material-symbols-outlined" style="font-size:18px;">backup</span>Backup Now</button>
-                <button type="button" class="btn-outline-teal" disabled title="{{ unavailable.backup }}"><span class="material-symbols-outlined" style="font-size:18px;">download</span>Download Backup</button>
-                <button type="button" class="btn-ghost-ids" disabled title="{{ unavailable.backup }}"><span class="material-symbols-outlined" style="font-size:18px;">restore</span>Restore Backup</button>
-              </div>
+              <button type="button" class="btn-ghost-ids" title="{{ unavailable.restore }}"><span class="material-symbols-outlined" style="font-size:18px;">restore</span>Restore Backup</button>
+              </fieldset>
+              <div class="form-text-hint" style="margin-top:8px;">{{ unavailable.restore }}</div>
             </div>
 
             <!-- SYSTEM MAINTENANCE -->
             <div class="tab-pane fade" id="pane-maint">
               <div class="section-title">System Maintenance</div>
               <div class="section-sub">Tools for keeping the system running smoothly</div>
+{#- Its own disabled fieldset, holding what the page-wide one used to. Nothing in
+    this pane is built: there is no maintenance mode, nothing prunes the audit
+    trail on any retention period, and there is no application cache to clear. #}
+              <fieldset class="unavailable-form" disabled>
 
               <div class="toggle-row">
                 <div><div class="toggle-row-label">Maintenance Mode</div><div class="toggle-row-desc">Temporarily restrict access to Administrators only</div></div>
@@ -705,7 +980,8 @@
     does not record; an application cache is not one of them. #}
               </div>
 
-              <button type="button" class="btn-ghost-ids" disabled title="{{ unavailable.settings }} There is also no application cache to clear: pages are served with no-store and every figure is read from the database on each request."><span class="material-symbols-outlined" style="font-size:18px;">cleaning_services</span>Clear Cache</button>
+              <button type="button" class="btn-ghost-ids" title="{{ unavailable.settings }} There is also no application cache to clear: pages are served with no-store and every figure is read from the database on each request."><span class="material-symbols-outlined" style="font-size:18px;">cleaning_services</span>Clear Cache</button>
+              </fieldset>
             </div>
 
             <!-- ABOUT SYSTEM -->
@@ -744,25 +1020,43 @@
                 <div class="about-label">Last Update</div><div class="about-value">Not tracked</div>
               </div>
               <div class="about-item"><div class="about-label">Developer</div><div class="about-value">BSIT Capstone Development Team</div></div>
-              <div class="about-item"><div class="about-label">Institution</div><div class="about-value">San Francisco, Surigao del Norte</div></div>
-              <div class="about-item"><div class="about-label">Deployed For</div><div class="about-value">Barangay Poblacion Health Center</div></div>
+{#- These two were typed literals naming the same place three fields on General
+    Settings now store. They read the stored values, so renaming the facility or
+    correcting the province updates the pane that reports what this system is
+    deployed for, instead of leaving it naming somewhere the system has stopped
+    calling itself. #}
+              <div class="about-item"><div class="about-label">Institution</div><div class="about-value">{{ health_center.municipality }}, {{ health_center.province }}</div></div>
+              <div class="about-item"><div class="about-label">Deployed For</div><div class="about-value">{{ health_center.name }}</div></div>
             </div>
 
           </div>
-          </fieldset>
         </div>
       </div>
     </div>
 
-    <!-- FORM ACTIONS — outside the fieldset above, so each carries its own
-         reason rather than inheriting the fieldset's. There is nothing to save,
-         nothing to cancel and no stored default to reset to. -->
-    <div class="form-actions">
-      <div class="req-legend">Fields marked <span style="color:var(--danger);">*</span> would be required if this screen were connected.</div>
-      <div class="d-flex align-items-center gap-2 flex-wrap">
-        <button type="button" class="btn-danger-text" disabled title="{{ unavailable.settings }}">Cancel</button>
-        <button type="button" class="btn-ghost-ids" disabled title="{{ unavailable.settings }}"><span class="material-symbols-outlined" style="font-size:18px;">restart_alt</span>Reset to Default</button>
-        <button type="button" class="btn-primary-teal" disabled title="{{ unavailable.settings }}"><span class="material-symbols-outlined" style="font-size:18px;">save</span>Save Changes</button>
-      </div>
-    </div>
+{#- THE PAGE-WIDE ACTION BAR IS GONE. It held Cancel, Reset to Default and Save
+    Changes, all three disabled, under a legend reading "Fields marked * would be
+    required if this screen were connected."
+
+    It cannot survive this change, and not merely because it was dead. A single
+    Save Changes at the foot of the page claims to save the page, and the page is
+    now nine panes of which exactly one saves -- so a live version of that button
+    would be promising to store the DOH licence number and the session timeout,
+    and a disabled version sitting below a General Settings pane that genuinely
+    saves would read as the save having failed. Neither is acceptable.
+
+    The one pane that saves carries its own Save button, inside its own form,
+    where the fields it writes are. That is also how every other form in this
+    project ends -- Register Patient, Add/Edit Medicine, Record Consultation --
+    so this screen now looks like the rest of the application rather than like a
+    settings mockup.
+
+    Cancel and Reset to Default go with it and are not replaced. Cancel had
+    nothing to abandon; reloading the page is what it would have done. Reset to
+    Default would need to mean deleting the six stored rows so the defaults in
+    models/settings.py take over again, which is a real action with real
+    consequences -- it would rename the health center on every screen and export
+    in one click -- and it is not one this task built or tested. A button that
+    does that is a different piece of work; a disabled button promising it is the
+    thing this screen has spent three passes removing. #}
 {% endblock %}

@@ -98,6 +98,7 @@ own UNTRACKED dict names five more. Where the screen already holds the wording -
 Management's does -- it is quoted rather than rewritten, so the file and the
 screen say the same thing in the same words.
 """
+from models.settings import health_center_name
 from routes.report_export import _download  # noqa: F401  (re-exported below)
 from utils.dates import display_date, display_timestamp, long_date, now, today
 from utils.document import LANDSCAPE, render
@@ -351,7 +352,7 @@ def _document(export, produced_by):
         footer_left += f" by {produced_by}"
     payload = render(
         export["sheets"],
-        org="Barangay Poblacion Health Center",
+        org=health_center_name(),
         org_sub="Integrated Data System (IDS-BPHCSN)",
         doc_title=export["doc_title"],
         range_label=export["scope_label"],
@@ -415,7 +416,7 @@ def _cover_sheet(screen, subtitle, produced_by, detail, controls, index, intro,
         *detail,
         ("Exported", stamped.strftime("%B %d, %Y at %I:%M %p")),
         ("Exported by", produced_by or "—"),
-        ("Source", "Barangay Poblacion Health Center records, via IDS-BPHCSN"),
+        ("Source", f"{health_center_name()} records, via IDS-BPHCSN"),
     ]
 
     blocks = [
@@ -439,8 +440,15 @@ def _cover_sheet(screen, subtitle, produced_by, detail, controls, index, intro,
     return sheet(
         "About This File",
         blocks,
-        heading="Barangay Poblacion Health Center",
+        heading=health_center_name(),
         intro=(
+            # NOT SWITCHED TO THE STORED NAME, AND THAT IS THE DELIBERATE HALF OF
+            # THIS CHANGE. Every letterhead line above now reads the health
+            # center's stored name, but this one is the SYSTEM's own title -- the
+            # words IDS-BPHCSN is an acronym of. Renaming the facility does not
+            # rename the software, and rewriting this from a setting would
+            # produce an expansion whose initials no longer spell the acronym
+            # printed beside it.
             "Integrated Data System for Barangay Poblacion Health Center "
             "Networking (IDS-BPHCSN).\n" + intro
         ),

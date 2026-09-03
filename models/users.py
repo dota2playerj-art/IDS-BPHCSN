@@ -311,12 +311,10 @@ PASSWORD_MIN_CHARACTER_KINDS = 3
 
 # The one-sentence version, shown on the form and repeated in the field error so
 # an administrator never has to look in two places for the rule they just broke.
-PASSWORD_RULE_TEXT = (
-    f"At least {PASSWORD_MIN_LENGTH} characters, using at least "
-    f"{PASSWORD_MIN_CHARACTER_KINDS} of these four: a small letter, a capital "
-    "letter, a number, and a symbol. It must not contain the username or the "
-    "person's name, and must not be a commonly-used password."
-)
+#
+# BUILT AT THE BOTTOM OF THIS FILE, NOT HERE, because it now names the four
+# character kinds by reading PASSWORD_CHARACTER_KINDS -- which is defined below
+# this line, beside the function that tests them. See password_policy().
 
 # Widely-used passwords, refused outright. Compared after lower-casing and after
 # stripping trailing digits and punctuation, so "password2026" and "qwerty123!"
@@ -342,31 +340,65 @@ REQUIRED_NEW_USER_FIELDS = {
 }
 
 
+# THE FOUR KINDS, AS DATA, BECAUSE TWO THINGS NOW READ THEM.
+# This used to be four `if` statements inside _character_kinds() and a separate
+# English sentence in PASSWORD_RULE_TEXT listing the same four in the same order.
+# Settings' Password Policy pane now displays them as well, which would have made
+# three copies of one list -- and a rule displayed from a second copy is a rule
+# that can be displayed wrongly. The test and the label it is shown under are one
+# entry here, so the pane cannot describe a kind the validator does not count and
+# cannot miss one it does.
+#
+# `not c.isalnum()` covers a space as well as punctuation, which is why the label
+# says so: a passphrase is meant to satisfy this kind without a symbol in it.
+PASSWORD_CHARACTER_KINDS = (
+    ("a small letter", str.islower),
+    ("a capital letter", str.isupper),
+    ("a number", str.isdigit),
+    ("a symbol or a space", lambda c: not c.isalnum()),
+)
+
+
 def _character_kinds(password):
     """How many of the four kinds of character the password uses."""
-    kinds = 0
-    if any(c.islower() for c in password):
-        kinds += 1
-    if any(c.isupper() for c in password):
-        kinds += 1
-    if any(c.isdigit() for c in password):
-        kinds += 1
-    if any(not c.isalnum() for c in password):
-        kinds += 1
-    return kinds
+    return sum(
+        1 for _label, matches in PASSWORD_CHARACTER_KINDS
+        if any(matches(c) for c in password)
+    )
+
+
+def _kinds_phrase():
+    """'a small letter, a capital letter, a number, and a symbol or a space'.
+
+    One function so the sentence on the Add User form, the sentence in the field
+    error a rejected password gets, and the list Settings displays are the same
+    words in the same order -- read off PASSWORD_CHARACTER_KINDS, which is what
+    _character_kinds() actually tests.
+    """
+    labels = [label for label, _matches in PASSWORD_CHARACTER_KINDS]
+    return ", ".join(labels[:-1]) + f", and {labels[-1]}"
+
+
+# The shortest word from a name or a username that rules 3 and 4 will refuse a
+# password for containing. A named constant because check_password_strength()
+# applies it to the username, _name_words() applies it to each part of the full
+# name, and Settings' Password Policy pane states it -- three readers of one
+# number, which is two too many for a literal 2 sitting in a comparison.
+MIN_BANNED_WORD_LENGTH = 3
 
 
 def _name_words(full_name):
     """The parts of a person's name long enough to be worth banning.
 
-    Two letters or fewer are skipped: an initial, or a Filipino particle such as
-    "de" or "y", appears inside far too many ordinary words to refuse a password
-    over -- banning "de" would reject "the blue jeepney" for containing it.
+    Anything shorter than MIN_BANNED_WORD_LENGTH is skipped: an initial, or a
+    Filipino particle such as "de" or "y", appears inside far too many ordinary
+    words to refuse a password over -- banning "de" would reject "the blue
+    jeepney" for containing it.
     """
     return [
         word.lower()
         for word in re.split(r"[^A-Za-z0-9]+", full_name or "")
-        if len(word) > 2
+        if len(word) >= MIN_BANNED_WORD_LENGTH
     ]
 
 
@@ -385,14 +417,14 @@ def check_password_strength(password, username="", full_name=""):
 
     if _character_kinds(password) < PASSWORD_MIN_CHARACTER_KINDS:
         return (
-            f"Use at least {PASSWORD_MIN_CHARACTER_KINDS} of these four: a small "
-            "letter, a capital letter, a number, and a symbol."
+            f"Use at least {PASSWORD_MIN_CHARACTER_KINDS} of these "
+            f"{len(PASSWORD_CHARACTER_KINDS)}: {_kinds_phrase()}."
         )
 
     lowered = password.lower()
 
     username = (username or "").strip().lower()
-    if username and len(username) > 2 and username in lowered:
+    if len(username) >= MIN_BANNED_WORD_LENGTH and username in lowered:
         return (
             "A password must not contain the username. Someone guessing at this "
             "account already knows that word."
@@ -416,6 +448,100 @@ def check_password_strength(password, username="", full_name=""):
         )
 
     return None
+
+
+# ---------------------------------------------------------------------------
+# THE RULE, STATED RATHER THAN ENFORCED
+# ---------------------------------------------------------------------------
+# WHY THIS FUNCTION EXISTS, AND WHY IT IS IN THIS FILE AND NOT ON THE SCREEN.
+#
+# Settings' Password Policy pane used to be five controls describing a policy
+# that was not this one and was not enforced by anything: "Minimum Length 8" in a
+# number box, a 90-day expiry, three complexity toggles, and a switch promising
+# the last three passwords could not be reused. The real rule was twelve
+# characters, three character kinds of four, no username, no name, no common
+# password -- so the screen understated the length, named requirements the
+# validator does not apply one at a time, and offered two features (expiry,
+# reuse history) that do not exist anywhere in this system.
+#
+# The obvious repair is to retype the correct numbers into the same boxes. That
+# is the repair this function exists to refuse. A description typed on a screen
+# is a SECOND copy of the rule, and the whole failure above is what a second copy
+# does over time: somebody changed the validator, or wrote it, and the screen
+# went on describing something else. Every figure below is read from the
+# constants check_password_strength() itself branches on and from the very list
+# _character_kinds() iterates -- so raising PASSWORD_MIN_LENGTH to 14, or adding
+# a fifth character kind, changes what this screen says in the same edit. There
+# is no path by which the pane can be wrong while the validator is right.
+#
+# What it does NOT do is enforce anything. It is a read of the rule, and the pane
+# that renders it is labelled as informational for that reason: the enforcement
+# is check_password_strength(), called by validate_new_user_form() and by
+# validate_password_reset(), and nothing an administrator can type on Screen 13
+# changes it.
+def password_policy():
+    """The live password rule, as facts a screen can render. Nothing is typed here.
+
+    Returns a dict:
+
+        min_length        the length the validator refuses below
+        min_kinds         how many character kinds it requires
+        kinds             every kind it counts, labelled, in the order counted
+        min_banned_word   shortest username or name-word that is refused
+        blocklist_size    how many common passwords are refused outright
+        rule_text         the one-sentence version shown on the Add User form
+        not_enforced      rules this system does NOT apply, said out loud
+
+    `not_enforced` is part of the answer rather than an omission from it. The
+    pane it feeds replaced controls for an expiry period and a reuse history, and
+    a pane that simply stopped mentioning them would leave an administrator to
+    assume they are handled somewhere else. They are not handled anywhere.
+    """
+    return {
+        "min_length": PASSWORD_MIN_LENGTH,
+        "min_kinds": PASSWORD_MIN_CHARACTER_KINDS,
+        "kinds": [label for label, _matches in PASSWORD_CHARACTER_KINDS],
+        "min_banned_word": MIN_BANNED_WORD_LENGTH,
+        "blocklist_size": len(COMMON_PASSWORDS),
+        "rule_text": PASSWORD_RULE_TEXT,
+        "not_enforced": [
+            (
+                "Passwords do not expire",
+                "No password has an age recorded against it and nothing checks "
+                "one, so no account is ever asked to change its password on a "
+                "schedule.",
+            ),
+            (
+                "Previous passwords are not remembered",
+                "Only the current hash is stored. There is no history to compare "
+                "against, so a password can be re-set to what it was before.",
+            ),
+            (
+                "Each character kind is not required on its own",
+                f"The rule counts how many of the {len(PASSWORD_CHARACTER_KINDS)} "
+                f"kinds appear and asks for {PASSWORD_MIN_CHARACTER_KINDS} of "
+                "them. A long passphrase with no symbol passes; so does one with "
+                "no capital letter.",
+            ),
+            (
+                "The three seeded demo accounts were never checked against this",
+                "This rule governs passwords set from now on. A stored hash "
+                "cannot be re-validated, because the password is not recoverable "
+                "from it -- which is the entire reason it is stored that way.",
+            ),
+        ],
+    }
+
+
+# Assembled from the same constants and the same kinds list password_policy()
+# reports and _character_kinds() counts, so the sentence on the Add User form,
+# the sentence in the field error, and the pane on Settings are one sentence.
+PASSWORD_RULE_TEXT = (
+    f"At least {PASSWORD_MIN_LENGTH} characters, using at least "
+    f"{PASSWORD_MIN_CHARACTER_KINDS} of these {len(PASSWORD_CHARACTER_KINDS)}: "
+    f"{_kinds_phrase()}. It must not contain the username or the person's name, "
+    "and must not be a commonly-used password."
+)
 
 
 def username_taken(username):

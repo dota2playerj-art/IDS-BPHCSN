@@ -16,8 +16,8 @@ from models.appointments import (
     APPOINTMENT_TYPES,
     BOOKING_HORIZON_DAYS,
     BOOKING_NOTES_MAX,
-    BOOKING_TIME_SLOTS,
     CLOSURE_STATUSES,
+    booking_time_slots,
     check_in_patient,
     close_appointment,
     complete_consultation,
@@ -304,7 +304,11 @@ def booking_context(booking=None):
             "acknowledge_conflict": bool(booking.get("acknowledge_conflict")),
         },
         "appointment_types": APPOINTMENT_TYPES,
-        "booking_time_slots": BOOKING_TIME_SLOTS,
+        # Read per render rather than from a module constant: the clinic day is
+        # a stored setting now, so the dropdown has to be built from whatever
+        # Screen 13 currently holds -- and from the same call validate_booking()
+        # makes, so the times offered and the times accepted cannot diverge.
+        "booking_time_slots": booking_time_slots(),
         "booking_notes_max": BOOKING_NOTES_MAX,
         "clinical_staff": get_clinical_staff(),
         # The date input's own bounds, so the picker refuses out-of-range days

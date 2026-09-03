@@ -62,7 +62,11 @@ from routes.patient_views import (
     registered_patient_name,
     save_and_register_another_requested,
 )
-from routes.settings_views import settings_context
+from routes.settings_views import (
+    backup_download_response,
+    process_general_settings,
+    settings_context,
+)
 from routes.report_export import (
     analytics_pdf,
     analytics_workbook,
@@ -916,7 +920,68 @@ def export_audit_logs_pdf():
 @login_required
 @role_required("Admin")
 def settings():
-    # A context at last, and a deliberately small one -- see
-    # routes/settings_views.py for why only the Security pane gets real figures
-    # while every other pane on this screen stays a disabled control.
+    # See routes/settings_views.py for what each pane on this screen now is:
+    # one stored form, four panes read live from what the system actually does,
+    # and the rest disabled with a reason.
     return render_template('settings.html', **settings_context())
+
+
+# SAVING GENERAL SETTINGS. POST only, and Admin only.
+#
+# THE GUARD IS THE ENFORCEMENT, NOT A COPY OF THE SCREEN'S, and the reach of
+# these six values is why it matters as much here as on add_user(). They are not
+# display text. The health center's name is the first thing in every appointment
+# SMS this system sends, so an endpoint another role could reach would let that
+# role change what is texted to every patient in the barangay, over the health
+# center's own name. The opening and closing times are what the bookable slots
+# are generated from and what validate_booking() accepts, so the same endpoint
+# would let that role close the clinic's booking day, or open it to hours nobody
+# is working.
+#
+# No GET. It changes stored values, so there is no URL to navigate to and none a
+# link, a bookmark or a prefetch could reach.
+#
+# A refused submit returns a rendered page rather than a redirect, because it
+# carries typing that must survive: the form comes back with the messages beside
+# the fields and every value still in it. That is the same treatment add_user()
+# and edit_user() give theirs, and the reason process_general_settings() returns
+# a context instead of a message.
+@admin_bp.route('/settings/general', methods=["POST"])
+@login_required
+@role_required("Admin")
+def save_general_settings():
+    context, message = process_general_settings(
+        request.form, session.get("user_id"), request.remote_addr
+    )
+    if context is not None:
+        return render_template('settings.html', **context)
+    flash(message)
+    return redirect(url_for("admin.settings"))
+
+
+# DOWNLOADING A BACKUP. Admin only, and a GET, unlike every other route in this
+# block.
+#
+# WHY A GET WHEN IT IS GUARDED THIS HEAVILY. It changes nothing. Every other
+# guarded endpoint here writes, and a GET on one of those would be reachable by a
+# link or a prefetch that could alter a record; this one reads the database and
+# hands back a copy, exactly like the eleven export routes above it, and it is a
+# GET for the same reason they are -- a download is an anchor with `download` on
+# it, not a form.
+#
+# THAT IT CHANGES NOTHING IS NOT WHY IT IS GUARDED. What leaves is every patient
+# record, every consultation, every immunisation and every account row in one
+# file, which makes this the single most consequential read the application
+# offers. role_required("Admin") is the enforcement: an endpoint another role
+# could reach would hand the whole register to anyone who could sign in.
+#
+# The download is recorded in the audit trail even though no record changed --
+# see ACTION_BACKUP_DOWNLOADED in models/audit.py for why that is the one read in
+# this system worth an entry.
+@admin_bp.route('/settings/backup.db')
+@login_required
+@role_required("Admin")
+def download_backup():
+    return backup_download_response(
+        session.get("user_id"), request.remote_addr
+    )

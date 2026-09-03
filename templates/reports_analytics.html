@@ -141,7 +141,7 @@
     same resolved window the figures below were counted over. #}
     <div class="print-only print-head">
       <div>
-        <div class="print-org-name">Barangay Poblacion Health Center</div>
+        <div class="print-org-name">{{ health_center.name }}</div>
         <div class="print-org-sub">Integrated Data System &mdash; IDS-BPHCSN</div>
       </div>
       <div class="print-doc">
@@ -151,7 +151,7 @@
       </div>
     </div>
 
-    <div class="eyebrow no-print">Barangay Poblacion Health Center</div>
+    <div class="eyebrow no-print">{{ health_center.name }}</div>
     <div class="page-title no-print">Reports &amp; Analytics</div>
     <div class="page-desc no-print">Statistics on patients, appointments, medicine, SMS, and health programs for DOH reporting and clinic planning.</div>
 
@@ -809,7 +809,7 @@
 
     <div class="print-only print-foot">
       {{ selection.type_label }} &middot; {{ window.start | long_date }} to {{ window.end | long_date }}
-      &middot; generated from Barangay Poblacion Health Center records by IDS-BPHCSN.
+      &middot; generated from {{ health_center.name }} records by IDS-BPHCSN.
       Registrations, appointments, consultations and SMS activity are counted inside this range.
       Medicine stock, the roster breakdowns and the programme memberships are the position as of
       {{ report_date | long_date }} and are marked as such where they appear.

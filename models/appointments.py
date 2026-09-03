@@ -25,6 +25,7 @@ import calendar as _calendar
 from datetime import date, datetime, timedelta
 
 from database.connection import get_db
+from models.settings import clinic_hours, display_time
 from utils.dates import now, recent_months, resolve_range, today
 
 # Statuses that still represent a commitment the patient is expected to keep.
@@ -90,31 +91,60 @@ APPOINTMENT_TYPES = (
     "Follow-up Consultation",
 )
 
-# Clinic hours and the granularity bookings are taken at. Half-hour slots rather
-# than a free-text time for two reasons: the operator cannot mistype 0930 as
-# 09:3, and "another patient already has this slot" becomes an exact comparison
-# instead of a fuzzy one about how near two times have to be to collide.
-CLINIC_OPEN_HOUR = 8
-CLINIC_CLOSE_HOUR = 17
+# The granularity bookings are taken at. Half-hour slots rather than a free-text
+# time for two reasons: the operator cannot mistype 0930 as 09:3, and "another
+# patient already has this slot" becomes an exact comparison instead of a fuzzy
+# one about how near two times have to be to collide.
 SLOT_MINUTES = 30
 
 
-def _build_time_slots():
+# THE CLINIC DAY IS NO LONGER TWO CONSTANTS IN THIS FILE.
+# It was CLINIC_OPEN_HOUR = 8 and CLINIC_CLOSE_HOUR = 17, and BOOKING_TIME_SLOTS
+# was a module-level tuple built from them once, at import. Both are now read
+# from the settings table through models/settings.py, where an administrator can
+# change them on Screen 13 -- so the two constants are gone rather than kept as
+# a second copy of a value that can now move.
+#
+# THE SLOTS ARE A FUNCTION NOW, AND THEY HAD TO BECOME ONE.
+# A module-level tuple is computed at import and never again, so a clinic whose
+# hours were changed at 10am would keep offering yesterday's slots until the
+# process was restarted -- and, worse, validate_booking() would go on refusing
+# times the screen had just started offering, because both read the same stale
+# tuple. Called per request, the dropdown and the validator cannot disagree.
+#
+# The cost is one settings read per call, and it is not one query per call:
+# models/settings.py caches the resolved values on flask.g for the life of the
+# request, so a booking render that asks for the slots twice reads the table
+# once.
+def booking_time_slots():
     """('08:00', '08:30', ... '16:30') -- every bookable slot in a clinic day.
 
-    The last slot starts one interval before closing, so nothing is booked to
-    begin at the moment the doors shut.
+    Generated from the stored opening time upwards in SLOT_MINUTES steps, so a
+    clinic that opens at 08:15 books at 08:15, 08:45 and so on. The last slot
+    starts one interval before closing, so nothing is booked to begin at the
+    moment the doors shut.
+
+    Never empty: validate_general_settings() refuses a clinic day shorter than
+    one slot, so the pair of times behind this always admits at least one.
     """
+    opening, closing = clinic_hours()
     slots = []
-    minute = CLINIC_OPEN_HOUR * 60
-    end = CLINIC_CLOSE_HOUR * 60
-    while minute + SLOT_MINUTES <= end:
+    minute = opening
+    while minute + SLOT_MINUTES <= closing:
         slots.append(f"{minute // 60:02d}:{minute % 60:02d}")
         minute += SLOT_MINUTES
     return tuple(slots)
 
 
-BOOKING_TIME_SLOTS = _build_time_slots()
+def clinic_hours_label():
+    """'8:00 AM to 5:00 PM' -- the stored clinic day, for anything that prints it."""
+    from models.settings import KEY_CLOSING, KEY_OPENING, get_settings
+
+    values = get_settings()
+    return (
+        f"{display_time(values[KEY_OPENING])} to "
+        f"{display_time(values[KEY_CLOSING])}"
+    )
 
 # How far ahead a booking may be made. A year covers the longest thing this
 # center schedules (an annual maintenance review); beyond that a date is far more
@@ -856,12 +886,13 @@ def validate_booking_form(values, staff_ids=()):
             )
 
     appointment_time = (values.get("appointment_time") or "").strip()
+    slots = booking_time_slots()
     if not appointment_time:
         errors["appointment_time"] = "Choose a time slot."
-    elif appointment_time not in BOOKING_TIME_SLOTS:
+    elif appointment_time not in slots:
         errors["appointment_time"] = (
             f"Choose a time from the list — the clinic books "
-            f"{BOOKING_TIME_SLOTS[0]} to {BOOKING_TIME_SLOTS[-1]} in "
+            f"{slots[0]} to {slots[-1]} in "
             f"{SLOT_MINUTES}-minute slots."
         )
 
