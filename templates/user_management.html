@@ -91,6 +91,8 @@
   table.user-table tbody tr{cursor:pointer;}
   table.user-table tbody tr:hover{background:#FAFBFC;}
   table.user-table tbody tr.selected{background:var(--teal-light);}
+  /* Keyboard focus has to be visible on a row that is itself the control. */
+  table.user-table tbody tr:focus-visible{outline:2px solid var(--teal-dark); outline-offset:-2px;}
   table.user-table tbody tr:last-child td{border-bottom:none;}
 
   .user-cell{display:flex; align-items:center; gap:10px;}
@@ -114,12 +116,6 @@
   }
   .badge-active{background:#DCFCE7; color:#15803D;}
   .badge-inactive{background:#F3F4F6; color:#4B5563;}
-
-  .action-icon{
-    width:32px; height:32px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center;
-    color:var(--text-muted); background:transparent; border:none;
-  }
-  .action-icon:hover{background:var(--bg); color:var(--teal-dark);}
 
   .table-footer{display:flex; align-items:center; justify-content:space-between; padding-top:18px; margin-top:6px; border-top:1px solid var(--border-color); flex-wrap:wrap; gap:12px;}
   .pg-info{font-size:13px; color:var(--text-muted);}
@@ -312,12 +308,38 @@
                   <th>Contact</th>
                   <th>Status</th>
                   <th>Last Login</th>
-                  <th style="text-align:right;">Actions</th>
                 </tr>
               </thead>
               <tbody>
 {%- for user in users %}
-                <tr{% if loop.first %} class="selected"{% endif %} data-user="{{ user.id }}" onclick="selectUser(this)">
+{#- THE ROW IS THE CONTROL, AND IT IS REACHABLE BY KEYBOARD.
+
+    There was a View icon in an Actions column here. It called selectUser() on
+    this same row -- the identical function this onclick calls -- so it opened a
+    panel that clicking anywhere else in the row had already opened, one pixel
+    away from itself. It is gone, and the empty column went with it: a header
+    over nothing reads as a control that failed to render. Audit Logs' table is
+    the shape this now matches, and has been all along -- selectable rows, a
+    detail panel beside them, no Actions column.
+
+    What that icon did carry, incidentally rather than by design, was keyboard
+    access: it was a <button>, so Tab reached it and Enter pressed it. Deleting
+    it without replacing that would have left a keyboard-only Administrator able
+    to select no account but the first -- every other account's Edit, Reset
+    Password and Deactivate live inside a panel that is `hidden` until its row is
+    chosen, and hidden content takes no focus. That is a loss of function, not of
+    decoration, so the row carries the affordance now instead of a duplicate
+    control in a column of its own: tabindex makes it focusable, the keydown
+    handler below activates it on Enter or Space, and aria-controls/aria-expanded
+    say which panel it opens and whether that panel is the one showing.
+
+    The <tr> stays a <tr>. role="button" would have made it focusable too and
+    would have stopped a screen reader announcing it as a table row at all,
+    which is the one thing about it worth announcing. #}
+                <tr{% if loop.first %} class="selected"{% endif %} data-user="{{ user.id }}"
+                    tabindex="0" aria-controls="userDetail{{ user.id }}"
+                    aria-expanded="{{ 'true' if loop.first else 'false' }}"
+                    onclick="selectUser(this)">
                   <td>
                     <div class="user-cell">
                       <div class="user-avatar">{{ user.initials }}</div>
@@ -348,14 +370,6 @@
                   <td>
                     {%- if user.last_login_display %}{{ user.last_login_display }}
                     {%- else %}<span class="muted-cell" title="This account exists and can sign in, but no sign-in has ever been recorded against it.">Never signed in</span>{% endif %}
-                  </td>
-                  <td>
-                    <div class="d-flex justify-content-end gap-1">
-                      <button class="action-icon" type="button" onclick="selectUser(this.closest('tr')); event.stopPropagation();"
-                              aria-label="View details for {{ user.full_name }}" title="View details">
-                        <span class="material-symbols-outlined" style="font-size:18px;">visibility</span>
-                      </button>
-                    </div>
                   </td>
                 </tr>
 {%- endfor %}
@@ -1025,13 +1039,36 @@
 
 {% block scripts %}
 <script>
+  // Called by the row's own onclick and by the keydown handler below. It keeps
+  // aria-expanded in step with what is actually showing, because the attribute
+  // is rendered once on the server for whichever row starts selected and would
+  // otherwise still be claiming that row is open after another was chosen.
   function selectUser(row){
-    document.querySelectorAll('#userTable tbody tr').forEach(function(r){ r.classList.remove('selected'); });
+    document.querySelectorAll('#userTable tbody tr').forEach(function(r){
+      r.classList.remove('selected');
+      r.setAttribute('aria-expanded', 'false');
+    });
     row.classList.add('selected');
+    row.setAttribute('aria-expanded', 'true');
     document.querySelectorAll('.user-detail').forEach(function(panel){ panel.hidden = true; });
     var detail = document.getElementById('userDetail' + row.dataset.user);
     if (detail) { detail.hidden = false; }
   }
+
+  // Enter or Space on a focused row does what clicking it does. The rows are the
+  // only way to choose an account since the duplicate View icon was removed, so
+  // without this an Administrator working from the keyboard could reach the
+  // controls of the first account and no other -- see the note on the row.
+  //
+  // Space is prevented from its default, which on a focusable element is to
+  // scroll the page. Enter is not, because it has no default here.
+  document.addEventListener('keydown', function(event){
+    if (event.key !== 'Enter' && event.key !== ' ' && event.key !== 'Spacebar') { return; }
+    var row = event.target.closest ? event.target.closest('#userTable tbody tr') : null;
+    if (!row || row !== event.target) { return; }
+    if (event.key !== 'Enter') { event.preventDefault(); }
+    selectUser(row);
+  });
 
   // A submit that did not save comes back with what was typed and the errors
   // beside the fields; this reopens the dialog on it. The same mechanism

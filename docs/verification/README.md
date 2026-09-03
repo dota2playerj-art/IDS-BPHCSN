@@ -25,6 +25,16 @@ So the evidence lives on the machine that produced it. What is committed is this
 file, naming what was captured and how to produce it again, so the absence is
 stated rather than left for someone to trip over.
 
+## view-icon-removal/
+
+Verification that User Management's View icon and its Actions column are gone —
+the icon called the same `selectUser()` the row's own click calls, so it opened a
+panel that clicking anywhere else in the row had already opened — and that the
+keyboard access the button carried incidentally moved onto the row rather than
+being deleted with it. 202 checks, a measured table layout with no trailing gap,
+and a live pass in which an account was chosen by Enter and by Space and its Edit
+dialog opened from there.
+
 ## immunization-next-step/
 
 Verification that every Due and Overdue row on the Immunization Record tab now
