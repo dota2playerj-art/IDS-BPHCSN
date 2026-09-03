@@ -238,15 +238,29 @@ APPOINTMENT_UNTRACKED = (
 # appearing in exports.
 # The "write" key is gone from that dict and so is the row that quoted it. It
 # was labelled "Creating, editing and deactivating accounts" and said none of the
-# three was built; two of them are, from this screen, so the label and the reason
-# were both false. What is left of it is the one clause that is still true --
-# editing an existing account -- under its own key and its own label.
+# three was built; two of them were, from this screen, so the label and the
+# reason were both false.
+#
+# Its two successors have now gone the same way, for the same reason and one step
+# further on. "Editing an existing account" and "Password reset" quoted the
+# `edit_account` and `reset_password` reasons, and both of those said the feature
+# did not exist. Both exist -- Edit User changes a full name and a role, Reset
+# Password sets a new one -- so the reasons were deleted from the screen and
+# these two rows go with them.
+#
+# The rows are removed rather than left to be dropped by the `if key in
+# untracked` filter further down. That filter would have made this file quietly
+# correct while this tuple went on naming two absences the system does not have,
+# and the next person to read it would have believed the tuple.
+#
+# What replaced those reasons is not an absence at all. A username cannot be
+# changed and a stored password cannot be read back; both are rules the system
+# enforces on purpose, worded beside the controls that enforce them, and this
+# sheet lists what the system CANNOT do rather than what it refuses to.
 USER_STATED_UNTRACKED = (
     ("Station and zone assignment", "assignment"),
     ("Invitation and lock-out states", "invitations"),
     ("Contact details", "contact"),
-    ("Editing an existing account", "edit_account"),
-    ("Password reset", "reset_password"),
 )
 
 

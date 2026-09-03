@@ -42,6 +42,38 @@ of them is a decision rather than an implementation detail:
   models.users.deactivate_user(), inside the transaction that does the write,
   and this file only words it. See the section note further down.
 
+
+EDIT USER AND RESET PASSWORD ARE REAL AS WELL, AND WHAT THAT SETTLED
+---------------------------------------------------------------------
+Both were disabled buttons with a sentence explaining that the system could not
+do it. Both do it now, and three of the decisions behind them belong here beside
+the other three rather than only in the model:
+
+* A username cannot be edited, and the form says so on the field itself -- the
+  box is rendered read-only with the reason under it, rather than being left
+  editable and rejected on submit. This project's rule is that a control which
+  will not work should not look as though it will. The reason is that
+  audit_logs attributes every action to an account and the entries name it by
+  username; renaming one would leave the trail describing actions taken by a
+  person the roster no longer knows.
+
+* The last-administrator refusal now covers a role change as well as a
+  deactivation. Demoting the only Administrator who can sign in produces exactly
+  the lockout that refusal exists to prevent -- the account still signs in, and
+  reaches nothing that could put an Administrator back. It is enforced in
+  models.users.update_user() inside the write, and worded here.
+
+* A refused edit reopens its dialog with what was typed still in it, rather than
+  flashing above a closed one. That is the difference between this pair and the
+  deactivation buttons: a deactivation carries no typing to lose, so its
+  refusals are flashes, while an edit whose role was refused may also carry a
+  name correction the administrator does not want to type again.
+
+An administrator resetting a password is not asked for the old one, and cannot
+usefully be: it is stored as a one-way hash and not knowing it is the situation
+the reset exists for. What guards the action is that only an Administrator can
+reach the route at all, and that every reset writes an entry naming who did it.
+
 The screen was drawn as a staff directory for a much larger centre: eighteen
 users across five roles (Nurse, Midwife, Pharmacist, Barangay Health Worker),
 each with a station assignment, a mobile number, an invitation status and a
@@ -96,26 +128,37 @@ drift from the enforcement the way a hand-written list would.
 from flask import current_app, session
 
 from models.audit import (
+    ACTION_PASSWORD_RESET,
     ACTION_USER_CREATED,
     ACTION_USER_DEACTIVATED,
+    ACTION_USER_EDITED,
     ACTION_USER_REACTIVATED,
+    ACTION_USER_ROLE_CHANGED,
     MODULE_USERS,
+    describe_changes,
     get_last_logins,
     log_action,
 )
 from models.users import (
     ADMIN_ROLE,
     ALREADY_IN_THAT_STATE,
+    EDITABLE_USER_FIELDS,
     LAST_ADMINISTRATOR,
     PASSWORD_RULE_TEXT,
     ROLE_CHOICES,
+    ROLE_LABELS,
+    USER_EDIT_LABELS,
     count_active_admins,
     create_user,
     deactivate_user,
     get_all_users,
     get_user_by_id,
     reactivate_user,
+    set_user_password,
+    update_user,
     validate_new_user_form,
+    validate_password_reset_form,
+    validate_user_edit_form,
 )
 from utils.dates import day_start_utc, days_ago, display_timestamp, today
 from utils.roles import normalize_role
@@ -218,28 +261,35 @@ UNTRACKED = {
     # What survives is the one clause that is still true, and it is a different
     # claim about a different control, so it gets its own key and its own
     # wording below rather than inheriting the old one's.
-    "edit_account": (
-        "Editing an existing account is not built. A name, a username and a role "
-        "are set when the account is created, and nothing can change them "
-        "afterwards. Deactivating the account and creating a replacement is the "
-        "only way round it today; the old account stays in the roster and keeps "
-        "its history."
-    ),
-    # STILL TRUE, AND NOW SAYING WHERE THE ONE PASSWORD-SETTING MOMENT IS.
-    # It said each password "is set once when the account is first created", and
-    # that was written when nothing in the application could create one -- so the
-    # sentence described a moment that had only ever happened at first boot. It
-    # is a moment an administrator now lives through on this screen, so the
-    # reason points at it: a reader who has just been told the password cannot be
-    # reset is owed the fact that the one chance to set it has already gone by.
-    "reset_password": (
-        "Password reset is not built. A password is set once, by the "
-        "administrator who creates the account, and nothing afterwards can "
-        "change it -- not this screen, and not the account's own holder. It is "
-        "stored only as a hash, so it cannot be looked up or recovered either, "
-        "and there is no email channel to send a reset through. An account whose "
-        "password has been forgotten has to be deactivated and replaced."
-    ),
+    # THERE IS NO "edit_account" ENTRY ANY MORE, AND THAT IS THE POINT.
+    # It said "editing an existing account is not built", that a name, a username
+    # and a role are fixed at creation, and that deactivating the account and
+    # creating a replacement was "the only way round it today". Two of those
+    # three clauses are false now: Edit User changes a full name and a role, and
+    # the replacement dance is no longer anybody's only option.
+    #
+    # The surviving clause -- that a username cannot be changed -- is not a gap
+    # and does not belong in this dict at all. UNTRACKED collects the things this
+    # system CANNOT do; a fixed username is a thing it REFUSES to do, for a
+    # stated reason, exactly as the last-administrator rule is. Those are worded
+    # beside the control that enforces them, which is where the field's own
+    # helper text now says it, so a reader meets the rule at the box it governs
+    # rather than in a tooltip on a button.
+    #
+    # So it goes the way "last_login", "search", "export" and "write" went before
+    # it, rather than being narrowed until it describes something else. A reason
+    # that denies a working control is the worst kind this project keeps.
+    #
+    # THERE IS NO "reset_password" ENTRY EITHER, FOR THE SAME REASON.
+    # It said password reset "is not built", that nothing after creation could
+    # change a password -- "not this screen, and not the account's own holder" --
+    # and that a forgotten password meant deactivating the account and replacing
+    # it. This screen does it now. Half of the old sentence is still true and is
+    # still said: the holder cannot change their own, and a stored password
+    # cannot be looked up or recovered. Both of those are printed inside the
+    # Reset Password dialog, where they are answers to what an administrator is
+    # about to do, rather than kept here as an explanation for a control that no
+    # longer needs one.
 }
 
 # Endpoint stems whose underscores do not title-case into anything a reader
@@ -365,7 +415,10 @@ def _decorate(user, last_logins, active_admins, signed_in_id):
     }
 
 
-def user_management_context(add_form=None, add_errors=None, add_open=False):
+def user_management_context(
+    add_form=None, add_errors=None, add_open=False,
+    edit_state=None, reset_state=None,
+):
     """Everything Screen 11 renders.
 
     The three `add_*` arguments carry the Add User dialog's state back after a
@@ -378,6 +431,18 @@ def user_management_context(add_form=None, add_errors=None, add_open=False):
     See _extract_add_user_form() below for why re-rendering a password into an
     HTML attribute is the one case where keeping what was typed is the wrong
     call.
+
+    `edit_state` and `reset_state` are the same idea for the two per-account
+    dialogs, and they are single objects rather than three arguments each because
+    each of them has to say WHICH account it belongs to. Add User has one dialog
+    on the page; Edit User and Reset Password have one per row, so the state must
+    carry a user_id or the wrong person's dialog would spring open holding
+    somebody else's correction. Their shape is built by _edit_state() and
+    _reset_state() below and is the same shape
+    routes/vaccination_correction_views.py::_reopen() returns.
+
+    Only one of the three can be set on any render, because a POST arrives from
+    one form.
     """
     last_logins = get_last_logins()
     # One count for the whole render. Every row's "is this the last
@@ -426,6 +491,14 @@ def user_management_context(add_form=None, add_errors=None, add_open=False):
         "add_form": add_form or {},
         "add_errors": add_errors or {},
         "add_open": bool(add_open),
+        # The two per-account dialogs' state after a submit that did not save.
+        # None on an ordinary render, which is what keeps every dialog closed.
+        "edit_state": edit_state,
+        "reset_state": reset_state,
+        # The stored role strings mapped to the words the form shows, so a
+        # refusal can name a role in the same language the dropdown offered it
+        # in rather than in the value the database holds.
+        "role_labels": ROLE_LABELS,
         # The two values the status form posts, named here so the template's
         # buttons and process_account_status() below read the same two strings
         # and cannot drift out of agreement.
@@ -689,6 +762,321 @@ def process_account_status(form_data, actor_id, ip_address=None):
     return (
         f'{user["full_name"]}’s account is active again. They can sign in with '
         "the same password they had before it was deactivated — no new password "
-        "was set, so if they have forgotten it there is no way to look it up or "
-        "reset it from this screen."
+        "was set. If they have forgotten it, it still cannot be looked up, but "
+        "Reset Password on this screen sets them a new one."
     )
+
+
+# ---------------------------------------------------------------------------
+# EDIT USER, AND RESET PASSWORD
+# ---------------------------------------------------------------------------
+# THE SPLIT IS THE SAME SPLIT. models/users.py decides -- what a name and a role
+# may be, and whether demoting this particular account would lock everybody out
+# -- and returns an errors dict or a (before, after, refusal) triple. This file
+# turns that into what a person reads and what the trail keeps.
+#
+# WHY BOTH OF THESE REOPEN A DIALOG WHERE DEACTIVATE FLASHES.
+# process_account_status() answers every outcome, refusals included, with a
+# sentence above a closed page, and that is right for it: a deactivation is a
+# button press carrying no typing, so there is nothing to preserve and nothing
+# to correct in place. These two carry typing. An edit refused because it would
+# demote the last Administrator may also hold a name correction that was
+# perfectly good, and a reset refused for a weak password has had twelve
+# characters entered twice. Throwing either away and explaining it from the top
+# of the page is the failure the whole form-redisplay pass in this project
+# existed to remove, so neither is built that way.
+#
+# WHAT THE ENTRIES SAY, AND WHAT THEY STILL NEVER SAY.
+# A role change spells out the role held before and the role held after, in one
+# sentence, so the pair can be read without joining this entry to an earlier one
+# -- which is the whole of what makes "elevate, act, revert" visible in a list.
+# The acting administrator is named in the text as well as carried in user_id,
+# for the reason ACTION_USER_CREATED's entries name them: the author and the
+# subject are two different people here.
+#
+# And the password is not in any of it. Not the value, not a hash, not its
+# length, not which rules it passed or failed. process_reset_password() below
+# does not pass the plaintext to anything except the validator and the model,
+# and the entry it writes is composed from the account row rather than from the
+# form.
+
+# The two fields Edit User posts besides the account it names.
+_EDIT_USER_FIELDS = EDITABLE_USER_FIELDS
+
+
+def _resolve_target(form_data):
+    """The account a per-account dialog was submitted against. Returns (id, row).
+
+    (None, None) means the form did not name an account this system holds. Both
+    dialogs are rendered per row with the id in a hidden field, so reaching that
+    branch means a POST that did not come from this page -- which is exactly the
+    request that must not be trusted, and is why the row is read back out of the
+    database rather than taken from the form.
+    """
+    raw_id = (form_data.get("user_id") or "").strip()
+    if not raw_id.isdigit():
+        return None, None
+    user_id = int(raw_id)
+    return user_id, get_user_by_id(user_id)
+
+
+def _edit_state(user_id, values, errors, banner=None):
+    """The Edit User dialog's state after a submit that did not save.
+
+    `banner` is the sentence at the top of the reopened dialog when the refusal
+    is about the edit as a whole rather than about one box -- the
+    last-administrator refusal is the only one, and it needs the room to explain
+    what would have broken. Field errors carry their own wording next to the
+    field and leave this None.
+    """
+    return {
+        "open": True,
+        "user_id": user_id,
+        "errors": errors,
+        "banner": banner,
+        "form": {field: values.get(field, "") for field in _EDIT_USER_FIELDS},
+    }
+
+
+def _reset_state(user_id, errors):
+    """The Reset Password dialog's state after a submit that did not save.
+
+    There is no `form` on this one, and its absence is the point. Both boxes hold
+    a password, and _extract_add_user_form() states in full why a password is the
+    one value this project does not re-render into a `value=` attribute: it would
+    put a working credential into the page source and the browser's history cache,
+    at the exact moment -- a rejected submit -- when the tab is most likely to be
+    left open. The dialog comes back naming the account and carrying the error;
+    both boxes are empty.
+    """
+    return {
+        "open": True,
+        "user_id": user_id,
+        "errors": errors,
+    }
+
+
+def _role_phrase(role):
+    """A stored role string, in the words the form offered it in."""
+    return ROLE_LABELS.get(role, role)
+
+
+def process_edit_user(form_data, actor_id, ip_address=None):
+    """Change one account's full name and role. Returns (user_id, context, message).
+
+    The same three-way contract process_create_user() uses: a user_id means the
+    caller redirects and flashes `message`, a context means it re-renders User
+    Management with this account's dialog reopened on what was typed.
+
+    NOTHING ABOUT THE USERNAME IS READ FROM THIS FORM. `values` is built from
+    EDITABLE_USER_FIELDS, which does not contain it, so a posted username is not
+    validated, not rejected and not written -- there is simply no path from the
+    request to that column. The template renders the box read-only; this is why
+    that is a statement of the rule rather than the whole of it.
+
+    A SAVE THAT CHANGED NOTHING IS NOT AN EVENT. describe_changes() reports which
+    of the two fields actually moved, and when neither did the answer is a flash
+    saying so, with no audit entry written. The alternative -- an entry reading
+    "Full name: 'Arnel Manalastas' -> 'Arnel Manalastas'" -- is the kind of row that
+    makes a trail harder to read rather than more complete.
+    """
+    user_id, user = _resolve_target(form_data)
+    if user is None:
+        return None, None, "That account could not be found."
+
+    values = {
+        field: (form_data.get(field) or "").strip() for field in _EDIT_USER_FIELDS
+    }
+
+    errors = validate_user_edit_form(values)
+    if errors:
+        return None, user_management_context(
+            edit_state=_edit_state(user_id, values, errors)
+        ), None
+
+    before, after, refusal = update_user(user_id, values)
+
+    if before is None:
+        if refusal == LAST_ADMINISTRATOR:
+            # The refusal is about the role box, so it is worded on the role box,
+            # and the reason it would matter is in the banner above -- the same
+            # division the deactivation refusal makes between "this is not
+            # allowed" and "here is what it would break". Everything typed comes
+            # back, including a name correction that was never the problem.
+            return None, user_management_context(edit_state=_edit_state(
+                user_id,
+                values,
+                {"role": (
+                    f'{user["full_name"]} must stay an Administrator for now. '
+                    "Leave the role as Administrator to save the rest of this "
+                    "edit."
+                )},
+                banner=(
+                    f'{user["full_name"]}’s role cannot be changed: this is the '
+                    "last Administrator account that can still sign in. Only an "
+                    "Administrator can open User Management, so moving this "
+                    "account to another role would leave nobody able to create "
+                    "an account, restore one, or undo the change — exactly the "
+                    "lockout that deactivating it is refused for, reached by a "
+                    "different button. The system could then only be recovered "
+                    "by editing the database file by hand. Create another "
+                    "Administrator first, and this account's role can then be "
+                    "changed."
+                ),
+            )), None
+        return None, None, "That account could not be found."
+
+    summary, changed = describe_changes(before, after, USER_EDIT_LABELS)
+    if not changed:
+        return user_id, None, (
+            f'No change. {after["full_name"]}’s name and role are already what '
+            "you entered."
+        )
+
+    actor = get_user_by_id(actor_id) if actor_id else None
+    role_changed = "role" in changed
+    acting_on_self = actor_id is not None and user_id == actor_id
+
+    # A role change names the entry even when the name moved in the same submit.
+    # The more serious of the two facts is the one a reviewer scans for; both are
+    # in `details` either way.
+    if role_changed:
+        role_sentence = (
+            f'; ROLE CHANGED: this account held {_role_phrase(before["role"])} '
+            f'("{before["role"]}") and now holds {_role_phrase(after["role"])} '
+            f'("{after["role"]}") — the screens it can open, and every record it '
+            "can reach, changed with it"
+            + (
+                "; the administrator changed their own role, so their own access "
+                "is what moved"
+                if acting_on_self
+                else ""
+            )
+            + f'; {count_active_admins()} Administrator account'
+            f'{"" if count_active_admins() == 1 else "s"} can sign in after this '
+            "change"
+        )
+    else:
+        role_sentence = (
+            f'; the role is unchanged and remains {_role_phrase(after["role"])} '
+            f'("{after["role"]}"), so nothing about what this account can reach '
+            "has moved"
+        )
+
+    log_action(
+        actor_id,
+        ACTION_USER_ROLE_CHANGED if role_changed else ACTION_USER_EDITED,
+        module=MODULE_USERS,
+        details=(
+            f'Account "{after["username"]}" edited by {_actor_phrase(actor)}; '
+            f"{summary}"
+            + role_sentence
+            + f'; the username "{after["username"]}" is fixed for the life of the '
+            "account and was not changed -- it is what this trail attributes "
+            "every action to; the password was not touched by this edit and the "
+            "account signs in with the credential it already had"
+        ),
+        ip_address=ip_address,
+    )
+
+    message = f'{after["full_name"]}’s account has been updated. {summary}.'
+    if role_changed:
+        message += (
+            f' The role change takes effect immediately — "{after["username"]}" '
+            f"now reaches exactly the screens listed for "
+            f'{_role_phrase(after["role"])} on this page, and no others. The '
+            "change is recorded in the audit trail with both roles named."
+        )
+        if acting_on_self:
+            message += (
+                " You changed your own role, so your own access has changed with "
+                "it and this screen may no longer be open to you."
+            )
+    else:
+        message += " Their role, username and password are unchanged."
+    return user_id, None, message
+
+
+def process_reset_password(form_data, actor_id, ip_address=None):
+    """Set a new password on one account. Returns (user_id, context, message).
+
+    The same three-way contract as process_edit_user() above.
+
+    THE ACCOUNT'S OWN STORED NAME AND USERNAME ARE WHAT THE STRENGTH RULE READS.
+    They are taken from the row this function looked up, not from the request, so
+    the two clauses that refuse a password for containing the username or a part
+    of the person's name are checked against the real account. A form that could
+    supply its own name alongside the password would let "bhwmanalastas2026!!" through
+    for the account named bhwmanalastas by claiming the person is called something
+    else.
+
+    THE OLD PASSWORD IS NOT ASKED FOR AND IS NOT CHECKED. models/users.py's module
+    note gives the reasoning in full: an administrator resetting an account does
+    not know it, cannot be made to know it -- it is a one-way hash -- and
+    demanding it would refuse every legitimate reset while stopping nothing. What
+    stands in its place is the route's role_required("Admin") guard and this
+    function's audit entry.
+    """
+    user_id, user = _resolve_target(form_data)
+    if user is None:
+        return None, None, "That account could not be found."
+
+    values = {
+        "password": form_data.get("password") or "",
+        "confirm_password": form_data.get("confirm_password") or "",
+    }
+
+    errors = validate_password_reset_form(
+        values, user["username"], user["full_name"]
+    )
+    if errors:
+        return None, user_management_context(
+            reset_state=_reset_state(user_id, errors)
+        ), None
+
+    changed, refusal = set_user_password(user_id, values["password"])
+    if not changed:
+        return None, None, "That account could not be found."
+
+    actor = get_user_by_id(actor_id) if actor_id else None
+    acting_on_self = actor_id is not None and user_id == actor_id
+
+    # Composed from the stored account row. The plaintext was handed to the
+    # validator and the model and reaches nothing else -- see the section note.
+    log_action(
+        actor_id,
+        ACTION_PASSWORD_RESET,
+        module=MODULE_USERS,
+        details=(
+            f"Password for account {_account_phrase(user)} reset by "
+            f"{_actor_phrase(actor)}"
+            + (
+                "; the administrator reset the password on their own account"
+                if acting_on_self
+                else ""
+            )
+            + "; the previous password stopped working the moment this was saved "
+            "and the account signs in with the new one from now on; the new value "
+            "was set directly by the administrator, met the same strength rule a "
+            "new account's password must meet, and is stored only as a salted "
+            "hash -- the value itself is not recorded here, in this entry, or "
+            "anywhere else in the system, by design, so nobody including the "
+            "administrator who set it can look it up later; nothing else about "
+            "the account changed -- its username, name, role and whether it may "
+            "sign in are exactly as they were"
+        ),
+        ip_address=ip_address,
+    )
+
+    message = (
+        f'{user["full_name"]}’s password has been reset. They sign in with the '
+        f'new password from now on — the old one stopped working the moment you '
+        "saved this. That password is not stored anywhere it can be read back — "
+        "tell them what it is; nobody, including you, can look it up later."
+    )
+    if acting_on_self:
+        message += (
+            " This is the account you are signed in as. Your current session "
+            "stays open, but the new password is what you will need next time."
+        )
+    return user_id, None, message

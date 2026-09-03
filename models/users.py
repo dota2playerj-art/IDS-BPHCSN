@@ -26,11 +26,45 @@ has to keep existing. Deleting an account would either be refused by the databas
 or, if that constraint were ever relaxed, would orphan the history of everything
 that account did -- which is the one outcome an audit trail exists to prevent.
 
-There is also no password change and no reset. A password is set once, at
-creation, by the administrator creating the account. Changing one later is a
-separate feature with its own decisions to make (does the holder change their
-own? does an administrator overwrite it? is the old one required?) and User
-Management states the absence rather than implying it.
+PASSWORD RESET AND ACCOUNT EDITING ARE HERE NOW, AND WHAT THEY DECIDED
+----------------------------------------------------------------------
+The paragraph that used to stand here said there was no password change and no
+reset, and listed the three questions such a feature would have to answer first.
+They are answered, and the answers are the shape of set_user_password() and
+update_user() below:
+
+* An administrator overwrites the password; the holder does not change their
+  own. There is no self-service screen and no email channel to send a link
+  through, so the only person who can set a credential is the one who could
+  already create the account that holds it.
+* The old password is NOT required, and asking for it would be theatre. An
+  administrator resetting an account does not know its password -- that is the
+  situation the reset exists for -- and could not be made to know it, because
+  the stored value is a one-way hash. A prompt for something nobody can supply
+  would refuse every legitimate reset and stop nothing else.
+* The new password meets the same rule a new account's does, through the same
+  check_password_strength(). One rule, one implementation; a reset that could
+  set a weaker password than creation allows would make the rule advisory.
+
+Hashing is unchanged and is not negotiable. generate_password_hash() with no
+arguments, exactly as create_user() and seed_demo_users() call it, so every
+credential in the table is verified by one code path. Nothing anywhere stores,
+logs or can read back a password -- not the administrator who set it, not this
+module, and not the audit trail.
+
+update_user() edits a full name and a role, and nothing else. THE USERNAME IS
+FIXED FOR THE LIFE OF THE ACCOUNT and is not in its UPDATE at all. It is the
+stable identity every audit entry is attributed to: audit_logs.user_id points at
+the row, and the entries themselves spell the username into their text, so
+renaming one would leave the trail saying that "mdelacruz" performed an action
+that the roster now attributes to somebody else's name. An account that needs a
+different username is a different account -- create it, and deactivate the old
+one, which keeps its history intact and attributable.
+
+The role is the security-sensitive half of that edit, and it carries the
+last-administrator guard for the same reason deactivation does: demoting the only
+Administrator who can sign in is the same unrecoverable lockout as switching them
+off, reached by a different button.
 """
 import re
 import sqlite3
@@ -673,6 +707,244 @@ def reactivate_user(user_id):
             return False, ALREADY_IN_THAT_STATE
 
         _set_active(conn, user_id, True)
+        conn.commit()
+        return True, None
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------------------
+# Editing an account, and resetting its password
+# ---------------------------------------------------------------------------
+# WHAT AN EDIT MAY TOUCH, AND THE ONE FIELD IT MAY NOT.
+# A full name and a role. Not the username, and not by omission -- it is absent
+# from EDITABLE_USER_FIELDS, absent from the UPDATE statement, and rendered
+# read-only on the form, so there are three separate places a change would have
+# to be made before one could happen. The module note at the top of this file
+# gives the reason in full: the username is what the audit trail attributes every
+# action to, and a trail whose subject can be renamed is a trail that cannot
+# answer "who did this".
+#
+# email and phone are not editable either, and for a different reason: nothing in
+# this application ever writes them, so an edit form offering them would be the
+# only place in the system where contact details exist. User Management's
+# `contact` reason says they were never captured, and it stays true.
+EDITABLE_USER_FIELDS = ("full_name", "role")
+
+# The labels describe_changes() prints for the two editable fields, in the order
+# an edit is reported. Kept beside the fields themselves so the audit entry and
+# the form cannot come to disagree about what either one is called.
+USER_EDIT_LABELS = {
+    "full_name": "Full name",
+    "role": "Role",
+}
+
+REQUIRED_USER_EDIT_FIELDS = {
+    "full_name": "Enter the person's full name.",
+    "role": "Choose the role this account holds.",
+}
+
+REQUIRED_PASSWORD_RESET_FIELDS = {
+    "password": "Set a new password for this account.",
+    "confirm_password": "Type the new password a second time to confirm it.",
+}
+
+
+def validate_user_edit_form(values):
+    """Server-side validation for Edit User. Returns {field: message}.
+
+    Same contract as validate_new_user_form() above, and deliberately narrower:
+    it validates the two fields an edit may change and says nothing about the
+    username, because the username is not one of the values update_user() writes.
+    A posted `username` is not rejected here -- it is simply never read, which is
+    the stronger answer. There is nothing to reject when there is no code path
+    that could act on it.
+    """
+    errors = {}
+
+    for field, message in REQUIRED_USER_EDIT_FIELDS.items():
+        if not (values.get(field) or "").strip():
+            errors[field] = message
+
+    full_name = (values.get("full_name") or "").strip()
+    if full_name and len(full_name) > FULL_NAME_MAX_LENGTH:
+        errors["full_name"] = (
+            f"Keep the name to {FULL_NAME_MAX_LENGTH} characters or fewer."
+        )
+
+    role = (values.get("role") or "").strip()
+    if role and role not in USER_ROLES:
+        errors["role"] = "Choose a role from the list."
+
+    return errors
+
+
+def validate_password_reset_form(values, username="", full_name=""):
+    """Server-side validation for Reset Password. Returns {field: message}.
+
+    `username` and `full_name` are the STORED values of the account being reset,
+    passed in by the caller rather than read from the form, so the two rules that
+    compare a password against the person it belongs to are compared against the
+    real account. A form-supplied name would let the same weak password through by
+    posting a different one alongside it.
+
+    The strength rule is check_password_strength() -- the same function, not a
+    copy of it -- so a password an administrator may set on a reset is exactly a
+    password they could have set at creation.
+
+    THE OLD PASSWORD IS NOT AMONG THESE FIELDS AND IS NOT ASKED FOR. See the
+    module note: an administrator resetting an account does not know it, cannot
+    be made to know it because the stored value is a one-way hash, and requiring
+    it would refuse every legitimate reset while stopping nothing. What stands in
+    its place is the guard on the route -- only an Administrator can reach it at
+    all -- and an audit entry naming who did it.
+    """
+    errors = {}
+
+    for field, message in REQUIRED_PASSWORD_RESET_FIELDS.items():
+        if not (values.get(field) or "").strip():
+            errors[field] = message
+
+    password = values.get("password") or ""
+    confirm = values.get("confirm_password") or ""
+
+    if password and "password" not in errors:
+        problem = check_password_strength(password, username, full_name)
+        if problem:
+            errors["password"] = problem
+
+    # Checked even when the strength rule already failed, for the reason
+    # validate_new_user_form() gives: two mistakes about two different boxes are
+    # both shown at once rather than discovered one submit at a time.
+    if password and confirm and password != confirm:
+        errors["confirm_password"] = (
+            "The two passwords do not match. Type the same one in both boxes."
+        )
+
+    return errors
+
+
+def update_user(user_id, values):
+    """Change one account's full name and role. Returns (before, after, refusal).
+
+    `before` and `after` are the row as it was and as it now is, both as plain
+    dicts, so the caller can describe the change without re-reading the table and
+    without risking a description of a row somebody else edited in between. A
+    refusal comes back as (None, None, code) and nothing was written.
+
+    THE LAST-ADMINISTRATOR GUARD IS HERE TOO, AND IT IS THE SAME RULE
+    -----------------------------------------------------------------
+    deactivate_user() refuses to switch off the only Administrator who can sign
+    in, because only an Administrator can open User Management and the result
+    would be a system nobody can ever administer again, recoverable only by
+    editing app.db by hand. Changing that same account's role to anything else
+    produces the identical outcome by a different route: the account still signs
+    in, and it still cannot reach a single screen that could put an Administrator
+    back. Guarding one and not the other would have left the lock on the front
+    door and the back door open.
+
+    So the check is the same check, on the same terms. It fires only when the
+    account is an ACTIVE Administrator, is the only one, and the edit moves its
+    role away from Admin -- an inactive Administrator is not counted by
+    count_active_admins() and demoting one takes nothing away that is currently
+    there, exactly as deactivate_user() does not fire on an account that is
+    already off.
+
+    THE COUNT AND THE UPDATE SHARE ONE TRANSACTION, for the reason spelled out on
+    deactivate_user(): BEGIN IMMEDIATE takes the write lock before the count is
+    read, so two administrators demoting each other at the same moment cannot both
+    be told there are two of them. The second waits, counts one, and is refused.
+
+    An edit that changes nothing is not refused here. It writes the same two
+    values back and returns a `before` and an `after` that are equal, and the
+    caller compares them -- describe_changes() reports no changed fields, and
+    routes/user_views.py declines to flash a change or write an audit entry for a
+    save that saved nothing. That decision is about wording and about what belongs
+    in a trail, so it is made where the wording is.
+    """
+    full_name = (values.get("full_name") or "").strip()
+    role = (values.get("role") or "").strip()
+
+    conn = get_db()
+    try:
+        # Write lock first, then read -- see above.
+        conn.execute("BEGIN IMMEDIATE")
+
+        columns = "id, username, full_name, role, is_active"
+        user = conn.execute(
+            f"SELECT {columns} FROM users WHERE id = ?", (user_id,)
+        ).fetchone()
+        if user is None:
+            conn.rollback()
+            return None, None, ACCOUNT_NOT_FOUND
+
+        if (
+            user["role"] == ADMIN_ROLE
+            and role != ADMIN_ROLE
+            and bool(user["is_active"])
+        ):
+            active_admins = conn.execute(
+                "SELECT COUNT(*) FROM users WHERE is_active = 1 AND role = ?",
+                (ADMIN_ROLE,),
+            ).fetchone()[0]
+            if active_admins <= 1:
+                conn.rollback()
+                return None, None, LAST_ADMINISTRATOR
+
+        # username is not in this statement, and that absence is the rule rather
+        # than an oversight. See EDITABLE_USER_FIELDS above.
+        conn.execute(
+            "UPDATE users SET full_name = ?, role = ? WHERE id = ?",
+            (full_name, role, user_id),
+        )
+        after = conn.execute(
+            f"SELECT {columns} FROM users WHERE id = ?", (user_id,)
+        ).fetchone()
+        conn.commit()
+        return dict(user), dict(after), None
+    finally:
+        conn.close()
+
+
+def set_user_password(user_id, password):
+    """Replace one account's stored password. Returns (changed, refusal).
+
+    Assumes validate_password_reset_form() has already passed, the same contract
+    create_user() has with validate_new_user_form().
+
+    THE HASH IS THE SAME HASH, AND THAT IS THE REQUIREMENT.
+    generate_password_hash() with no arguments, exactly as create_user() and
+    seed_demo_users() call it. routes/auth.py verifies with check_password_hash()
+    against whatever scheme the stored string names, so an account whose password
+    was reset here and one created last week are verified by one code path and
+    are indistinguishable afterwards. Naming a different method here would work
+    and would quietly leave two kinds of credential in one table.
+
+    The plaintext is used to compute a hash and is not held, returned, logged, or
+    passed on. What comes back is a boolean.
+
+    NO LAST-ADMINISTRATOR GUARD, AND NOTHING IS MISSING. Every argument in
+    deactivate_user() is about removing the ability to sign in. A reset replaces
+    one working credential with another working credential; the account is as
+    able to sign in afterwards as before, with a password the administrator
+    performing the reset knows and can hand over. The one account this could
+    strand is one whose new password is then forgotten before it is written down,
+    and the answer to that is another reset.
+    """
+    conn = get_db()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        user = conn.execute(
+            "SELECT id FROM users WHERE id = ?", (user_id,)
+        ).fetchone()
+        if user is None:
+            conn.rollback()
+            return False, ACCOUNT_NOT_FOUND
+
+        conn.execute(
+            "UPDATE users SET password_hash = ? WHERE id = ?",
+            (generate_password_hash(password), user_id),
+        )
         conn.commit()
         return True, None
     finally:

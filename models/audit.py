@@ -172,6 +172,45 @@ ACTION_USER_CREATED = "Created user account"
 ACTION_USER_DEACTIVATED = "Deactivated user account"
 ACTION_USER_REACTIVATED = "Reactivated user account"
 
+# Editing an account, split into two phrases for the same reason deactivation and
+# reactivation are two rather than one "changed account status".
+#
+# A NAME CORRECTION AND A ROLE CHANGE ARE NOT THE SAME EVENT.
+# Fixing a misspelt surname and moving an account from Health Center Staff to
+# Administrator both arrive through one form, and under a single "Edited user
+# account" phrase they would be one line each in a list, indistinguishable at a
+# glance and counted together in any total. One of them is a typo; the other
+# hands somebody every screen in the system, including this one -- the ability to
+# create accounts, revoke them and reach every patient record.
+#
+# Privilege elevation is also the change most worth being able to scan for,
+# because the recognised way it is abused is to raise a role, act, and lower it
+# again: two edits that individually look ordinary and together look like nothing
+# at all unless the trail lets a reviewer pull role changes out on their own.
+#
+# ACTION_USER_ROLE_CHANGED is therefore written whenever the role moved, EVEN IF
+# the name moved in the same submit -- the more serious of the two facts names
+# the entry, and `details` carries both changes in full. The `details` text
+# always spells out the role that was held and the role that replaced it, side by
+# side, so the pair can be read without joining this entry to an earlier one.
+ACTION_USER_EDITED = "Edited user account"
+ACTION_USER_ROLE_CHANGED = "Changed user account role"
+
+# An administrator setting a new password on an existing account.
+#
+# ITS OWN PHRASE, NOT AN EDIT. It changes a credential rather than a detail of
+# the account, and it is the one act on this screen that can be performed against
+# an account without the holder knowing -- so "when was this account's password
+# last replaced, and by whom" has to be a question the trail answers directly
+# rather than one a reviewer reconstructs from a general edit entry.
+#
+# AND THE PROHIBITION FROM ACTION_USER_CREATED BINDS HERE UNCHANGED. Not the
+# value, not a hash of it, not its length, not which strength rules it passed.
+# What the entry records is that the password was replaced, by whom, on which
+# account, and that the new one is stored only as a salted hash -- which is
+# every fact about it a reviewer can act on.
+ACTION_PASSWORD_RESET = "Reset user account password"
+
 # Every action that means somebody was turned away at the login form. Grouped so
 # the Security Events figure counts refusals rather than one particular kind of
 # refusal -- adding a fourth outcome later must not silently shrink that number.

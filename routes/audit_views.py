@@ -69,8 +69,11 @@ from models.audit import (
     ACTION_LOGIN_FAILED,
     ACTION_LOGIN_SUCCESS,
     ACTION_SESSION_REVOKED,
+    ACTION_PASSWORD_RESET,
     ACTION_USER_CREATED,
     ACTION_USER_DEACTIVATED,
+    ACTION_USER_EDITED,
+    ACTION_USER_ROLE_CHANGED,
     ACTION_USER_REACTIVATED,
     MODULE_AUTH,
     MODULE_IMMUNIZATIONS,
@@ -249,6 +252,28 @@ _ICONS = {
     ACTION_USER_CREATED: "person_add",
     ACTION_USER_DEACTIVATED: "block",
     ACTION_USER_REACTIVATED: "how_to_reg",
+    # The three later account-management entries, on the same principle: a
+    # reviewer scans this list rather than reading it in order, so no two of the
+    # six may look alike at a glance.
+    #
+    # `edit` and `lock_reset` are the glyphs User Management draws on the two
+    # buttons that produce these entries -- the trail and the control that wrote
+    # it read as one thing, which is the same reasoning MODULE_IMMUNIZATIONS'
+    # `vaccines` above is chosen on.
+    #
+    # `shield` for a role change, and it is deliberately not `shield_person`:
+    # that one is MODULE_AUTH's pill and means somebody presenting credentials at
+    # the door. This means somebody's set of doors was changed, which is the row
+    # in this table that most needs to stand out on its own.
+    #
+    # All three ligatures are already drawn in this project's templates --
+    # `edit` and `lock_reset` on User Management's own buttons, `shield` on
+    # Settings' Security Settings tab -- which is the available check that the fixed font subset in
+    # static/fonts carries them; one it does not hold renders as its own literal
+    # name.
+    ACTION_USER_EDITED: "edit",
+    ACTION_USER_ROLE_CHANGED: "shield",
+    ACTION_PASSWORD_RESET: "lock_reset",
 }
 _MODULE_ICONS = {
     MODULE_SMS: "campaign",

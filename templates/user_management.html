@@ -29,10 +29,12 @@
       so this screen inherits the same appearance every other disabled control
       has instead of keeping a copy that could drift from it.
 
-      Add User is not one of them any more. It works, so it carries no reason
-      and no faded treatment -- and the two account-status buttons below it are
-      real as well. What is still disabled on this screen is Edit User and Reset
-      Password, and each says why in its own title. #}
+      Nothing on this screen is disabled for want of a feature any more. Add
+      User, Deactivate, Reactivate, Edit User and Reset Password all work, so
+      none of them carries a reason or a faded treatment. The one disabled
+      control left is the Deactivate button on the last active Administrator,
+      and that is a rule the system enforces rather than a gap in it -- it is
+      worded beside the button, not in UNTRACKED. #}
 
   {#- FORM FIELDS INSIDE THE DIALOGS. Same class names and the same values as
       Register Patient and the booking dialog on Appointment Scheduling, so the
@@ -288,8 +290,10 @@
           <div class="scope-note">
             <strong>Every account that can sign in is on this list, and it is managed from this screen.</strong>
             Add User creates one with a password you set yourself. That password is stored
-            only as a hash — nobody, including you, can look it up afterwards, and there is
-            no reset — so tell the new holder what it is before you leave this screen.
+            only as a hash — nobody, including you, can look it up afterwards — so tell the
+            new holder what it is before you leave this screen. If it is ever forgotten,
+            Reset Password sets a new one on the account: a password can be replaced, never
+            recovered.
             Deactivating an account refuses it at the login form from then on and ends any
             session it already has open; nothing is deleted, and reactivating it restores
             the same password.
@@ -453,17 +457,27 @@
               enforced, not a copy of it.
             </div>
 
-            {#- Two of these three used to be disabled behind one shared reason.
-                Two still are, and they now quote reasons of their own, because
-                the shared one described three controls and only these two are
-                still true of it. The third is real. #}
+            {#- LIVE, BOTH OF THEM. These were the last two disabled controls
+                on this screen, sitting behind reasons that said editing an
+                account and resetting a password "is not built". Both are built,
+                so both the `disabled` attributes and the two UNTRACKED entries
+                behind them are gone -- a reason that denies a working control is
+                the worst kind this project keeps.
+
+                Each opens its own dialog for this one account, rendered below
+                with this account's id in it, for the reason the status dialogs
+                are per-account: a dialog filled in by script can name the wrong
+                person, and here that would mean resetting the wrong account's
+                password. #}
             <div class="d-flex gap-2 mt-3">
-              <button class="btn-ghost-ids" type="button" style="flex:1; justify-content:center;" disabled
-                      title="{{ untracked.reset_password }}">
+              <button class="btn-ghost-ids" type="button" style="flex:1; justify-content:center;"
+                      data-bs-toggle="modal" data-bs-target="#resetPasswordModal{{ user.id }}"
+                      title="Set a new password for this account. The current one is not needed and cannot be looked up — it is stored only as a hash.">
                 <span class="material-symbols-outlined" style="font-size:18px;">lock_reset</span>Reset Password
               </button>
-              <button class="btn-primary-teal" type="button" style="flex:1; justify-content:center;" disabled
-                      title="{{ untracked.edit_account }}">
+              <button class="btn-primary-teal" type="button" style="flex:1; justify-content:center;"
+                      data-bs-toggle="modal" data-bs-target="#editUserModal{{ user.id }}"
+                      title="Change this account's full name or role. The username is fixed for the life of the account and cannot be changed.">
                 <span class="material-symbols-outlined" style="font-size:18px;">edit</span>Edit User
               </button>
             </div>
@@ -739,8 +753,8 @@
             <p style="margin-bottom:0; font-size:13px; color:var(--text-muted);">
               The password this account had before it was deactivated works again — deactivating
               it never changed the stored password, and no new one is set here. If it has been
-              forgotten there is no way to look it up or reset it; the account would have to be
-              replaced.
+              forgotten it still cannot be looked up, but Reset Password on this account's panel
+              sets a new one — the account does not have to be replaced.
             </p>
           </div>
           <div class="modal-footer">
@@ -756,6 +770,256 @@
       </div>
     </div>
 {%- endif %}
+{%- endfor %}
+
+    <!-- EDIT USER AND RESET PASSWORD, ONE PAIR PER ACCOUNT.
+
+         Per account rather than one of each filled in by script, for the reason
+         the status dialogs above are: the roster is small and complete, so every
+         value each dialog needs is known at render time. A dialog assembled in
+         JavaScript can name the wrong account if a data attribute is ever
+         missed, and on these two that would mean editing the wrong person's role
+         or resetting the wrong person's password.
+
+         `novalidate` on both, for the reason every form in this project carries
+         it: the browser's checks are a convenience, and the server re-checks
+         everything in models/users.py, which is what runs when a POST arrives
+         without this page having been loaded at all. -->
+{%- for user in users %}
+{#- This account's dialog state, but only if the refused submit was against THIS
+    account. edit_state and reset_state each carry the id they belong to, so the
+    comparison is what keeps a rejected edit from springing open on every row. #}
+{%- set estate = edit_state if edit_state and edit_state.user_id == user.id else None %}
+{%- set eerr = estate.errors if estate else {} %}
+{%- set eform = estate.form if estate else {} %}
+{%- set rstate = reset_state if reset_state and reset_state.user_id == user.id else None %}
+{%- set rerr = rstate.errors if rstate else {} %}
+    <div class="modal fade" id="editUserModal{{ user.id }}" tabindex="-1" aria-labelledby="editUserModalLabel{{ user.id }}" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content" style="border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.12);">
+          <div class="modal-header">
+            <h5 class="modal-title" id="editUserModalLabel{{ user.id }}">Edit User</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+
+{%- if estate and estate.banner %}
+            {#- The whole-edit refusal: the last active Administrator's role. It
+                gets the banner rather than only the field error because the
+                field error can say what to do and this has to say what would
+                have broken. #}
+            <div class="alert-ids alert-danger-ids">
+              <span class="material-symbols-outlined">shield_person</span>
+              <div>
+                <strong>This role change was refused</strong>
+                {{ estate.banner }}
+              </div>
+            </div>
+{%- elif eerr %}
+            <div class="alert-ids alert-danger-ids">
+              <span class="material-symbols-outlined">error</span>
+              <div>
+                <strong>This account was not updated</strong>
+                Correct the {{ eerr|length }} highlighted field{{ '' if eerr|length == 1 else 's' }} below.
+                Everything you entered has been kept.
+              </div>
+            </div>
+{%- endif %}
+
+{%- if user.is_self %}
+            <div class="alert-ids alert-warning-ids">
+              <span class="material-symbols-outlined">warning</span>
+              <div>
+                <strong>This is the account you are signed in as</strong>
+                Changing its role changes your own access straight away. If you move it off
+                Administrator you will lose this screen on your next click, and another
+                Administrator would have to move it back.
+              </div>
+            </div>
+{%- elif user.is_last_admin %}
+            <div class="alert-ids alert-info-ids">
+              <span class="material-symbols-outlined">shield_person</span>
+              <div>
+                <strong>This role cannot be changed yet</strong>
+                It is the only Administrator account that can sign in. Moving it to another
+                role would leave nobody able to manage accounts at all — the same lockout
+                deactivating it is refused for. The name can still be corrected. Create
+                another Administrator first, and this role can then be changed.
+              </div>
+            </div>
+{%- endif %}
+
+            <p style="font-size:13.5px; color:var(--text-muted); margin-bottom:14px;">
+              Changes the name this account is known by and the role that decides what it can
+              open. It does not touch the password, and it does not sign anybody out.
+            </p>
+
+            <form id="editUserForm{{ user.id }}" method="POST" action="{{ url_for('edit_user') }}" novalidate>
+              <input type="hidden" name="user_id" value="{{ user.id }}">
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="field-label" for="editFullName{{ user.id }}">Full Name<span class="req">*</span></label>
+                  <input type="text" class="form-control{% if eerr.full_name %} is-invalid{% endif %}"
+                         id="editFullName{{ user.id }}" name="full_name" maxlength="100" autocomplete="off"
+                         value="{{ eform.full_name if estate else user.full_name }}">
+{%- if eerr.full_name %}
+                  <div class="field-error">{{ eerr.full_name }}</div>
+{%- else %}
+                  <div class="form-text-hint">Shown in the sidebar, on this roster, and against everything this account records from now on. Entries already in the audit trail keep the name that was current when they were written.</div>
+{%- endif %}
+                </div>
+                <div class="col-md-6">
+                  {#- READ-ONLY, AND SAID SO RATHER THAN ONLY ENFORCED.
+                      The server never reads a posted username -- routes/user_views.py
+                      builds its values from models.users.EDITABLE_USER_FIELDS, which
+                      does not contain it, so there is no path from this request to
+                      that column. This box is here because leaving the field out
+                      entirely would look like an oversight, and leaving it editable
+                      would look like a promise. It shows what the username is and
+                      says why it stays. #}
+                  <label class="field-label" for="editUsername{{ user.id }}">Username</label>
+                  <input type="text" class="form-control" id="editUsername{{ user.id }}"
+                         value="{{ user.username }}" readonly disabled
+                         style="background:var(--bg); color:var(--text-muted);">
+                  <div class="form-text-hint">
+                    Fixed for the life of the account. It is what the audit trail attributes every
+                    action to, so changing it would leave the history saying this person did things
+                    the roster no longer knows them by. An account that needs a different username is
+                    a new account — create it and deactivate this one, which keeps its record intact.
+                  </div>
+                </div>
+
+                <div class="col-md-6">
+                  <label class="field-label" for="editRole{{ user.id }}">Role<span class="req">*</span></label>
+                  <select class="form-select{% if eerr.role %} is-invalid{% endif %}" id="editRole{{ user.id }}" name="role">
+{%- for value, label in role_choices %}
+                    <option value="{{ value }}"{% if (eform.role if estate else user.role) == value %} selected{% endif %}>{{ label }}</option>
+{%- endfor %}
+                  </select>
+{%- if eerr.role %}
+                  <div class="field-error">{{ eerr.role }}</div>
+{%- else %}
+                  <div class="form-text-hint">Takes effect immediately. The list of screens on this panel is read from each screen's own access guard, so it will show exactly what the new role reaches.</div>
+{%- endif %}
+                </div>
+                <div class="col-md-6 d-flex align-items-end">
+                  <div class="alert-ids alert-warning-ids" style="margin-bottom:0; width:100%;">
+                    <span class="material-symbols-outlined">history</span>
+                    <div>
+                      <strong>A role change is recorded in full</strong>
+                      The audit trail keeps the role held before and the role held after, side by
+                      side, with your name and the time.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </form>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" form="editUserForm{{ user.id }}" class="btn-primary-teal">
+              <span class="material-symbols-outlined" style="font-size:18px;">save</span>Save Changes
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="resetPasswordModal{{ user.id }}" tabindex="-1" aria-labelledby="resetPasswordModalLabel{{ user.id }}" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content" style="border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.12);">
+          <div class="modal-header">
+            <h5 class="modal-title" id="resetPasswordModalLabel{{ user.id }}">Reset Password</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+
+{%- if rerr %}
+            <div class="alert-ids alert-danger-ids">
+              <span class="material-symbols-outlined">error</span>
+              <div>
+                <strong>This password was not set</strong>
+                Correct the {{ rerr|length }} highlighted field{{ '' if rerr|length == 1 else 's' }} below.
+                Both boxes have been cleared and need retyping, so a password is never written
+                back into the page.
+              </div>
+            </div>
+{%- endif %}
+
+            <p style="margin-bottom:10px;">
+              Set a new password for <strong style="display:inline;">{{ user.full_name }}</strong>
+              ({{ user.username }}, {{ user.role }}).
+            </p>
+            <p style="font-size:13.5px; color:var(--text-muted); margin-bottom:14px;">
+              You are not asked for the current password and could not be: it is stored as a
+              one-way hash, so nobody — including you — can read it back. Not knowing it is the
+              situation this exists for. The account keeps its username, its role and its access;
+              only the credential changes, and it changes the moment you save.
+{%- if user.is_self %}
+              This is the account you are signed in as: your current session stays open, but
+              the new password is what you will need next time.
+{%- endif %}
+{%- if not user.is_active %}
+              This account is deactivated, so it is still refused at the login form whatever
+              password it holds. Reactivate it separately if it is meant to sign in again.
+{%- endif %}
+            </p>
+
+            <form id="resetPasswordForm{{ user.id }}" method="POST" action="{{ url_for('reset_user_password') }}" novalidate>
+              <input type="hidden" name="user_id" value="{{ user.id }}">
+              <div class="row g-3">
+                <div class="col-12">
+                  {#- The same rule box Add User prints, in the same words,
+                      because it is the same rule -- one
+                      check_password_strength() serves both, so a reset cannot
+                      set a password creation would have refused. #}
+                  <div class="rule-box">
+                    <strong>The password you set must meet these rules:</strong>
+                    <ul>
+                      <li>at least 12 characters;</li>
+                      <li>at least 3 of these 4 &mdash; a small letter, a capital letter, a number, a symbol;</li>
+                      <li>it must not contain the username or any part of the person's name;</li>
+                      <li>it must not be a commonly-guessed password, with or without numbers on the end.</li>
+                    </ul>
+                    Exactly the rule Add User enforces &mdash; a reset cannot set a password that
+                    creating the account would have refused. Once saved it is stored only as a
+                    hash: it cannot be shown or looked up afterwards, so write it down or tell
+                    the person before you close this dialog.
+                  </div>
+                </div>
+
+                <div class="col-md-6">
+                  <label class="field-label" for="resetPassword{{ user.id }}">New Password<span class="req">*</span></label>
+                  <input type="password" class="form-control{% if rerr.password %} is-invalid{% endif %}"
+                         id="resetPassword{{ user.id }}" name="password" autocomplete="new-password">
+{%- if rerr.password %}
+                  <div class="field-error">{{ rerr.password }}</div>
+{%- else %}
+                  <div class="form-text-hint">{{ password_rule }}</div>
+{%- endif %}
+                </div>
+                <div class="col-md-6">
+                  <label class="field-label" for="resetConfirmPassword{{ user.id }}">Confirm New Password<span class="req">*</span></label>
+                  <input type="password" class="form-control{% if rerr.confirm_password %} is-invalid{% endif %}"
+                         id="resetConfirmPassword{{ user.id }}" name="confirm_password" autocomplete="new-password">
+{%- if rerr.confirm_password %}
+                  <div class="field-error">{{ rerr.confirm_password }}</div>
+{%- else %}
+                  <div class="form-text-hint">Typed twice because a mistyped password cannot be discovered later — it would simply refuse the person at the login form with no way to find out why.</div>
+{%- endif %}
+                </div>
+              </div>
+            </form>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" form="resetPasswordForm{{ user.id }}" class="btn-ghost-ids">
+              <span class="material-symbols-outlined" style="font-size:18px;">lock_reset</span>Set New Password
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
 {%- endfor %}
 {% endblock %}
 
@@ -798,9 +1062,27 @@
   // library is guaranteed present. The guard stays -- it is now a real assertion
   // about a library that should be there, not a silent skip. This is the same
   // wait, for the same reason, that patient_profile.html documents on its tab.
+  //
+  // The same wait covers the two per-account dialogs below it. They differ from
+  // Add User in one way only: there is one of each per row, so the id names the
+  // account the refused submit was actually about. edit_state and reset_state
+  // carry that id from the server; only one of the three blocks below can be
+  // rendered on a given response, because a POST arrives from one form.
 {%- if add_open %}
   document.addEventListener('DOMContentLoaded', function(){
     var dialog = document.getElementById('addUserModal');
+    if (dialog && window.bootstrap) { new bootstrap.Modal(dialog).show(); }
+  });
+{%- endif %}
+{%- if edit_state %}
+  document.addEventListener('DOMContentLoaded', function(){
+    var dialog = document.getElementById('editUserModal{{ edit_state.user_id }}');
+    if (dialog && window.bootstrap) { new bootstrap.Modal(dialog).show(); }
+  });
+{%- endif %}
+{%- if reset_state %}
+  document.addEventListener('DOMContentLoaded', function(){
+    var dialog = document.getElementById('resetPasswordModal{{ reset_state.user_id }}');
     if (dialog && window.bootstrap) { new bootstrap.Modal(dialog).show(); }
   });
 {%- endif %}

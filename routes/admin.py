@@ -86,6 +86,8 @@ from routes.roster_export import (
 from routes.user_views import (
     process_account_status,
     process_create_user,
+    process_edit_user,
+    process_reset_password,
     user_management_context,
 )
 from routes.vaccination_correction_views import process_vaccination_correction
@@ -766,6 +768,65 @@ def add_user():
     # Field errors are shown inside the reopened dialog, next to what they refer
     # to, rather than as a flash above the page -- the same treatment Register
     # Patient and the booking dialog give theirs.
+    return render_template('user_management.html', **context)
+
+
+# EDIT USER AND RESET PASSWORD. POST only, and Admin only, for exactly the
+# reasons written over add_user() and set_user_status() above -- and one more
+# that belongs to these two in particular.
+#
+# EDITING A ROLE IS THE SAME POWER AS CREATING AN ACCOUNT, REACHED FROM THE OTHER
+# END. add_user() is guarded because an endpoint any other role could reach would
+# let that role create itself an Administrator account; edit_user() is guarded
+# because an endpoint any other role could reach would let that role PROMOTE
+# itself to one, which needs no new account and leaves no new row in the roster
+# for anybody to notice. reset_user_password() is guarded because an endpoint any
+# other role could reach would let that role set a password of its choosing on
+# the Administrator account and then simply sign in as it. Each of those is every
+# access rule in the application at once, and the decorator is the enforcement
+# rather than a copy of the screen's.
+#
+# Both return a rendered page rather than a redirect when the submission was
+# refused, because both carry typing that must survive: the account's dialog
+# reopens with the error beside the field and the values still in it. That is the
+# same treatment add_user() gives its dialog, and the reason process_edit_user()
+# and process_reset_password() return a context instead of a message.
+#
+# No GET on either, for the reason neither of the two above has one: both change
+# records, so there is no URL to navigate to and none a link, a bookmark or a
+# prefetch could reach.
+@admin_bp.route('/user_management/edit', methods=["POST"])
+@login_required
+@role_required("Admin")
+def edit_user():
+    user_id, context, message = process_edit_user(
+        request.form, session.get("user_id"), request.remote_addr
+    )
+    if user_id:
+        flash(message)
+        return redirect(url_for("admin.user_management"))
+    if context is None:
+        # The form did not name an account this system holds -- a POST that did
+        # not come from this page. There is no dialog to reopen it on, so it is
+        # a sentence above the roster like the status route's refusals.
+        flash(message)
+        return redirect(url_for("admin.user_management"))
+    return render_template('user_management.html', **context)
+
+
+@admin_bp.route('/user_management/reset_password', methods=["POST"])
+@login_required
+@role_required("Admin")
+def reset_user_password():
+    user_id, context, message = process_reset_password(
+        request.form, session.get("user_id"), request.remote_addr
+    )
+    if user_id:
+        flash(message)
+        return redirect(url_for("admin.user_management"))
+    if context is None:
+        flash(message)
+        return redirect(url_for("admin.user_management"))
     return render_template('user_management.html', **context)
 
 
