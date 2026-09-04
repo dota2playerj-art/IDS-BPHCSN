@@ -6,7 +6,9 @@ is role_required("Health Staff"), and /official/* is the Barangay Official's.
 So a blueprint's url_prefix and its guard say the same thing, and adding a route
 to the wrong file is immediately visible in its URL.
 
-    auth_bp      /              index, login, logout, dashboard
+    auth_bp      /              index, login, logout, dashboard, and
+                                My Account -- the one screen no role owns,
+                                because it acts on the caller's own row
     admin_bp     /admin/*       11 Administrator screens
     staff_bp     /staff/*        8 Health Center Staff screens
     official_bp  /official/*     8 Barangay Official screens

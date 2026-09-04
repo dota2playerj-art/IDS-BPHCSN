@@ -25,6 +25,30 @@ So the evidence lives on the machine that produced it. What is committed is this
 file, naming what was captured and how to produce it again, so the absence is
 stated rather than left for someone to trip over.
 
+## my-account/
+
+Verification of **My Account** — the self-service panel reached from the profile
+circle in the header, holding the signed-in person's own name, role and username
+read-only, and a Change Password form that asks for the password they currently
+sign in with before it will set a new one.
+
+It kept **no images**, for the reason `add-user/` gives: the screen's subject is
+a credential. The whole pass ran against throwaway copies of `app.db` — the
+suite against one, the live browser run against another served on port 5056 —
+and the real database was confirmed byte-identical afterwards against
+`app.db.PRETASK_BACKUP_my-account_20260904_110941`.
+
+**338 checks, 0 failures**, plus a live browser pass in which all three roles
+changed their own password through the form and then **signed in with the new
+one**, having first been refused with the old. A wrong current password and a
+weak new one were each refused in the browser with the error beside the box and
+every box cleared. The audit entry is a phrase of its own —
+*Changed own account password*, under Authentication, attributed to the holder —
+distinct from the Administrator's *Reset user account password* under User
+Management, which was re-exercised in the same run and is unaffected. Route ×
+role matrix: exactly the two new `login_required` rules and nothing else moved,
+zero 5xx across 212 pairs.
+
 ## booking-dialog-gap/
 
 Verification that the Schedule Appointment dialog no longer carries an empty

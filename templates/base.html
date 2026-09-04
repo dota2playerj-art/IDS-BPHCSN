@@ -431,7 +431,26 @@
         <span class="material-symbols-outlined" style="font-size:18px; color:var(--text-muted);">expand_more</span>
       
       </div>
+{#- The chip's menu. It held one item -- Logout -- for the project's whole life,
+    which made the profile circle a control whose only purpose was to leave.
+    My Account is the other half of what a person clicks their own face for:
+    what this system says about them, and the one thing on it they can change
+    themselves.
+
+    IT IS NOT WRAPPED IN A ROLE TEST, AND THAT IS THE FEATURE. Every other
+    conditional in this file asks which role is signed in, because the screens
+    it links to belong to roles. This one belongs to the account, so the
+    Administrator, Health Center Staff and the Barangay Official all get the
+    same item pointing at the same URL -- which acts on whichever of them
+    clicked it. See routes/auth.py's note on why the pair is mounted at the site
+    root rather than under a role prefix. #}
       <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="profileDropdown">
+        <li>
+          <a class="dropdown-item d-flex align-items-center gap-2" href="{{ url_for('my_account') }}">
+            <span class="material-symbols-outlined">account_circle</span>My Account
+          </a>
+        </li>
+        <li><hr class="dropdown-divider"></li>
         <li>
           <button type="button" class="dropdown-item d-flex align-items-center gap-2 text-danger" data-bs-toggle="modal" data-bs-target="#logoutConfirmModal">
             <span class="material-symbols-outlined">logout</span>Logout

@@ -225,6 +225,50 @@ ACTION_USER_ROLE_CHANGED = "Changed user account role"
 # every fact about it a reviewer can act on.
 ACTION_PASSWORD_RESET = "Reset user account password"
 
+# The account holder setting their own password from My Account, having proved
+# it is them by typing the one they currently sign in with.
+#
+# IT IS A SEPARATE PHRASE FROM ACTION_PASSWORD_RESET, AND THE TWO MUST NEVER BE
+# COLLAPSED. Both end with a new hash in the same column, and that is the whole
+# of what they have in common. A reset is performed BY somebody else, ON an
+# account, without its holder's knowledge or consent being needed -- which is
+# why the entry above exists at all. A change is performed by the holder, on
+# their own account, and could not have been performed by anyone who did not
+# already know the password. Read months later, "this account's password was
+# replaced on the 4th" is an entirely different fact depending on which of those
+# happened: one says an administrator handed somebody a new credential, the
+# other says the person who already held it chose a different one. A single
+# phrase would make the trail unable to tell a reviewer which.
+#
+# IT IS FILED UNDER MODULE_AUTH RATHER THAN MODULE_USERS, AND THAT IS A DECISION
+# WITH A COST WORTH STATING.
+# MODULE_USERS' own note above defines what belongs to it: "administrative acts
+# with an author who is not the account named in them". This act is the exact
+# negation of that clause -- the author IS the account named, and the row is
+# attributed to them because they are the person who did it. It is also, like
+# every other row under Authentication, written by somebody who presented a
+# credential: the current password is verified against the stored hash before
+# anything is written, in the same check_password_hash() call the login form
+# makes. So it sits with the sign-ins, where the account is the subject and the
+# actor at once.
+#
+# The cost is that "every time this account's password changed, by anyone" now
+# spans two module filters rather than one. That is accepted rather than
+# overlooked. The alternative costs more: filing it under User Management would
+# put a health worker's own housekeeping into the list an administrator selects
+# to review what OTHER administrators have done to accounts, which is the one
+# thing the split between those two modules exists to prevent. The phrase, not
+# the module, is what tells the two events apart -- and both phrases spell out
+# in `details` who acted and on whose account, so neither row can be misread
+# whichever filter surfaces it.
+#
+# THE PROHIBITION ON THE VALUE BINDS HERE EXACTLY AS IT DOES ABOVE, and it binds
+# to two passwords now rather than one. Neither the new password nor the current
+# one the holder typed to prove themselves reaches this table -- not the value,
+# not a hash, not its length, not which strength rules it passed. The entry is
+# composed from the stored account row.
+ACTION_PASSWORD_CHANGED_SELF = "Changed own account password"
+
 # The two Settings actions.
 #
 # ACTION_SETTINGS_UPDATED covers the six General Settings values -- the health

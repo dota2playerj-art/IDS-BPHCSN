@@ -73,6 +73,33 @@ so the figures these entries feed are sign-in counts and not session counts. Bot
 absences are stated on the screens that report the counts rather than left to be
 inferred from a number.
 
+MY ACCOUNT IS MOUNTED HERE, AND IT IS THE ONE SCREEN NO ROLE OWNS
+------------------------------------------------------------------
+/account and /account/password sit in this file rather than in one of the three
+role blueprints, and the reason is the rule routes/__init__.py states: a
+blueprint's url_prefix and its guard say the same thing, so /admin/* is
+Administrator-only and /staff/* is Health Center Staff's. My Account belongs to
+none of them. It is the same screen for all three roles because it acts on the
+caller's own row and on nothing else -- there is no account parameter anywhere on
+either route -- so putting it behind any prefix would either lock two roles out
+of their own password or need the same screen registered three times.
+
+That makes it the fourth thing at the site root, alongside the login form, the
+sign-out link and the dashboard dispatcher, and it sits with them for the same
+reason they are here: all four are about the person rather than about the role.
+It carries @login_required and no role check, which is the whole requirement --
+be somebody, and it acts on you. What the two routes actually do is in
+routes/account_views.py; this file only wires them.
+
+A PASSWORD CHANGED THERE DOES NOT END THE SESSION, and that is a property of
+this file rather than of that one. login() writes session["user_id"] and three
+descriptive copies; nothing in the session is derived from the password, and
+utils/security.py re-reads the account by id on every guarded request. So a
+holder who changes their own password stays exactly as signed in as they were,
+which is right -- they have just proved they are themselves -- and the next
+sign-in is where the new value is needed. The flash message says so, because
+that is not something anyone should have to find out by being logged out.
+
 One more boundary used to be stated here, and it has since been closed rather
 than narrowed. The active flag was checked when a session STARTED and not on any
 request afterwards, so an account deactivated while it was already signed in kept
@@ -105,6 +132,7 @@ from models.audit import (
 )
 from models.settings import maintenance_mode
 from models.users import get_user_by_username
+from routes.account_views import my_account_context, process_password_change
 from utils.roles import normalize_role
 from utils.security import get_current_user, login_required, refuse_credentials
 
@@ -391,6 +419,53 @@ def login():
 def logout():
     session.clear()
     return redirect(url_for("auth.login"))
+
+
+# MY ACCOUNT. Every signed-in person, whatever their role, reading their own
+# account and changing their own password. See the module note above for why the
+# pair is mounted here rather than under a role prefix, and
+# routes/account_views.py for everything they decide.
+@auth_bp.route("/account")
+@login_required
+def my_account():
+    return render_template("my_account.html", **my_account_context())
+
+
+# POST only, and no GET, for the reason routes/admin.py's write endpoints have
+# none: this changes a credential, so there is no URL to navigate to and none a
+# link, a bookmark or a prefetch could reach.
+#
+# IT IS NOT role_required ANYTHING, AND THAT IS NOT AN OVERSIGHT. Every other
+# password-writing endpoint in this project is Admin-only because an endpoint any
+# role could reach would let that role set a password on the Administrator
+# account and sign in as it. That argument does not apply here and cannot: this
+# route reads no account from the request. It changes the password of whoever
+# sent it, and only after verifying the password that account already has, so the
+# most a forged post can achieve is what its own sender could achieve by typing
+# it on the form -- changing their own password, which is the feature.
+#
+# A REFUSED SUBMIT RE-RENDERS THIS SCREEN AT 200 rather than redirecting, the
+# same shape add_user() and reset_user_password() use. Three password boxes are
+# cleared by a refusal whatever happens, so what survives the round trip is the
+# error beside the box it belongs to -- which is the whole of what redisplay can
+# preserve on a form made entirely of passwords, and exactly why it must not be
+# thrown away into a flash on another page.
+@auth_bp.route("/account/password", methods=["POST"])
+@login_required
+def change_own_password():
+    changed, context, message = process_password_change(
+        request.form, request.remote_addr
+    )
+    if changed:
+        flash(message)
+        return redirect(url_for("auth.my_account"))
+    if context is None:
+        # The signed-in row could not be read -- unreachable behind the guard,
+        # which refuses a session naming a row that is not there. Answered with a
+        # sentence rather than a traceback.
+        flash(message)
+        return redirect(url_for("auth.my_account"))
+    return render_template("my_account.html", **context)
 
 
 @auth_bp.route("/dashboard")

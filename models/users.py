@@ -33,10 +33,10 @@ reset, and listed the three questions such a feature would have to answer first.
 They are answered, and the answers are the shape of set_user_password() and
 update_user() below:
 
-* An administrator overwrites the password; the holder does not change their
-  own. There is no self-service screen and no email channel to send a link
-  through, so the only person who can set a credential is the one who could
-  already create the account that holds it.
+* An administrator overwrites the password on somebody else's account. THIS IS
+  NO LONGER THE ONLY WAY A PASSWORD CHANGES -- see the section below -- but it
+  is still the only way one changes without its holder taking part, and that is
+  what the entry in the audit trail has to say.
 * The old password is NOT required, and asking for it would be theatre. An
   administrator resetting an account does not know its password -- that is the
   situation the reset exists for -- and could not be made to know it, because
@@ -65,11 +65,47 @@ The role is the security-sensitive half of that edit, and it carries the
 last-administrator guard for the same reason deactivation does: demoting the only
 Administrator who can sign in is the same unrecoverable lockout as switching them
 off, reached by a different button.
+
+AND THE HOLDER CAN NOW CHANGE THEIR OWN PASSWORD, WHICH THE NOTE ABOVE USED TO
+SAY WAS IMPOSSIBLE
+-----------------------------------------------------------------------------
+It said "the holder does not change their own. There is no self-service screen".
+There is one now -- My Account, reached from the profile chip in the header by
+every role -- and the two paths are deliberately not the same function with a
+flag on it. What separates them is the one question each can ask:
+
+    reset   an administrator, on someone else's account, WITHOUT the old
+            password, because they do not have it and cannot be given it
+    change  the holder, on their own account, ONLY with the old password,
+            because they do have it and it is the only thing that proves the
+            person at the keyboard is them and not somebody who walked up to a
+            signed-in machine
+
+verify_user_password() is what makes the second sentence true, and it is a real
+comparison against the stored hash -- the same check_password_hash() call the
+login form makes, against the same column. A change whose current-password box
+is wrong writes nothing at all.
+
+Everything else about the two is deliberately identical. The new password goes
+through check_password_strength(), the same function, with the account's own
+stored username and full name -- so a password a holder may set on themselves is
+exactly a password an administrator could have set on them and exactly one that
+creating the account would have allowed. And the write is set_user_password(),
+the same function, so there is one UPDATE and one hashing call in this module
+and no second way for a credential to enter the table.
+
+THERE IS STILL NO REUSE HISTORY, AND THIS DID NOT ADD ONE. A change may set the
+password back to what it already was: nothing stores what it was before, the
+current one is knowable here only because the holder just typed it, and
+password_policy() says out loud on Settings that previous passwords are not
+remembered. That statement is left true. What the change path does instead is
+notice the case and say so -- see routes/account_views.py -- rather than refuse
+it with a rule the rest of the system does not have.
 """
 import re
 import sqlite3
 
-from werkzeug.security import generate_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from database.connection import get_db
 
@@ -1075,3 +1111,126 @@ def set_user_password(user_id, password):
         return True, None
     finally:
         conn.close()
+
+
+# ---------------------------------------------------------------------------
+# Changing your own password
+# ---------------------------------------------------------------------------
+# WHAT THIS SECTION ADDS TO THE ONE ABOVE, AND WHAT IT REUSES UNCHANGED.
+# It adds exactly two things: a way to ask whether a supplied password is this
+# account's real one, and a validator that asks for three boxes instead of two.
+# It adds no way to write a password. The write is set_user_password() above --
+# the same function the administrator's reset calls, with the same
+# generate_password_hash() and the same UPDATE -- so a credential set from My
+# Account and one set from User Management are indistinguishable in the table
+# and are verified by one code path at the login form.
+#
+# That reuse is the reason this section is short, and it is worth saying why it
+# is not shorter still. validate_password_reset_form() could have grown an
+# optional current-password field and served both screens. It is not extended,
+# because the two forms disagree about the one field that matters: the reset
+# MUST NOT ask for the old password (an administrator does not have it) and the
+# change MUST (it is the only proof the holder is present). A single validator
+# with a flag would put both rules in one function where a caller passing the
+# flag wrongly gets the wrong security property and no error -- and the wrong
+# direction is silent, because a change that skipped the check would look like a
+# change that worked.
+
+
+REQUIRED_PASSWORD_CHANGE_FIELDS = {
+    "current_password": "Type the password you sign in with now.",
+    "new_password": "Set the new password you want to use.",
+    "confirm_new_password": "Type the new password a second time to confirm it.",
+}
+
+
+def verify_user_password(user_id, password):
+    """Whether this password is the one the account actually signs in with.
+
+    Returns True only for the stored credential. False for a wrong password, for
+    an id that names no account, and for an empty submission -- an account whose
+    stored hash is somehow blank does not thereby accept every password.
+
+    THE COMPARISON IS check_password_hash() AGAINST users.password_hash, WHICH IS
+    THE SAME COMPARISON THE LOGIN FORM MAKES. Not a similar one: routes/auth.py
+    verifies a sign-in against that column with that function, and so does this,
+    which is what makes "the password you sign in with" a true description of
+    what the field is asking for. A second scheme here would let the two answers
+    diverge for the same typed string, and the divergence would show up as a
+    correct password being refused on one screen and accepted on the other.
+
+    The legacy plaintext branch mirrors routes/auth.py's for the same defensive
+    reason it has one -- the live schema has no `password` column, and if a row
+    ever carried one it must be honoured identically by both readers rather than
+    by whichever of them happened to be written first.
+
+    The value is used for one comparison and is not held, returned or logged.
+    What comes back is a boolean, and the callers of this function pass it
+    nothing that reaches the audit trail.
+    """
+    if not password:
+        return False
+
+    user = get_user_by_id(user_id)
+    if user is None:
+        return False
+
+    values = dict(user)
+    stored_hash = values.get("password_hash")
+    if stored_hash:
+        return check_password_hash(stored_hash, password)
+    if values.get("password"):
+        return values["password"] == password
+    return False
+
+
+def validate_password_change_form(values, username="", full_name=""):
+    """Server-side validation for My Account's Change Password. Returns {field: message}.
+
+    Same contract as validate_password_reset_form() above -- a dict keyed by the
+    field the message belongs beside, empty when the submission is acceptable --
+    and the same rule applied to the new password, through the same
+    check_password_strength(). A holder cannot set themselves a password an
+    administrator could not have set them, and neither could set one that
+    creating the account would have refused.
+
+    `username` and `full_name` are the STORED values of the signed-in account,
+    passed in by the caller rather than read from the form, for the reason
+    validate_password_reset_form() gives: the two clauses that refuse a password
+    for containing the username or a part of the person's own name have to be
+    compared against the real account, or a form could post a different name
+    alongside the password and let the weak one through.
+
+    WHAT THIS FUNCTION DOES NOT DO IS CHECK THE CURRENT PASSWORD. It cannot: the
+    check needs the stored hash, this validator is handed a form. It reports only
+    that the box is EMPTY, which is a fact about the form. Whether what was typed
+    is right is verify_user_password()'s answer, asked by the caller, and the
+    caller places the refusal on this same `current_password` key so the two
+    kinds of problem with that one box read identically on the screen.
+
+    Every box is checked even after another has failed, for the reason
+    validate_new_user_form() gives: three mistakes about three different boxes
+    are shown at once rather than discovered one submit at a time -- which
+    matters more here than anywhere, because every box on this form is a password
+    and a rejected submit clears all three.
+    """
+    errors = {}
+
+    for field, message in REQUIRED_PASSWORD_CHANGE_FIELDS.items():
+        if not (values.get(field) or "").strip():
+            errors[field] = message
+
+    new_password = values.get("new_password") or ""
+    confirm = values.get("confirm_new_password") or ""
+
+    if new_password and "new_password" not in errors:
+        problem = check_password_strength(new_password, username, full_name)
+        if problem:
+            errors["new_password"] = problem
+
+    if new_password and confirm and new_password != confirm:
+        errors["confirm_new_password"] = (
+            "The two new passwords do not match. Type the same one in both boxes."
+        )
+
+    return errors
