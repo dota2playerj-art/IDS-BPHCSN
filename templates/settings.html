@@ -388,10 +388,16 @@
 {#- Its own disabled fieldset, for the reason the note at the top of this tab
     strip gives. Nothing in this pane has a reader anywhere in the project: no
     file asks what the facility type is, none reads a DOH licence number, and
-    none reads a date established or a description. The Head Physician box is the
+    none reads a date established or a description. The Administrator box is the
     exception that proves it -- it shows the signed-in administrator, which is
     live, and is a display of who is looking rather than a stored fact about the
-    facility. #}
+    facility.
+
+    Its label read "Head Physician / Administrator" until the account's persona
+    was corrected to Kagawad Antonio Acido, who chairs the Health Committee and
+    is not a physician. Since the box renders whoever is signed in rather than a
+    stored head physician, the half of the label that was never true of the value
+    is gone rather than left to contradict the name printed under it. #}
               <fieldset class="unavailable-form" disabled title="{{ unavailable.settings }}">
 
               <div class="row g-3 mb-3">
@@ -411,7 +417,7 @@
 
               <div class="row g-3 mb-3">
                 <div class="col-md-6">
-                  <label class="field-label">Head Physician / Administrator</label>
+                  <label class="field-label">Administrator</label>
                   <input type="text" class="form-control" value="{{ sidebar_user_name }}">
                 </div>
                 <div class="col-md-6">

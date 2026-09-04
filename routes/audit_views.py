@@ -89,6 +89,7 @@ from models.audit import (
     get_audit_stats,
 )
 from utils.dates import to_clinic_time
+from utils.names import initials
 
 # How many entries one page of the trail shows. The screen has no paging
 # controls behind it yet, so this doubles as the honest ceiling the footer
@@ -161,15 +162,11 @@ UNTRACKED = {
 }
 
 
+# "?" rather than a blank when there is no name: every row here names an account
+# that definitely exists, so an empty circle would read as the name having gone
+# missing rather than as there being nobody. utils/names.py holds the rule.
 def _initials(name):
-    """'Dr. Joshua Reyes' -> 'JR'. Titles are skipped so the avatar reads as a person."""
-    skip = {"dr.", "dr", "mr.", "mrs.", "ms.", "engr."}
-    parts = [p for p in str(name or "").split() if p.lower() not in skip]
-    if not parts:
-        return "?"
-    if len(parts) == 1:
-        return parts[0][:2].upper()
-    return (parts[0][0] + parts[-1][0]).upper()
+    return initials(name, "?")
 
 
 def _split_details(details):

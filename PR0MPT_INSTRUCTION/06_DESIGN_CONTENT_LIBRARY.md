@@ -58,7 +58,11 @@ Note also that this municipality has **eleven barangays, and exactly one Poblaci
 
 Name
 
-Dr. Joshua Reyes
+Kagawad Antonio Acido
+
+Title
+
+Kagawad (elected barangay councilor), chairing the Health Committee
 
 Username
 
@@ -71,6 +75,30 @@ Administrator
 Status
 
 Active
+
+### Why this persona is stated here and not cited
+
+"Dr. Joshua Reyes" was a placeholder, invented for this document and copied from
+here into the seeded `admin` account, the sidebar defaults in `utils/context.py`
+and the two `_initials()` docstrings. The real person holding this account is
+**Antonio Acido**, a Kagawad chairing the barangay's Health Committee, confirmed
+by the project team's technical adviser. He is not a physician, so the honorific
+is "Kagawad" and not "Dr.".
+
+Two things deliberately did NOT change with the name:
+
+* **The username stays `admin`.** A username is permanently fixed in this
+  project -- `models/users.py` says why at length: it is what past audit entries
+  are attributable to, so an account needing a different username is a different
+  account.
+* **The system role stays "Admin" / "Administrator".** That is the value the
+  schema's CHECK constraint allows, the string `role_required()` compares, and
+  the label User Management shows in the Role column. Only the person filling
+  the role changed. What reads "Kagawad, Health Committee" is the subtitle under
+  the name in the profile chip, which describes the person, not the permission.
+
+Audit entries already written under the old name were **not** rewritten. They
+say what the system recorded at the time, which is what an audit trail is for.
 
 ---
 

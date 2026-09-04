@@ -161,6 +161,7 @@ from models.users import (
     validate_user_edit_form,
 )
 from utils.dates import day_start_utc, days_ago, display_timestamp, today
+from utils.names import initials
 from utils.roles import normalize_role
 
 # How recent "recently" is on the Signed In Recently card, in days, counting
@@ -348,13 +349,14 @@ def accessible_screens(role):
     return sorted(labels)
 
 
+# THIS USED TO BE ITS OWN COPY OF THE RULE, AND IT DISAGREED WITH THE OTHER TWO.
+# It skipped no honorifics at all, so the roster drew "KA" for the account the
+# header and the audit trail both drew "AA" for -- one person, two answers, on
+# screens an administrator reads side by side. It had disagreed before the
+# persona was corrected too ("DR" here against "JR" there); the correction only
+# made it visible. The rule is now utils/names.py, once, for all three.
 def _initials(full_name):
-    parts = [word for word in str(full_name).replace(".", " ").split() if word]
-    if not parts:
-        return "?"
-    if len(parts) == 1:
-        return parts[0][:2].upper()
-    return (parts[0][0] + parts[-1][0]).upper()
+    return initials(full_name, "?")
 
 
 def _decorate(user, last_logins, active_admins, signed_in_id):

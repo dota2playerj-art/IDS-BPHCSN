@@ -25,6 +25,31 @@ So the evidence lives on the machine that produced it. What is committed is this
 file, naming what was captured and how to produce it again, so the absence is
 stated rather than left for someone to trip over.
 
+## admin-persona/
+
+Verification of the Administrator persona correction — the placeholder
+"Dr. Joshua Reyes" replaced by **Antonio Acido**, a Kagawad chairing the
+barangay's Health Committee — and of the two things the correction had left
+unfinished.
+
+The username, the password and the system role `Admin` are all unchanged, and
+the 506 audit entries written under the old name were **not** rewritten. What
+reads "Kagawad, Health Committee" is the subtitle under the name in the profile
+chip, which describes the person; the role a guard compares is still "Admin".
+
+The gap worth recording is that the rule for skipping an honorific before taking
+avatar initials existed in **three copies**, and only two were updated: the same
+account rendered `AA` in the header and on every audit row, and `KA` on the User
+Management roster. That copy had in fact never agreed with the other two. It is
+now one function, `utils/names.py::initials()`. The migration's docstring also
+claimed 508 affected audit entries where the counted number is 506.
+
+94-check persona suite, all 12 Administrator screens asserted on their rendered
+HTML, the my-account suite re-run at 338/0, route × role matrix byte-identical,
+and a live browser pass. The migration was exercised on scratch copies down both
+paths and is a byte-for-byte no-op against the live database, which was already
+corrected.
+
 ## my-account/
 
 Verification of **My Account** — the self-service panel reached from the profile

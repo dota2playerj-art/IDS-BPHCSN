@@ -122,7 +122,7 @@ from database.connection import get_db
 # Their passwords would not pass the strength rule further down this file, and
 # they are not re-checked against it. That is stated in full beside the rule.
 DEMO_USERS = [
-    ("admin", "(retired demo password)", "Dr. Joshua Reyes", "Admin"),
+    ("admin", "(retired demo password)", "Kagawad Antonio Acido", "Admin"),
     ("staff", "(retired demo password)", "Health Center Staff", "Health Center Staff"),
     ("official", "(retired demo password)", "Barangay Official", "Barangay Official"),
 ]

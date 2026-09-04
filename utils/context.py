@@ -15,6 +15,7 @@ from models.settings import (
 )
 from routes.appointment_views import take_appointment_sms_offer
 from utils.dates import now, today
+from utils.names import initials
 from utils.roles import normalize_role
 from utils.security import get_current_user
 from utils.unavailable import UNAVAILABLE
@@ -26,15 +27,12 @@ from utils.unavailable import UNAVAILABLE
 HEADER_SEARCH_MAX = 100
 
 
+# The sidebar and the profile chip render an EMPTY circle when there is no name
+# -- a signed-out visitor has no person to abbreviate, and a "?" there would read
+# as a failure to look one up. The audit trail and the roster pass "?" instead,
+# for the opposite reason; see utils/names.py.
 def _initials(name):
-    """'Dr. Joshua Reyes' -> 'JR'. Titles skipped so the avatar reads as a person."""
-    skip = {"dr.", "dr", "mr.", "mrs.", "ms.", "engr."}
-    parts = [p for p in str(name or "").split() if p.lower() not in skip]
-    if not parts:
-        return ""
-    if len(parts) == 1:
-        return parts[0][:2].upper()
-    return (parts[0][0] + parts[-1][0]).upper()
+    return initials(name)
 
 
 def inject_role_context():
@@ -112,9 +110,17 @@ def inject_role_context():
         }
     elif normalized_role == "admin":
         context = {
-            "sidebar_role_label": "Administrator",
-            "sidebar_user_name": "Dr. Joshua Reyes",
-            "sidebar_user_initials": "JR",
+            # The line under the name in the profile chip. It names the person
+            # holding the role, not the role itself: the Administrator of this
+            # system is Antonio Acido, a Kagawad chairing the barangay's Health
+            # Committee. The SYSTEM role is still "Admin"/"Administrator" --
+            # that spelling lives in models/users.py ROLE_CHOICES, is what
+            # role_required() and every guard compare against, and is what User
+            # Management shows in the Role column. Only the chip's subtitle
+            # describes the person, so only it says Kagawad.
+            "sidebar_role_label": "Kagawad, Health Committee",
+            "sidebar_user_name": "Kagawad Antonio Acido",
+            "sidebar_user_initials": "AA",
             "dashboard_endpoint": "admin_dashboard",
             "patient_records_endpoint": "patient_records",
             "patient_profile_endpoint": "patient_profile",
