@@ -63,7 +63,12 @@ routes/user_views.py::_reset_state(). All three come back empty, and the banner
 at the top says so, so an empty box after a refusal reads as intended rather than
 as the screen having lost what was typed.
 """
-from models.audit import ACTION_PASSWORD_CHANGED_SELF, MODULE_AUTH, log_action
+from models.audit import (
+    ACTION_PASSWORD_CHANGE_FAILED_SELF,
+    ACTION_PASSWORD_CHANGED_SELF,
+    MODULE_AUTH,
+    log_action,
+)
 from models.users import (
     PASSWORD_RULE_TEXT,
     ROLE_LABELS,
@@ -153,11 +158,14 @@ def process_password_change(form_data, ip_address=None):
     screen with the errors on the form, and neither means the caller flashes
     `message` above a fresh render.
 
-    THE CURRENT PASSWORD IS VERIFIED BEFORE ANYTHING IS WRITTEN, AND A WRONG ONE
-    WRITES NOTHING AT ALL. Not the password, and not an audit entry either -- see
-    the note below the verification. verify_user_password() compares against the
-    stored hash with the same check_password_hash() the login form uses, so
-    "the password you sign in with" is literally what that box is asking for.
+    THE CURRENT PASSWORD IS VERIFIED BEFORE THE ACCOUNT IS TOUCHED, AND A WRONG
+    ONE CHANGES NOTHING -- but it is recorded. verify_user_password() compares
+    against the stored hash with the same check_password_hash() the login form
+    uses, so "the password you sign in with" is literally what that box is
+    asking for, and a refusal is written to the trail the way a refused sign-in
+    is; the note at the verification below says why that row is worth having.
+    Nothing about the account changes on that path: no hash, no field, no
+    session.
 
     THE STRENGTH RULE READS THE STORED USERNAME AND NAME, not anything the form
     carried, for the reason process_reset_password() gives: the two clauses that
@@ -211,6 +219,52 @@ def process_password_change(form_data, ip_address=None):
     if values["current_password"] and "current_password" not in errors:
         if not verify_user_password(user["id"], values["current_password"]):
             errors["current_password"] = WRONG_CURRENT_PASSWORD
+            # RECORDED, THOUGH NOTHING CHANGED. The trail already writes a
+            # refused sign-in for the same reason: one is a typo, a run of them
+            # is somebody guessing, and the run is invisible if only successes
+            # are written down. This refusal is the narrower and worse case --
+            # whoever typed it is holding a live session for this account and
+            # does not know its password, which is what an unattended machine
+            # left signed in looks like from the trail.
+            #
+            # WRITTEN HERE RATHER THAN WHERE THE OTHER ERRORS ARE HANDLED,
+            # because only this branch knows a password was verified and failed.
+            # An empty box, a weak new password or a mismatched confirmation are
+            # form mistakes and get no row; they say nothing about who is at the
+            # keyboard. The `if` above already excludes the empty box, so a
+            # submit with nothing in it cannot reach this.
+            #
+            # NOTHING TYPED IS AN ARGUMENT TO THIS CALL. Every value in it comes
+            # from the stored account row, exactly as _log_failed_sign_in() in
+            # routes/auth.py is built, so no caller-supplied text is on any path
+            # into the table -- not the value, not a hash, not its length, not
+            # how near it came.
+            log_action(
+                user["id"],
+                ACTION_PASSWORD_CHANGE_FAILED_SELF,
+                module=MODULE_AUTH,
+                # CLAUSES SEPARATED BY "; ", WHICH IS NOT A STYLE CHOICE.
+                # routes/audit_views.py::_split_details() splits this column on
+                # exactly that, and names this shape in its own docstring:
+                # "sign-in / refusal -- <who, as what, from where>; <clause>;
+                # <clause>". Written with full stops instead, the whole entry
+                # renders as one unbroken bullet in the detail panel while every
+                # sign-in beside it reads as a short list.
+                details=(
+                    f'A password change was refused on account '
+                    f'"{user["username"]}" ({user["full_name"]}, '
+                    f'{user["role"]}), from {_address_phrase(ip_address)}; the '
+                    "current password typed on My Account to prove identity did "
+                    "not match the stored hash; nothing was written and the "
+                    "account signs in with exactly what it did before; this came "
+                    "from a session already signed in as this account, which a "
+                    "refused sign-in at the login form is not -- read on its own "
+                    "it says somebody holding this session does not know this "
+                    "account's password; the value supplied is not recorded "
+                    "anywhere, by design"
+                ),
+                ip_address=ip_address,
+            )
 
     if errors:
         return False, my_account_context(change_errors=errors), None

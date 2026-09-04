@@ -67,6 +67,7 @@ reason is deleted the moment the gap it describes is closed.
 from models.audit import (
     ACTION_LOGIN_BLOCKED,
     ACTION_LOGIN_FAILED,
+    ACTION_PASSWORD_CHANGE_FAILED_SELF,
     ACTION_BACKUP_DOWNLOADED,
     ACTION_LOGIN_SUCCESS,
     ACTION_MAINTENANCE_DISABLED,
@@ -232,6 +233,17 @@ _ICONS = {
     # fixed subset and a ligature it does not carry renders as its own literal
     # name, which is the failure mode medicine_inventory.html documents.
     ACTION_SESSION_REVOKED: "link_off",
+    # A refused own-password change. It needs a glyph of its own for the reason
+    # the three above do: it is a refusal, and the successful self-change beside
+    # it in the trail carries no entry in this map at all, so without one an
+    # admission and a refusal on the same screen would render the identical
+    # Authentication module icon -- the precise thing this map exists to
+    # prevent. `password` rather than another shield: `gpp_bad` is the login
+    # form's refusal and this one is not a sign-in, so the two must not read as
+    # the same event happening twice. Drawn already in this project's templates,
+    # which is the available check that the fixed font subset in static/fonts
+    # carries it; one it does not hold renders as its own literal name.
+    ACTION_PASSWORD_CHANGE_FAILED_SELF: "password",
     # The three account-management entries. Each gets its own glyph for the
     # reason the three phrases are separate constants: these are the rows a
     # reviewer scans a list for rather than reads in order, and an account being

@@ -269,6 +269,41 @@ ACTION_PASSWORD_RESET = "Reset user account password"
 # composed from the stored account row.
 ACTION_PASSWORD_CHANGED_SELF = "Changed own account password"
 
+# The same screen's refusal: somebody signed in as this account opened My Account
+# and typed a current password that is not the one the account signs in with.
+#
+# WHY THIS IS WORTH A ROW AT ALL, WHEN THE ATTEMPT CHANGED NOTHING.
+# It is the same argument ACTION_LOGIN_FAILED rests on, arriving one door
+# further in. A refused sign-in is recorded because a run of them against one
+# account is the shape of somebody guessing, and that shape is invisible if only
+# the successful attempt is written down. This screen is reachable only from
+# inside an open session, which makes the refusal here narrower and, for the one
+# case that matters, worse: the person at the keyboard holds a live session for
+# this account and does not know its password. That is what an unattended,
+# still-signed-in machine looks like from the trail -- somebody sat down at it
+# and tried to take the account properly by changing its credential. A single
+# such row is a mistyped password; a series of them is the event this table
+# exists to make visible, and until now the series left no trace whatsoever.
+#
+# IT IS A SEPARATE PHRASE FROM ACTION_LOGIN_FAILED, AND MUST STAY ONE.
+# Both are "a password was typed and did not match", and that is the whole of the
+# overlap. A refused sign-in is somebody at the door who may be anybody; this is
+# somebody already inside, holding a session the system itself issued. An
+# administrator counting refused sign-ins to see who is being guessed at must not
+# find these mixed in, because they answer a different question and, unlike a
+# refused sign-in, every one of them was made by a session that was already
+# trusted. The counts below select on the phrase, so collapsing the two would
+# also silently change what those figures mean.
+#
+# THE PROHIBITION ON THE VALUE BINDS HERE AS IT DOES EVERYWHERE ELSE, and this
+# is the entry where it binds hardest, because what was typed here is the one
+# string in the system most likely to be a REAL password that simply belongs to
+# a different account -- somebody typing their own password into a machine left
+# signed in as a colleague. Nothing about it reaches this table: not the value,
+# not a hash, not its length, not how near it came. The row is composed entirely
+# from the stored account row, exactly as ACTION_LOGIN_FAILED's is.
+ACTION_PASSWORD_CHANGE_FAILED_SELF = "Refused own-password change attempt"
+
 # The two Settings actions.
 #
 # ACTION_SETTINGS_UPDATED covers the six General Settings values -- the health
@@ -331,6 +366,15 @@ ACTION_MAINTENANCE_DISABLED = "Disabled maintenance mode"
 # it is only kept out of a total whose name would stop being true. If a future
 # session wants these counted, the honest change is a card of their own, not a
 # quiet addition to this tuple.
+#
+# ACTION_PASSWORD_CHANGE_FAILED_SELF IS OUT OF THIS GROUP FOR THE SAME REASON,
+# and the temptation to include it is stronger, because unlike a revoked session
+# it really is a password that was typed and refused. It is still not a sign-in
+# attempt: it happens on My Account, inside a session the system already issued,
+# and the two labels above would become false about the number the moment it was
+# added. It is written under MODULE_AUTH and appears in the trail and under the
+# Authentication filter like the rest; only the total it would misname excludes
+# it. The same honest change applies -- a card of its own, not a quiet addition.
 REFUSAL_ACTIONS = (ACTION_LOGIN_FAILED, ACTION_LOGIN_BLOCKED)
 
 # Modules that are not a change to a stored record, and so are excluded from the
