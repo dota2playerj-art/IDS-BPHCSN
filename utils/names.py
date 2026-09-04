@@ -37,14 +37,23 @@ letters. Nothing left gives `empty`, which the caller chooses -- see below.
 TITLES HOLDS HONORIFICS THAT PRECEDE A NAME, AND ONLY THOSE. "Kagawad" is here
 because an elected barangay councilor's title is written in front of their name
 exactly as "Dr." is, and an avatar reading "KA" names the office rather than the
-person. "Hon." is deliberately NOT here: no account in this system carries it,
-the Barangay Official persona is stored as a plain name, and adding a title on
-speculation would silently change what an account nobody has created yet renders
-as. It belongs in this list on the day such an account exists, not before.
+person.
+
+"Hon." was deliberately NOT here until 2026-09-05, and the reason it is here now
+is the one this docstring already gave for keeping it out: "no account in this
+system carries it ... It belongs in this list on the day such an account exists,
+not before." That day arrived. The Barangay Official demo account was given the
+persona "Hon. Michael Flores" by migrate_demo_data_hygiene.py, so an account now
+carries the honorific and the avatar would otherwise read "HF" -- the title and
+the surname -- instead of "MF".
+
+Worth keeping the sequence visible, because it is the rule working: the entry was
+added in the same commit as the account that needs it, rather than on speculation
+years earlier or as a fix months later when somebody noticed the wrong initials.
 """
 
 TITLES = frozenset({
-    "dr.", "dr", "mr.", "mrs.", "ms.", "engr.", "kagawad",
+    "dr.", "dr", "mr.", "mrs.", "ms.", "engr.", "kagawad", "hon.", "hon",
 })
 
 # The comparison form. Full stops are stripped from the name before the words

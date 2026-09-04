@@ -104,7 +104,23 @@ say what the system recorded at the time, which is what an audit trail is for.
 
 ## Health Center Staff
 
-Examples
+Name
+
+Jennifer Ramos
+
+Username
+
+staff
+
+Role
+
+Health Center Staff
+
+Status
+
+Active
+
+Examples (for sample data elsewhere)
 
 Maria Santos
 
@@ -120,7 +136,23 @@ Jennifer Ramos
 
 ## Barangay Officials
 
-Examples
+Name
+
+Hon. Michael Flores
+
+Username
+
+official
+
+Role
+
+Barangay Official
+
+Status
+
+Active
+
+Examples (for sample data elsewhere)
 
 Hon. Roberto Villanueva
 
@@ -129,6 +161,48 @@ Hon. Michael Flores
 Hon. Arlene Garcia
 
 Hon. Karen Mendoza
+
+---
+
+### Why these two personas are demonstration personas, and the Administrator's is not
+
+Added 2026-09-05. Until then both accounts carried their own **role** as their
+name -- `staff` was called "Health Center Staff" and `official` was called
+"Barangay Official" -- so the profile chip showed a person for one role and a job
+title for the other two. That reads as unfinished beside a correctly-named
+Administrator, and it is the sort of thing a panel asks about.
+
+The names above are drawn from this document's own example lists for those roles,
+and neither collides with a surname already on the patient roster. "Maria
+Santos", "Angela Cruz" and "Hon. Karen Mendoza" were passed over for that reason.
+"Joshua Reyes" was passed over for a stronger one: it was the *invented*
+Administrator persona this project spent a migration removing, and putting it
+back on a different account would be actively confusing to anyone reading the
+audit trail.
+
+**The distinction that matters, and it must not be blurred.** Kagawad Antonio
+Acido is stated above as fact because he is the real person holding the
+Administrator account, confirmed by the project's technical adviser. **Jennifer
+Ramos and Hon. Michael Flores are not real people.** They are demonstration
+personas, chosen from a list of examples, and nothing about them has been
+confirmed by anybody. If a real health worker or barangay official is ever given
+an account, they get their own -- a new account with their own username, not a
+rename of one of these, for the same reason `models/users.py` gives at length: a
+username is what past audit entries are attributable to, so an account needing a
+different username is a different account.
+
+Two consequences worth recording, both matching how the Administrator rename was
+handled:
+
+* **Existing audit entries were not rewritten.** 606 entries name these two
+  accounts, many by their old full name. They say what the system recorded at the
+  time. Entries written before and after 2026-09-05 therefore differ, which is
+  what a rename looks like in a trail that is not edited.
+* **`utils/names.py` gained "hon." in the same commit.** That file's TITLES set
+  had deliberately excluded the honorific, and said so: it "belongs in this list
+  on the day such an account exists, not before." Account `official` is now that
+  account, so without the entry its avatar would read "HF" -- the title and the
+  surname -- rather than "MF".
 
 ---
 
