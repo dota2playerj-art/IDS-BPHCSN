@@ -4,9 +4,11 @@ Version: 1.1
 
 Status: Active Development
 
-Last reviewed: 13 August 2026 — reconciled against the running system and the live database
-(see AUDIT_REPORT_2026-08-12_v3.md). Every status below was checked against code that runs,
-not against intent.
+Last reviewed: 5 September 2026 — the Current Project Status section was re-measured against the
+running system and the live database in a full verification pass (all four core objectives driven
+end to end, a 377-probe route × role matrix, and the complete account-management lifecycle). The
+21 August 2026 reconciliation of the Known Gaps section still stands. Every status below was
+checked against code that runs, not against intent.
 
 ---
 
@@ -40,44 +42,96 @@ maps onto these 5 phases — it is not a separate or competing methodology:
 
 Current Phase
 
-Phase 6: Integration — with Phase 7 (Testing) beginning. Phases 1 through 5 are complete.
+Phase 6: Integration — complete. Phase 7 (Testing) is the outstanding phase, and what is missing
+there is a *committed* suite rather than verification itself; see Phase 7 below for the
+distinction. Phases 1 through 6 are complete.
 
 Progress
 
-In Progress
+Feature-complete for the approved scope; documentation and test-suite work outstanding.
 
 Completion
 
-Approximately 70–75%.
+Approximately 95%.
 
-What that figure means, stated plainly so it can be defended:
+**This section was rewritten on 5 September 2026 and every figure in it was re-measured against
+the running system on that date.** The previous version reported 70–75%, six decorative screens,
+no README and no version control. All of those were false by the time anyone would have read
+them — and, worse, this document's own "Known Gaps" section had already listed most of them as
+corrected claims since 21 August. A roadmap that contradicts itself is read top to bottom, so the
+stale half was the half being believed. What that drift said, and what was actually true, is
+recorded at the end of this section rather than quietly deleted.
+
+What the figure means, stated plainly so it can be defended:
 
 All four core objectives from the approved Proposal are built and working against real stored
 data — Patient Records, Medicine Inventory, Appointment Scheduling with Community Notifications,
-and Reports & Analytics. Role-based access control is enforced across all 80 guarded routes for
-all three roles with no gaps. The database holds 10 tables with 12 indexes and passes integrity and
-foreign-key checks.
+and Reports & Analytics. Each was exercised end to end on 4 September 2026 by driving the real
+forms over HTTP against the live database: a patient registered, edited and reopened; a dispense
+moved stock across its threshold and the low-stock alert reacted on every surface that reports it;
+a patient booked, checked in, consulted and written up with dispensing and immunisation in one
+save; a broadcast sent to a computed audience with per-recipient rows.
 
-The remaining 25–30% is concentrated in four places, none of which is a core objective:
+Role-based access control is enforced across all **89 guarded endpoints** for all three roles with
+no gaps, confirmed by a 377-probe route × role matrix run under four identities — Administrator,
+Health Center Staff, Barangay Official and anonymous — with **zero leaks**. The database holds
+**13 tables with 19 indexes** and passes integrity and foreign-key checks.
 
-- Six screens are still presentation-only, rendering hard-coded content rather than live data:
-  User Management, Audit Logs, Settings, and four of the five Barangay Official extension screens.
-  Three of these are supporting infrastructure that 01_PROJECT_BIBLE.md ranks below the core
-  objectives; the Barangay Official extension screens were never part of the approved Proposal.
-- Two dashboards (Administrator, Health Center Staff) are partially wired — the inventory and
-  immunization panels are live, several statistic cards and activity tables are still mockup.
-- Phase 7 Testing has produced no artifacts yet.
-- Phase 8 Documentation has not started; there is no README.md and the project is not yet under
-  version control.
+The remaining ~5% is concentrated in three places, none of which is a core objective:
+
+- **One screen is presentation-only:** Notifications (Screen 19), which renders with no context
+  because there is no `notifications` table and nothing writes one. Every other screen in the
+  system is driven by real queries. User Management, Audit Logs, the Barangay Official screens and
+  both partially-wired dashboards named in the previous version of this section are all live.
+- **Phase 7 Testing has no committed artifacts.** Verification is real and substantial but is
+  written fresh each session and discarded, so nobody else can re-run it. Converting it to a
+  committed suite is a conversion, not a start from nothing.
+- **A short list of features named in the specifications is deliberately unbuilt**, each declared
+  on the screen that would have carried it rather than rendered as a dead control: account lockout,
+  Remember Me, Restore, SMS draft and scheduling, and a configured SMS gateway key. These are open
+  scope decisions, not oversights. See "Features named in the specifications that are not built"
+  below.
+
+Supporting infrastructure is complete and was driven end to end in the same pass. Account
+management works in full — Add User, Edit User, Reset Password and Deactivate/Reactivate — with the
+last-Administrator guard holding on both deactivation and demotion, and counting only accounts that
+can still sign in. Self-service password change is built, and a refused attempt is recorded in its
+own audit phrase. On Settings, **General Settings and Maintenance Mode are genuinely live**: the
+health center's name, barangay, municipality, province and clinic hours are written to the
+`settings` table and read back by the SMS composer, the export modules, the booking slot generator
+and every template header, and closing the system to non-Administrators works with no possibility
+of self-lockout. **Download Backup is built** and serves a real database file that opens and passes
+its own integrity check; **Restore is the one half that remains unbuilt**, and says so on itself,
+because restoring safely means stopping the application first — which is not something a screen
+inside that application can do.
+
+README.md exists and states how to run the system, the three roles and the migration order. The
+project is under version control on `master`.
 
 Scope added since the approved Proposal
 
 DOH Expanded Program on Immunization (EPI) tracking was added during development and is fully
 working: an `immunizations` table, the EPI schedule held in code, per-dose status on the Patient
 Profile, due/overdue alerts on both dashboards, and coverage figures on Reports & Analytics.
-Doses are recorded from the Record Consultation screen. This is not described in
-03_SCREEN_SPECIFICATIONS.md yet — that document still describes the original 15 screens and is
-the next documentation task.
+Doses are recorded from the Record Consultation screen. It is documented: 03_SCREEN_SPECIFICATIONS.md
+now specifies Screens 01–20, and §9 of 09_IDS-BPHCSN_UI_Architecture_FROM-CLAUDE.md records the
+scope extension and its reasoning.
+
+What this section used to claim, and why it was wrong
+
+Kept for the same reason the equivalent table in Known Gaps is kept: a status section loses a
+reader's trust by being written once and never re-read while the system moves past it, and the way
+to earn it back is to show the drift rather than erase it.
+
+| Previous claim | Actual state on 5 September 2026 |
+|---|---|
+| "Approximately 70–75%." | ~95%. All four core objectives and all supporting infrastructure are built and were exercised end to end. |
+| "enforced across all 80 guarded routes" | 89 guarded endpoints, verified by a 377-probe route × role matrix with zero leaks. |
+| "The database holds 10 tables with 12 indexes" | 13 tables, 19 indexes. Integrity and foreign-key checks both clean. |
+| "Six screens are still presentation-only… User Management, Audit Logs, Settings, and four of the five Barangay Official extension screens." | One: Notifications. User Management and Audit Logs are fully live; Settings is live apart from the panes that declare themselves unbuilt; all Barangay Official screens take a real context from `routes/official_views.py`. |
+| "Two dashboards (Administrator, Health Center Staff) are partially wired… several statistic cards and activity tables are still mockup." | Both are data-driven, including the Continue Consultation shortcut and the immunisation due/overdue panels. |
+| "Phase 8 Documentation has not started; there is no README.md and the project is not yet under version control." | README.md exists. The project has been under Git since before this claim was written. |
+| "03_SCREEN_SPECIFICATIONS.md… still describes the original 15 screens" | It specifies Screens 01–20 and carries a reconciliation section against the built system. |
 
 ---
 
@@ -226,10 +280,10 @@ Tasks
 
 ☑ Authentication — hashed passwords via Werkzeug, session cleared on login, role-based dispatch
   to the correct dashboard. Account lockout after repeated failures is NOT implemented, although
-  03_SCREEN_SPECIFICATIONS.md Screen 01 lists it; "Remember Me" and "Show Password" are also
-  still outstanding on that screen.
+  03_SCREEN_SPECIFICATIONS.md Screen 01 lists it; "Remember Me" is also still outstanding on that
+  screen. "Show Password" IS built — `login.html` carries a working `aria-pressed` eye toggle.
 
-☑ Role Management — `login_required` and `role_required` decorators on all 80 guarded routes, verified
+☑ Role Management — `login_required` and `role_required` decorators on all 89 guarded endpoints, verified
   with no gaps for Admin, Health Staff, Barangay Official and anonymous visitors. The Health
   Staff read-only restriction on SMS is enforced structurally: no send endpoint exists in the
   staff blueprint at all.
@@ -324,12 +378,12 @@ Integration
 
 Status
 
-In Progress — substantially complete
+Completed
 
 Tasks
 
-☑ Connect UI — 10 of 21 screens are wired end to end to live data with working write paths;
-  2 more are partially wired
+☑ Connect UI — every screen but Notifications is wired to live data; the screens with write
+  paths all have working ones. Notifications is the single exception and has no table to read
 
 ☑ Connect Backend — shared context builders in `routes/*_views.py` are used by both the Admin
   and Staff variants of each screen, so the two role surfaces cannot drift apart
@@ -340,17 +394,21 @@ Tasks
 ☑ Session Management — login, logout, session clearing, and a no-store cache header on every
   authenticated response
 
-☑ User Roles — verified across all 80 guarded routes under all four identities with zero gaps.
-  The application exposes 83 URL rules beyond static files; 80 of them are guarded (79 under
-  `role_required`, plus `/dashboard` under `login_required`) and three are deliberately open
-  (`/`, `/login`, `/logout`). The last sweep ran all 80 guarded rules under each of the four
-  identities -- 320 checks -- and found no leak.
+☑ User Roles — verified across all 89 guarded endpoints under all four identities with zero gaps.
+  The application exposes 96 URL rules beyond static files, resolving to 92 endpoints; 89 of
+  those endpoints are guarded (86 under `role_required`, plus `/dashboard`, `/account` and
+  `/account/password` under `login_required`) and three are deliberately open (`/`, `/login`,
+  `/logout`). The sweep of 4 September 2026 probed every guarded route under each of the four
+  identities -- 377 checks -- and found no leak. Write routes were probed only from identities
+  that must be refused, so a passing guard was never given the chance to alter data.
 
-☐ Wire the Audit Logs screen — the query and the data already exist; only the route context and
-  the template loop remain (carried forward from Phase 4)
+☑ Wire the Audit Logs screen — done. Screen 12 reads the trail through `get_audit_logs()`,
+  filters it by user, date and module, and exports it to `.xlsx` and `.pdf`
 
-☐ Replace the remaining hard-coded dashboard panels with the live figures the context builders
-  already compute
+☑ Replace the remaining hard-coded dashboard panels with the live figures the context builders
+  already compute — done. Both the Administrator and Health Center Staff dashboards are
+  data-driven, including the immunisation due/overdue panels and the Continue Consultation
+  shortcut
 
 Deliverable
 
@@ -747,11 +805,18 @@ end of this section so the drift itself is on the record.
 `render_template('notifications.html')` with no context at all, and there is no `notifications`
 table for it to read. It is the only screen in the system in that position.
 
-Settings (Screen 13) is a partial case and is stated separately rather than counted above.
-`settings()` now passes `settings_context()`, and the Security Settings pane reports live sign-in
-and refused-sign-in counts read from the audit trail. Every other pane on the screen is a disabled
-fieldset: the `settings` table exists in `schema.sql` and is empty, and no route writes to it. So
-nothing typed on that screen is stored, and exactly one block on it is read.
+Settings (Screen 13) is a partial case and is stated separately rather than counted above, and
+the balance has shifted decisively since this was written. **General Settings is stored and read
+back**: the health center's name, barangay, municipality, province and the clinic's opening and
+closing times are written to the `settings` table by `admin.save_general_settings` and consumed by
+the SMS composer, all three export modules, the booking slot generator and every template header —
+saving a new opening time changes the slots the booking dialog offers on the next render.
+**Maintenance Mode is live**, written by `admin.set_maintenance_mode` and read on every guarded
+request. The Password Policy pane, the sign-in figures and the database size are read from the
+running system and are not editable anywhere. **Download Backup is real** and serves a verified
+copy of the database. What remains disabled is Restore, the SMS gateway controls and the scheduling
+controls, each inside its own fieldset stating its own reason — so the claim that "nothing typed on
+that screen is stored" is no longer true of it, and has not been since 3 September 2026.
 
 Every other screen is driven by real queries. The Barangay Official's screens — Health Programs,
 Vaccination Campaigns, Community Reports and the Official Dashboard — each take a context built in
@@ -771,9 +836,13 @@ Reports & Analytics about the same barangay.
   `login.html` carries a working `aria-pressed` eye toggle.)
 - Screen 09: **"Save Draft"** and **"Schedule"** for SMS broadcasts. Not built; the compose dialog
   offers Cancel and Send Broadcast only, so neither appears as a dead button.
-- Screen 11: **account writes** — Add User, Reset Password, Disable, Enable, Delete. Present and
-  disabled, each stating why, because every one of them touches authentication. This is an open
-  scope decision for the team rather than an oversight.
+- Screen 11: **account writes are BUILT** and this entry no longer belongs in a list of things
+  that are not. Add User, Edit User, Reset Password and Deactivate/Reactivate all work, each with
+  a real hashed password and a real audit entry, and the last-Administrator guard refuses both
+  deactivating and demoting the last account that can still sign in. Delete is the one write that
+  was never built and never will be on present reasoning: nothing in this project deletes an
+  account, because the audit trail attributes past entries to it. Deactivation is the supported
+  end of an account's life.
 - **Column sorting on Appointment Scheduling's queue**, and only there. Sorting itself is built:
   Patient Records sorts by Name, Age, Last Visit and Status, and Medicine Inventory by Medicine
   Name, Current Stock, Expiration Date and Status, over the rendered rows and composing with each
@@ -784,13 +853,17 @@ Reports & Analytics about the same barangay.
   This is the `sort` reason in `utils/unavailable.py`, now quoted by that one screen.
 - **Paging**. Every row the query returns is already on the page, so there is no second page; the
   `pagination` reason says so on the two screens that used to show page numbers.
-- **Backup and Restore** on Settings, and the **SMS gateway** controls on the same screen. The SMS
+- **Restore** on Settings, and the **SMS gateway** controls on the same screen. Backup is no
+  longer in this list: Download Backup serves a real database file that opens and passes its own
+  integrity check. Restore is deliberately the harder half — a backup is a copy and risks nothing,
+  while a restore replaces every record with no way to undo it, and doing that safely means
+  stopping the application first, which a screen inside that application cannot do. The SMS
   integration itself is real — `utils/sms.py` posts to Semaphore and every send checks
   `SEMAPHORE_API_KEY` — so what is missing there is a configured key, not the feature.
 
 ## Engineering practice
 
-- **Templates carry inline `<style>` and `<script>` blocks.** 17 of the 23 files in `templates/`
+- **Templates carry inline `<style>` and `<script>` blocks.** 19 of the 25 files in `templates/`
   do. `04_DEVELOPMENT_GUIDE.md` asks for separate CSS and JS files; `static/css/` and `static/js/`
   are still almost entirely vendor assets (Bootstrap, Chart.js, and the self-hosted Inter and
   Material Symbols fonts). The one exception is `static/js/table-sort.js`, the shared sort
@@ -807,17 +880,23 @@ Reports & Analytics about the same barangay.
   patient, appointment and stock row the demo runs on. The mitigation is a manual dated copy taken
   outside the application.
 
-## Documentation debt — closed 21 August 2026
+## Documentation debt — closed 21 August 2026, re-counted 5 September 2026
 
 This subsection previously recorded that `03_SCREEN_SPECIFICATIONS.md` described 15 screens while
 the system had 21, and that `09_IDS-BPHCSN_UI_Architecture_FROM-CLAUDE.md` §1 also listed 15. Both
-are now current and both were re-checked on 21 August 2026:
+were brought current on 21 August 2026, and both were re-counted on 5 September 2026 after
+My Account and the maintenance response page were added:
 
-- The system has **20 screens**. `templates/` holds 23 `.html` files; three are not screens
-  (`base.html`, the shared layout, plus the `_print.html` and `_chart_table.html` partials).
-- `03_SCREEN_SPECIFICATIONS.md` documents Screens 01–20 and carries a
+- The system has **21 screens**. `templates/` holds 25 `.html` files; four are not screens —
+  `base.html` (the shared layout), the `_print.html` and `_chart_table.html` partials, and
+  `maintenance.html`, which is a **response page rather than a screen**: it has no route and
+  nothing navigates to it, because `utils/security.py` renders it with a 503 in place of the
+  screen that was asked for.
+- **My Account is counted as a screen** — it has its own route, guard, context and a form that
+  writes, and is entered from the header profile chip. It is Screen 21.
+- `03_SCREEN_SPECIFICATIONS.md` documents Screens 01–21 and carries a
   "Reconciliation With The Built System" section, updated in the same pass as this one.
-- `09_IDS-BPHCSN_UI_Architecture_FROM-CLAUDE.md` §1 lists the same 20.
+- `09_IDS-BPHCSN_UI_Architecture_FROM-CLAUDE.md` §1 lists the same 21.
 
 ## What this section used to claim, and why it was wrong
 

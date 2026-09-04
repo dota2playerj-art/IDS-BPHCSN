@@ -1,7 +1,7 @@
 # IDS-BPHCSN UI ARCHITECTURE DOCUMENT
 
 Version: 2.0
-Status: Approved. Sections 1, 2, 3, 5, 7 and 8 reconciled against the built system on 2026-08-15 and re-checked on 2026-08-21; section 10 added. Sections 11, 12 and 13 added 2026-08-21. Section 17 added 2026-08-26.
+Status: Approved. Sections 1, 2, 3, 5, 7 and 8 reconciled against the built system on 2026-08-15 and re-checked on 2026-08-21; section 10 added. Sections 11, 12 and 13 added 2026-08-21. Section 17 added 2026-08-26. Section 1's inventory and section 2's per-role screen lists re-counted on 2026-09-05, when My Account was added as Screen 21.
 Prepared For: Integrated Digital System for Barangay Poblacion Health Center Services and Community Notifications (IDS-BPHCSN)
 Institution: Northeastern Mindanao Colleges (NEMCO)
 
@@ -28,9 +28,9 @@ All future UI generation and frontend development must follow this document unle
 
 ## 1. Complete Screen Inventory
 
-**The system has 20 screens.** Screens 1–15 were the original inventory; screens 16–20 were built afterwards and are added here in Version 2.0.
+**The system has 21 screens.** Screens 1–15 were the original inventory; screens 16–20 were built afterwards and are added here in Version 2.0; screen 21, My Account, was built on 2026-09-04 and added here on 2026-09-05.
 
-`templates/` holds 23 `.html` files, of which three are not screens: `base.html` is the shared layout — sidebar, header, content region — and `_print.html` and `_chart_table.html` are partials included by the screens that print and the screens that render a chart's underlying figures as a table. The other 20 files are the 20 screens below, one file each.
+`templates/` holds 25 `.html` files, of which four are not screens. `base.html` is the shared layout — sidebar, header, content region. `_print.html` and `_chart_table.html` are partials included by the screens that print and the screens that render a chart's underlying figures as a table. And `maintenance.html` is a **response page rather than a screen**: it has no route and no sidebar entry, and `utils/security.py::_maintenance_response()` renders it with a 503 *in place of* whatever screen the request asked for while maintenance mode is on. Nothing navigates to it, so counting it as a screen would imply somewhere to click that does not exist. The other 21 files are the 21 screens below, one file each.
 
 The **Primary Role(s)** column is not a description kept in step by hand. It is the set of roles each view's own `role_required()` guard admits, read off `utils/security.py` and confirmed against the live `url_map` by `routes/user_views.py::accessible_screens()` — the same function that prints the permission list on Screen 11. If this column and the code ever disagree, the code is right and this table is stale.
 
@@ -56,6 +56,7 @@ The **Primary Role(s)** column is not a description kept in step by hand. It is 
 | 18 | Community Reports | `community_reports.html` | Barangay Official | Community-level health summary, built from `reports_analytics_context()` so it cannot report the barangay differently from Screen 10. Exports a real spreadsheet and PDF. |
 | 19 | Notifications | `notifications.html` | Barangay Official | Notification centre. Presentation only — there is no notifications table. |
 | 20 | Record / Edit Consultation | `record_consultation.html` | Administrator, Health Center Staff | Write up the clinical record of a visit, and edit one already recorded. Two modes of one template and one context builder. See §10. |
+| 21 | My Account | `my_account.html` | All three roles (`login_required`) | The signed-in person's own details, and a self-service password change requiring the current password. The only screen guarded by `login_required` rather than `role_required`, because what it reaches is one row — the caller's own — rather than a role's worth of screens. Entered from the header profile chip; it has no sidebar entry. |
 
 **One screen is not backed by data: 19, Notifications.** It is rendered as `render_template('notifications.html')` with no context, because there is no `notifications` table. Nothing on it should be quoted as a system output; recorded activity lives on Screen 12.
 
@@ -87,7 +88,7 @@ Do not re-add an Announcements screen without adding the table and routes behind
 
 The menus below are transcribed from `templates/base.html`, which renders one sidebar and swaps only the items per role. The accessible and restricted lists are the enforced guards, not a summary of them.
 
-Three screens are reachable but never appear in a sidebar, because they are always entered from another screen with a subject already chosen: **Patient Profile** (from Patient Records), **Add/Edit Medicine** (from Medicine Inventory), and **Record / Edit Consultation** (from the queue, or from a patient's Consultation History).
+Four screens are reachable but never appear in a sidebar. Three are entered from another screen with a subject already chosen: **Patient Profile** (from Patient Records), **Add/Edit Medicine** (from Medicine Inventory), and **Record / Edit Consultation** (from the queue, or from a patient's Consultation History). The fourth, **My Account**, is entered from the profile chip in the header — it has no sidebar entry because it belongs to no role's menu; every role reaches it the same way.
 
 ### Administrator
 
@@ -110,7 +111,7 @@ ADMINISTRATION
 ```
 
 - **Navigation hierarchy:** Two sidebar groups — "Main Menu" (operational) and "Administration" (governance). This is the only role for which the Administration group is rendered.
-- **Accessible screens (14 of 20):** Login, Administrator Dashboard, Patient Records, Register Patient, Patient Profile, Medicine Inventory, Add/Edit Medicine, Appointment Scheduling, Record / Edit Consultation, SMS Notifications, Reports & Analytics, User Management, Audit Logs, Settings.
+- **Accessible screens (15 of 21):** Login, Administrator Dashboard, Patient Records, Register Patient, Patient Profile, Medicine Inventory, Add/Edit Medicine, Appointment Scheduling, Record / Edit Consultation, SMS Notifications, Reports & Analytics, User Management, Audit Logs, Settings, My Account.
 - **Restricted screens:** The two other dashboards, and the four Barangay Official screens — Health Programs, Vaccination Campaigns, Community Reports, Notifications. **The Administrator does not have access to every screen.** The earlier claim in this document that the role reached "all 15 screens" was never true of the built system: the community-facing screens are guarded to the Barangay Official alone.
 
 ### Health Center Staff
@@ -128,7 +129,7 @@ MAIN MENU
 ```
 
 - **Navigation hierarchy:** Single group, operational only — no "Administration" section is rendered for this role.
-- **Accessible screens (10 of 20):** Login, Health Center Staff Dashboard, Patient Records, Register Patient, Patient Profile, Medicine Inventory, Add/Edit Medicine, Appointment Scheduling, Record / Edit Consultation, SMS Notifications.
+- **Accessible screens (11 of 21):** Login, Health Center Staff Dashboard, Patient Records, Register Patient, Patient Profile, Medicine Inventory, Add/Edit Medicine, Appointment Scheduling, Record / Edit Consultation, SMS Notifications, My Account.
 - **Restricted screens:** Reports & Analytics, User Management, Audit Logs, Settings, and all four Barangay Official screens.
 - **Resolved:** an earlier note here hedged that staff might get SMS "send/view only, not necessarily full broadcast history depending on future rule confirmation". The rule is settled in code — Health Center Staff render the same SMS screen as the Administrator, including the full broadcast history, and may send. `routes/staff.py` and `routes/admin.py` build it from one shared context builder.
 
@@ -148,7 +149,7 @@ MAIN MENU
 ```
 
 - **Navigation hierarchy:** Single group, community-facing. No Administration section. No badges on any item — see §1.1.
-- **Accessible screens (8 of 20):** Login, Barangay Official Dashboard, SMS Notifications, Health Programs, Vaccination Campaigns, Community Reports, Reports & Analytics, Notifications.
+- **Accessible screens (9 of 21):** Login, Barangay Official Dashboard, SMS Notifications, Health Programs, Vaccination Campaigns, Community Reports, Reports & Analytics, Notifications, My Account.
 - **Restricted screens:** Patient Records, Patient Profile, Register Patient, Record / Edit Consultation, Medicine Inventory, Add/Edit Medicine, Appointment Scheduling, User Management, Audit Logs, Settings, and the other two dashboards.
 - **The Barangay Official reaches no clinical screen.** This is the system's central access rule, and it holds against the enforced guards independently of this document: `accessible_screens("Barangay Official")` walks the live `url_map` and returns exactly the seven guarded screens above — no patient record, no patient profile, no consultation, no inventory.
 - The "Announcements" item that this section previously listed does not exist. See §1.1.

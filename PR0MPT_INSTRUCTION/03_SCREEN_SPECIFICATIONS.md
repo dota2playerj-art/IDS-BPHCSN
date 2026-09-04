@@ -2,7 +2,7 @@
 
 Version: 2.0
 
-Status: Screens 01–15 approved. Screens 16–20 specified from the built system and reconciled against the code on 2026-08-15.
+Status: Screens 01–15 approved. Screens 16–20 specified from the built system and reconciled against the code on 2026-08-15. Screen 21 (My Account) specified 2026-09-05; the file and screen counts and the Screen 11 and Screen 13 entries in the reconciliation section were re-checked against the running system on the same date.
 
 ---
 
@@ -10,11 +10,17 @@ Status: Screens 01–15 approved. Screens 16–20 specified from the built syste
 
 This document defines every screen of the IDS-BPHCSN system.
 
-The system has 20 screens.
+The system has 21 screens.
 
-Screens 01 to 15 are the original approved specifications and are unchanged below. Screens 16 to 20 were built after this document was first written and are specified here for the first time.
+Screens 01 to 15 are the original approved specifications and are unchanged below. Screens 16 to 20 were built after this document was first written and are specified here for the first time. Screen 21, My Account, was built on 4 September 2026 and is specified at the end.
 
-`templates/` holds 21 `.html` files. `base.html` is the shared layout — sidebar, header, content region — and is not a screen. The other 20 files are the 20 screens, one file each.
+`templates/` holds 25 `.html` files. Twenty-one of them are the 21 screens, one file each. The other four are not screens, and are not screens for two different reasons:
+
+- **`base.html`** is the shared layout — sidebar, header, content region — that every screen renders inside.
+- **`_print.html`** and **`_chart_table.html`** are partials, included by the screens that print and the screens that render a chart's underlying figures as a table.
+- **`maintenance.html`** is a *response page*, not a screen. It has no route, no sidebar entry and no URL of its own: `utils/security.py::_maintenance_response()` renders it with a 503 status **instead of** whatever screen the request asked for, while maintenance mode is on. Nothing navigates to it, so it is closer to an error page than to a screen, and counting it as one would imply somewhere to click that does not exist.
+
+Why My Account **is** counted as a screen when `maintenance.html` is not: it has its own route (`/account`), its own guard, its own context and a form that writes. It is entered deliberately, from the profile chip in the header rather than from a sidebar — which makes it unusual among the 21, but no more so than Patient Profile, Add/Edit Medicine and Record Consultation, which are also reachable only from another screen.
 
 Record Consultation and Edit Consultation are two modes of one template, `record_consultation.html`, rendered by one shared context builder, and are specified together as Screen 20.
 
@@ -938,6 +944,74 @@ Immunisation tracking on this screen extends beyond the original scope of this d
 
 ---
 
+# SCREEN 21
+
+## My Account
+
+Purpose
+
+Show the signed-in person their own account details, and let them change their own password without asking the Administrator.
+
+Authorized Users
+
+- Administrator
+- Health Center Staff
+- Barangay Official
+
+All three, identically. This is the one screen in the system guarded by `@login_required` rather than `@role_required`, because what it reaches is not a role's worth of screens — it is one row, the caller's own.
+
+Navigation
+
+Entered from the profile chip in the header, on any screen. It has no sidebar entry, because it belongs to no role's menu.
+
+Sections
+
+Account Details
+
+Change Password
+
+Fields
+
+Current Password
+
+New Password
+
+Confirm New Password
+
+Read-only on this screen
+
+Full name
+
+Role
+
+Username
+
+Actions
+
+Change Password
+
+Validation
+
+The current password must be supplied and must match. This is the whole difference between this screen and the Administrator's reset on Screen 11: a reset exists precisely *because* the old password is unavailable, and a change exists precisely because it is available and is the only thing proving the person at the keyboard is the account holder rather than whoever found the machine still signed in.
+
+The new password is checked against the same password policy Screen 11 applies — length, character kinds, and refusal of anything containing the username or the person's own name.
+
+A refused submit re-renders this screen at 200 with the error beside the box it belongs to, the project's form-redisplay standard. Nothing typed is written back into the page: all three boxes hold a password, and re-rendering one into the markup would put it somewhere it should not be.
+
+Backend Notes
+
+Context and both handlers live in `routes/account_views.py`.
+
+**Neither handler takes an account to act on, and that is the guard.** Both call `get_current_user()` and act on whatever comes back, so there is no parameter, no hidden field and no path by which a request could name a different account. A posted `user_id` is not rejected — it is never read, which is the stronger answer.
+
+Name, role and username are deliberately not editable here. That is the same boundary Screen 11 draws, kept from the other side: a role a person can raise on themselves is not a role, and a name the audit trail attributes actions to should not be changeable by the person the trail is about. The username is fixed for the life of the account for anybody.
+
+There is no photograph, contact detail or preference of any kind, because nothing in this application stores or reads one.
+
+Both outcomes are audited. A successful change writes "Changed own account password"; a refused one writes "Refused own-password change attempt", in the same shape the sign-in entries use, so an attempt against a password somebody does not know is as visible as a refused sign-in.
+
+---
+
 # Global Navigation Rules
 
 Login
@@ -1044,8 +1118,11 @@ a reconciliation section that under-reports the system is as misleading as one t
 it. Screens 01 to 20 above are left exactly as approved; this section records only where the built
 system differs from them.
 
-The system has **20 screens**. `templates/` holds 23 `.html` files, of which three are not screens:
-`base.html` (the shared layout) and the `_print.html` and `_chart_table.html` partials.
+The system has **21 screens**. `templates/` holds 25 `.html` files, of which four are not screens:
+`base.html` (the shared layout), the `_print.html` and `_chart_table.html` partials, and
+`maintenance.html` — a response page rendered with a 503 in place of the screen that was asked for,
+with no route and nothing navigating to it. See the note under "Purpose" at the top of this
+document for why My Account counts as a screen and `maintenance.html` does not.
 
 ## Specified but not built
 
@@ -1072,11 +1149,23 @@ it now holds at **both** ends of a session:
 Not built. The compose dialog offers Cancel and Send Broadcast only, so neither appears as a dead
 control.
 
-**Screen 11 — "Add User", "Reset Password", "Disable", "Enable", "Delete".**
+**Screen 11 — account writes are BUILT.**
 
-Not implemented, and deliberately so rather than overlooked. Every write on that screen touches
-authentication — password hashing, role assignment, and the ability to revoke a sign-in — so it is
-an open scope decision for the team. The buttons are present and disabled, each stating why.
+This entry previously read "Not implemented, and deliberately so… The buttons are present and
+disabled, each stating why", and none of that has been true since 3 September 2026. **Add User,
+Edit User, Reset Password and Deactivate/Reactivate all work**, each writing a real hashed password
+or a real column change and each recording itself in the audit trail. The last-Administrator guard
+refuses both deactivating and demoting the last account that can still sign in, and states the
+reason beside the control rather than refusing silently.
+
+**Delete is the one write that was never built**, and on present reasoning never will be: nothing
+in this project deletes an account, because the audit trail attributes past entries to it.
+Deactivation is the supported end of an account's life — it refuses the account at the login form
+and ends any session it already has open, and it is reversible.
+
+The `write`, `edit_user` and `reset_password` reasons that used to sit behind those buttons in
+`utils/unavailable.py` and `routes/user_views.py::UNTRACKED` are retired. A reason that denies a
+working control is the worst kind this project keeps.
 
 **Column sorting — built on Screens 03 and 06; deliberately absent on Screen 08.**
 
@@ -1097,13 +1186,29 @@ discard the one thing that list is for. See the `sort` reason in `utils/unavaila
 Not implemented and not needed: every row the query returns is already on the page. The page
 numbers that used to sit in these footers were markup counting a roster the system does not hold.
 
-**Screen 13 — Settings: everything except the Security pane.**
+**Screen 13 — Settings is now mostly live, and this entry has been rewritten twice over.**
 
-Nothing typed on that screen is stored. The `settings` table exists in `schema.sql` and is empty,
-and no route writes to it, so every input sits inside a disabled fieldset. Backup and Restore do
-nothing; the project's real backup practice is a manual dated copy of `app.db` taken outside the
-application. The SMS gateway controls are disabled for a different reason — the integration in
-`utils/sms.py` is real and finished, and what is absent is a configured `SEMAPHORE_API_KEY`.
+It previously read "Nothing typed on that screen is stored. The `settings` table… is empty, and no
+route writes to it". That has not been true since 3 September 2026.
+
+- **General Settings is stored and read back.** The health center's name, barangay, municipality,
+  province and the clinic's opening and closing times are written to the `settings` table and
+  consumed by the SMS composer, all three export modules, the booking slot generator and every
+  template header. Saving a new opening time changes the slots the booking dialog offers.
+- **Maintenance Mode is live.** An Administrator can close the system to Health Center Staff and
+  Barangay Officials, who are shown a 503 maintenance page and keep their sessions. Administrator
+  access is structurally unaffected, so there is no self-lockout.
+- **Password Policy, the sign-in figures and the database size** are read from the running system
+  and are not editable anywhere.
+- **Download Backup is real** and serves a verified copy of the database.
+
+What is still disabled, each inside its own fieldset stating its own reason: **Restore** —
+deliberately the harder half, because a restore replaces every record with no way to undo it and
+doing it safely means stopping the application first, which a screen inside that application
+cannot do; the **SMS gateway** controls, where the integration in `utils/sms.py` is real and
+finished and what is absent is a configured `SEMAPHORE_API_KEY`; and the **scheduled-backup**
+controls, because nothing in this system runs a timed job. User Preferences, Notification Settings
+and Clear Cache were removed outright rather than left disabled.
 
 **Screen 19 — Notifications.**
 

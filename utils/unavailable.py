@@ -13,11 +13,20 @@ clicking. Naming the specific missing piece -- a library, a table, a route --
 also tells the next session what building it would actually take, which
 "Coming soon" does not.
 
-The two buttons that named the rule are now on opposite sides of it, which is
-the rule working rather than the rule breaking. Add User creates a real account
-with a real hashed password, so it carries no `disabled` and no reason at all --
-a working control needs no excuse, and leaving one on it would be the same
-defect as a false reason. Edit User is still not built and still says so.
+The two buttons that named the rule have now both left it, which is the rule
+working rather than the rule breaking. Add User creates a real account with a
+real hashed password, so it carries no `disabled` and no reason at all -- a
+working control needs no excuse, and leaving one on it would be the same defect
+as a false reason. Edit User followed it on 2026-09-03, along with Reset
+Password and Deactivate/Reactivate, and their reasons went with them.
+
+This paragraph said "Edit User is still not built and still says so" until
+2026-09-05, by which point it had been untrue for two days. It is worth leaving
+the correction visible rather than silently rewriting it: a file whose whole
+purpose is to stop stale reasons surviving in templates is exactly the file whose
+own prose has to be re-read when the world changes. The reasons themselves were
+retired on the day the controls started working; only this sentence about them
+lagged.
 
 WHY THESE LIVE HERE AND NOT IN EACH TEMPLATE
 --------------------------------------------
