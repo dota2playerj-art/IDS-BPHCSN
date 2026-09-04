@@ -167,7 +167,13 @@
           <div class="col-md-4">
             <label class="field-label" for="currentPassword">Current Password<span class="req">*</span></label>
             <input type="password" class="form-control{% if change_errors.current_password %} is-invalid{% endif %}"
-                   id="currentPassword" name="current_password" autocomplete="current-password" autofocus>
+                   {#- No autofocus. This field sits about 1,050px down the page, below
+                       Account Details, and a browser asked to focus it scrolls it into
+                       view -- which on a shorter window carries the account's own name,
+                       role and username off the top and opens this screen looking like
+                       it is only a password form. The order was never wrong; the focus
+                       was. Nothing else in this project autofocuses either. #}
+                   id="currentPassword" name="current_password" autocomplete="current-password">
 {%- if change_errors.current_password %}
             <div class="field-error">{{ change_errors.current_password }}</div>
 {%- else %}
