@@ -57,6 +57,8 @@
   table.audit-table tbody tr{cursor:pointer;}
   table.audit-table tbody tr:hover{background:#FAFBFC;}
   table.audit-table tbody tr.selected{background:var(--teal-light);}
+  /* Keyboard focus has to be visible on a row that is itself the control. */
+  table.audit-table tbody tr:focus-visible{outline:2px solid var(--teal-dark); outline-offset:-2px;}
   table.audit-table tbody tr:last-child td{border-bottom:none;}
 
   .ts-main{font-weight:600;}
@@ -74,12 +76,6 @@
   .badge-success{background:#DCFCE7; color:#15803D;}
   .badge-failed{background:#FEE2E2; color:#B91C1C;}
   .badge-warning{background:#FEF3C7; color:#B45309;}
-
-  .action-icon{
-    width:32px; height:32px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center;
-    color:var(--text-muted); background:transparent; border:none;
-  }
-  .action-icon:hover{background:var(--bg); color:var(--teal-dark);}
 
   .table-footer{display:flex; align-items:center; justify-content:space-between; padding-top:18px; margin-top:6px; border-top:1px solid var(--border-color); flex-wrap:wrap; gap:12px;}
   .pg-info{font-size:13px; color:var(--text-muted);}
@@ -279,13 +275,46 @@
                   <th>Activity</th>
                   <th>IP Address</th>
                   <th>Status</th>
-                  <th style="text-align:right;">Actions</th>
                 </tr>
               </thead>
               <tbody>
 {%- for entry in entries %}
+{#- THE ROW IS THE CONTROL, AND IT IS REACHABLE BY KEYBOARD.
+
+    There was a View icon in an Actions column here. It had no handler of its
+    own: being inside this <tr>, a click on it bubbled to this onclick, so it
+    opened the panel that clicking anywhere else in the row had already opened,
+    one pixel away from itself. It is gone, and the empty column went with it --
+    a header over nothing reads as a control that failed to render. This is the
+    same removal User Management had in 1d48f1c, for the same reason.
+
+    There was nothing for it to show, either. Every column of audit_logs is on
+    the panel beside the table: the full timestamp, the user and their role, the
+    module, the IP address, the entry number, and `details` -- the one column not
+    in the table at all -- expanded into a summary and before/after pairs. No
+    cell here is truncated, so unlike Medicine Inventory's View there is no
+    fuller version to open.
+
+    What that icon did carry, incidentally rather than by design, was keyboard
+    access: it was a <button>, so Tab reached it and Enter pressed it, and the
+    click that raised fell through to this handler. Deleting it without replacing
+    that would have left a keyboard-only Administrator able to read the first
+    entry's before/after detail and no other -- every other panel is `hidden`
+    until its row is chosen, and hidden content takes no focus. The trail is a
+    reading screen; not being able to choose what to read is a loss of function.
+
+    So the row carries the affordance now instead of a duplicate control in a
+    column of its own: tabindex makes it focusable, the keydown handler below
+    activates it on Enter or Space, and aria-controls/aria-expanded name the
+    panel it opens and say whether that panel is the one showing.
+
+    The <tr> stays a <tr>. role="button" would have made it focusable too and
+    would have stopped a screen reader announcing it as a table row at all,
+    which is the one thing about it worth announcing. #}
                 <tr{% if loop.first %} class="selected"{% endif %} data-entry="{{ entry.id }}"
                     data-search="{{ (entry.user_name ~ ' ' ~ (entry.module or '') ~ ' ' ~ entry.action ~ ' ' ~ (entry.details or '')) | lower }}"
+                    tabindex="0" aria-controls="auditDetail{{ entry.id }}"
+                    aria-expanded="{{ 'true' if loop.first else 'false' }}"
                     onclick="selectRow(this)">
                   <td><div class="ts-main">{{ entry.time_text }}</div><div class="ts-sub">{{ entry.date_text }}</div></td>
                   <td>
@@ -304,11 +333,10 @@
                       called after the write it describes has succeeded, so there
                       is no failed or partial row for this column to report. #}
                   <td><span class="badge-status badge-success">Recorded</span></td>
-                  <td><div class="d-flex justify-content-end"><button class="action-icon" type="button" aria-label="View entry {{ entry.id }}"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button></div></td>
                 </tr>
 {%- else %}
                 <tr id="auditEmpty">
-                  <td colspan="7" style="text-align:center; padding:38px 14px; color:var(--text-muted);">
+                  <td colspan="6" style="text-align:center; padding:38px 14px; color:var(--text-muted);">
                     <div class="material-symbols-outlined" style="font-size:34px; opacity:0.45;">fact_check</div>
                     <div style="font-weight:600; margin-top:8px; color:var(--text-dark);">No activity recorded yet</div>
                     <div style="font-size:13px; margin-top:4px;">
@@ -319,7 +347,7 @@
                 </tr>
 {%- endfor %}
                 <tr id="auditNoMatch" hidden>
-                  <td colspan="7" style="text-align:center; padding:32px 14px; color:var(--text-muted);">
+                  <td colspan="6" style="text-align:center; padding:32px 14px; color:var(--text-muted);">
                     No entry matches that search.
                   </td>
                 </tr>
@@ -371,7 +399,7 @@
           </div>
 {%- endif %}
 {%- for entry in entries %}
-          <div class="entry-detail" data-detail="{{ entry.id }}"{% if not loop.first %} hidden{% endif %}>
+          <div class="entry-detail" id="auditDetail{{ entry.id }}" data-detail="{{ entry.id }}"{% if not loop.first %} hidden{% endif %}>
             <div class="detail-header">
               <div class="detail-icon">
                 <span class="material-symbols-outlined" style="color:var(--teal-dark); font-size:22px;">{{ entry.icon }}</span>
@@ -438,17 +466,39 @@
   // Selecting a row shows that entry's detail block. Every block is already on
   // the page, rendered by the server from the stored row, so nothing here
   // builds text -- it only decides which one is visible.
+  //
+  // It also keeps aria-expanded in step with what is actually showing, because
+  // the attribute is rendered once on the server for whichever row starts
+  // selected and would otherwise still be claiming that row is open after
+  // another was chosen.
   function selectRow(row){
     var id = row.getAttribute('data-entry');
     if(!id){ return; }
     document.querySelectorAll('#auditTable tbody tr[data-entry]').forEach(function(r){
       r.classList.remove('selected');
+      r.setAttribute('aria-expanded', 'false');
     });
     row.classList.add('selected');
+    row.setAttribute('aria-expanded', 'true');
     document.querySelectorAll('.entry-detail').forEach(function(panel){
       panel.hidden = panel.getAttribute('data-detail') !== id;
     });
   }
+
+  // Enter or Space on a focused row does what clicking it does. The rows are the
+  // only way to choose an entry since the duplicate View icon was removed, so
+  // without this an Administrator working from the keyboard could read the first
+  // entry's before/after detail and no other -- see the note on the row.
+  //
+  // Space is prevented from its default, which on a focusable element is to
+  // scroll the page. Enter is not, because it has no default here.
+  document.addEventListener('keydown', function(event){
+    if (event.key !== 'Enter' && event.key !== ' ' && event.key !== 'Spacebar') { return; }
+    var row = event.target.closest ? event.target.closest('#auditTable tbody tr[data-entry]') : null;
+    if (!row || row !== event.target) { return; }
+    if (event.key !== 'Enter') { event.preventDefault(); }
+    selectRow(row);
+  });
 
   // Search filters the rows already on the page against the same text the
   // server put in data-search (user, role, module, activity and details).

@@ -96,6 +96,17 @@ being deleted with it. 202 checks, a measured table layout with no trailing gap,
 and a live pass in which an account was chosen by Enter and by Space and its Edit
 dialog opened from there.
 
+## audit-view-icon-removal/
+
+Verification that Audit Logs' View icon and its Actions column are gone — the
+icon had no handler at all, so a click on it simply bubbled to the row's own
+`onclick` and opened the panel that clicking anywhere else in the row had already
+opened — and that the keyboard access the button carried incidentally moved onto
+the row rather than being deleted with it. 834 checks plus 9 more on the two
+empty states, both colspans compared against the rendered header count rather
+than a hardcoded number, a measured table layout with no trailing gap, and a live
+pass in which a row was reached by Tab and chosen by Enter and by Space.
+
 ## immunization-next-step/
 
 Verification that every Due and Overdue row on the Immunization Record tab now
