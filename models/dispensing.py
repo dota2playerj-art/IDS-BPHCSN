@@ -110,6 +110,7 @@ medicine is expired is exactly the drift models/inventory.py's own header warns
 against.
 """
 from database.connection import get_db
+from models.consultations import RESTRICTED_PLACEHOLDER, can_view_restricted
 from models.inventory import (
     ITEM_CATEGORIES,
     RETIRED_STATUS,
@@ -716,7 +717,8 @@ SELECT d.id, d.patient_id, d.consultation_id, d.inventory_item_id,
        u.full_name AS dispensed_by_name,
        i.item_code AS item_code,
        c.consultation_date AS consultation_date,
-       c.diagnosis AS consultation_diagnosis
+       c.diagnosis AS consultation_diagnosis,
+       c.is_restricted AS consultation_restricted
 FROM medicine_dispensing d
 JOIN users u ON u.id = d.dispensed_by
 LEFT JOIN inventory_items i ON i.id = d.inventory_item_id
@@ -724,18 +726,40 @@ LEFT JOIN consultations c ON c.id = d.consultation_id
 """
 
 
-def _to_records(rows):
+def _to_records(rows, viewer_role=None):
+    """Stored dispensing rows -> the dicts the three readers below hand out.
+
+    `viewer_role` None means "do not redact", which is the right default for the
+    two callers that never put a diagnosis on a screen -- see each of them. Where
+    a diagnosis IS shown, the role is compulsory at that function's own signature
+    rather than defaulted here.
+
+    WHY A DISPENSING ROW HAS TO BE REDACTED AT ALL.
+    It does not hold a diagnosis; it joins to one. _DISPENSING_SELECT brings
+    `c.diagnosis` along so the Dispensing History tab can print the column headed
+    "For (Diagnosis)" without a query per row, and that column is on the same
+    Patient Profile page whose Consultation History is sealed. Withholding the
+    diagnosis in one tab and printing it two tabs across would be a seal that
+    protects nothing -- and it is exactly the kind of second copy of a value that
+    an access rule applied only at the obvious place leaves behind.
+    """
+    can_view = can_view_restricted(viewer_role) if viewer_role is not None else True
     records = [dict(row) for row in rows]
     for record in records:
         record["label"] = dispensing_label(record)
         record["quantity_text"] = _plural(
             record["quantity_dispensed"], record.get("unit")
         )
+        record["consultation_restricted"] = bool(
+            record.get("consultation_restricted")
+        )
+        if not can_view and record["consultation_restricted"]:
+            record["consultation_diagnosis"] = RESTRICTED_PLACEHOLDER
     return records
 
 
-def get_dispensing_for_patient(patient_id):
-    """Everything issued to one patient, most recent first.
+def get_dispensing_for_patient(patient_id, viewer_role):
+    """Everything issued to one patient, most recent first, redacted to fit.
 
     The Dispensing History tab on Screen 04. Newest first, matching the general
     vaccination history and for the same reason: this is a plain record of what
@@ -745,6 +769,14 @@ def get_dispensing_for_patient(patient_id):
     The visit's own date and diagnosis come along from _DISPENSING_SELECT, so the
     tab can say which consultation an issue belongs to and what it was given for
     without a second query per row.
+
+    That diagnosis is why `viewer_role` has no default here, exactly as it has
+    none on models.consultations.get_consultations_for_patient(): this is the
+    second place on the Patient Profile where a sealed diagnosis would otherwise
+    reach the page, and a default would be a decision about confidentiality made
+    by whichever value looked harmless when the signature was written. The
+    dispensing itself is never withheld -- what was handed over is what a health
+    worker needs in order to do their job, and none of it is sealed.
     """
     conn = get_db()
     rows = conn.execute(
@@ -753,11 +785,18 @@ def get_dispensing_for_patient(patient_id):
         (patient_id,),
     ).fetchall()
     conn.close()
-    return _to_records(rows)
+    return _to_records(rows, viewer_role)
 
 
 def get_dispensing_for_consultation(consultation_id):
-    """The items issued during one visit, oldest row first."""
+    """The items issued during one visit, oldest row first.
+
+    Not redacted, and it does not need to be: its two callers are the "already
+    dispensed at this visit" list on the consultation form and the same list in
+    the profile's per-visit detail panel, and both print the medicine, the
+    quantity and who issued it. Neither reads consultation_diagnosis, so there is
+    nothing on this path for a seal to withhold.
+    """
     if not consultation_id:
         return []
     conn = get_db()
@@ -775,6 +814,12 @@ def get_dispensing_by_consultation(consultation_ids):
     The Recent Consultations table on the Administrator dashboard has a Dispensed
     column and prints five rows. Asking per row would be five queries for a panel
     that already has its consultations in hand; this is one.
+
+    Not redacted, for the reason get_dispensing_for_consultation() above is not:
+    the only screen behind it is that dashboard panel, which prints the medicines
+    and reads no diagnosis from these rows. It is also Administrator-only -- the
+    Health Center Staff dashboard has no such table -- so both the caller and the
+    role point the same way.
     """
     ids = [int(value) for value in consultation_ids if value]
     if not ids:

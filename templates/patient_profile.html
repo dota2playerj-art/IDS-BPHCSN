@@ -10,6 +10,20 @@
     is what keeps the button and the guard from ever disagreeing: adding or
     withdrawing the endpoint moves both at once. #}
 {% set can_correct = correct_vaccination_endpoint is defined %}
+{#- Whether this render may offer the Restricted control on a consultation.
+
+    Built exactly as can_correct above is, and for the same reason: it asks
+    whether a URL exists rather than whether a role matches. utils/context.py
+    hands `restrict_consultation_endpoint` to the Administrator alone, because
+    that blueprint is the only one that registers the route -- there is no staff
+    equivalent to hide, which is what makes hiding this control presentation
+    rather than the permission.
+
+    It is deliberately NOT the same question as `may_view_restricted`, which the
+    server answers separately and which decides whether the sealed text is in
+    this page at all. One governs a button, the other governs the content; a
+    template that used one for both would be a page deciding its own access. #}
+{% set can_restrict = restrict_consultation_endpoint is defined %}
 {% block title %}IDS-BPHCSN | Patient Profile{% endblock %}
 
 {% block styles %}
@@ -124,6 +138,35 @@
   .badge-waiting{background:#FEF3C7; color:#B45309;}
   .badge-inconsult{background:var(--teal-light); color:var(--teal-dark);}
   .badge-noshow{background:#F3F4F6; color:#4B5563;}
+  /* THE CONFIDENTIALITY SEAL, IN FOUR PLACES ON THIS SCREEN.
+
+     Purple, and deliberately not amber or red. Every other coloured state on
+     this page means something is wrong or needs doing -- red is a refused
+     correction and a cancelled visit, amber is a dose due and a warning. A
+     sealed record is neither: it is working exactly as intended, and colouring
+     it as an alert would teach a health worker to read the most carefully
+     protected records in the register as a queue of problems. Purple is the one
+     hue here already reserved for a classification rather than a condition
+     (.badge-referred), which is what this is.
+
+     The badge is muted rather than filled for the same reason: it labels a row,
+     it does not compete with the status beside it. */
+  .restricted-badge{background:#EDE9FE; color:var(--purple);}
+  .restricted-chip{
+    display:inline-flex; align-items:center; gap:3px; font-size:11.5px;
+    font-weight:600; color:var(--purple);
+  }
+  /* The placeholder itself, where a value would be. Italic and muted so it does
+     not read as a diagnosis somebody typed -- the words say it is withheld, and
+     the styling has to agree with them at a glance or the cell will be skimmed
+     as content. */
+  .restricted-value{color:var(--text-muted); font-style:italic;}
+  .restricted-note{
+    border-radius:12px; border:1px solid #DDD6FE; background:#F5F3FF;
+    color:#5B21B6; padding:12px 14px; font-size:12.5px; display:flex; gap:10px;
+    align-items:flex-start; margin-top:14px;
+  }
+  .restricted-note strong{display:block; margin-bottom:2px;}
 
   /* SUMMARY CARDS */
   .stat-card{
@@ -528,9 +571,17 @@
             <div class="timeline-item">
               <div class="timeline-dot"><span class="material-symbols-outlined" style="font-size:11px; color:var(--teal-dark);">favorite</span></div>
               <div class="timeline-date">{{ consultation.consultation_date | display_date }}</div>
+{#- The diagnosis and treatment plan printed here are whatever the server put in
+    the list. On a sealed entry seen by a role that may not read it, that is the
+    placeholder -- models.consultations.redact() replaces the field itself and
+    not merely its display twin, precisely so a line like this one, written long
+    before the seal existed, prints the withheld text rather than the real
+    thing. There is no branch here to forget. #}
               <div class="timeline-title">{{ consultation.diagnosis or consultation.chief_complaint or 'Consultation' }}</div>
               <div class="timeline-desc">{{ consultation.treatment_plan or 'No treatment plan recorded.' }}</div>
-              <div class="timeline-meta">Attending: {{ consultation.recorded_by }}</div>
+              <div class="timeline-meta">Attending: {{ consultation.recorded_by }}
+{%- if consultation.withheld %} &middot; <span class="restricted-chip"><span class="material-symbols-outlined" style="font-size:13px; vertical-align:-2px;">lock</span> Restricted</span>{% endif %}
+              </div>
             </div>
 {%- endfor %}
           </div>
@@ -548,6 +599,30 @@
         <!-- CONSULTATION HISTORY -->
         <div class="tab-pane fade" id="tab-consult">
           <h2 class="print-only print-section-title">Consultation History</h2>
+{#- SAID ONCE AT THE TOP, NOT LEFT TO BE NOTICED ROW BY ROW.
+    A health worker scanning this table would otherwise meet the placeholder for
+    the first time in a cell, halfway down, with no way to tell whether it is a
+    rule or a fault. This says how many entries are affected, what is withheld
+    and -- the part that changes what they do next -- what is NOT withheld, so
+    they know the record they need for dispensing is still complete.
+
+    Only rendered when something actually was withheld on THIS page. A standing
+    notice on every profile would be a sentence about a rule rather than about
+    the record in front of them, and would train them to skip it. #}
+{%- if withheld_count %}
+          <div class="alert-ids alert-info-ids">
+            <span class="material-symbols-outlined">lock</span>
+            <div>
+              <strong>{{ withheld_count }} of these consultation{{ 's' if consultations|length != 1 else '' }} {{ 'are' if withheld_count != 1 else 'is' }} Restricted</strong>
+              The Administrator has marked {{ 'them' if withheld_count != 1 else 'it' }} as holding sensitive medical
+              information, so the diagnosis and treatment plan are not shown to your role and are not
+              part of this page. Everything else about {{ 'those visits' if withheld_count != 1 else 'that visit' }}
+              &mdash; the date, the chief complaint, the vital signs, any vaccinations given and anything
+              dispensed &mdash; is shown in full, so intake and dispensing are unaffected. This view has
+              been recorded in the audit log.
+            </div>
+          </div>
+{%- endif %}
 {%- if consultations %}
           <div style="overflow-x:auto;">
             <table class="history-table">
@@ -581,9 +656,26 @@
                   </td>
                   <td>{{ consultation.consultation_date | display_date }}{% if consultation.was_edited %}<div style="font-size:11.5px; color:var(--text-muted);">edited</div>{% endif %}</td>
                   <td>{{ consultation.chief_complaint or '—' }}</td>
-                  <td>{{ consultation.diagnosis or '—' }}</td>
+{#- Prints the placeholder rather than an em dash on a sealed entry, because the
+    value in `consultation.diagnosis` IS the placeholder by the time it reaches
+    here. An em dash would say the field is empty, which is the one thing about a
+    sealed record that is not true and the thing most likely to make a health
+    worker go and ask the patient a question their record already answers. #}
+                  <td{% if consultation.withheld %} style="color:var(--text-muted); font-style:italic;"{% endif %}>{{ consultation.diagnosis or '—' }}</td>
                   <td>{{ consultation.recorded_by }}</td>
-                  <td><span class="badge-status badge-completed">Completed</span></td>
+                  <td><span class="badge-status badge-completed">Completed</span>
+{%- if consultation.is_restricted %}
+{#- Shown to BOTH roles, and that is deliberate. For the Administrator it is the
+    only way to see at a glance which records are sealed. For everyone else it is
+    the honest label on a row whose Diagnosis cell they cannot read -- a system
+    that withheld the content and also hid the fact of the seal would leave a
+    health worker unable to tell a restricted record from a badly filled-in one,
+    and unable to ask the right person about it. The badge names the state; it
+    does not name the condition, which is the whole distinction the seal rests
+    on. #}
+                    <span class="badge-status restricted-badge"><span class="material-symbols-outlined" style="font-size:13px; vertical-align:-2px;">lock</span> Restricted</span>
+{%- endif %}
+                  </td>
                   <td>
 {#- View and Edit are deliberately two different things. The read-only panel
     below already existed and already worked, but the only affordance for it was
@@ -603,6 +695,32 @@
                          class="action-icon" title="Edit this consultation — the change is recorded in the audit log">
                         <span class="material-symbols-outlined" style="font-size:18px;">edit</span>
                       </a>
+{#- Sealing a record already on file, or opening one back up. Offered only where
+    a POST would be admitted -- see can_restrict at the head of this file -- so
+    the control and the guard cannot disagree.
+
+    Its own button rather than a trip through Edit Consultation, for the reason
+    routes/consultation_views.py gives: that form makes every field writable, and
+    a seal set through it would leave a consultation edit in the audit trail that
+    changed no field, sitting next to the entry explaining it.
+
+    The two directions carry OPPOSITE glyphs rather than one toggle, so a
+    sealed row and an unsealed one do not look alike at a glance -- the same
+    reasoning the maintenance-mode pair in routes/audit_views.py is chosen on.
+    Both `lock` and `lock_open` are already drawn by this project (the sign-in
+    form and the audit trail's own icon map), which is the available check that
+    the fixed font subset in static/fonts carries them. #}
+{%- if can_restrict %}
+                      <button type="button" class="action-icon restrict-open"
+                              data-bs-toggle="modal" data-bs-target="#restrictConsultationModal"
+                              data-consultation="{{ consultation.id }}"
+                              data-date="{{ consultation.consultation_date | display_date }}"
+                              data-recorded-by="{{ consultation.recorded_by_name }}"
+                              data-restricted="{{ '1' if consultation.is_restricted else '0' }}"
+                              title="{% if consultation.is_restricted %}Lift the restriction — the diagnosis and treatment plan become legible to Health Center Staff again{% else %}Mark Restricted — withhold the diagnosis and treatment plan from Health Center Staff{% endif %}">
+                        <span class="material-symbols-outlined" style="font-size:18px;">{% if consultation.is_restricted %}lock{% else %}lock_open{% endif %}</span>
+                      </button>
+{%- endif %}
                     </div>
                   </td>
                 </tr>
@@ -629,8 +747,12 @@
                         </div>
                         <div class="info-grid">
                           <div class="info-item" style="grid-column:1/-1;"><div class="info-label">Chief Complaint</div><div class="info-value">{{ consultation.chief_complaint_display }}</div></div>
-                          <div class="info-item" style="grid-column:1/-1;"><div class="info-label">Diagnosis</div><div class="info-value">{{ consultation.diagnosis_display }}</div></div>
-                          <div class="info-item" style="grid-column:1/-1;"><div class="info-label">Treatment Plan / Medicines Given</div><div class="info-value">{{ consultation.treatment_plan_display }}</div></div>
+{#- Both values arrive redacted or not, decided on the server before this page
+    was built. `withheld` is true only when something was actually taken out of
+    THIS entry for THIS reader, so the Administrator -- who has nothing withheld
+    -- never sees the muted styling, and an unsealed record never carries it. #}
+                          <div class="info-item" style="grid-column:1/-1;"><div class="info-label">Diagnosis</div><div class="info-value{% if consultation.withheld %} restricted-value{% endif %}">{{ consultation.diagnosis_display }}</div></div>
+                          <div class="info-item" style="grid-column:1/-1;"><div class="info-label">Treatment Plan / Medicines Given</div><div class="info-value{% if consultation.withheld %} restricted-value{% endif %}">{{ consultation.treatment_plan_display }}</div></div>
                           <div class="info-item" style="grid-column:1/-1;"><div class="info-label">Additional Notes</div><div class="info-value">{{ consultation.remarks_display }}</div></div>
                         </div>
 {#- Doses given at this visit. The panel described the visit's clinical text and
@@ -691,6 +813,39 @@
                             <span style="color:var(--text-muted);">&middot; {{ record.date_dispensed | display_date }} &middot; by {{ record.dispensed_by_name }}</span>
                           </div>
 {%- endfor %}
+                        </div>
+{%- endif %}
+{#- The seal, explained inside the panel it applies to, in whichever of the two
+    voices fits the reader.
+
+    The Administrator is told what OTHER people cannot see, because they can see
+    everything on this panel and would otherwise have no indication the record is
+    sealed at all beyond a badge two rows up. Everybody else is told what is
+    missing and why, beside the placeholder itself.
+
+    Neither sentence names the condition. The seal exists to keep it out of this
+    page, and an explanation that gave it away would be the whole disclosure. #}
+{%- if consultation.is_restricted %}
+                        <div class="restricted-note">
+                          <span class="material-symbols-outlined" style="font-size:17px;">lock</span>
+                          <div>
+{%- if may_view_restricted %}
+                            <strong>This consultation is Restricted</strong>
+                            You are seeing it in full. Health Center Staff and BHWs see
+                            &ldquo;{{ restricted_placeholder }}&rdquo; where the diagnosis and treatment plan are
+                            above; everything else on this panel is visible to them.
+{%- if consultation.restricted_by_name %}
+                            Marked by {{ consultation.restricted_by_name }}{% if consultation.restricted_at %} on {{ consultation.restricted_at | display_date }}{% endif %}.
+{%- endif %}
+{%- else %}
+                            <strong>The diagnosis and treatment plan for this visit are restricted</strong>
+                            The Administrator has marked this consultation as holding sensitive medical
+                            information, so those two fields are withheld from your role and are not part of
+                            this page. Everything else here &mdash; the vital signs, any doses given and anything
+                            dispensed &mdash; is the complete record. Ask the Administrator if you need the
+                            assessment itself.
+{%- endif %}
+                          </div>
                         </div>
 {%- endif %}
                         <div style="font-size:12px; color:var(--text-muted); margin-top:14px; padding-top:12px; border-top:1px dashed var(--border-color);">
@@ -771,7 +926,14 @@
 {#- The visit this was given during. Blank only if that consultation record was
     later removed — the item was still handed over, which is why the column is
     ON DELETE SET NULL rather than cascading. #}
-                  <td>{{ record.consultation_diagnosis or '—' }}</td>
+{#- Redacted in models/dispensing.py, at the same read that fetches it, because
+    this column joins to the very consultation the tab beside it may be sealing.
+    Withholding a diagnosis in Consultation History and printing it here would be
+    a seal that protects nothing -- and this is the copy an access rule applied
+    only at the obvious place leaves behind. What the row is FOR is never
+    withheld: the item, the quantity, the date and who issued it are what a
+    health worker needs, and none of them is sealed. #}
+                  <td{% if record.consultation_restricted %} style="color:var(--text-muted); font-style:italic;"{% endif %}>{{ record.consultation_diagnosis or '—' }}</td>
                   <td>{{ record.dispensed_by_name }}</td>
                 </tr>
 {%- endfor %}
@@ -1381,6 +1543,96 @@
     </div>
 {%- endif %}
 
+{#- THE RESTRICTED DIALOG.
+
+    Behind a confirmation for the reason the correction dialog above it is: this
+    changes who may read a clinical record, and this project puts every act of
+    that weight behind an explicit second step rather than a single click on a
+    table row. What the dialog adds beyond the click is the sentence naming which
+    visit is being sealed and what the consequence is, in both directions.
+
+    ONE DIALOG SERVING BOTH DIRECTIONS, filled from the button that opened it --
+    exactly how the correction dialog and Patient Records' status dialog work,
+    and for the same reason: the row already knows whether it is sealed, and
+    asking the server again would be a second answer that could differ from the
+    one on screen.
+
+    Rendered only where a POST would be admitted. `can_restrict` tests for the
+    endpoint's existence rather than for a role name, so the dialog, the button
+    and the guard move together. #}
+{%- if can_restrict %}
+    <div class="modal fade" id="restrictConsultationModal" tabindex="-1" aria-labelledby="restrictConsultationModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.12);">
+          <form method="post" action="{{ url_for(restrict_consultation_endpoint, patient_id=patient.id) }}" novalidate>
+            <input type="hidden" name="{{ restrict_consultation_field }}" id="restrictConsultationId" value="">
+{#- The direction is posted explicitly rather than inferred from the record's
+    current state on the server. Two people working the same profile could
+    otherwise each open the dialog on an unsealed row, and the second submit
+    would silently lift the seal the first had just set -- a toggle deciding for
+    itself what it means is exactly how that happens. Naming the direction makes
+    the second submit a no-op that says so. #}
+            <input type="hidden" name="{{ restrict_action_field }}" id="restrictAction" value="{{ restrict_on }}">
+            <div class="modal-header">
+              <h5 class="modal-title" id="restrictConsultationModalLabel">Restrict Consultation</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <p id="restrictSubject" style="margin-bottom:16px; font-size:13.5px; color:var(--text-muted);"></p>
+
+              <div id="restrictOnBody">
+                <p style="margin-bottom:10px; font-size:13.5px;">
+                  The diagnosis and treatment plan on this visit will be withheld from Health Center
+                  Staff and BHWs. They will see &ldquo;{{ restricted_placeholder }}&rdquo; in their
+                  place &mdash; not a blank, so nobody reads the record as never having been written up.
+                </p>
+{#- The half a clinician most needs to be sure of before using this. A seal that
+    also broke dispensing would be a seal nobody dared set, and the whole design
+    rests on it not doing that. #}
+                <p style="margin-bottom:10px; font-size:13.5px;">
+                  Everything else stays visible to them: the date, the chief complaint, the vital
+                  signs, any vaccinations given and anything dispensed. Intake and dispensing on this
+                  patient are unaffected.
+                </p>
+                <p style="margin-bottom:16px; font-size:13.5px;">
+                  Nothing is deleted or changed &mdash; the record keeps exactly what it says, and you
+                  continue to see all of it. This can be lifted again from this same table.
+                </p>
+              </div>
+
+              <div id="restrictOffBody" style="display:none;">
+                <p style="margin-bottom:10px; font-size:13.5px;">
+                  The diagnosis and treatment plan on this visit will become legible again to Health
+                  Center Staff and BHWs, and views of it will no longer be recorded as withheld.
+                </p>
+                <p style="margin-bottom:16px; font-size:13.5px;">
+                  The record itself is unchanged either way &mdash; this only decides who may read it.
+                </p>
+              </div>
+
+              <div class="audit-notice">
+                <span class="material-symbols-outlined" style="font-size:18px; margin-top:1px;">history</span>
+                <div>
+                  <strong style="display:block; margin-bottom:2px;">This will be logged</strong>
+                  The audit trail will record your name, the time, and which consultation was
+                  affected. The diagnosis itself is deliberately not written into that entry.
+                  Every view this restriction withholds from another role is logged too. That
+                  entry cannot be edited or removed.
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn-primary-teal" id="restrictSubmit">
+                <span class="material-symbols-outlined" style="font-size:18px;">lock</span><span id="restrictSubmitLabel">Mark Restricted</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+{%- endif %}
+
     <div class="print-only print-foot">
       Printed from IDS-BPHCSN, {{ health_center.name }}. This is a copy of
       {{ patient.full_name }}'s record ({{ patient.patient_id }}) as held at the time of printing;
@@ -1512,6 +1764,52 @@
       // and the row cannot appear to be about different records.
       var recordedBy = button.dataset.recordedBy;
       subject.textContent = 'Correcting: ' + (button.dataset.label || 'this record')
+        + (recordedBy ? ', recorded by ' + recordedBy : '') + '.';
+    });
+  })();
+
+  // THE RESTRICTED DIALOG.
+  //
+  // Reads which visit and which direction off the button that opened it, exactly
+  // as the correction dialog above does and for the reason stated there: the row
+  // already knows, and a second lookup is a second answer that could differ from
+  // the one on screen.
+  //
+  // Everything it sets is presentation plus the two hidden fields the server
+  // re-validates anyway -- process_consultation_restriction() checks the
+  // direction against the two words it recognises and re-reads the consultation
+  // from the database, so a dialog driven with the wrong values cannot produce a
+  // seal on the wrong record.
+  (function(){
+    var modal = document.getElementById('restrictConsultationModal');
+    if(!modal){ return; }
+
+    var idField  = document.getElementById('restrictConsultationId');
+    var action   = document.getElementById('restrictAction');
+    var subject  = document.getElementById('restrictSubject');
+    var onBody   = document.getElementById('restrictOnBody');
+    var offBody  = document.getElementById('restrictOffBody');
+    var label    = document.getElementById('restrictSubmitLabel');
+    var title    = document.getElementById('restrictConsultationModalLabel');
+
+    modal.addEventListener('show.bs.modal', function(event){
+      var button = event.relatedTarget;
+      if(!button){ return; }
+
+      var sealed = button.dataset.restricted === '1';
+      idField.value = button.dataset.consultation || '';
+      action.value = sealed ? '{{ restrict_off }}' : '{{ restrict_on }}';
+
+      onBody.style.display  = sealed ? 'none' : '';
+      offBody.style.display = sealed ? '' : 'none';
+      title.textContent = sealed ? 'Lift Restriction' : 'Restrict Consultation';
+      label.textContent = sealed ? 'Lift Restriction' : 'Mark Restricted';
+
+      // Says which visit, in the words the table used, so the dialog and the row
+      // cannot appear to be about different records.
+      var recordedBy = button.dataset.recordedBy;
+      subject.textContent = (sealed ? 'Lifting the restriction on: ' : 'Restricting: ')
+        + '{{ patient.first_name }}\u2019s consultation of ' + (button.dataset.date || 'this visit')
         + (recordedBy ? ', recorded by ' + recordedBy : '') + '.';
     });
   })();

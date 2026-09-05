@@ -134,6 +134,33 @@ def get_current_user():
     return user
 
 
+def current_role():
+    """The signed-in account's canonical role, or "" when nobody is signed in.
+
+    THE POINT OF THIS FUNCTION IS WHERE IT DOES NOT READ FROM.
+    The role comes from the STORED account row, through get_current_user(), and
+    falls back to the session's own copy only when there is no row to read -- the
+    same order and the same reason inject_role_context() uses. Nothing a request
+    carried is on any path into the answer: not a form field, not a query string,
+    not a header. That is what lets it be the authority behind a permission
+    rather than a convenience.
+
+    It exists because two decisions now have to be made per request from the
+    role, away from the decorators that were previously the only thing asking:
+    whether this person may write a diagnosis, and whether they may read one that
+    has been sealed (models/consultations.py can_diagnose / can_view_restricted).
+    Both are asked inside the shared view builders, which serve two blueprints
+    each and so cannot read the answer off their own guard.
+
+    It costs no query. get_current_user() caches the row on flask.g for the life
+    of the request, and every guarded request has already fetched it.
+    """
+    user = get_current_user()
+    if user is not None:
+        return normalize_role(user["role"])
+    return normalize_role(session.get("role"))
+
+
 # THE ONE RESPONSE EVERY REFUSAL RETURNS.
 # Moved here from routes/auth.py, which still imports it, because a second caller
 # appeared and the whole point of the function is that there is only one of it.

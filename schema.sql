@@ -83,10 +83,32 @@ CREATE TABLE consultations (
     height REAL,
     head_circumference REAL,
     follow_up_date TEXT,
+    -- THE CONFIDENTIALITY SEAL. Set by the Administrator -- the licensed doctor
+    -- -- on an entry they judge to be sensitive, and read by every screen that
+    -- would otherwise show this record's diagnosis or treatment plan to anyone
+    -- else. RA 11166 makes HIV status privileged medical information with
+    -- criminal penalties for unauthorised disclosure, and it is not the only
+    -- such rule; nothing here guesses which diagnoses are covered, because a
+    -- system that guessed would be wrong in both directions. The clinician
+    -- decides and this column holds the decision.
+    --
+    -- It seals the two doctor-only fields, diagnosis and treatment_plan, and
+    -- nothing else: the visit date, chief complaint, vitals, doses and dispensing
+    -- stay legible to Health Center Staff, who still take the intake and still
+    -- hand the medicine over. See models/consultations.py DOCTOR_ONLY_FIELDS.
+    --
+    -- restricted_by / restricted_at say who sealed it and when, so the profile
+    -- can print that beside the placeholder without a per-row search of the audit
+    -- trail. audit_logs remains the authority; these two are a convenience and
+    -- are cleared whenever the restriction is lifted.
+    is_restricted INTEGER NOT NULL DEFAULT 0 CHECK (is_restricted IN (0, 1)),
+    restricted_by INTEGER,
+    restricted_at TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
     FOREIGN KEY (recorded_by) REFERENCES users(id) ON DELETE RESTRICT,
+    FOREIGN KEY (restricted_by) REFERENCES users(id) ON DELETE RESTRICT,
     FOREIGN KEY (appointment_id) REFERENCES appointments(id) ON DELETE SET NULL
 );
 

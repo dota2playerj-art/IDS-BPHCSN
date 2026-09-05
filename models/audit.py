@@ -82,6 +82,30 @@ MODULE_USERS = "User Management"
 # on somebody's laptop, which is the single most consequential read this
 # application offers and the one a reviewer most needs to be able to enumerate.
 MODULE_SETTINGS = "Settings"
+# The confidentiality seal on a consultation: who sealed one, who lifted one, and
+# who was kept out of one.
+#
+# ITS OWN MODULE RATHER THAN A CORNER OF MODULE_CONSULTATIONS, on the same
+# distinction that separates User Management from Authentication. That module
+# answers "what did this consultation used to say, and what does it say now" --
+# it is a trail of clinical content. This one answers a question no clinical
+# trail can: "who decided this record is privileged, and who has been refused
+# it". The two are read by different people looking for different things, and
+# folding these entries into the consultation trail would bury them under an edit
+# for every temperature ever corrected.
+#
+# It also keeps the module filter useful in both directions. An administrator
+# reviewing confidentiality selects this and sees seals, liftings and refusals
+# and nothing else; one reviewing what was actually recorded about a patient
+# selects Consultation Records and is not shown the access housekeeping.
+#
+# WHY IT IS NAMED FOR THE DUTY RATHER THAN FOR THE LAW. RA 11166 is what made
+# this necessary and is cited at every point in the code that implements it, but
+# the seal is not HIV-specific and must not read as though it were: a module pill
+# saying "RA 11166" beside an entry would tell everyone who could see the Audit
+# Logs screen which law the sealed record falls under, which is most of the
+# disclosure the seal exists to prevent.
+MODULE_CONFIDENTIALITY = "Medical Confidentiality"
 
 # Activity phrases, in the same voice as the ones on that screen ("Updated
 # patient record", "Updated stock quantity").
@@ -347,6 +371,78 @@ ACTION_BACKUP_DOWNLOADED = "Downloaded a database backup"
 ACTION_MAINTENANCE_ENABLED = "Enabled maintenance mode"
 ACTION_MAINTENANCE_DISABLED = "Disabled maintenance mode"
 
+# The four confidentiality phrases. All under MODULE_CONFIDENTIALITY.
+#
+# TWO OF THEM ARE CHANGES AND TWO ARE NOT, WHICH IS WHY THERE ARE FOUR.
+# Sealing and lifting move a column on a consultation. A withheld view and a
+# refused field move nothing at all -- one is somebody being shown a placeholder,
+# the other is a submission having two of its fields dropped. Collapsing any pair
+# would make a count of them answer nothing.
+#
+# ACTION_CONSULTATION_RESTRICTED / _UNRESTRICTED are two phrases rather than one
+# "changed restriction", for the reason ACTION_USER_DEACTIVATED and
+# ACTION_USER_REACTIVATED are two: they are opposite acts and only one of them
+# takes information away. "Six restriction changes this month" would read
+# identically for six seals and six liftings, and a reviewer asking whether a
+# patient's privileged record was ever opened up again needs those to look
+# different in a list.
+#
+# `details` on both names the consultation, the patient, the visit date and who
+# originally recorded it. IT NEVER NAMES THE DIAGNOSIS. That prohibition is
+# absolute and it is the same shape as the one on passwords above: the audit
+# trail is readable by any Administrator and is exported whole by
+# routes/audit_export.py, so writing the sealed text into `details` would move
+# the privileged information out of the one column that protects it and into the
+# one place in this system that is designed to be read and downloaded. What the
+# entry records is that a record was sealed, whose it is, and by whom -- which is
+# every fact a reviewer can act on.
+ACTION_CONSULTATION_RESTRICTED = "Marked consultation restricted"
+ACTION_CONSULTATION_UNRESTRICTED = "Lifted consultation restriction"
+
+# The read half. Written when a role that may not see a sealed diagnosis opens a
+# patient's record and the system shows them the placeholder instead.
+#
+# WHY A REFUSED READ IS WORTH A ROW WHEN THE READ CHANGED NOTHING.
+# It is the argument ACTION_BACKUP_DOWNLOADED rests on, narrowed to one record.
+# That entry exists because "who has a complete copy of the register" is a
+# question a health center must be able to answer, and nothing else in the trail
+# could answer it. This one exists because "who has been at this patient's
+# privileged record" is a question RA 11166 makes a health center answerable for,
+# and an access rule that leaves no trace is a rule nobody can demonstrate was
+# ever enforced. The entry is the evidence that the seal held.
+#
+# ONE ROW PER VIEW THAT ACTUALLY WITHHELD SOMETHING, NOT ONE PER SEALED ENTRY ON
+# THE PAGE, AND NOT ONE PER SCREEN A HEALTH WORKER OPENS.
+# This is the shape of thing that fills a table -- utils/security.py's
+# _maintenance_response() declines to write a row per blocked click for exactly
+# that reason -- so the boundary is drawn deliberately. A profile with three
+# sealed visits writes one entry naming all three, because the event is "this
+# person looked at this patient's record", not "this person failed to read
+# entry #12". A profile with none writes nothing at all, because nothing was
+# withheld and a row saying so would be a row about an ordinary page view.
+ACTION_RESTRICTED_WITHHELD = "Withheld restricted consultation from view"
+
+# The write half, and the more serious of the two. Written when a submission from
+# a role that may not diagnose arrives carrying a diagnosis or a treatment plan
+# anyway.
+#
+# IT IS A SEPARATE PHRASE FROM THE ONE ABOVE AND MUST STAY ONE. Both are the
+# access rule doing its job, and that is the whole of the overlap. A withheld
+# view is the ordinary, expected consequence of a health worker opening a record
+# they work with every day -- there is nothing wrong with it and nobody did
+# anything. A refused field cannot be produced by using this system as it is
+# built: the fields are not rendered for that role, so a submission carrying them
+# was assembled by something other than the form. A single row is a stale tab or
+# a replayed request; a series of them is somebody probing the boundary, and that
+# distinction is invisible if the two share a phrase.
+#
+# `details` names the fields that were dropped and NOT what they contained. The
+# submitted text is the caller's guess at a diagnosis, and writing an unlicensed
+# guess about a patient's condition into the permanent trail would create exactly
+# the record the refusal exists to prevent -- attributed to the patient, readable
+# by every Administrator, and carried into every audit export.
+ACTION_DIAGNOSIS_REFUSED = "Refused clinical judgement from an unlicensed role"
+
 # Every action that means somebody was turned away at the login form. Grouped so
 # the Security Events figure counts refusals rather than one particular kind of
 # refusal -- adding a fourth outcome later must not silently shrink that number.
@@ -392,6 +488,26 @@ REFUSAL_ACTIONS = (ACTION_LOGIN_FAILED, ACTION_LOGIN_BLOCKED)
 # kind of wrong, because it would report data as having changed when what
 # happened was that a copy of it left unchanged.
 NON_RECORD_MODULES = (MODULE_SMS, MODULE_AUTH, MODULE_USERS, MODULE_SETTINGS)
+
+# The same exclusion drawn one level finer, for the one module whose entries are
+# not all of a kind.
+#
+# WHY MODULE_CONFIDENTIALITY COULD NOT JUST JOIN THE TUPLE ABOVE. Two of its four
+# actions genuinely change a stored consultation -- sealing one and lifting a seal
+# both move a column on the row -- so excluding the whole module would understate
+# "Record Updates" by every seal ever set. The other two change nothing whatever:
+# a withheld view is somebody being shown a placeholder, and a refused field is a
+# submission having two of its values dropped before they reached the database.
+# Counting either as a record update would report data as having been altered when
+# nothing was written, which is the failure ACTION_BACKUP_DOWNLOADED's note above
+# calls the worst kind.
+#
+# So the module stays in the count and these two actions come out of it. Kept as a
+# named tuple beside NON_RECORD_MODULES rather than as a condition typed into the
+# query, for the reason that one is a tuple: a fifth confidentiality action added
+# later must be classified deliberately, in this file, next to its own phrase --
+# not discovered afterwards to have been counted as an edit to somebody's record.
+NON_RECORD_ACTIONS = (ACTION_RESTRICTED_WITHHELD, ACTION_DIAGNOSIS_REFUSED)
 
 
 def log_action(user_id, action, module=None, details=None, ip_address=None):
@@ -564,13 +680,20 @@ def get_audit_stats():
     # list that could drift from MODULE_* above. This was "except SMS" until
     # authentication started writing; leaving it that way would have quietly
     # counted every sign-in as an edit to somebody's record.
+    #
+    # The action exclusion beside it is the same rule one level finer, for the
+    # two confidentiality entries that change nothing -- see NON_RECORD_ACTIONS.
+    # Their module is not excluded, because its other two entries do move a
+    # column on a consultation.
     exclusions = ", ".join("?" for _ in NON_RECORD_MODULES)
+    action_exclusions = ", ".join("?" for _ in NON_RECORD_ACTIONS)
     record_updates = conn.execute(
         f"""
         SELECT COUNT(*) FROM audit_logs
          WHERE module IS NOT NULL AND module NOT IN ({exclusions})
+           AND action NOT IN ({action_exclusions})
         """,
-        NON_RECORD_MODULES,
+        NON_RECORD_MODULES + NON_RECORD_ACTIONS,
     ).fetchone()[0]
     actors = conn.execute(
         "SELECT COUNT(DISTINCT user_id) FROM audit_logs"

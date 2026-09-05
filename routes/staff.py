@@ -479,8 +479,14 @@ def staff_complete_consultation():
 @role_required("Health Staff")
 def staff_record_consultation(appointment_id):
     if request.method == "POST":
+        # ip_address is passed for the same reason the edit route below passes
+        # it: a submission from this role carrying a diagnosis or a treatment
+        # plan is refused server-side and the refusal is audited, and an entry
+        # about a request that did not come from the form as it is drawn is worth
+        # very little without the address it came from.
         patient_id, context, message = process_record_consultation(
-            appointment_id, request.form, session.get("user_id")
+            appointment_id, request.form, session.get("user_id"),
+            ip_address=request.remote_addr,
         )
         flash(message)
         if patient_id:

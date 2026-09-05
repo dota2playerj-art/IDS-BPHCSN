@@ -80,7 +80,12 @@ from models.audit import (
     ACTION_USER_EDITED,
     ACTION_USER_ROLE_CHANGED,
     ACTION_USER_REACTIVATED,
+    ACTION_CONSULTATION_RESTRICTED,
+    ACTION_CONSULTATION_UNRESTRICTED,
+    ACTION_DIAGNOSIS_REFUSED,
+    ACTION_RESTRICTED_WITHHELD,
     MODULE_AUTH,
+    MODULE_CONFIDENTIALITY,
     MODULE_IMMUNIZATIONS,
     MODULE_SETTINGS,
     MODULE_SMS,
@@ -319,6 +324,43 @@ _ICONS = {
     # unverified glyph would have put the word "lock_open" in the trail.
     ACTION_MAINTENANCE_ENABLED: "lock",
     ACTION_MAINTENANCE_DISABLED: "lock_open",
+    # The four confidentiality entries. Each gets its own glyph for the reason
+    # the four phrases are separate constants: two of them are a clinician
+    # deciding who may read a record, and two are somebody being kept out of one.
+    # A reviewer scans this list rather than reading it in order, and those are
+    # the rows they are scanning FOR.
+    #
+    # `shield_lock` for the seal and `no_encryption` for its lifting: opposite
+    # glyphs rather than one shared padlock, on the same argument the maintenance
+    # pair above rests on -- these describe a window during which a record was
+    # privileged, and a reviewer looking for "was this ever opened back up" wants
+    # the closing and the opening to be distinguishable without reading either
+    # row. The plain `lock` / `lock_open` pair is taken, by that maintenance pair,
+    # and reusing it would make a record being sealed look like the whole system
+    # being shut.
+    #
+    # `visibility_off` for a withheld view, which is the only entry in this trail
+    # that means somebody LOOKED and was shown less than the record holds -- and
+    # is deliberately the eye that Patient Profile's own View control uses,
+    # negated, so the entry and the act read as one place.
+    #
+    # `gpp_bad` for a refused field. It is the login form's refusal glyph and
+    # that is the intended echo: both mean a request was turned away rather than
+    # served, and this is the only other place in the system where that happens
+    # to somebody already inside. It is distinct from ACTION_SESSION_REVOKED's
+    # `link_off` and from ACTION_PASSWORD_CHANGE_FAILED_SELF's `password`, which
+    # are the two other refusals aimed at a live session.
+    #
+    # All four were checked against static/fonts/material-symbols-outlined.woff2
+    # directly rather than by the usual "it renders somewhere already" test,
+    # because none of the three new ones is drawn anywhere else in this project.
+    # That file is a fixed subset and a ligature it does not carry renders as its
+    # own literal name -- an unverified glyph would have put the word
+    # "shield_lock" into the audit trail.
+    ACTION_CONSULTATION_RESTRICTED: "shield_lock",
+    ACTION_CONSULTATION_UNRESTRICTED: "no_encryption",
+    ACTION_RESTRICTED_WITHHELD: "visibility_off",
+    ACTION_DIAGNOSIS_REFUSED: "gpp_bad",
 }
 _MODULE_ICONS = {
     MODULE_SMS: "campaign",
@@ -343,6 +385,11 @@ _MODULE_ICONS = {
     # arrives looking like configuration rather than like a save or a download it
     # is not.
     MODULE_SETTINGS: "settings",
+    # Reached only by a future confidentiality action that is not one of the four
+    # above. `shield_lock` rather than any of their glyphs, so a fifth kind of
+    # entry arrives looking like confidentiality rather than like one of the four
+    # specific events it is not.
+    MODULE_CONFIDENTIALITY: "shield_lock",
 }
 
 

@@ -125,6 +125,15 @@ def inject_role_context():
             "patient_records_endpoint": "patient_records",
             "patient_profile_endpoint": "patient_profile",
             "correct_vaccination_endpoint": "correct_vaccination",
+            # Sealing one consultation as Restricted, from the profile's
+            # Consultation History tab. Present for THIS ROLE ONLY, and the
+            # absence elsewhere is the same kind of absence send_broadcast_endpoint
+            # has for Health Center Staff: there is no staff route behind this
+            # name to expose, because deciding that a diagnosis is privileged
+            # belongs to the role licensed to write one. patient_profile.html
+            # guards on `is defined`, so the other role gets no control rather
+            # than a URL it would bounce off.
+            "restrict_consultation_endpoint": "restrict_consultation",
             "register_patient_endpoint": "register_patient",
             "archive_patients_endpoint": "archive_patients",
             "medicine_inventory_endpoint": "medicine_inventory",

@@ -35,12 +35,25 @@ offer to add one to what is now a toddler.
 Immunisations live in models/immunizations.py, recorded during a consultation and
 reading the same paediatric cohort and the same visit date this module resolves.
 See the note below PEDIATRIC/INFANT_AGE_YEARS for why they attach there.
+
+
+WHO MAY WRITE A DIAGNOSIS, AND WHO MAY READ A SEALED ONE
+---------------------------------------------------------
+Two rules were added to this module together, and they are one rule seen from
+each end. See DOCTOR_ONLY_FIELDS and the confidentiality block beneath it.
+
+The short version: Health Center Staff and BHWs are not licensed to diagnose, so
+they do not write `diagnosis` or `treatment_plan` -- and the Administrator, who
+is the licensed clinician, can seal an individual entry so those same two fields
+are withheld from everyone else. Everything else about a visit stays open to the
+staff who take the intake and hand the medicine over.
 """
 from datetime import datetime
 
 from database.connection import get_db
 from models.patients import calculate_age, format_age
 from utils.dates import recent_months, resolve_range, today
+from utils.roles import normalize_role
 
 # Growth monitoring cohort -- DOH Operation Timbang Plus / WHO 0-59 months.
 PEDIATRIC_AGE_YEARS = 5
@@ -121,6 +134,101 @@ FIELD_LABELS = {
 }
 
 MISSING_TEXT = "Not recorded"
+
+# ---------------------------------------------------------------------------
+# CLINICAL AUTHORITY AND THE CONFIDENTIALITY SEAL
+#
+# THE TWO FIELDS ONLY A LICENSED CLINICIAN MAY WRITE.
+# Diagnosing a patient and deciding their treatment is a licensed act. Health
+# Center Staff and Barangay Health Workers take the intake -- the complaint, the
+# vitals, the growth measurements -- give the vaccinations and hand over the
+# medicine the doctor prescribed; they do not decide what the patient has. The
+# Administrator account in this system is the licensed doctor, so these two
+# fields are theirs.
+#
+# This tuple is the single authority on that, in the same way
+# allowed_growth_fields() is the single authority on which measurements an age
+# admits. The form renders these fields only for a role that may write them, the
+# validator stops requiring them of a role that may not, and
+# routes/consultation_views.py drops them from any submission by such a role --
+# so a POST that never touched the page cannot put a diagnosis on a record.
+DOCTOR_ONLY_FIELDS = ("diagnosis", "treatment_plan")
+
+# WHAT A SEALED ENTRY SHOWS INSTEAD, AND WHY IT SHOWS ANYTHING AT ALL.
+# A withheld field is never silently blanked and never quietly dropped from the
+# page. A health worker who opens a record and finds an empty Diagnosis cell has
+# been told something false -- that nothing was written -- and the next thing
+# they do is write one, or ask the patient a question the record already answers.
+# The placeholder says the field exists, holds something, and is not theirs to
+# read. That is the whole of the honest answer, and it is the same principle
+# utils/unavailable.py applies to every deliberately disabled control here.
+#
+# It names the role that CAN read it rather than the reason it is sealed. The
+# reason would be the disclosure: "Restricted — HIV" protects nothing.
+RESTRICTED_PLACEHOLDER = "Restricted — Administrator access only"
+
+
+def can_diagnose(role):
+    """Whether this role may enter a diagnosis and a treatment plan.
+
+    The Administrator is the licensed doctor and is the only role that may. A
+    Barangay Official reaches no consultation screen at all, so in practice this
+    separates the Administrator from Health Center Staff and BHWs.
+
+    Asked of the SIGNED-IN ACCOUNT'S stored role, never of anything a request
+    carried. That is what makes it a permission rather than a preference -- see
+    routes/consultation_views.py, where the answer comes from
+    utils.security.current_role() and cannot be reached by a form field.
+    """
+    return normalize_role(role) == "admin"
+
+
+def can_view_restricted(role):
+    """Whether this role may read a consultation the clinician has sealed.
+
+    Deliberately the same answer as can_diagnose(), and deliberately a separate
+    function rather than the same one called twice. They are one rule read from
+    each end: the seal withholds exactly the fields DOCTOR_ONLY_FIELDS names, so
+    the role that may write them is the role that may read them back once sealed.
+    Written as a delegation so that stays true by construction -- if the write
+    rule ever moves, the read rule moves with it rather than being a second copy
+    that quietly disagrees.
+    """
+    return can_diagnose(role)
+
+
+def redact(consultation, viewer_can_view):
+    """A copy of one consultation with its sealed fields withheld, if they are.
+
+    Returns a NEW dict every time. The row it is given is never mutated, because
+    the same row is read by the audit trail and by the write path, and a
+    redaction that leaked into either would either censor an audit entry or
+    write the placeholder into the database as though it were a diagnosis.
+
+    Both the raw field and its `<field>_display` twin are replaced, not just the
+    twin. The profile prints the raw value in two places and the twin in a third,
+    and a template added later will reach for whichever is nearer -- so the value
+    that is present is the placeholder whichever one it takes. That is the
+    difference between a rule and a habit: there is no spelling of
+    `consultation.diagnosis` that yields the sealed text to a viewer who may not
+    read it.
+
+    `withheld` says whether anything was actually taken out, which is what the
+    profile reads to decide whether to explain itself, and what
+    routes/patient_views.py counts to decide whether the view is worth an audit
+    entry. It is False for an unsealed record and False for the Administrator,
+    who had nothing withheld from them.
+    """
+    values = dict(consultation)
+    if viewer_can_view or not values.get("is_restricted"):
+        values["withheld"] = False
+        return values
+
+    for field in DOCTOR_ONLY_FIELDS:
+        values[field] = RESTRICTED_PLACEHOLDER
+        values[f"{field}_display"] = RESTRICTED_PLACEHOLDER
+    values["withheld"] = True
+    return values
 
 
 def as_date(value):
@@ -267,15 +375,26 @@ def _to_consultation(row):
         and consultation.get("created_at")
         and consultation["updated_at"] != consultation["created_at"]
     )
+    # A plain bool rather than the stored 0/1, because every reader of this is a
+    # condition -- a template branch, redact()'s guard, an audit decision -- and
+    # SQLite hands integers back. Kept alongside the raw column rather than
+    # replacing it so nothing that reads `is_restricted` has to know which.
+    consultation["is_restricted"] = bool(consultation.get("is_restricted"))
     return consultation
 
 
+# restricted_by is LEFT joined, unlike recorded_by above it, because it is null
+# on every consultation nobody has sealed -- which is nearly all of them. An
+# inner join here would have silently dropped every unsealed record from the
+# patient's history, which is the kind of failure that looks like data loss.
 _CONSULTATION_SELECT = """
     SELECT c.*, u.full_name AS recorded_by_name, u.role AS recorded_by_role,
+           r.full_name AS restricted_by_name,
            p.patient_id AS patient_reference, p.first_name, p.middle_name,
            p.last_name, p.birth_date, p.sex
     FROM consultations c
     JOIN users u ON u.id = c.recorded_by
+    LEFT JOIN users r ON r.id = c.restricted_by
     JOIN patients p ON p.id = c.patient_id
 """
 
@@ -476,8 +595,8 @@ def get_consultation_stats(months=6, limit=TOP_DIAGNOSIS_LIMIT, on_date=None,
     }
 
 
-def get_consultations_for_patient(patient_id):
-    """Consultation History tab on Screen 04, most recent first.
+def get_consultations_for_patient(patient_id, viewer_role):
+    """Consultation History tab on Screen 04, most recent first, redacted to fit.
 
     Returns the whole row, not the four columns it used to: the tab now shows the
     vitals and growth measurements alongside the clinical text, and each entry
@@ -485,7 +604,23 @@ def get_consultations_for_patient(patient_id):
 
     recorded_by keeps its original meaning -- the health worker's name -- so the
     template that already prints it is unaffected.
+
+    `viewer_role` HAS NO DEFAULT, AND THAT IS THE POINT.
+    A default would be a decision about confidentiality made by whichever value
+    seemed harmless when this signature was written, inherited silently by every
+    caller added afterwards. Defaulting to the Administrator would leak a sealed
+    diagnosis to any future caller that forgot to pass a role; defaulting the
+    other way would blank the doctor's own screen. So the question is compulsory,
+    it is answered from the signed-in account (utils.security.current_role()),
+    and a caller that cannot answer it cannot call this function.
+
+    The redaction happens HERE, at the read, rather than in the template. What is
+    withheld is not in the returned dictionaries at all, so it is not in the
+    render context, so it is not in the bytes sent to the browser -- there is
+    nothing for a View Source, a saved page or a disabled stylesheet to recover.
     """
+    can_view = can_view_restricted(viewer_role)
+
     conn = get_db()
     rows = conn.execute(
         _CONSULTATION_SELECT
@@ -500,12 +635,21 @@ def get_consultations_for_patient(patient_id):
         # The name under its historical key, so patient_profile.html's existing
         # "Attending: {{ consultation.recorded_by }}" keeps working unchanged.
         consultation["recorded_by"] = consultation["recorded_by_name"]
-        consultations.append(consultation)
+        consultations.append(redact(consultation, can_view))
     return consultations
 
 
 def get_consultation_by_id(consultation_id):
-    """One consultation with its patient and author, or None."""
+    """One consultation with its patient and author, or None.
+
+    DELIBERATELY UNREDACTED, unlike get_consultations_for_patient() above. This
+    is the write path's reader: process_edit_consultation() calls it for the
+    before-and-after that the audit entry is composed from, and an audit trail
+    that had been shown a placeholder instead of the stored value would record
+    the seal as though it were the diagnosis. The two callers that put this on a
+    screen redact it themselves, at the point they know who is looking -- see
+    routes/consultation_views.py consultation_form_context().
+    """
     conn = get_db()
     row = conn.execute(
         _CONSULTATION_SELECT + " WHERE c.id = ?", (consultation_id,)
@@ -571,7 +715,7 @@ def parse_blood_pressure(raw):
     return systolic, diastolic
 
 
-def validate_consultation_form(values, age_context):
+def validate_consultation_form(values, age_context, require_diagnosis=True):
     """Server-side validation. Returns {field: message}; empty means valid.
 
     Runs independently of the browser: the form carries `novalidate`, and a POST
@@ -579,10 +723,24 @@ def validate_consultation_form(values, age_context):
 
     Growth fields are checked against `age_context`, so submitting a head
     circumference for an adult is an error rather than something quietly stored.
+
+    `require_diagnosis` False drops the two DOCTOR_ONLY_FIELDS from the required
+    set, and it is what a save by Health Center Staff passes. Without it the
+    intake they are allowed to record could never be saved: the form would refuse
+    it for missing two fields the person filling it in is not licensed to write
+    and cannot see. It narrows what is REQUIRED and nothing else -- the same
+    submission's growth, vital and date rules are unchanged, and whether those
+    two fields may be WRITTEN is not decided here at all but in
+    routes/consultation_views.py, which strips them before this runs.
     """
     errors = {}
 
-    for field, message in REQUIRED_FIELDS.items():
+    required = dict(REQUIRED_FIELDS)
+    if not require_diagnosis:
+        for field in DOCTOR_ONLY_FIELDS:
+            required.pop(field, None)
+
+    for field, message in required.items():
         if not str(values.get(field) or "").strip():
             errors[field] = message
 
@@ -757,3 +915,79 @@ def update_consultation(consultation_id, values, age_context):
     affected = cursor.rowcount
     conn.close()
     return affected
+
+
+def set_consultation_restriction(consultation_id, restricted, user_id):
+    """Seal or unseal one consultation. Returns what actually happened.
+
+    One of "missing", "unchanged", "restricted" or "lifted". The caller decides
+    what to say about each; nothing here flashes or logs, for the reason
+    update_consultation() gives -- only the caller knows who is acting and from
+    where.
+
+    IT DOES NOT TOUCH updated_at, AND THAT IS DELIBERATE.
+    Every other write to this table stamps updated_at, which is what
+    was_edited reads and what the profile prints as "edited" beside the visit
+    date. Sealing a record changes who may read it; it changes nothing the record
+    says about the patient. Stamping it would put "edited" on a consultation
+    whose clinical content is exactly what the clinician wrote, and would send
+    anyone chasing that word to an audit trail with no content change in it.
+    The seal has its own entry in that trail and its own two columns here.
+
+    THE THREE COLUMNS ARE WRITTEN AS A SET, ALWAYS.
+    Lifting a restriction clears restricted_by and restricted_at rather than
+    leaving them behind as a fossil of the last seal. A row saying "not
+    restricted, sealed by Antonio Acido on the 3rd" is a record making two claims
+    at once, and the profile would have to choose which to print. The migration
+    asserts the three agree, on every run.
+
+    A no-op returns "unchanged" and writes nothing, which is the same rule
+    process_edit_consultation() follows: a save that moved nothing is not an
+    event, and an audit entry for it would bury the ones that matter.
+    """
+    flag = 1 if restricted else 0
+
+    conn = get_db()
+    row = conn.execute(
+        "SELECT is_restricted FROM consultations WHERE id = ?", (consultation_id,)
+    ).fetchone()
+    if row is None:
+        conn.close()
+        return "missing"
+
+    if bool(row["is_restricted"]) == bool(flag):
+        conn.close()
+        return "unchanged"
+
+    conn.execute(
+        """
+        UPDATE consultations
+           SET is_restricted = ?,
+               restricted_by = ?,
+               restricted_at = ?
+         WHERE id = ?
+        """,
+        (
+            flag,
+            user_id if flag else None,
+            # NULL here for both directions. Lifting a seal wants NULL and keeps
+            # it; setting one has its stamp written by the statement below, from
+            # SQLite's own clock rather than from Python's -- created_at and
+            # updated_at on this table both come from that clock, and a third
+            # date taken from a different one would disagree with them by
+            # however far the application's idea of now has drifted.
+            None,
+            consultation_id,
+        ),
+    )
+    # Same shape and same precision as the stamp update_consultation() writes, so
+    # the dates on a record read alike and sort together.
+    if flag:
+        conn.execute(
+            "UPDATE consultations "
+            "SET restricted_at = strftime('%Y-%m-%d %H:%M:%f', 'now') WHERE id = ?",
+            (consultation_id,),
+        )
+    conn.commit()
+    conn.close()
+    return "restricted" if flag else "lifted"

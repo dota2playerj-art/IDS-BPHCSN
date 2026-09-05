@@ -6,6 +6,8 @@ the same data. The queries live here so the two role variants cannot drift
 apart; the routes stay thin and each keeps its own role_required guard and its
 own redirect target.
 """
+from flask import request, session
+
 from models.appointments import (
     IN_CONSULTATION,
     WAITING,
@@ -13,7 +15,16 @@ from models.appointments import (
     get_appointments_for_patient,
     get_next_appointment_for_patient,
 )
-from models.consultations import get_consultations_for_patient
+from models.audit import (
+    ACTION_RESTRICTED_WITHHELD,
+    MODULE_CONFIDENTIALITY,
+    log_action,
+)
+from models.consultations import (
+    RESTRICTED_PLACEHOLDER,
+    can_view_restricted,
+    get_consultations_for_patient,
+)
 from models.dispensing import get_dispensing_for_patient
 from models.general_vaccinations import get_general_vaccinations_for_patient
 from models.immunizations import dose_label, get_immunization_status
@@ -39,8 +50,16 @@ from models.patients import (
     update_patient,
     validate_patient_form,
 )
+from routes.consultation_views import (
+    RESTRICT_ACTION_FIELD,
+    RESTRICT_CONSULTATION_FIELD,
+    RESTRICT_OFF,
+    RESTRICT_ON,
+)
 from routes.vaccination_correction_views import correction_options
 from utils.context import HEADER_SEARCH_MAX
+from utils.dates import display_date
+from utils.security import current_role
 
 # Bulk status changes are restricted to a selection that is already all on the
 # same status. The alternative -- offering the union of every selected patient's
@@ -501,15 +520,82 @@ def immunization_next_step(patient, immunization):
     }
 
 
+def _log_withheld_consultations(patient, withheld, viewer_role):
+    """Record that this render kept a sealed consultation back from its viewer.
+
+    ONE ENTRY PER PAGE THAT ACTUALLY WITHHELD SOMETHING, naming every entry it
+    withheld. Not one per sealed consultation, and not one per profile opened.
+    That boundary is drawn on purpose and models/audit.py's note on
+    ACTION_RESTRICTED_WITHHELD sets out why: the event a reviewer is asking about
+    is "this health worker was at this patient's privileged record", which is one
+    thing however many visits are on the page. A row per sealed entry would
+    multiply one access by the length of the patient's history, and a row per
+    profile view would file an entry about an ordinary page.
+
+    Nothing is written when nothing was withheld, which is every render for the
+    Administrator and every render of a patient with no sealed visit -- so the
+    ordinary use of this screen adds nothing to the trail.
+
+    THE ACCESS RULE IS NOT ENFORCED HERE. The content is already gone by the time
+    this runs: get_consultations_for_patient() redacted it at the read, and this
+    counts what came back marked `withheld`. If this function were deleted the
+    seal would still hold and the only loss would be the evidence that it did --
+    which is exactly the right relationship between an access control and its
+    log, and the reason a failure to write the row (log_action() returns None for
+    an unattributable request) does not cost the viewer their page.
+    """
+    if not withheld:
+        return None
+
+    visits = ", ".join(
+        "#{} ({})".format(entry["id"], display_date(entry["consultation_date"]))
+        for entry in withheld
+    )
+    return log_action(
+        user_id=session.get("user_id"),
+        action=ACTION_RESTRICTED_WITHHELD,
+        module=MODULE_CONFIDENTIALITY,
+        details=(
+            f"Patient Profile for {patient['full_name']} "
+            f"({patient['patient_id']}) was rendered for an account holding the "
+            f"role {viewer_role or 'no role'}, which may not read a restricted "
+            f"consultation. {len(withheld)} consultation"
+            f"{'s were' if len(withheld) != 1 else ' was'} withheld — {visits}. "
+            f'Each showed "{RESTRICTED_PLACEHOLDER}" in place of its diagnosis '
+            "and treatment plan; the withheld text was not sent to the browser "
+            "at all, having been removed before the page was built. The visit "
+            "date, chief complaint, vital signs, immunisations and dispensing on "
+            "the same records were shown as normal, so intake and dispensing are "
+            "unaffected"
+        ),
+        ip_address=request.remote_addr,
+    )
+
+
 def patient_profile_context(patient_id):
     """Everything Screen 04 renders, or None if no such patient exists.
 
     Returning None rather than raising lets each blueprint redirect to its own
     Patient Records URL, which differs per role.
+
+    THIS FUNCTION CAN WRITE TO THE AUDIT TRAIL, which no other context builder in
+    this project does, and it is worth saying out loud rather than leaving to be
+    discovered. A consultation the clinician has sealed is withheld from a viewer
+    who may not read it, and RA 11166 makes a health center answerable for who
+    has been at privileged medical information -- so the withholding is recorded.
+    It is done here, in the one place both blueprints build this screen from,
+    because doing it in each route would be two copies of a confidentiality rule
+    that could come to disagree. See _log_withheld_consultations().
     """
     patient = get_patient_by_id(patient_id)
     if patient is None:
         return None
+
+    # Read once from the signed-in account and used for every read below, so a
+    # single page cannot redact its Consultation History against one answer and
+    # its Dispensing History against another.
+    viewer_role = current_role()
+    may_view_restricted = can_view_restricted(viewer_role)
 
     # Read for every patient, shown for two cases: the paediatric cohort the DOH
     # schedule applies to, and anyone older who nonetheless has doses on file.
@@ -528,7 +614,14 @@ def patient_profile_context(patient_id):
     # said "Medicine dispensing is not recorded yet" for the whole life of the
     # project; there is now a table behind it, so it shows what that table holds
     # for this patient and an honest empty state when it holds nothing.
-    dispensing = get_dispensing_for_patient(patient_id)
+    dispensing = get_dispensing_for_patient(patient_id, viewer_role)
+
+    # Redacted at the read, so what a viewer may not see is not in this list and
+    # therefore not in the render context and not in the response body. The
+    # template's placeholder is what it prints, not what it hides.
+    consultations = get_consultations_for_patient(patient_id, viewer_role)
+    withheld = [entry for entry in consultations if entry.get("withheld")]
+    _log_withheld_consultations(patient, withheld, viewer_role)
 
     return {
         "patient": patient,
@@ -537,7 +630,21 @@ def patient_profile_context(patient_id):
         # see immunization_next_step() for why the schedule half of this tab
         # carries guidance rather than an action.
         "immunization_next_step": immunization_next_step(patient, immunization),
-        "consultations": get_consultations_for_patient(patient_id),
+        "consultations": consultations,
+        # Whether this viewer is being shown everything. The template asks this
+        # rather than comparing role strings, so it cannot come to disagree with
+        # the server about who may read a sealed record -- and it is what decides
+        # whether the seal control and the "you are seeing everything" wording
+        # appear at all.
+        "may_view_restricted": may_view_restricted,
+        # How many entries on this page are sealed, so the tab can say so once at
+        # the top instead of leaving a health worker to notice it row by row.
+        "withheld_count": len(withheld),
+        "restricted_placeholder": RESTRICTED_PLACEHOLDER,
+        "restrict_consultation_field": RESTRICT_CONSULTATION_FIELD,
+        "restrict_action_field": RESTRICT_ACTION_FIELD,
+        "restrict_on": RESTRICT_ON,
+        "restrict_off": RESTRICT_OFF,
         "appointments": get_appointments_for_patient(patient_id),
         "next_appointment": get_next_appointment_for_patient(patient_id),
         "immunization": immunization,

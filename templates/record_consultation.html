@@ -788,15 +788,62 @@
       </div>
 
       <!-- ASSESSMENT AND PLAN -->
+{#- THE TWO FIELDS IN THIS PANEL ARE NOT DRAWN FOR A ROLE THAT MAY NOT WRITE
+    THEM, AND "NOT DRAWN" IS MEANT LITERALLY.
+    They are not disabled and not hidden with a class: for Health Center Staff
+    and BHWs there is no textarea, no label and no field name anywhere in the
+    delivered markup, so there is nothing for View Source, a disabled stylesheet
+    or a saved copy of the page to recover. That is this project's standing rule
+    about a control which cannot act (utils/unavailable.py), and here it is also
+    the visible half of an access rule.
+
+    It is only the visible half. The page is a suggestion and a POST does not
+    have to come from it, so routes/consultation_views.py strips both fields out
+    of every submission by such a role, before validation and before anything is
+    stored, and records the refusal. `can_diagnose` below is handed down from
+    that same server-side answer -- this template never compares a role string,
+    so it cannot come to disagree with the rule it is drawing. #}
       <div class="panel-card">
         <div class="section-head">
-          <div class="section-icon"><span class="material-symbols-outlined">stethoscope</span></div>
+          <div class="section-icon"><span class="material-symbols-outlined">{% if can_diagnose %}stethoscope{% else %}edit_note{% endif %}</span></div>
           <div>
+{%- if can_diagnose %}
             <div class="section-title">Assessment &amp; Plan</div>
             <div class="section-sub">What it was judged to be, and what was done about it</div>
+{%- else %}
+{#- Retitled rather than kept as "Assessment & Plan" with two thirds of it
+    missing. A panel headed with the name of a thing it does not contain reads as
+    a section that failed to load, and the operator's next move is to look for
+    the fields or to write the diagnosis into Additional Notes instead - which
+    would put the clinical judgement in the one box on this panel that is not
+    restricted. It is named for what it actually collects. #}
+            <div class="section-title">Notes &amp; Follow-up</div>
+            <div class="section-sub">Anything worth recording, and when the patient should come back</div>
+{%- endif %}
           </div>
         </div>
 
+{%- if not can_diagnose %}
+{#- Said plainly rather than left as an absence. A health worker who has recorded
+    the complaint and the vitals and finds nowhere to write what it is has been
+    given a form that looks incomplete; this says the fields are elsewhere by
+    design, who fills them in, and - the part that actually changes what they do
+    next - that saving without them is correct and expected rather than a
+    half-finished record they should come back to. #}
+        <div class="alert-ids alert-info-ids" style="margin-bottom:16px;">
+          <span class="material-symbols-outlined">stethoscope</span>
+          <div>
+            <strong>Diagnosis and treatment plan are recorded by the Administrator</strong>
+            Deciding what a patient has and what to do about it is a licensed act, so those
+            two fields are not part of this form for your role. Record the complaint, the
+            measurements, any vaccinations given and anything dispensed, and save &mdash; the
+            record is complete for what you are recording. The Administrator adds the
+            assessment to this same visit afterwards.
+          </div>
+        </div>
+{%- endif %}
+
+{%- if can_diagnose %}
         <div class="mb-3">
           <label class="field-label">{{ field_labels.diagnosis }}<span class="req">*</span></label>
           <textarea class="form-control{% if errors.diagnosis %} is-invalid{% endif %}" name="diagnosis"
@@ -826,10 +873,58 @@
           {%- else %}<div class="form-text-hint">The instruction itself &mdash; what to take, how much, how often, for how long. The amount handed over goes under Items Dispensed above.</div>{% endif %}
         </div>
 
+{#- THE SEAL. Offered inside the same guard as the two fields above it, because
+    it is a decision about those two fields and nothing else - there is nothing
+    for a role that cannot write them to restrict.
+
+    It is on the form as well as on the Patient Profile, unlike the vaccination
+    correction path which is deliberately kept off this screen. The reason the
+    two differ is the reason each exists. A correction is retrospective: somebody
+    noticed later that a recorded dose is wrong, and putting that on a form
+    worked at speed with a patient in the room is how a clinical record gets
+    changed by an accidental click. Sealing is not retrospective - the clinician
+    knows the diagnosis is sensitive at the moment they type it, and every minute
+    between writing it and going somewhere else to seal it is a minute the record
+    sits open. Both routes exist: this one for the moment it is written, the
+    profile's for anything already on file. #}
+        <div class="mb-3" style="padding:12px 14px; border:1px solid var(--border-color); border-radius:8px; background:#FAFBFC;">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox"
+                   id="restrictConsultation" name="{{ restrict_field }}" value="1"
+                   {% if restrict_checked %}checked{% endif %}>
+            <label class="form-check-label" for="restrictConsultation" style="font-weight:600;">
+              <span class="material-symbols-outlined" style="font-size:16px; vertical-align:-3px;">lock</span>
+              Mark this consultation Restricted
+            </label>
+          </div>
+{#- What it does, in terms of who sees what, rather than in terms of a flag. And
+    what it deliberately does NOT do, which is the half a clinician has to be
+    sure of before they use it: sealing a record must not stop the health worker
+    at the counter handing over the medicine on it. #}
+          <div class="form-text-hint" style="margin-top:6px;">
+            The diagnosis and treatment plan above are then withheld from Health Center
+            Staff and BHWs, who see &ldquo;{{ restricted_placeholder }}&rdquo; in their place.
+            Everything else on this visit &mdash; the date, the complaint, the vital signs,
+            any vaccinations and anything dispensed &mdash; stays visible to them, so intake
+            and dispensing are unaffected. Use it for anything you judge sensitive; HIV
+            status is privileged medical information under RA 11166, and it is not the only
+            such case. Setting or lifting this is recorded in the audit log, as is every
+            view it withholds.
+          </div>
+        </div>
+{%- endif %}
+
         <div class="mb-3">
           <label class="field-label">{{ field_labels.remarks }}</label>
           <textarea class="form-control" name="remarks"
                     placeholder="Anything else worth recording — advice given, referrals, observations">{{ form.remarks or '' }}</textarea>
+{#- Said only to the role that has the choice. Additional Notes is written by
+    both roles and read by both, so it is NOT covered by the seal above - and a
+    clinician who put a sensitive detail here having sealed the record would have
+    sealed the wrong box. The rule is one sentence and it is worth one line. #}
+{%- if can_diagnose %}
+          <div class="form-text-hint">Visible to Health Center Staff whether or not this consultation is Restricted &mdash; anything sensitive belongs in the diagnosis or treatment plan above.</div>
+{%- endif %}
         </div>
 
         <div class="row g-3">
