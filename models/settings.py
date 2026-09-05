@@ -27,7 +27,7 @@ of GENERAL_KEYS and why it fails open. The rest of this note is about the six.
 
 Six rather than the twenty-odd fields Screen 13 draws, and the line between them
 is not taste. Each of these six is a value some OTHER part of the running system
-already reads: the name is at the front of every appointment SMS and on every
+already reads: the name is at the front of every broadcast SMS and on every
 export letterhead, the three place names make up the address those letterheads
 and the login page print, and the two times are the hours the facility publishes
 as its own. (Those two built the bookable time slots as well, until advance
@@ -166,8 +166,8 @@ FIELD_LABELS = {
 # anything else on the screen -- a blank would reach a patient's phone.
 REQUIRED_MESSAGES = {
     KEY_NAME: (
-        "Enter the health center's name. It is printed on every export and is "
-        "the first thing in every appointment SMS."
+        "Enter the health center's name. It is printed on every export and at "
+        "the front of every SMS the barangay sends."
     ),
     KEY_BARANGAY: "Enter the barangay the health center stands in.",
     KEY_MUNICIPALITY: "Enter the municipality or city.",

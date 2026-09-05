@@ -86,7 +86,7 @@ MODULE_USERS = "User Management"
 # system itself is set up, and who took a copy of everything in it".
 #
 # Both kinds of entry here reach further than any single record. A settings save
-# changes the facility name at the front of every appointment SMS and on every
+# changes the facility name at the front of every SMS the barangay sends and on every
 # export letterhead, and the clinic hours every booking is validated against -- so
 # a message a patient disputes months later has to be explainable from this
 # trail. A backup download puts every patient record in the system into one file
@@ -159,6 +159,14 @@ ACTION_SMS_BROADCAST_SENT = "Sent community SMS broadcast"
 # `details` carries the message itself, the number it was addressed to, the
 # appointment it is about and whether it was actually transmitted -- an entry
 # that omitted the last of those would read as a send that happened.
+# NOTHING WRITES THIS ANY MORE, AND IT IS KEPT ANYWAY, LIKE MODULE_APPOINTMENTS
+# ABOVE. Individual appointment confirmations were retired with advance booking
+# on 2026-09-05, so no new row will ever carry this phrase. Eight rows already
+# do. The constant stays as the documented spelling of what is in the table --
+# deleting it would leave those eight rows' action phrase recorded nowhere but
+# in the rows themselves, and the counts on Audit Logs select on these strings.
+# It is not re-worded for the same reason it is not deleted: an audit trail
+# records what was true when the row was written.
 ACTION_APPOINTMENT_SMS_SENT = "Sent appointment SMS to patient"
 # The two authentication outcomes, written from routes/auth.py's login route.
 # Both phrases are stable strings because the counts below select on them: a

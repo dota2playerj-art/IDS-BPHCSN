@@ -45,7 +45,8 @@ WHY THE GENERAL FORM IS THE ONLY LIVE ONE, AND WHY THAT IS NOT ARBITRARY
 --------------------------------------------------------------------------
 The line is not "which fields would be nice to store". It is "which fields does
 some other part of the running system already read". Six do -- the facility name
-is at the front of every appointment SMS and on every export letterhead, the
+is on every export letterhead and at the front of the messages this system
+sends, the
 three place names make up the address those letterheads print, and the two times
 are what the bookable slots are built from. Storing the contact number or the
 DOH licence number would produce a control that accepts input and changes
@@ -392,9 +393,9 @@ def process_general_settings(form_data, actor_id, ip_address=None):
         details=(
             f"General Settings saved by {actor_phrase}: {describe_changes(changed)}"
             ". These six values are read by the rest of the system rather than "
-            "only displayed: the health center's name is the first thing in "
-            "every appointment SMS and the heading on every PDF and Excel "
-            "export, the barangay, municipality and province make up the "
+            "only displayed: the health center's name is the heading on every "
+            "PDF and Excel export and the first thing in every SMS the barangay "
+            "sends, the barangay, municipality and province make up the "
             "address those exports and the sign-in page print, and the opening "
             "and closing times are the hours the health center publishes as its "
             "own. Messages already sent and files already downloaded are "
@@ -416,14 +417,14 @@ def process_general_settings(form_data, actor_id, ip_address=None):
             return None, (
                 "General Settings saved. The clinic day is now "
                 f"{display_time(values[KEY_OPENING])} to "
-                f"{display_time(values[KEY_CLOSING])}, and Appointment "
-                "Scheduling offers and accepts times inside it."
+                f"{display_time(values[KEY_CLOSING])}, which is what the health "
+                "center publishes as its hours on exports and printed records."
             )
 
     return None, (
         f"General Settings saved. The health center is now named "
-        f'"{values[KEY_NAME]}" on every screen, on every export, and in every '
-        "appointment SMS sent from now on."
+        f'"{values[KEY_NAME]}" on every screen and on every export produced from '
+        "now on."
     )
 
 

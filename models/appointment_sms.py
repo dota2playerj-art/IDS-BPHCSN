@@ -17,18 +17,21 @@ exactly the same day -- the moment SEMAPHORE_API_KEY is set, with no code change
 here or there. See the activation note at the top of utils/sms.py.
 
 
-IT IS SENT BY HAND, AND THAT IS THE DESIGN
-------------------------------------------
-Nothing in this module is called from create_appointment(), reschedule_appointment()
-or close_appointment(). A booking saves; then the operator is offered a button,
-and the message goes only if they press it. Two reasons, and neither is
-laziness:
+NOTHING IN HERE SENDS ANY MORE, AND THE READING HALF IS WHY IT SURVIVES
+----------------------------------------------------------------------
+Advance booking was retired on 2026-09-05. The three events this module knew how
+to write about -- a booking made, moved or called off -- cannot occur, so
+compose_message(), build_offer() and send_appointment_sms() went with them. What
+is left is the history: six messages were actually sent, they name real
+patients, and SMS Notifications still lists them. Deleting the readers would
+have deleted the only account of a thing that happened.
 
-* A text costs money per segment and cannot be recalled. A booking corrected
-  twice in a minute at the desk would send three messages automatically, two of
-  them wrong, and the patient would have no way to tell which to believe.
-* Half the roster is a walk-in queue. Automatic confirmation would mean texting
-  people who are standing at the counter having just been told the same thing.
+The sending half was by hand, never automatic, and that was the design: a text
+costs money per segment and cannot be recalled, so a booking corrected twice in
+a minute would otherwise have sent three messages, two of them wrong. That
+argument is recorded here rather than removed, because it is the reason the
+stored rows read the way they do -- every one names the person who pressed the
+button.
 
 So the send is an act, it is attributed to whoever performed it, and it is
 recorded. What is NOT claimed anywhere is that a patient was notified: only that
@@ -81,14 +84,14 @@ from utils.sms import LIVE, SIMULATED
 # life of the process, so a name corrected at 10am would keep going out wrong on
 # every message until a restart. compose_message() asks for it per message.
 
-# The three things worth telling one patient about one appointment.
+# The three things this system used to tell one patient about one appointment.
+# Nothing composes them now; they survive because EVENT_LABELS below turns the
+# stored `event` column into the words the history panel prints.
 #
-# A no-show is deliberately absent, and its absence is a decision rather than an
-# oversight. close_appointment() admits two closures -- Cancelled and No-show --
-# and only the first is news to the patient: somebody who did not attend already
-# knows they did not attend, and a text saying so would be a reprimand sent at
-# the barangay's expense. Nothing is offered for that closure, which is not the
-# same as offering something that refuses.
+# A no-show was deliberately absent, and the absence was a decision rather than
+# an oversight: somebody who did not attend already knows they did not attend,
+# and a text saying so would have been a reprimand sent at the barangay's
+# expense. No stored row carries one, which is why there is no label for it.
 BOOKED = "booked"
 RESCHEDULED = "rescheduled"
 CANCELLED_EVENT = "cancelled"

@@ -25,6 +25,38 @@ So the evidence lives on the machine that produced it. What is committed is this
 file, naming what was captured and how to produce it again, so the absence is
 stated rather than left for someone to trip over.
 
+## retire-advance-booking/
+
+Verification of the five-commit retirement of **advance booking** and the rename
+of Screen 08 from *Appointment Scheduling* to **Patient Queue**. Everything that
+booked, moved or called off a future visit is gone — eight routes, three dialogs,
+the Upcoming panel and reminders strip, the profile's Schedule Appointment button
+and its Upcoming tile, two dashboard panels, the register hand-off, and the SMS
+that told a patient about a booking.
+
+The three bookings still open were closed **first**, through the Cancel dialog
+while it still worked: #15, #22 and #54, all past-dated, all marked No-show.
+Screen 10's *Still expected* went 3 → 0 and *Cancelled or no-show* 5 → 8 with the
+month total unchanged, which is what "nothing was deleted" looks like in the
+figures.
+
+Two things this pass was told not to touch, and did not: the
+`.patient-pick` / `.patient-option` CSS the Check In dialog shares with the
+removed booking dialog, and `SLOT_MINUTES`, which `models/settings.py` still
+imports to refuse a clinic day shorter than one slot.
+
+The check the pass exists for is the `url_for()` one: **189 GET route × role
+pairs rendered with zero 4xx and zero 5xx**, plus a static resolution of every
+`url_for()` in all 25 templates — 50 literal names and 33 context-supplied names
+across 63 name × role pairs, all resolving. A `BuildError` surfaces only when the
+page holding it renders, so reading the source would not have found one.
+
+Writes ran against a throwaway copy on port 5056 and the real `app.db` was
+confirmed untouched afterwards; `app.db.PRETASK_BACKUP_retire-booking_20260905_224609`
+is the recovery point. Full detail, including the gap the removal makes visible —
+a patient who checks in and leaves before being seen cannot be closed off the
+queue — is in `retire-advance-booking/README.md`.
+
 ## admin-persona/
 
 Verification of the Administrator persona correction — the placeholder

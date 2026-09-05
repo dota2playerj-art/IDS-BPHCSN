@@ -169,8 +169,8 @@
     <div class="scope-note">
       <strong>Some of this screen is live, and each pane says which it is.</strong>
       <strong style="display:inline; font-weight:600;">General Settings</strong> is saved and read
-      back — the health center's name, where it stands and the hours it books appointments in are
-      stored here and used by the rest of the system. Password Policy, the sign-in figures under
+      back — the health center's name, where it stands and the hours it keeps are stored here and
+      used by the rest of the system. Password Policy, the sign-in figures under
       Security Settings, the database rows under Backup &amp; Restore and About System are read from
       what this system actually does, on every load, and are not editable anywhere.
       Every remaining field is a control for a feature this system does not have. Each one says so on
@@ -234,7 +234,7 @@
             <!-- GENERAL SETTINGS -->
             <div class="tab-pane fade{% if active_pane == 'pane-general' %} show active{% endif %}" id="pane-general">
               <div class="section-title">General Settings</div>
-              <div class="section-sub">The health center&#39;s own name, where it stands, and the hours it books appointments in</div>
+              <div class="section-sub">The health center&#39;s own name, where it stands, and the hours it keeps</div>
 
 {#- THE ONE FORM ON THIS SCREEN THAT SAVES.
 
@@ -292,7 +292,7 @@
 {%- if general.errors.health_center_name %}
                   <div class="field-error">{{ general.errors.health_center_name }}</div>
 {%- endif %}
-                  <div class="form-text-hint">Printed at the top of every PDF and Excel export, shown in the header of every screen, and the first thing in every appointment SMS.</div>
+                  <div class="form-text-hint">Printed at the top of every PDF and Excel export, and shown in the header of every screen.</div>
                 </div>
               </div>
 

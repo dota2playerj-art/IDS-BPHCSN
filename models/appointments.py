@@ -113,12 +113,6 @@ def _to_appointment(row):
     appointment["status_badge_class"] = STATUS_BADGE_CLASS.get(
         appointment.get("status"), "badge-scheduled"
     )
-    # Whether this row is still a plan rather than a visit under way, and
-    # therefore whether it can be moved or called off. Derived here, alongside
-    # the badge, so the queue and the profile's Appointment
-    # History all decide it the same way -- and so the buttons a screen offers
-    # are exactly the ones close_appointment() and reschedule_appointment()
-    # would accept.
     return appointment
 
 
@@ -135,11 +129,6 @@ def _to_queue_entry(row):
     entry["reference"] = f"APT-{entry['id']:05d}"
     entry["arrival_time"] = _clock(entry.get("checked_in_at"))
     entry["booked_time"] = _clock(entry.get("appointment_time"))
-    # Whether this row is still a plan rather than a visit in progress, and
-    # therefore whether it can be moved or called off. Derived here, next to the
-    # other display fields, so the queue and the profile both
-    # decide it the same way -- and so the buttons a screen offers are exactly
-    # the ones close_appointment() and reschedule_appointment() would accept.
     return entry
 
 
@@ -1051,20 +1040,24 @@ def get_calendar_month(month_start=None, on_date=None):
 def set_appointment_status(appointment_id, status):
     """Move one appointment to a status. Returns rows actually changed.
 
-    NOT THE WAY TO CANCEL OR CLOSE A BOOKING -- use close_appointment().
-    ---------------------------------------------------------------------
-    This was written as the unguarded primitive for Cancelled and No-show, back
-    when nothing performed those two transitions. Something does now, and it does
-    not go through here: close_appointment() re-checks the status inside its own
-    UPDATE, so a page that went stale while the patient walked in and was checked
-    in cannot reach past the check-in and cancel a visit already under way. This
-    function has no such guard and would write straight over it.
+    IT HAS NO GUARD, AND THAT IS WHY IT HAS NO CALLERS.
+    ---------------------------------------------------
+    This was written as the unguarded primitive for Cancelled and No-show. Those
+    were later performed by close_appointment(), which re-checked the status
+    inside its own UPDATE so that a page gone stale while the patient walked in
+    could not reach past the check-in and cancel a visit already under way. That
+    function was removed with advance booking on 2026-09-05; this one, which
+    never had the guard, was deliberately not promoted into its place.
 
     It is kept because it is still the honest general primitive -- a caller with
     a genuinely new transition and its own guard can build on it -- but it has no
-    callers today, and a new one should be sure it does not want one of the four
-    guarded transitions instead: start_consultation(), complete_consultation(),
-    close_appointment(), reschedule_appointment().
+    callers today, and a new one should be sure it does not want one of the two
+    guarded transitions instead: start_consultation() or complete_consultation().
+
+    A caller wanting to close a queue row for a patient who left before being
+    seen should read utils/unavailable.py `queue_exit` first: that is a status
+    this system does not have, and writing one through here would put a value
+    past the schema's CHECK rather than adding the feature.
 
     Entering and leaving the consultation room in particular must go through
     start_consultation() and complete_consultation(): those hold the
