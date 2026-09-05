@@ -293,20 +293,7 @@ def staff_add_edit_medicine(medicine_id=None):
 def staff_appointment_scheduling():
     return render_template(
         'appointment_scheduling.html',
-        **appointment_scheduling_context(
-            month=request.args.get("month"),
-            # ?reschedule=<id> and ?cancel=<id> open one of this screen's
-            # dialogs on a named appointment, and ?back= says where to land
-            # afterwards. That is how the Patient Profile's Appointment History
-            # offers both actions without a second copy of either dialog.
-            reschedule_id=request.args.get("reschedule"),
-            cancel_id=request.args.get("cancel"),
-            return_to=request.args.get("back"),
-            # ?book=<patient_id> is the same arrangement for the other
-            # direction: the profile's Schedule Appointment action opens the New
-            # Appointment dialog here, on that patient.
-            book_patient_id=request.args.get("book"),
-        ),
+        **appointment_scheduling_context(month=request.args.get("month")),
     )
 
 

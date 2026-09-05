@@ -25,7 +25,6 @@ import calendar as _calendar
 from datetime import date, datetime
 
 from database.connection import get_db
-from models.settings import clinic_hours, display_time
 from utils.dates import now, recent_months, resolve_range, today
 
 # Statuses that still represent a commitment the patient is expected to keep.
@@ -78,82 +77,12 @@ WALK_IN_TYPE = "Walk-in Consultation"
 # what check_in_patient() converts it for.
 BOOKED_STATUS = "Scheduled"
 
-# The services that can be booked in advance. Same list the screen's Service
-# filter already offers, so the two cannot drift; WALK_IN_TYPE is absent on
-# purpose -- a walk-in is by definition not booked ahead, and offering it here
-# would let a future appointment claim it had no prior booking.
-APPOINTMENT_TYPES = (
-    "Consultation",
-    "Prenatal Check-up",
-    "Immunization",
-    "DM / Hypertension Monitoring",
-    "Dental",
-    "Follow-up Consultation",
-)
-
 # The granularity bookings are taken at. Half-hour slots rather than a free-text
 # time for two reasons: the operator cannot mistype 0930 as 09:3, and "another
 # patient already has this slot" becomes an exact comparison instead of a fuzzy
 # one about how near two times have to be to collide.
 SLOT_MINUTES = 30
 
-
-# THE CLINIC DAY IS NO LONGER TWO CONSTANTS IN THIS FILE.
-# It was CLINIC_OPEN_HOUR = 8 and CLINIC_CLOSE_HOUR = 17, and BOOKING_TIME_SLOTS
-# was a module-level tuple built from them once, at import. Both are now read
-# from the settings table through models/settings.py, where an administrator can
-# change them on Screen 13 -- so the two constants are gone rather than kept as
-# a second copy of a value that can now move.
-#
-# THE SLOTS ARE A FUNCTION NOW, AND THEY HAD TO BECOME ONE.
-# A module-level tuple is computed at import and never again, so a clinic whose
-# hours were changed at 10am would keep offering yesterday's slots until the
-# process was restarted -- and, worse, validate_booking() would go on refusing
-# times the screen had just started offering, because both read the same stale
-# tuple. Called per request, the dropdown and the validator cannot disagree.
-#
-# The cost is one settings read per call, and it is not one query per call:
-# models/settings.py caches the resolved values on flask.g for the life of the
-# request, so a booking render that asks for the slots twice reads the table
-# once.
-def booking_time_slots():
-    """('08:00', '08:30', ... '16:30') -- every bookable slot in a clinic day.
-
-    Generated from the stored opening time upwards in SLOT_MINUTES steps, so a
-    clinic that opens at 08:15 books at 08:15, 08:45 and so on. The last slot
-    starts one interval before closing, so nothing is booked to begin at the
-    moment the doors shut.
-
-    Never empty: validate_general_settings() refuses a clinic day shorter than
-    one slot, so the pair of times behind this always admits at least one.
-    """
-    opening, closing = clinic_hours()
-    slots = []
-    minute = opening
-    while minute + SLOT_MINUTES <= closing:
-        slots.append(f"{minute // 60:02d}:{minute % 60:02d}")
-        minute += SLOT_MINUTES
-    return tuple(slots)
-
-
-def clinic_hours_label():
-    """'8:00 AM to 5:00 PM' -- the stored clinic day, for anything that prints it."""
-    from models.settings import KEY_CLOSING, KEY_OPENING, get_settings
-
-    values = get_settings()
-    return (
-        f"{display_time(values[KEY_OPENING])} to "
-        f"{display_time(values[KEY_CLOSING])}"
-    )
-
-# How far ahead a booking may be made. A year covers the longest thing this
-# center schedules (an annual maintenance review); beyond that a date is far more
-# likely to be a mistyped year than an intention.
-BOOKING_HORIZON_DAYS = 365
-
-# Matches the reason/notes length the Check In dialog already allows, so the two
-# ways a note reaches appointments.notes agree about how long it may be.
-BOOKING_NOTES_MAX = 200
 
 # appointments.status -> the badge class the screens' stylesheets define.
 STATUS_BADGE_CLASS = {
@@ -192,8 +121,6 @@ def _to_appointment(row):
     # History all decide it the same way -- and so the buttons a screen offers
     # are exactly the ones close_appointment() and reschedule_appointment()
     # would accept.
-    appointment["is_open_booking"] = appointment.get("status") in PENDING_STATUSES
-    appointment["closures"] = allowed_appointment_closures(appointment)
     return appointment
 
 
@@ -266,29 +193,6 @@ def get_appointments_for_patient(patient_id):
     ).fetchall()
     conn.close()
     return [_to_appointment(row) for row in rows]
-
-
-def get_next_appointment_for_patient(patient_id):
-    """Soonest still-upcoming appointment, or None."""
-    placeholders = ", ".join("?" for _ in PENDING_STATUSES)
-    conn = get_db()
-    row = conn.execute(
-        f"""
-        SELECT a.appointment_date, a.appointment_time, a.appointment_type, a.status
-        FROM appointments a
-        WHERE a.patient_id = ?
-          AND a.status IN ({placeholders})
-          AND date(a.appointment_date) >= ?
-        ORDER BY a.appointment_date ASC, a.appointment_time ASC
-        LIMIT 1
-        """,
-        # Clinic-local today, not SQLite's date('now'), which is UTC: an
-        # appointment booked for today would otherwise drop off this list eight
-        # hours early -- mid-afternoon, while the patient is still expected.
-        (patient_id, *PENDING_STATUSES, today().isoformat()),
-    ).fetchone()
-    conn.close()
-    return row
 
 
 _QUEUE_SELECT = """
@@ -843,59 +747,6 @@ def parse_iso_date(value):
         return None
 
 
-# ---------------------------------------------------------------------------
-# CHANGING A BOOKING THAT HAS ALREADY BEEN MADE
-#
-# Both actions below are guarded on PENDING_STATUSES, and that one condition is
-# doing all the work. A booking may be called off or moved only while nobody has
-# arrived for it: the moment check_in_patient() converts it to Waiting the row
-# stops being a plan and becomes a patient in the building, and neither cancelling
-# them nor moving them to next Tuesday describes anything that could happen.
-#
-# Note that this is a status rule, not a date rule -- which is what makes the
-# awkward case fall out for free. A booking made for today that the patient rings
-# to call off is still Scheduled, so it can be cancelled; and once cancelled it
-# leaves PENDING_STATUSES, so find_todays_appointment() stops offering it to
-# check-in and get_queue_stats() stops counting it as not-yet-arrived. Nothing in
-# the queue needed a special case for it.
-# ---------------------------------------------------------------------------
-
-# The two ways a booking ends without the patient ever being seen. Both are
-# closures, not deletions: the row stays, exactly as an Inactive patient record
-# stays -- see set_patient_status() for the same principle on Screen 03.
-CANCELLED = "Cancelled"
-NO_SHOW = "No-show"
-CLOSURE_STATUSES = (CANCELLED, NO_SHOW)
-
-# Only a booking nobody has turned up for can be cancelled, moved or written off.
-OPEN_BOOKING_STATUSES = PENDING_STATUSES
-
-
-def allowed_appointment_closures(appointment, on_date=None):
-    """Which of Cancelled / No-show this appointment may be moved to.
-
-    The direct counterpart of models/patients.py allowed_status_transitions(),
-    and the dialog that offers these is the same dialog shape Screen 03 uses --
-    a record's current state decides what it is offered, so no button is ever
-    present that the server would then refuse.
-
-    Cancelled is always available on an open booking: calling off a visit is
-    something that can be decided at any point before it happens.
-
-    No-show is not, because it is a statement about a day that has already run
-    its course. Offering it on next Tuesday's appointment would invite the desk
-    to record an absence from a day nobody has lived through yet.
-    """
-    if not appointment or appointment.get("status") not in OPEN_BOOKING_STATUSES:
-        return ()
-
-    reference = on_date or today()
-    booking_date = parse_iso_date(appointment.get("appointment_date"))
-    if booking_date is not None and booking_date <= reference:
-        return CLOSURE_STATUSES
-    return (CANCELLED,)
-
-
 def _to_upcoming_entry(row, reference=None):
     """A future booking with the fields the upcoming list and calendar print."""
     entry = _to_queue_entry(row)
@@ -958,26 +809,6 @@ def get_upcoming_stats(entries=None, from_date=None):
         "tomorrow": sum(1 for entry in entries if entry["days_away"] == 1),
         "days_with_bookings": len(days),
     }
-
-
-def get_slot_load(from_date=None):
-    """{date: {time: [patient names]}} for every pending future booking.
-
-    Handed to the booking dialog so the time dropdown can say which slots the
-    chosen day already has somebody in, before the operator picks one. The same
-    rows find_scheduling_conflicts() would warn about afterwards -- shown early
-    so the usual case is a clash avoided rather than a warning acknowledged.
-    """
-    load = {}
-    for entry in get_upcoming_appointments(from_date=from_date):
-        slot_time = (entry.get("appointment_time") or "").strip()
-        if not slot_time:
-            continue
-        day = entry["appointment_date"][:10]
-        load.setdefault(day, {}).setdefault(slot_time, []).append(
-            queue_display_name(entry)
-        )
-    return load
 
 
 def get_appointment_day_summary(start_date, end_date):

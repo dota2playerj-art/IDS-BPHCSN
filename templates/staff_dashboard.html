@@ -323,35 +323,6 @@
           </div>
         </div>
 
-        <!-- UPCOMING VACCINATION SCHEDULE -->
-        <div class="panel-card mb-0">
-          <div class="d-flex align-items-center justify-content-between mb-2">
-            <div>
-              <div class="panel-title">Upcoming Vaccination Schedule</div>
-              <div class="panel-sub">Booked immunization visits still to come</div>
-            </div>
-            <a href="{{ url_for(appointment_scheduling_endpoint) }}" class="panel-link">View All<span class="material-symbols-outlined" style="font-size:15px;">chevron_right</span></a>
-          </div>
-          <div>
-{#- Real bookings only. The three names that used to sit here were invented, and
-    the panel is deliberately allowed to be empty: a child who is due a dose but
-    has no appointment belongs in Immunization Follow-up, which reports them. #}
-{%- for entry in upcoming_vaccinations %}
-            <div class="list-row">
-              <div class="list-avatar" style="background:#DBEAFE; color:var(--info);"><span class="material-symbols-outlined" style="font-size:17px;">vaccines</span></div>
-              <div>
-                <div class="list-title"><a href="{{ url_for(patient_profile_endpoint, patient_id=entry.patient_id) }}" style="color:inherit; text-decoration:none;">{{ entry.first_name }} {{ entry.last_name }}</a></div>
-                <div class="list-sub">{{ entry.appointment_type }} &middot; {{ entry.appointment_date | display_date }}{% if entry.booked_time %}, {{ entry.booked_time }}{% endif %}</div>
-              </div>
-              <div class="list-meta">{{ entry.when_label }}</div>
-            </div>
-{%- endfor %}
-{%- if not upcoming_vaccinations %}
-            <div class="panel-sub">No immunization appointments are booked. {% if immunization_alert.child_count %}{{ immunization_alert.child_count }} child{{ "ren" if immunization_alert.child_count != 1 }} {{ "are" if immunization_alert.child_count != 1 else "is" }} due a dose — see Immunization Follow-up.{% endif %}</div>
-{%- endif %}
-          </div>
-        </div>
-
       </div>
 
       <!-- RIGHT COLUMN -->
@@ -453,7 +424,6 @@
           <div class="quick-stat-row"><div class="qs-label">Consultations completed today</div><div class="qs-value">{{ queue_stats.completed }}</div></div>
           <div class="quick-stat-row"><div class="qs-label">Consultations this month</div><div class="qs-value">{{ consultation_stats.recorded_this_month }}</div></div>
           <div class="quick-stat-row"><div class="qs-label">New registrations this month</div><div class="qs-value">{{ patient_stats.new_this_month }}</div></div>
-          <div class="quick-stat-row"><div class="qs-label">Appointments still upcoming</div><div class="qs-value">{{ upcoming_count }}</div></div>
           <div class="quick-stat-row"><div class="qs-label">SMS messages sent</div><div class="qs-value">{{ broadcast_stats.messages_sent }}</div></div>
           <div class="panel-sub" style="margin-top:10px; line-height:1.55;">{{ untracked.staff_activity }}</div>
         </div>

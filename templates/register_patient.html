@@ -97,8 +97,6 @@
     <div class="page-desc">Update {{ patient.full_name }}'s details below. Fields marked with <span style="color:var(--danger);">*</span> are required.</div>
     {%- elif check_in %}
     <div class="page-desc">This is the same registration form as always — nothing is shortened or skipped. Saving it also checks the patient in for today. Fields marked with <span style="color:var(--danger);">*</span> are required.</div>
-    {%- elif booking %}
-    <div class="page-desc">This is the same registration form as always — nothing is shortened or skipped. Saving it also books the appointment agreed at the desk. Fields marked with <span style="color:var(--danger);">*</span> are required.</div>
     {%- else %}
     <div class="page-desc">Complete the form below to add a new patient to the health center's records. Fields marked with <span style="color:var(--danger);">*</span> are required.</div>
     {%- endif %}
@@ -122,27 +120,6 @@
     </div>
 {%- endif %}
 
-{%- if booking %}
-    <!-- Opened from the New Appointment dialog's "New patient" path. Exactly the
-         same arrangement as the check-in notice above: the form is untouched,
-         and only this notice, the hidden fields inside it, and the save button's
-         wording differ. The appointment details were already validated before
-         this screen opened, so nothing here can be typed into an invalid state. -->
-    <div class="alert-ids alert-success-ids">
-      <span class="material-symbols-outlined">event_available</span>
-      <div>
-        <strong>New appointment — saving this form also books the visit</strong>
-        Register the patient in full now. When you save, the record is created permanently
-        <em>and</em> the appointment below is booked as <strong style="display:inline;">Scheduled</strong>;
-        you will be returned to Appointment Scheduling.
-        Booking: <strong style="display:inline;">{{ booking.appointment_type }}</strong> on
-        <strong style="display:inline;">{{ booking.appointment_date | long_date }}</strong> at
-        <strong style="display:inline;">{{ booking.appointment_time }}</strong>{% if booking.notes %}
-        — {{ booking.notes }}{% endif %}.
-      </div>
-    </div>
-{%- endif %}
-
 {%- if duplicates %}
     <!-- SOFT DUPLICATE WARNING - informs, never blocks. Submitting again carries
          the hidden confirm_duplicate field below and saves a separate record. -->
@@ -152,7 +129,7 @@
         <strong>A similar patient record already exists — please verify before continuing</strong>
         {% for match in duplicates %}{{ match.first_name }} {{ match.last_name }} (ID: {{ match.patient_id }}), born {{ match.birth_date | long_date }}{{ "; " if not loop.last else "" }}{% endfor %}.
         Nothing has been saved yet. Check the details below — if this really is a different
-        person, press <strong style="display:inline;">{% if check_in %}Save &amp; Check In{% elif booking %}Save &amp; Book Appointment{% else %}Save Patient Record{% endif %}</strong> again to
+        person, press <strong style="display:inline;">{% if check_in %}Save &amp; Check In{% else %}Save Patient Record{% endif %}</strong> again to
         register them as a separate record.
       </div>
     </div>
@@ -178,15 +155,6 @@
            therefore never end up registered but not queued. -->
       <input type="hidden" name="{{ check_in_flag_field }}" value="1">
       <input type="hidden" name="{{ check_in_reason_field }}" value="{{ check_in_reason }}" maxlength="{{ check_in_reason_max }}">
-{%- endif %}
-{%- if booking %}
-      <!-- The booking rides along the same way, and is re-validated on the
-           server when it arrives back -- these are a claim about what was sent,
-           not a fact, however they got here. -->
-      <input type="hidden" name="{{ booking_flag_field }}" value="1">
-{%- for field, value in booking_hidden %}
-      <input type="hidden" name="{{ field }}" value="{{ value }}">
-{%- endfor %}
 {%- endif %}
 
       <!-- PERSONAL INFORMATION -->
@@ -431,7 +399,7 @@
               form was opened for, so leaving lands where the operator started. #}
 {%- if patient %}
           <a href="{{ url_for(patient_profile_endpoint, patient_id=patient.id) }}" class="btn-danger-text" style="text-decoration:none;">Cancel</a>
-{%- elif check_in or booking %}
+{%- elif check_in %}
           <a href="{{ url_for(appointment_scheduling_endpoint) }}" class="btn-danger-text" style="text-decoration:none;">Cancel</a>
 {%- else %}
           <a href="{{ url_for(patient_records_endpoint) }}" class="btn-danger-text" style="text-decoration:none;">Cancel</a>
@@ -443,31 +411,31 @@
               looks exactly like the save being dropped. Clearing a blank
               new-patient form is harmless; reverting an in-progress edit is not.
 
-              `not patient` is the whole test: check-in and advance-booking are
-              add-mode variants, not a third mode. register_patient_context()
-              forces both to falsy whenever `patient` is set, so a form opened for
-              either is registering somebody new and starts blank -- Reset there
-              clears a blank form, exactly as it always has. Cancel is outside
+              `not patient` is the whole test: check-in is an add-mode variant,
+              not a second mode. register_patient_context() forces it to falsy
+              whenever `patient` is set, so a form opened for it is registering
+              somebody new and starts blank -- Reset there clears a blank form,
+              exactly as it always has. Cancel is outside
               this guard and stays on every mode: it is the safe way out, and
               unlike Reset it does not leave the operator looking at a form that
               has quietly become the old record again. #}
 {%- if not patient %}
           <button type="reset" class="btn-ghost-ids"><span class="material-symbols-outlined" style="font-size:18px;">restart_alt</span>Reset</button>
 {%- endif %}
-          {#- Save & Register Another. Plain add mode only: check-in and booking
-              were opened to reach a specific destination -- today's queue, the
-              appointment -- and edit mode is not registering anybody, so on
-              those three there is nothing for a second destination to mean.
+          {#- Save & Register Another. Plain add mode only: check-in was opened
+              to reach a specific destination -- today's queue -- and edit mode is
+              not registering anybody, so on those two there is nothing for a
+              second destination to mean.
 
               A real submit, not a second form: it carries name/value the way
               Patient Records' status buttons do, so it posts every field beside
               it through the identical route, the identical validate_patient_form()
               and the identical duplicate check. All the route does differently is
               send the operator back here afterwards instead of to the profile. #}
-{%- if not patient and not check_in and not booking %}
+{%- if not patient and not check_in %}
           <button type="submit" name="{{ save_action_field }}" value="{{ save_and_register_another }}" class="btn-outline-teal"><span class="material-symbols-outlined" style="font-size:18px;">person_add</span>Save &amp; Register Another</button>
 {%- endif %}
-          <button type="submit" class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">{% if check_in %}how_to_reg{% elif booking %}event_available{% else %}save{% endif %}</span>{% if patient %}Save Changes{% elif check_in %}Save &amp; Check In{% elif booking %}Save &amp; Book Appointment{% else %}Save Patient Record{% endif %}</button>
+          <button type="submit" class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">{% if check_in %}how_to_reg{% else %}save{% endif %}</span>{% if patient %}Save Changes{% elif check_in %}Save &amp; Check In{% else %}Save Patient Record{% endif %}</button>
         </div>
       </div>
 

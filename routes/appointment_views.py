@@ -7,14 +7,7 @@ each keeps its own role_required guard and its own redirect target.
 
 This mirrors routes/patient_views.py and routes/inventory_views.py exactly.
 """
-from datetime import timedelta
-
 from models.appointments import (
-    APPOINTMENT_TYPES,
-    BOOKING_HORIZON_DAYS,
-    BOOKING_NOTES_MAX,
-    CLOSURE_STATUSES,
-    booking_time_slots,
     check_in_patient,
     complete_consultation,
     get_active_consultation,
@@ -22,7 +15,6 @@ from models.appointments import (
     get_calendar_month,
     get_queue_entry,
     get_queue_stats,
-    get_slot_load,
     get_todays_appointments,
     get_upcoming_appointments,
     get_upcoming_stats,
@@ -32,67 +24,26 @@ from models.appointments import (
 )
 from models.immunizations import get_immunization_alert, get_immunization_status
 from models.patients import get_all_patients, get_patient_by_id
-from models.users import get_clinical_staff
 from utils.dates import today
 
-# Only a living, active record may be checked in or booked. An Inactive or
-# Deceased patient appearing in either picker is a data-entry accident waiting to
-# happen, and the roster is small enough that the filter costs nothing.
+# Only a living, active record may be checked in. An Inactive or Deceased patient
+# appearing in the Check In picker is a data-entry accident waiting to happen, and
+# the roster is small enough that the filter costs nothing.
 SCHEDULABLE_PATIENT_STATUS = "Active"
 
 
-def _booking_for_patient(patient_id):
-    """Open the New Appointment dialog on a named patient, or None.
-
-    The counterpart of _open_booking() for the other direction: ?book=<id> is
-    how the Patient Profile offers "Schedule Appointment" without holding a
-    second copy of the booking dialog, exactly as ?reschedule= and ?cancel=
-    already work for that screen's Appointment History.
-
-    Nothing is booked here -- this only decides which patient the dialog opens
-    on. The submit still goes through process_book_appointment() and is
-    validated there, because a POST need not come from this page.
-
-    A patient the dialog cannot offer is not preselected: the picker lists
-    Active records only, so an Inactive or Deceased id would open a dialog with
-    nothing chosen and no reason given. The link lands on the screen instead,
-    where the queue and the calendar are.
-    """
-    raw = (str(patient_id) if patient_id is not None else "").strip()
-    if not raw.isdigit():
-        return None
-    patient = get_patient_by_id(int(raw))
-    if patient is None or patient["status"] != SCHEDULABLE_PATIENT_STATUS:
-        return None
-    return {"open": True, "mode": "existing", "form": {"patient_id": raw}}
-
-
-def appointment_scheduling_context(month=None, booking=None, reschedule=None,
-                                   reschedule_id=None, cancel_id=None,
-                                   return_to="", book_patient_id=None):
+def appointment_scheduling_context(month=None):
     """Everything Screen 08 renders.
 
-    Three things now, and they are kept visibly apart because they answer
-    different questions:
+    Two things, and they are kept visibly apart because they answer different
+    questions:
 
-        today's queue      who is here, who is next    (unchanged by this pass)
-        the calendar       which days carry what load
-        upcoming bookings  who is expected, and when
+        today's queue      who is here, who is next
+        the calendar       which days carried what load
 
     `month` selects which month the calendar shows ('YYYY-MM'); anything
-    unusable falls back to the current one. `booking` carries the New
-    Appointment dialog's state back after a submit that did not save -- its
-    values, its field errors and any scheduling conflict awaiting
-    acknowledgement -- so the operator's entry survives the round trip exactly
-    as Register Patient's does. `reschedule` does the same for the Reschedule
-    dialog.
-
-    `reschedule_id` / `cancel_id` open one of those dialogs on a named
-    appointment, and `return_to` says where the action should land afterwards.
-    Together they are how the Patient Profile's Appointment History offers these
-    actions without holding a second copy of either dialog: it links here, the
-    dialog it asked for opens on the right row, and the operator is put back on
-    the profile when it is done.
+    unusable falls back to the current one. The queue below it is always
+    today's and is unaffected by it.
     """
     # The room is resolved once, here, and handed to both the queue and its stat
     # cards. get_active_consultation() is not scoped to a date -- a visit left
@@ -172,110 +123,6 @@ def appointment_scheduling_context(month=None, booking=None, reschedule=None,
         # own note in the template for why they are not merged.
         "upcoming": upcoming,
         "upcoming_stats": get_upcoming_stats(upcoming, reference),
-        # A booking bounced back from a failed submit wins over ?book=<id>: the
-        # operator's own entry must never be discarded in favour of a dialog
-        # reopened blank on a patient.
-        **booking_context(booking or _booking_for_patient(book_patient_id)),
-        **reschedule_context(reschedule, reschedule_id),
-        **cancel_context(cancel_id),
-        # Rendered as a hidden field in both dialogs, so wherever the operator
-        # opened them from is where the completed action puts them back.
-        "return_to": (return_to or "").strip(),
-    }
-
-
-def _open_booking(appointment_id):
-    """The named appointment if it can still be moved or called off, else None.
-
-    A link naming an appointment that has since been checked in, cancelled or
-    completed simply lands on the page with its dialog shut, rather than opening
-    one on a refusal. The screen behind it already shows what happened instead.
-    """
-    if not str(appointment_id or "").strip().isdigit():
-        return None
-    appointment = get_appointment_by_id(int(appointment_id))
-    if appointment is None or not appointment["is_open_booking"]:
-        return None
-    return appointment
-
-
-def reschedule_context(reschedule=None, reschedule_id=None):
-    """The Reschedule dialog's state.
-
-    It shares every vocabulary and bound with the New Appointment dialog -- they
-    are both choosing a slot for the same clinic -- so nothing is redefined here;
-    booking_context() supplies the slots, the date bounds and the slot load, and
-    this only carries which appointment is being moved and what has been entered
-    for it.
-    """
-    reschedule = dict(reschedule or {})
-    appointment = reschedule.get("appointment") or _open_booking(reschedule_id)
-
-    return {
-        "reschedule": {
-            "open": bool(reschedule.get("open")) or appointment is not None,
-            "appointment": appointment,
-            "form": reschedule.get("form") or {},
-            "errors": reschedule.get("errors") or {},
-            "conflicts": reschedule.get("conflicts") or {"slot": [], "patient_day": []},
-            "acknowledge_conflict": bool(reschedule.get("acknowledge_conflict")),
-        },
-    }
-
-
-def cancel_context(cancel_id=None):
-    """The Cancel dialog's state when a link opened it on a named appointment.
-
-    Every other way into that dialog is a button on this page, which tells it
-    which appointment through data-* attributes; this is the one path where the
-    server has to render the target, because the request arrived without one.
-    """
-    appointment = _open_booking(cancel_id)
-    return {
-        "cancel": {
-            "open": appointment is not None,
-            "appointment": appointment,
-            "closures": (
-                appointment["closures"] if appointment else CLOSURE_STATUSES
-            ),
-        },
-    }
-
-
-def booking_context(booking=None):
-    """The New Appointment dialog's own context, whether or not it is reopening.
-
-    Built here rather than inside the template so the vocabularies the form
-    offers are the same tuples validate_booking_form() checks against, and the
-    dialog cannot present a service or a slot the server would then reject.
-    """
-    booking = dict(booking or {})
-    reference = today()
-    return {
-        "booking": {
-            "open": bool(booking.get("open")),
-            "mode": booking.get("mode") or "existing",
-            "form": booking.get("form") or {},
-            "errors": booking.get("errors") or {},
-            "conflicts": booking.get("conflicts") or {"slot": [], "patient_day": []},
-            "acknowledge_conflict": bool(booking.get("acknowledge_conflict")),
-        },
-        "appointment_types": APPOINTMENT_TYPES,
-        # Read per render rather than from a module constant: the clinic day is
-        # a stored setting now, so the dropdown has to be built from whatever
-        # Screen 13 currently holds -- and from the same call validate_booking()
-        # makes, so the times offered and the times accepted cannot diverge.
-        "booking_time_slots": booking_time_slots(),
-        "booking_notes_max": BOOKING_NOTES_MAX,
-        "clinical_staff": get_clinical_staff(),
-        # The date input's own bounds, so the picker refuses out-of-range days
-        # before the server has to. The server still checks -- see
-        # validate_booking_form() -- because a POST need not come from this page.
-        "booking_min_date": (reference + timedelta(days=1)).isoformat(),
-        "booking_max_date": (reference + timedelta(days=BOOKING_HORIZON_DAYS)).isoformat(),
-        # {date: {time: [names]}} so the time dropdown can mark the slots a
-        # chosen day already has somebody in.
-        "booking_slot_load": get_slot_load(reference),
     }
 
 

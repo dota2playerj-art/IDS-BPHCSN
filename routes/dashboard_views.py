@@ -11,7 +11,6 @@ dashboard card and the screen it links to cannot show different totals:
 
     patients            models/patients.py       get_patient_stats()
     today's queue       models/appointments.py   get_todays_appointments/get_queue_stats
-    upcoming bookings   models/appointments.py   get_upcoming_appointments()
     consultations       models/consultations.py  get_consultation_stats/get_consultation_report
     inventory           models/inventory.py      get_inventory_stats/get_low_stock_alert
     immunisation        models/immunizations.py  get_immunization_alert()
@@ -30,7 +29,6 @@ from models.appointments import (
     get_calendar_month,
     get_queue_stats,
     get_todays_appointments,
-    get_upcoming_appointments,
     queue_display_name,
 )
 from models.audit import get_audit_logs, get_audit_stats
@@ -56,14 +54,6 @@ RECENT_CONSULTATIONS = 5
 RECENT_REGISTRATIONS = 3
 ACTIVITY_EVENTS = 5
 ALERT_ROWS = 5
-UPCOMING_ROWS = 5
-VACCINATION_ROWS = 5
-
-# How the Staff dashboard's vaccination panel recognises one of its own rows in
-# the upcoming bookings. appointment_type is free text on the booking form, so
-# this matches on what a clerk would actually type rather than on a fixed list.
-VACCINATION_WORDS = ("immuniz", "immunis", "vaccin")
-
 # Six months, matching TREND_MONTHS on Screen 10 so the dashboard's mini charts
 # and the full report plot the same window.
 TREND_MONTHS = 6
@@ -178,24 +168,6 @@ def _activity_feed(limit):
     return events
 
 
-def _upcoming_vaccinations(upcoming_all, limit):
-    """Booked immunisation visits still to come.
-
-    A filter over get_upcoming_appointments(), not a second query: the rows are
-    the ones Appointment Scheduling already lists, narrowed to the visits that
-    are about a dose. This panel is empty whenever nothing is booked, which is
-    the honest answer -- the children who are *due* a dose without a booking are
-    a different list, and get_immunization_alert() already reports them in the
-    Immunization Follow-up panel beside it.
-    """
-    rows = [
-        entry for entry in upcoming_all
-        if any(word in str(entry.get("appointment_type") or "").lower()
-               for word in VACCINATION_WORDS)
-    ]
-    return rows[:limit]
-
-
 def dashboard_context():
     """Everything both dashboards render. Neither adds a figure of its own."""
     reference = today()
@@ -211,7 +183,6 @@ def dashboard_context():
     consultation_stats = get_consultation_stats(months=TREND_MONTHS)
     dispensing_stats = get_dispensing_stats(months=TREND_MONTHS)
     inventory_stats = get_inventory_stats()
-    upcoming_all = get_upcoming_appointments()
 
     # THE ONE VISIT IN PROGRESS, FOR THE DASHBOARD SHORTCUT.
     #
@@ -244,9 +215,6 @@ def dashboard_context():
         # the shortcut cannot spell a patient differently from the row it came
         # from.
         "active_consultation_name": queue_display_name(active),
-        "upcoming": upcoming_all[:UPCOMING_ROWS],
-        "upcoming_count": len(upcoming_all),
-        "upcoming_vaccinations": _upcoming_vaccinations(upcoming_all, VACCINATION_ROWS),
         "consultation_stats": consultation_stats,
         "recent_consultations": _recent_consultations(RECENT_CONSULTATIONS, reference),
         "recent_registrations": _recent_registrations(RECENT_REGISTRATIONS),

@@ -422,36 +422,23 @@
     printout cannot disagree with the screen it was taken from. #}
           <button class="btn-ghost-ids" type="button" onclick="window.print()"
                   title="Print {{ patient.full_name }}'s full record — personal details, medical history, consultations, immunizations and appointments"><span class="material-symbols-outlined" style="font-size:18px;">print</span>Print Record</button>
-{#- Schedule Appointment opens the New Appointment dialog on Screen 08 with this
-    patient already chosen, and returns here when it is done. It is a link, not
-    a second copy of the dialog -- the same arrangement the Appointment History
-    tab below already uses for Reschedule and Cancel.
-
-    It is offered only for a patient the dialog can actually book: the picker
-    lists Active records, so for any other status this states why instead of
-    opening a dialog with nothing selected. #}
-{%- if patient.status == 'Active' %}
-          <a href="{{ url_for(appointment_scheduling_endpoint, book=patient.id, back='profile:' ~ patient.id) }}"
-             class="btn-outline-teal" title="Book an appointment for {{ patient.full_name }}"><span class="material-symbols-outlined" style="font-size:18px;">calendar_month</span>Schedule Appointment</a>
-{%- else %}
-          <button class="btn-outline-teal" type="button" disabled
-                  title="Appointments can only be booked for an Active patient. {{ patient.full_name }} is {{ patient.status }} — change the status on Patient Records first.">
-            <span class="material-symbols-outlined" style="font-size:18px;">calendar_month</span>Schedule Appointment
-          </button>
-{%- endif %}
           <a href="{{ url_for(register_patient_endpoint, patient_id=patient.id) }}" class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">edit</span>Edit Profile</a>
         </div>
       </div>
     </div>
 
     <!-- SUMMARY CARDS -->
-    {#- Screen furniture, not record. These four tiles summarise at a glance
+    {#- Screen furniture, not record. These three tiles summarise at a glance
         what the sections below state in full -- last visit, assigned worker,
-        prescriptions, next appointment -- and on paper they would take the top
-        third of page one to repeat the Consultation and Appointment sections
-        in larger type. The printed record carries the sections themselves. #}
+        what has been dispensed -- and on paper they would take the top third of
+        page one to repeat the Consultation and Dispensing sections in larger
+        type. The printed record carries the sections themselves.
+
+        There was a fourth, Upcoming Appointment. It went with advance booking:
+        nothing schedules a future visit any more, so the tile could only ever
+        have read "None scheduled". #}
     <div class="row g-3 mb-4 no-print">
-      <div class="col-md-3 col-sm-6">
+      <div class="col-md-4 col-sm-6">
         <div class="stat-card">
           <div class="stat-icon" style="background:var(--teal-light);"><span class="material-symbols-outlined" style="color:var(--teal-dark);">event_available</span></div>
           <div class="stat-value">{{ patient.last_visit | display_date('No visits yet') }}</div>
@@ -459,7 +446,7 @@
           <div class="stat-trend" style="color:var(--text-muted);">{{ consultations[0].chief_complaint if consultations else 'No consultations recorded' }}</div>
         </div>
       </div>
-      <div class="col-md-3 col-sm-6">
+      <div class="col-md-4 col-sm-6">
         <div class="stat-card">
           <div class="stat-icon" style="background:#DBEAFE;"><span class="material-symbols-outlined" style="color:var(--info);">stethoscope</span></div>
           <div class="stat-value">Not assigned</div>
@@ -467,7 +454,7 @@
           <div class="stat-trend" style="color:var(--text-muted);">Not yet tracked</div>
         </div>
       </div>
-      <div class="col-md-3 col-sm-6">
+      <div class="col-md-4 col-sm-6">
         <div class="stat-card">
 {#- Was "Active Prescriptions — Not tracked". The card is now real, but it is
     deliberately not headed with the old label: this system records that medicine
@@ -478,14 +465,6 @@
           <div class="stat-value">{{ dispensing | length }}</div>
           <div class="stat-label">Items Dispensed</div>
           <div class="stat-trend" style="color:var(--text-muted);">{{ dispensing[0].label ~ ', ' ~ (dispensing[0].date_dispensed | display_date) if dispensing else 'Nothing dispensed yet' }}</div>
-        </div>
-      </div>
-      <div class="col-md-3 col-sm-6">
-        <div class="stat-card">
-          <div class="stat-icon" style="background:#EDE9FE;"><span class="material-symbols-outlined" style="color:var(--purple);">calendar_month</span></div>
-          <div class="stat-value">{{ next_appointment.appointment_date | display_date if next_appointment else 'None scheduled' }}</div>
-          <div class="stat-label">Upcoming Appointment</div>
-          <div class="stat-trend" style="color:var(--text-muted);">{{ (next_appointment.appointment_type or 'Appointment') if next_appointment else 'No upcoming appointment' }}</div>
         </div>
       </div>
     </div>
@@ -1299,24 +1278,6 @@
                   <td><span class="badge-status {{ appointment.status_badge_class }}">{{ appointment.status }}</span></td>
                   <td>
                     <div class="d-flex justify-content-end gap-1 align-items-center">
-{#- A booking nobody has arrived for can still be moved or called off from here,
-    because this is often where the question gets asked -- the patient rings up
-    about their own appointment while somebody has their profile open.
-
-    Both are links into the dialogs Appointment Scheduling already owns, not
-    copies of them. The reschedule dialog needs the whole clinic's slot load to
-    mark which times are taken, and the cancel dialog decides between Cancelled
-    and No-show from the appointment's own date; reproducing either here would
-    be a second implementation of a rule that has to stay identical. ?reschedule=
-    and ?cancel= open the existing ones on this appointment, and `back` brings
-    the operator straight back to this profile once it is done. #}
-{%- if appointment.is_open_booking %}
-                      <a href="{{ url_for(appointment_scheduling_endpoint, reschedule=appointment.id, back='profile:' ~ patient.id) }}"
-                         class="action-icon" title="Reschedule this appointment"><span class="material-symbols-outlined" style="font-size:18px;">edit_calendar</span></a>
-                      <a href="{{ url_for(appointment_scheduling_endpoint, cancel=appointment.id, back='profile:' ~ patient.id) }}"
-                         class="action-icon" style="color:var(--danger);"
-                         title="Cancel this appointment — the record is kept, its status becomes Cancelled"><span class="material-symbols-outlined" style="font-size:18px;">event_busy</span></a>
-{%- endif %}
 {#- The booking's notes, opened in place. Same treatment Consultation History
     above and Medicine Inventory's View action give a record with more in it
     than its row shows: a Bootstrap collapse over a detail row, built from the

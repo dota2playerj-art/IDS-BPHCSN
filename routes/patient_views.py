@@ -13,7 +13,6 @@ from models.appointments import (
     WAITING,
     find_active_queue_entry,
     get_appointments_for_patient,
-    get_next_appointment_for_patient,
 )
 from models.audit import (
     ACTION_RESTRICTED_WITHHELD,
@@ -600,7 +599,6 @@ def patient_profile_context(patient_id):
         "restrict_on": RESTRICT_ON,
         "restrict_off": RESTRICT_OFF,
         "appointments": get_appointments_for_patient(patient_id),
-        "next_appointment": get_next_appointment_for_patient(patient_id),
         "immunization": immunization,
         "show_immunizations": show_immunizations,
         "doses_by_consultation": _doses_by_consultation(immunization["records"]),
