@@ -757,9 +757,26 @@
     at all-time was the subtle failure available here: a sheet headed "March to
     June" would have carried the year's top diagnoses underneath it and read as
     though those were March-to-June's. #}
+{#- The basis line has to describe what was actually RANKED, not how many visits
+    the range holds, once a sealed consultation can be one of the latter without
+    being one of the former. Saying "across the 12 consultations recorded" above
+    a ranking drawn from 11 is the kind of quietly wrong figure this screen
+    exists not to print.
+
+    Worded the original way whenever nothing was held back, which is the ordinary
+    case -- "12 of the 12" is a sentence that makes a reader look for a
+    subtraction that is not there. The count is safe to state when there is one:
+    it names no patient, no date and no condition. See the note above
+    _rank_free_text() in models/consultations.py. #}
+{%- set withheld = consultation_report_stats.window.diagnoses_withheld %}
           <div class="panel-sub">
+{%- if withheld %}
+            Across {{ consultation_report_stats.window.total - withheld }} of the {{ consultation_report_stats.window.total }} consultation{{ '' if consultation_report_stats.window.total == 1 else 's' }}
+            recorded {{ window.start | display_date }} &ndash; {{ window.end | display_date }}
+{%- else %}
             Across the {{ consultation_report_stats.window.total }} consultation{{ '' if consultation_report_stats.window.total == 1 else 's' }}
             recorded {{ window.start | display_date }} &ndash; {{ window.end | display_date }}
+{%- endif %}
           </div>
           <div class="mt-2">
 {%- for entry in diags %}
@@ -769,7 +786,16 @@
               <span class="rank-count">{{ entry.count }}</span>
             </div>
 {%- else %}
+{#- Two different empty states, because they are two different facts and the
+    original sentence is false in the second. "Nothing was written up" and "what
+    was written up is all restricted" look identical from here, and a reader who
+    saw the first above a total of 3 would be looking at a screen contradicting
+    itself one panel across. #}
+{%- if withheld %}
+            <div class="empty-note">Every consultation in this range is restricted, so there is nothing to rank.</div>
+{%- else %}
             <div class="empty-note">No consultation was written up in this range.</div>
+{%- endif %}
 {%- endfor %}
           </div>
 {%- if diags %}
@@ -779,6 +805,24 @@
           <div class="basis-note mt-2">
             Grouped by the text entered, ignoring case. Free text is not coded, so two
             spellings of one condition count separately.
+{#- Said only when it applies, and said without the condition, the patient or the
+    date. A ranking that had quietly dropped records would be a figure nobody
+    could reconcile against the totals on the same screen. #}
+{%- if withheld %}
+            {{ withheld }} restricted consultation{{ '' if withheld == 1 else 's' }} in this range
+            {{ 'is' if withheld == 1 else 'are' }} not ranked here &mdash; a diagnosis marked
+            Restricted is withheld from this list however few or many times it occurs. Those
+            visits are still counted in the totals and the trend above.
+{%- endif %}
+          </div>
+{%- elif withheld %}
+{#- The ranking is empty and yet the range holds consultations: every one of them
+    is sealed. Without this the panel would print "No consultation was written up
+    in this range" directly beneath a total saying otherwise. #}
+          <div class="basis-note mt-2">
+            {{ withheld }} restricted consultation{{ '' if withheld == 1 else 's' }} in this range
+            {{ 'is' if withheld == 1 else 'are' }} not ranked here. Those visits are still counted
+            in the totals and the trend above.
           </div>
 {%- endif %}
         </div>

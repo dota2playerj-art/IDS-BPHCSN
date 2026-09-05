@@ -512,6 +512,70 @@ def _ranked_block(title, entries, label_key, count_key, heads, note=None,
     )
 
 
+# ---------------------------------------------------------------------------
+# WHAT A DIAGNOSIS RANKING IN AN EXPORT MAY SAY ABOUT WHAT IT LEFT OUT
+#
+# A consultation the clinician has sealed is counted in this range's totals and
+# its trend, and is kept out of the diagnosis ranking entirely -- the rule and
+# the reason are in models/consultations.py, above _rank_free_text(). These three
+# helpers exist so the two blocks below state that consistently.
+#
+# THEY ARE SHARED BECAUSE THE WORKBOOK AND THE PDF ARE THE SAME ASSEMBLY. Both
+# export routes for both roles -- four of them, plus Screen 18's three -- build
+# from the identical context through the identical functions, which is what stops
+# an Administrator's workbook and a Barangay Official's PDF disagreeing about
+# what the barangay recorded. A sentence typed into one of the two ranking blocks
+# and not the other would reintroduce exactly that split.
+#
+# None of the three ever emits a diagnosis, a date or a patient. A count is the
+# whole of what they publish.
+# ---------------------------------------------------------------------------
+def _ranked_count(consultations):
+    """How many of the range's consultations the diagnosis ranking was drawn from.
+
+    The range total less the sealed ones. This is the number a "ranked from N"
+    sentence has to carry: the plain total was right until a record could be in
+    the range without being in the ranking, and an export whose stated basis its
+    own table does not meet cannot be reconciled by whoever reads it later.
+    """
+    window = consultations["window"]
+    return window["total"] - window["diagnoses_withheld"]
+
+
+def _withheld_note(consultations):
+    """The sentence appended to a ranking's note when something was held back.
+
+    Empty string when nothing was, which is the ordinary case -- a standing
+    paragraph about a rule that did not apply is a paragraph readers learn to
+    skip, and it would appear on every export this health centre ever produced.
+    """
+    withheld = consultations["window"]["diagnoses_withheld"]
+    if not withheld:
+        return ""
+    return (
+        f" {withheld} restricted consultation"
+        f"{'' if withheld == 1 else 's'} in this range "
+        f"{'is' if withheld == 1 else 'are'} not ranked here: a diagnosis the "
+        "clinician has marked Restricted is withheld from this list however few "
+        "or many times it occurs. Those visits are still counted in the totals "
+        "and the trend."
+    )
+
+
+def _ranking_empty(consultations):
+    """The empty state, which is two different facts and must not be one sentence.
+
+    "Nothing was written up in this range" and "everything written up in this
+    range is restricted" produce the same empty table, and the first is false in
+    the second case -- printed directly beneath a total saying otherwise, in a
+    document somebody files.
+    """
+    if consultations["window"]["diagnoses_withheld"]:
+        return ("Every consultation in this range is restricted, so there is "
+                "nothing to rank. Those visits are still counted in the totals.")
+    return "No consultation was written up in this range."
+
+
 def _month_change_rows(change, subject):
     """The "vs last month" figure Screen 18's cards print, as rows.
 
@@ -608,8 +672,9 @@ def _diagnoses(context):
             note=("Ranked from this range's consultations only. Diagnosis is prose a "
                   "health worker typed and is not coded against ICD or any other "
                   "classification this system holds, so entries are grouped ignoring "
-                  "case and two spellings of one condition count separately."),
-            empty="No consultation was written up in this range.",
+                  "case and two spellings of one condition count separately."
+                  + _withheld_note(consultations)),
+            empty=_ranking_empty(consultations),
         ),
         _ranked_block(
             "Most common presenting complaints in this range",
@@ -618,8 +683,19 @@ def _diagnoses(context):
             empty="No consultation was written up in this range.",
         ),
         figures("Basis", [
-            ("Consultations these are ranked from", consultations["window"]["total"],
+            # What the DIAGNOSIS ranking was actually drawn from, which is the
+            # range's consultations less any that are sealed. It was the plain
+            # total until a sealed record could be in one and not the other, and
+            # a workbook stating a basis its own table does not meet is the kind
+            # of figure nobody can reconcile six months later.
+            ("Consultations these are ranked from",
+             consultations["window"]["total"]
+             - consultations["window"]["diagnoses_withheld"],
              f"{display_date(window['start'])} to {display_date(window['end'])}"),
+            ("Consultations recorded in this range",
+             consultations["window"]["total"],
+             "Includes any restricted consultation, which is counted here and in "
+             "the totals but is not ranked by diagnosis"),
         ]),
     ]
 
@@ -661,12 +737,12 @@ def _concerns(context):
             "Diagnoses recorded in this range",
             consultations["window"]["top_diagnoses"], "label", "count",
             ("Diagnosis", "Consultations"),
-            note=(f"From the {consultations['window']['total']} consultation"
-                  f"{'' if consultations['window']['total'] == 1 else 's'} written up "
+            note=(f"From {_ranked_count(consultations)} consultation"
+                  f"{'' if _ranked_count(consultations) == 1 else 's'} written up "
                   f"between {display_date(window['start'])} and "
                   f"{display_date(window['end'])}. Grouped by the text entered, "
-                  "ignoring case."),
-            empty="No consultation was written up in this range.",
+                  "ignoring case." + _withheld_note(consultations)),
+            empty=_ranking_empty(consultations),
         ),
         figures("Register totals", [
             ("Patients on the register", conditions["cohort_size"], "Today"),

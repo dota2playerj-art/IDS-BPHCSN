@@ -460,6 +460,49 @@ def get_consultation_report(limit=None):
 # report is read at a glance; beyond about five the tail is noise.
 TOP_DIAGNOSIS_LIMIT = 5
 
+# ---------------------------------------------------------------------------
+# A SEALED DIAGNOSIS IS NOT RANKED, AT ANY COUNT
+#
+# The seal on a consultation withholds its diagnosis from everyone but the
+# Administrator on the screens that show that record. This module builds
+# something different -- a ranking of diagnosis TEXT across many records -- and
+# an aggregate looked like a safe place for a sealed value to go, because no
+# patient is named in it.
+#
+# It is not, and the reason is the size of the count rather than the absence of a
+# name. A ranking prints the words a clinician typed. A common diagnosis appears
+# there with a count in double figures and tells a reader nothing about anybody;
+# a rare one appears with a count of 1, and a count of 1 is not a statistic, it is
+# a record with the name filed off. Reports & Analytics carries a date range, and
+# a reader who can set that range to a single day has narrowed one sealed
+# diagnosis to the visits of that day. RA 11166 attaches criminal penalties to
+# disclosing HIV status without consent, and it does not stop applying because
+# the disclosure arrived as a row in a table.
+#
+# So the rule is not "exclude it when the count is low". Any threshold is a
+# promise about re-identification that this system is in no position to make, and
+# it would have to be re-argued every time a report gained a filter. Sealed
+# diagnoses are excluded from the ranking entirely, at every count, and the
+# exclusion lives HERE -- in the one function every reader of these figures goes
+# through -- rather than in the screens. There are nine surfaces printing this
+# ranking (the Administrator's Reports & Analytics and the Barangay Official's,
+# each as a screen, an Excel workbook and a PDF, plus the Official's Community
+# Reports as the same three), and a rule applied at nine call sites is a rule
+# with nine chances to be forgotten.
+#
+# WHAT IS STILL COUNTED. The visit, in `total`, in `patients_seen` and in the
+# trend; and its chief complaint, in the complaints ranking beside this one. Only
+# the diagnosis text is held back, which is exactly what the seal covers on every
+# other screen -- see DOCTOR_ONLY_FIELDS.
+#
+# The number withheld is published as `diagnoses_withheld` and said out loud
+# wherever the ranking is printed, because every one of those surfaces also
+# states how many consultations the ranking was drawn from. Silently ranking
+# fewer records than that sentence claims would make the report quietly wrong,
+# which is the failure this project refuses on every other screen. A count
+# discloses nothing: it names no patient, no date and no condition.
+# ---------------------------------------------------------------------------
+
 
 def _rank_free_text(rows, limit):
     """Group free-text clinical entries case-insensitively, most common first.
@@ -512,6 +555,16 @@ def get_consultation_stats(months=6, limit=TOP_DIAGNOSIS_LIMIT, on_date=None,
       only. Leaving them at all-time would have been the subtle failure here: a
       report headed "March to June" would have listed the year's top complaints
       underneath it and read as though those were March-to-June's.
+
+    SEALED CONSULTATIONS
+    --------------------
+    A consultation the clinician has marked Restricted contributes to every
+    figure here EXCEPT the two diagnosis rankings, which it is kept out of
+    entirely -- at both levels, at any count. `diagnoses_withheld` beside each
+    ranking says how many were held back, so a caller printing "ranked from N
+    consultations" can say what it actually ranked. The long note above
+    _rank_free_text() sets out why a count of 1 in an unattributed ranking is
+    still a disclosure.
     """
     reference = on_date or today()
     window = resolve_range(start=start, end=end, months=months, on_date=reference)
@@ -533,7 +586,22 @@ def get_consultation_stats(months=6, limit=TOP_DIAGNOSIS_LIMIT, on_date=None,
     patients_seen = conn.execute(
         "SELECT COUNT(DISTINCT patient_id) FROM consultations"
     ).fetchone()[0]
-    diagnoses = [row[0] for row in conn.execute("SELECT diagnosis FROM consultations")]
+    # A SEALED CONSULTATION'S DIAGNOSIS IS NOT RANKED HERE. See the block above
+    # _rank_free_text() for why an aggregate is not a safe place for one.
+    diagnoses = [
+        row[0] for row in conn.execute(
+            "SELECT diagnosis FROM consultations WHERE is_restricted = 0"
+        )
+    ]
+    withheld_total = conn.execute(
+        "SELECT COUNT(*) FROM consultations WHERE is_restricted = 1"
+    ).fetchone()[0]
+    # THE COMPLAINTS QUERY IS DELIBERATELY NOT FILTERED, and the asymmetry is the
+    # point rather than an oversight. The seal covers DOCTOR_ONLY_FIELDS and
+    # nothing else: chief_complaint is shown in full to Health Center Staff on a
+    # sealed record's own profile panel, so withholding it from a ranking nobody
+    # can attribute to a patient would protect nothing and would quietly
+    # understate what the barangay presented with.
     complaints = [
         row[0] for row in conn.execute("SELECT chief_complaint FROM consultations")
     ]
@@ -542,9 +610,18 @@ def get_consultation_stats(months=6, limit=TOP_DIAGNOSIS_LIMIT, on_date=None,
     # text (it is the day of the visit, not a UTC instant), so the range compares
     # against its leading ten characters directly -- no timezone conversion, and
     # a row carrying a time still lands on its own day.
+    #
+    # is_restricted comes along so the diagnosis ranking can drop the sealed rows
+    # WITHOUT the visit itself vanishing. The filter is applied where the ranking
+    # is built, a few lines below, and deliberately not in this WHERE clause: a
+    # sealed consultation still happened, was still attended, and still belongs
+    # in the total, in patients_seen and in the month it falls in. Filtering here
+    # would have made a sealed visit disappear from the barangay's activity
+    # figures altogether, which is a second, quieter falsehood -- and one that
+    # would have moved the trend line under a card that no longer matched it.
     scoped = conn.execute(
         """
-        SELECT diagnosis, chief_complaint, patient_id,
+        SELECT diagnosis, chief_complaint, patient_id, is_restricted,
                substr(consultation_date, 1, 7) AS month
         FROM consultations
         WHERE substr(consultation_date, 1, 10) BETWEEN ? AND ?
@@ -572,6 +649,14 @@ def get_consultation_stats(months=6, limit=TOP_DIAGNOSIS_LIMIT, on_date=None,
         for start_day, _, label in window["months"]
     ]
 
+    # The window's rankable diagnoses, and how many were held back from them.
+    # Counted rather than merely dropped, because every screen and export that
+    # prints this ranking also prints the number of consultations it was ranked
+    # from, and that sentence would otherwise be making a claim the ranking no
+    # longer meets. What is published is a count and never a hint of content.
+    scoped_diagnoses = [row["diagnosis"] for row in scoped if not row["is_restricted"]]
+    scoped_withheld = sum(1 for row in scoped if row["is_restricted"])
+
     return {
         "total": total,
         "recorded_this_month": by_month.get(current_month, 0),
@@ -580,6 +665,7 @@ def get_consultation_stats(months=6, limit=TOP_DIAGNOSIS_LIMIT, on_date=None,
         "trend": trend,
         "top_diagnoses": _rank_free_text(diagnoses, limit),
         "top_complaints": _rank_free_text(complaints, limit),
+        "diagnoses_withheld": withheld_total,
         "window": {
             "start": window["start"],
             "end": window["end"],
@@ -587,10 +673,14 @@ def get_consultation_stats(months=6, limit=TOP_DIAGNOSIS_LIMIT, on_date=None,
             "total": len(scoped),
             "patients_seen": len({row["patient_id"] for row in scoped}),
             "trend": trend,
-            "top_diagnoses": _rank_free_text(
-                [row["diagnosis"] for row in scoped], limit),
+            "top_diagnoses": _rank_free_text(scoped_diagnoses, limit),
             "top_complaints": _rank_free_text(
                 [row["chief_complaint"] for row in scoped], limit),
+            # How many of this range's `total` consultations were left out of the
+            # diagnosis ranking above -- and only that ranking. The complaints
+            # beside it, the total, patients_seen and the trend all still count
+            # every one of them.
+            "diagnoses_withheld": scoped_withheld,
         },
     }
 
