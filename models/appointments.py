@@ -1,9 +1,11 @@
 """Appointment queries, including the live consultation queue on Screen 08.
 
-A walk-in and a booked visit are the same kind of record here: a walk-in is an
-appointment created at the moment the patient arrives. Everything the queue shows
-therefore comes from one table and one query, rather than a union of two sources
-that could disagree about who is next.
+Every visit is a walk-in: an appointment row created at the moment the patient
+arrives at the desk. This system booked visits ahead until 2026-09-05 and the
+older rows in the table still carry the date and the time they were booked for,
+so both shapes read out of one table and one query rather than a union of two
+sources that could disagree about who is next. See utils/unavailable.py
+`advance_booking` for why the booking half went.
 
 ONE CONSULTATION AT A TIME
 --------------------------
@@ -67,20 +69,16 @@ READY_BADGE_CLASS = "badge-ready"
 # genuinely returns the same day gets a fresh walk-in record instead.
 CHECK_IN_FROM_STATUSES = PENDING_STATUSES
 
-# appointment_type recorded when the patient had no prior booking.
+# appointment_type recorded for a patient arriving at the desk, which is now
+# every patient.
 WALK_IN_TYPE = "Walk-in Consultation"
 
-# The status an advance booking is created with. Deliberately not Waiting: that
-# one means the patient is physically in the building, and _apply_queue_flow()
-# will put anyone holding it into the line. A booking made for next Tuesday must
-# not appear in a queue until Tuesday, and then only once they arrive -- which is
-# what check_in_patient() converts it for.
-BOOKED_STATUS = "Scheduled"
-
-# The granularity bookings are taken at. Half-hour slots rather than a free-text
-# time for two reasons: the operator cannot mistype 0930 as 09:3, and "another
-# patient already has this slot" becomes an exact comparison instead of a fuzzy
-# one about how near two times have to be to collide.
+# The granularity a clinic day is measured in. It was the size of a bookable
+# slot; advance booking is gone and nothing generates slots any more, but the
+# constant is NOT dead -- models/settings.py imports it to refuse a clinic day
+# shorter than one of these, which is what stops Screen 13 storing a facility
+# open for twenty minutes. It stays here, where the clinic day is described,
+# rather than moving to the one module that now reads it.
 SLOT_MINUTES = 30
 
 

@@ -193,7 +193,7 @@
          ============================
          A way back INTO a visit already under way, not a second way to start
          one. Recording a consultation belongs to the appointment it came from,
-         and Appointment Scheduling -> Start Consultation -> Record Consultation
+         and Patient Queue -> Start Consultation -> Record Consultation
          stays the route that begins one; that is the standard arrangement and
          this does not replace it. What it fixes is the return trip: a clinician
          who navigated away mid-visit had to reload the queue and find the row
@@ -238,7 +238,7 @@
       <div class="panel-title" style="font-size:15px;">No active consultation right now</div>
       <div class="panel-sub">
         Nobody is currently being seen. A consultation starts from
-        <a href="{{ url_for(appointment_scheduling_endpoint) }}" style="color:var(--teal-dark); font-weight:600;">Appointment Scheduling</a>,
+        <a href="{{ url_for(appointment_scheduling_endpoint) }}" style="color:var(--teal-dark); font-weight:600;">Patient Queue</a>,
         by calling in a patient who has checked in; it will appear here while it is open.
       </div>
 {%- endif %}

@@ -171,7 +171,7 @@ def sms_notifications_context(compose=None, errors=None):
         },
         **_gateway_context(),
         # The individual half of this screen: one message to one patient about
-        # one of their own appointments, sent from Appointment Scheduling or the
+        # one of their own appointments, sent from the Patient Queue or the
         # Patient Profile rather than from here. It is shown here because this is
         # where somebody asking "what has this system texted, and to whom?" comes
         # to look, and an answer that covered only broadcasts would be a partial

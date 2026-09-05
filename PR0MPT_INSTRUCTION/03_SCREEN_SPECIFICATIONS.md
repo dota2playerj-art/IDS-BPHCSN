@@ -379,45 +379,45 @@ Expiration date required.
 
 # SCREEN 08
 
-## Appointment Scheduling
+## Patient Queue
 
 Purpose
 
-Manage appointments.
+Work today's queue: record who has arrived, in the order they arrived, and see
+what each day of the month held.
+
+Renamed from **Appointment Scheduling** on 2026-09-05, when advance booking was
+retired. The screen no longer schedules anything; the name now says what it is.
+The URL, the endpoint and the template file keep their old names.
 
 Components
 
-Calendar
+Calendar (a record of each day's visits — it is not booked against)
 
-Upcoming Appointments
-
-Walk-in Queue
-
-Today's Schedule
+Today's Queue
 
 Buttons
 
-Schedule
+Check In Patient
 
-Reschedule
+Start Consultation
 
-Cancel
+Record Consultation
 
-Complete
+Mark Completed
 
 Fields
 
 Patient
 
-Date
-
-Time
-
-Purpose
-
-Assigned Staff
+Reason for visit
 
 Status
+
+Removed with advance booking: the Upcoming Appointments panel, the Upcoming
+Reminders strip, and the Schedule / Reschedule / Cancel buttons and their three
+dialogs, along with the Date, Time and Assigned Staff fields they collected. See
+`utils/unavailable.py` `advance_booking`, which the screen itself quotes.
 
 ---
 
@@ -866,7 +866,7 @@ Authorized Users
 
 Entry Points
 
-Record — Appointment Scheduling, on a queue entry moved to In Consultation.
+Record — Patient Queue, on a queue entry moved to In Consultation.
 
 Edit — Patient Profile, Consultation History tab, Edit action.
 
@@ -1176,7 +1176,7 @@ of resetting it. One comparator serves both (`static/js/table-sort.js`); each sc
 its own column list. The order in force is named on the Sort button, on the chosen option, and in
 the line beside the table, all three written from one state.
 
-Appointment Scheduling's Sort stays disabled, and its reason changed from "not implemented" to
+the Patient Queue's Sort stays disabled, and its reason changed from "not implemented" to
 what actually stops it: the queue is already in the order that answers who may be brought in next
 — in consultation, then waiting, then not yet arrived, then resolved — and re-sorting it would
 discard the one thing that list is for. See the `sort` reason in `utils/unavailable.py`.
@@ -1241,7 +1241,7 @@ in `utils/unavailable.py` is retired.
 
 This section previously stated that "Export and print are not implemented anywhere in this
 project" and that the controls were decorative. That is no longer true of any of them. Patient
-Records, Medicine Inventory, Appointment Scheduling, User Management, Audit Logs, Reports &
+Records, Medicine Inventory, Patient Queue, User Management, Audit Logs, Reports &
 Analytics and Community Reports each serve a real `.xlsx` and a real `.pdf` at their own route.
 Each file carries a cover sheet naming its scope, and each states that it holds the full list
 rather than the list as filtered on screen, because these screens filter in the browser and the
@@ -1278,11 +1278,12 @@ by module, and exports them.
   right. The inventory document a reader actually wants is Export PDF in the toolbar, which is
   built. See `09_IDS-BPHCSN_UI_Architecture_FROM-CLAUDE.md` §12.
 
-**Screen 08 — one New Appointment button, not five.** The screen carried five controls opening the
-same booking dialog; four were removed and the empty-state prose that named them was rewritten to
-report state instead of issuing instructions. The survivor sits in the queue toolbar beside Check
-In Patient. The dialog itself is titled "Schedule Appointment". See §13 of the architecture
-document.
+**Screen 08 — advance booking retired, and the screen renamed Patient Queue.** This entry used to
+record the consolidation of five New Appointment buttons down to one. That one has since gone with
+the feature: on 2026-09-05 advance booking was removed outright, because a barangay health center
+of this size sees patients in the order they arrive rather than at an hour agreed weeks before.
+What is left is a walk-in queue and a calendar that reports what each day held. The screen says so
+itself, quoting `utils/unavailable.py` `advance_booking`. See §13 of the architecture document.
 
 **Screens 02 and 14 — a Continue Consultation shortcut.** Both dashboards name whoever is
 currently In Consultation and link straight to that appointment's write-up form, or state that

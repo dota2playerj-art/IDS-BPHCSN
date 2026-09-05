@@ -43,7 +43,7 @@ The **Primary Role(s)** column is not a description kept in step by hand. It is 
 | 5 | Patient Profile | `patient_profile.html` | Administrator, Health Center Staff | A single patient's full record across six tabs (personal, medical, consultation, medicine, vaccination, appointment history). |
 | 6 | Medicine Inventory | `medicine_inventory.html` | Administrator, Health Center Staff | Track medicine stock, expiration, and low-stock/near-expiry status. |
 | 7 | Add/Edit Medicine | `add_edit_medicine.html` | Administrator, Health Center Staff | Create or update a medicine record's details and stock. |
-| 8 | Appointment Scheduling | `appointment_scheduling.html` | Administrator, Health Center Staff | Manage the appointment calendar, walk-in queue, and the live consultation queue. |
+| 8 | Patient Queue | `appointment_scheduling.html` | Administrator, Health Center Staff | Check patients in as they arrive, work the live consultation queue, and read the month's calendar. Renamed from Appointment Scheduling on 2026-09-05; the file name is unchanged. |
 | 9 | SMS Notifications | `sms_notifications.html` | Administrator, Health Center Staff, Barangay Official | Compose, send, and record SMS broadcasts to a real recipient audience. Specified as "Community Notifications" in `03_SCREEN_SPECIFICATIONS.md`; same screen. |
 | 10 | Reports & Analytics | `reports_analytics.html` | Administrator, Barangay Official | Consultation, inventory, registration, and immunisation reporting, over a selectable date range. Export Excel, Export PDF and Print are all built. |
 | 11 | User Management | `user_management.html` | Administrator only | List every account that can sign in, with the screens each role's guards admit it to. Account writes are built: Add User, Edit User, Reset Password, and Deactivate/Reactivate, with the last-Administrator guard on the last two. |
@@ -100,7 +100,7 @@ MAIN MENU
 ├── Patient Records
 ├── Register Patient
 ├── Medicine Inventory   [low-stock count badge, omitted when zero]
-├── Appointment Scheduling
+├── Patient Queue
 ├── SMS Notifications
 └── Reports & Analytics
 
@@ -111,7 +111,7 @@ ADMINISTRATION
 ```
 
 - **Navigation hierarchy:** Two sidebar groups — "Main Menu" (operational) and "Administration" (governance). This is the only role for which the Administration group is rendered.
-- **Accessible screens (15 of 21):** Login, Administrator Dashboard, Patient Records, Register Patient, Patient Profile, Medicine Inventory, Add/Edit Medicine, Appointment Scheduling, Record / Edit Consultation, SMS Notifications, Reports & Analytics, User Management, Audit Logs, Settings, My Account.
+- **Accessible screens (15 of 21):** Login, Administrator Dashboard, Patient Records, Register Patient, Patient Profile, Medicine Inventory, Add/Edit Medicine, Patient Queue, Record / Edit Consultation, SMS Notifications, Reports & Analytics, User Management, Audit Logs, Settings, My Account.
 - **Restricted screens:** The two other dashboards, and the four Barangay Official screens — Health Programs, Vaccination Campaigns, Community Reports, Notifications. **The Administrator does not have access to every screen.** The earlier claim in this document that the role reached "all 15 screens" was never true of the built system: the community-facing screens are guarded to the Barangay Official alone.
 
 ### Health Center Staff
@@ -124,12 +124,12 @@ MAIN MENU
 ├── Patient Records
 ├── Register Patient
 ├── Medicine Inventory   [low-stock count badge, omitted when zero]
-├── Appointment Scheduling
+├── Patient Queue
 └── SMS Notifications
 ```
 
 - **Navigation hierarchy:** Single group, operational only — no "Administration" section is rendered for this role.
-- **Accessible screens (11 of 21):** Login, Health Center Staff Dashboard, Patient Records, Register Patient, Patient Profile, Medicine Inventory, Add/Edit Medicine, Appointment Scheduling, Record / Edit Consultation, SMS Notifications, My Account.
+- **Accessible screens (11 of 21):** Login, Health Center Staff Dashboard, Patient Records, Register Patient, Patient Profile, Medicine Inventory, Add/Edit Medicine, Patient Queue, Record / Edit Consultation, SMS Notifications, My Account.
 - **Restricted screens:** Reports & Analytics, User Management, Audit Logs, Settings, and all four Barangay Official screens.
 - **Resolved:** an earlier note here hedged that staff might get SMS "send/view only, not necessarily full broadcast history depending on future rule confirmation". The rule is settled in code — Health Center Staff render the same SMS screen as the Administrator, including the full broadcast history, and may send. `routes/staff.py` and `routes/admin.py` build it from one shared context builder.
 
@@ -150,7 +150,7 @@ MAIN MENU
 
 - **Navigation hierarchy:** Single group, community-facing. No Administration section. No badges on any item — see §1.1.
 - **Accessible screens (9 of 21):** Login, Barangay Official Dashboard, SMS Notifications, Health Programs, Vaccination Campaigns, Community Reports, Reports & Analytics, Notifications, My Account.
-- **Restricted screens:** Patient Records, Patient Profile, Register Patient, Record / Edit Consultation, Medicine Inventory, Add/Edit Medicine, Appointment Scheduling, User Management, Audit Logs, Settings, and the other two dashboards.
+- **Restricted screens:** Patient Records, Patient Profile, Register Patient, Record / Edit Consultation, Medicine Inventory, Add/Edit Medicine, Patient Queue, User Management, Audit Logs, Settings, and the other two dashboards.
 - **The Barangay Official reaches no clinical screen.** This is the system's central access rule, and it holds against the enforced guards independently of this document: `accessible_screens("Barangay Official")` walks the live `url_map` and returns exactly the seven guarded screens above — no patient record, no patient profile, no consultation, no inventory.
 - The "Announcements" item that this section previously listed does not exist. See §1.1.
 
@@ -166,10 +166,10 @@ Login
    → Patient Records → Patient Profile → (Edit patient / Consultation History → View or Edit)
    → Register Patient → (Save → back to Patient Records)
    → Medicine Inventory → Add/Edit Medicine → (Save → back to Inventory)
-   → Appointment Scheduling → (Book / Reschedule / Cancel / Check in)
-                            → Start Consultation → Record Consultation
-                                                 → (Save → patient profile,
-                                                    queue entry Completed)
+   → Patient Queue → (Check in)
+                   → Start Consultation → Record Consultation
+                                        → (Save → patient profile,
+                                           queue entry Completed)
    → SMS Notifications → (Compose → Send → History)
    → Reports & Analytics → (View over a date range; Export Excel / Export PDF / Print)
    → User Management → (View roster and derived permissions; writes not implemented)
@@ -185,8 +185,8 @@ Login
  → Health Center Staff Dashboard
    → Patient Records → Patient Profile → Consultation History → (View / Edit)
    → Register Patient → (Save)
-   → Appointment Scheduling → (Book / Reschedule / Cancel / Check in)
-                            → Start Consultation → Record Consultation
+   → Patient Queue → (Check in)
+                   → Start Consultation → Record Consultation
    → Medicine Inventory → Add/Edit Medicine
    → SMS Notifications → (Compose → Send → History)
  → Logout
@@ -250,12 +250,12 @@ which is the same axis §2 already scopes the sidebar on.
 | Component | Reused In |
 |-----------|-----------|
 | **Dashboard/Overview Cards** (white, 16px radius, soft shadow, 24px padding) | All three dashboards, Reports summary tiles |
-| **Data Table** (rounded, white, soft shadow, alternating row hover, status badges, action buttons, search/filter/sort/pagination) | Patient Records, Medicine Inventory, Appointment Scheduling, User Management, Audit Logs, Reports (tabular sections) |
+| **Data Table** (rounded, white, soft shadow, alternating row hover, status badges, action buttons, search/filter/sort/pagination) | Patient Records, Medicine Inventory, Patient Queue, User Management, Audit Logs, Reports (tabular sections) |
 | **Search Bar** | Header (global patient search — Administrator and Health Center Staff only; it submits to Patient Records and that screen's own filter does the matching), Patient Records, Medicine Inventory tables |
-| **Advanced Filter** | Patient Records, Medicine Inventory, Audit Logs, Appointment Scheduling |
+| **Advanced Filter** | Patient Records, Medicine Inventory, Audit Logs, Patient Queue |
 | **Buttons** (Primary/Secondary/Danger/Success, Bootstrap-styled, 12px radius) | Every screen — form submissions, table actions, modals |
 | **Forms** (48px input height, 12px radius, label-above, Bootstrap validation) | Register Patient, Add/Edit Medicine, Appointment scheduling form, Record / Edit Consultation, SMS composer, Login. *(Settings and User Management carry form markup but no working form — see §1.)* |
-| **Modals** | Schedule Appointment (booking), Check In Patient, Cancel appointment, Reschedule appointment, Change Patient Status, Change Item Status (Medicine Inventory archive — see §12), Compose Broadcast, Confirm Logout. Every one of them follows the shape Patient Records' status dialog set: centred, 16px radius, header / body / footer, and where there is a choice to make the submit buttons *are* the choices. *(There is no Reset Password modal — password reset is not implemented.)* |
+| **Modals** | Check In Patient, Change Patient Status, Change Item Status (Medicine Inventory archive — see §12), Compose Broadcast, Confirm Logout. Every one of them follows the shape Patient Records' status dialog set: centred, 16px radius, header / body / footer, and where there is a choice to make the submit buttons *are* the choices. *(There is no Reset Password modal — password reset is not implemented.)* |
 | **Pagination** | Patient Records, Medicine Inventory, User Management, Audit Logs tables |
 | **Status Badges** (Success/Warning/Danger/Info/Neutral, 999px radius) | Patient status, medicine stock status, appointment status, user status, notification delivery status |
 | **Alerts/Toasts** | Low-stock warnings, save/update confirmations, failed SMS send notices |
@@ -264,7 +264,7 @@ which is the same axis §2 already scopes the sidebar on.
 | **Profile Dropdown** | Header — global, all roles (shows name, role, logout) |
 | **Breadcrumbs** | Patient Profile, Add/Edit Medicine, Settings sub-sections (to show hierarchy back to parent list) |
 | **SMS Composer / Character Counter / Recipient Selector** | SMS Notifications (Screen 09) only |
-| **Calendar Widget** | Appointment Scheduling |
+| **Calendar Widget** | Patient Queue |
 | **Tabs** | Patient Profile (Personal/Medical/Consultation/Medicine/Vaccination/Appointment history — six tabs, as specified), Settings sections |
 | **Untracked Notice** (a labelled statement, in place of a figure, naming what has no data source and why) | Reports & Analytics, Health Programs, Vaccination Campaigns, User Management, Audit Logs, Patient Records (Prenatal card), both community dashboards |
 | **EPI Schedule Checklist** (one row per scheduled dose; recorded doses render locked with the date given, never as a checkbox) | Record / Edit Consultation only — see §9 and §10 |
@@ -281,7 +281,7 @@ which is the same axis §2 already scopes the sidebar on.
 | **Icons** | Material Symbols Outlined exclusively. Never mix icon libraries. Consistent sizing throughout. |
 | **Card Style** | White background, 16px radius, soft shadow, 24px padding. Cards never touch — maintain consistent gutter. |
 | **Form Style** | 48px input height, 12px radius, label above input, light-gray placeholder text, teal border on focus, Bootstrap validation styling (no custom validation UI). |
-| **Table Style** | Rounded (16px), white, soft shadow, alternating row hover, status badges in dedicated column, action icons in dedicated column. Search and filter are present on every data table; **sort** is present where more than one order is useful (Patient Records, Medicine Inventory) and deliberately absent where the query's order is itself the answer (Appointment Scheduling's queue) — see §15. **Pagination is not present on any table**: every row the query returns is already on the page. |
+| **Table Style** | Rounded (16px), white, soft shadow, alternating row hover, status badges in dedicated column, action icons in dedicated column. Search and filter are present on every data table; **sort** is present where more than one order is useful (Patient Records, Medicine Inventory) and deliberately absent where the query's order is itself the answer (the Patient Queue's table) — see §15. **Pagination is not present on any table**: every row the query returns is already on the page. |
 | **Button Style** | Primary = filled teal/white text; Secondary = white/teal border; Danger = red; Success = green. All rounded 12px, Bootstrap-based. |
 | **Border Radius** | Cards 16px · Buttons 12px · Inputs 12px · Badges 999px · Tables 16px. No exceptions. |
 | **Shadows** | Subtle/soft only — never dramatic or heavy drop shadows. |
@@ -300,7 +300,7 @@ which is the same axis §2 already scopes the sidebar on.
 | Patient Profile | Nav Tabs/Pills, Card, Table (history logs), Breadcrumb, Button |
 | Medicine Inventory | Table, Badge (stock/expiry status), Progress (stock level bar), Modal (quick edit), Pagination |
 | Add/Edit Medicine | Form, Modal (if inline) or standalone page, Button, Alert (validation) |
-| Appointment Scheduling | Calendar (custom component, not native Bootstrap), List Group (queue/today's schedule), Badge (status), Modal (schedule/reschedule) |
+| Patient Queue | Calendar (custom component, not native Bootstrap), List Group (today's queue), Badge (status), Modal (check in) |
 | SMS Notifications | Form (message editor), Dropdown/Checkbox group (recipients), Badge (delivery status), Table (history), Toast (send confirmation) |
 | Record / Edit Consultation | Form (vitals + clinical record), Card (sectioned: patient banner / vitals / record / immunisations / follow-up), Checkbox group (EPI doses), Badge (dose status: Completed / Due Now / Upcoming / Overdue), Alert (validation) |
 | Health Programs | Card, Table (programme membership), Badge, Alert (untracked notice) |
@@ -339,7 +339,7 @@ Use this checklist for every remaining screen, in order:
 
 **Build order (historical).** All 20 screens are built; this list is kept as the record of the order they were built in, not as remaining work:
 
-1. Patient Records → 2. Register Patient → 3. Patient Profile → 4. Medicine Inventory → 5. Add/Edit Medicine → 6. Appointment Scheduling → 7. SMS Notifications → 8. Reports & Analytics → 9. User Management → 10. Audit Logs → 11. Settings → 12. Health Center Staff Dashboard → 13. Barangay Official Dashboard → 14. Record / Edit Consultation → 15. Health Programs → 16. Vaccination Campaigns
+1. Patient Records → 2. Register Patient → 3. Patient Profile → 4. Medicine Inventory → 5. Add/Edit Medicine → 6. Patient Queue → 7. SMS Notifications → 8. Reports & Analytics → 9. User Management → 10. Audit Logs → 11. Settings → 12. Health Center Staff Dashboard → 13. Barangay Official Dashboard → 14. Record / Edit Consultation → 15. Health Programs → 16. Vaccination Campaigns
 
 Community Reports and Notifications were built as UI alongside the Barangay Official Dashboard and have not been reconciled against real data. They are the outstanding work, not new screens.
 
@@ -497,40 +497,43 @@ which case it is removed and its reason is deleted with it.**
 
 ---
 
-## 13. Design Decision — One Booking Control, and a Way Back Into a Consultation
+## 13. Design Decision — No Booking Control at All, and a Way Back Into a Consultation
 
-### Appointment Scheduling has exactly one New Appointment control
+### Screen 08 does not book a future visit, and is called the Patient Queue
 
-It had five, all opening the same dialog: the calendar header, the queue toolbar, the queue empty
-state, the upcoming toolbar and the upcoming empty state. Five identical primary buttons is five
-competing primary actions, which is the same as none.
+**This section used to argue about how many New Appointment buttons the screen should have.** It
+had five, all opening the same dialog; that was cut to one, in the queue toolbar beside Check In
+Patient, and the empty-state prose that named the other four was rewritten rather than left
+pointing at controls that had gone.
 
-The survivor is in the **queue toolbar, beside Check In Patient**, because that pairing is the
-decision a desk actually makes: Check In is for somebody standing there now, New Appointment
-commits to a day that has not come yet. It is deliberately styled as the *secondary* button of
-that pair — Check In Patient remains the screen's single primary action, and promoting both would
-recreate the problem the consolidation solved.
+On **2026-09-05** the survivor went too, and so did the feature. The adviser's point was that a
+government barangay health center does not let a patient choose their own hour three weeks out —
+people walk in, and the desk works a queue. Everything that booked, moved or called off a future
+visit was removed: eight routes, three dialogs, the Upcoming Appointments panel, the Upcoming
+Reminders strip, the Schedule Appointment control on the Patient Profile, and the SMS that told a
+patient about a booking. The screen was renamed **Patient Queue**, because "Appointment Scheduling"
+described the half that went.
 
-**The empty-state prose was rewritten, not just stripped of its buttons.** Deleting a control and
-keeping the sentence that names it is the worse half of the change on its own: a reader told to
-"book one with New Appointment" hunts a panel for a control that is not in it. The two affected
-empty states now report state and say what fills it, in the passive shape used elsewhere in this
-project ("Nothing has been recorded for this patient. Diagnoses entered during consultations will
-appear here."). The queue's empty state still names Check In Patient, and that is not the same
-thing — that button is directly above it. **Naming a control the reader is standing next to is
-help; naming one they must go and find is not.**
+**The argument that survives is the one about prose, and it is why this section is rewritten rather
+than deleted.** Deleting a control and keeping the sentence that names it is the worse half of the
+change on its own. That was true of four empty states in the consolidation, and it is true of a
+whole feature: every sentence in the templates, the models, this document and the roadmap that
+described booking was corrected in the same pass, and the screen itself now carries a stated
+`advance_booking` reason from `utils/unavailable.py` saying that booking ahead is deliberate
+absence and not an unfinished feature. **A reader who used something last week and cannot find it
+this week cannot tell "removed on purpose" from "broken this morning" unless the screen says
+which.**
 
-The dialog is titled **"Schedule Appointment"**, not "New Appointment" and not "Book Appointment".
-Its submit button already reads Book Appointment, and more importantly that submit is not always
-Book: choosing the new-patient mode switches it to "Continue to Registration", because the dialog
-can hand off to Register Patient on the way to a booking. A title has to cover both modes.
-"Schedule" also matches the screen's own name and the Verb + Noun shape every other dialog here
-uses.
+What is *not* promised is a replacement. A real facility does publish a shape to its week — one day
+for immunisation, another for prenatal — and a fixed service-day schedule is the honest successor.
+Which days carry which services has not been confirmed with Barangay Poblacion Health Center, so
+nothing here names any: inventing a plausible timetable would be the same mistake advance booking
+was, in a smaller font.
 
 ### The dashboards offer a way back into a consultation, not a second way to start one
 
-**A separate sidebar module for Consultation was considered and rejected.** Appointment Scheduling
-→ Start Consultation → Record Consultation is the standard arrangement — the visit belongs to the
+**A separate sidebar module for Consultation was considered and rejected.** Patient Queue → Start
+Consultation → Record Consultation is the standard arrangement — the visit belongs to the
 appointment, so the appointment is where it begins — and a standalone Consultation destination is
 incoherent anyway, because a consultation only exists tied to one active patient.
 
@@ -541,14 +544,14 @@ that appointment's write-up form.
 
 Three properties keep it a shortcut rather than a second entry point:
 
-- It reads `get_active_consultation()` — the same call Appointment Scheduling uses to decide who
+- It reads `get_active_consultation()` — the same call the Patient Queue uses to decide who
   may start a consultation, and deliberately not scoped to today — so the dashboard and the queue
   can never disagree about whether the room is occupied.
 - It can only ever name a visit the queue has **already** started. It cannot begin one, and it
   cannot bypass the one-at-a-time rule.
 - It contains no form and posts nothing.
 
-Idle, it states "No active consultation right now" and points at Appointment Scheduling rather
+Idle, it states "No active consultation right now" and points at the Patient Queue rather
 than vanishing — the honesty pattern the rest of the dashboard already follows. A panel that
 silently disappears teaches a reader that the screen is inconsistent, not that the room is empty.
 
@@ -703,7 +706,7 @@ any row — `appendChild()` relocates rather than copies, so asking "what follow
 through a rebuild returns the neighbouring record's panel. Every detail row would end up under the
 wrong medicine.
 
-### Why Appointment Scheduling still refuses
+### Why the Patient Queue still refuses
 
 Its queue is already ordered by an answer: whoever is in consultation now, then whoever is waiting,
 then the not-yet-arrived, then everything resolved, ties broken by arrival time (`_STATUS_RANK` in

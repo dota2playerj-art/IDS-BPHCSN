@@ -118,7 +118,7 @@ def check_in_reason(source):
 
 # Save & Register Another. The submit button carries this name/value pair, the
 # shape this project already uses wherever one form has more than one action --
-# Patient Records' status buttons and Appointment Scheduling's queue buttons both
+# Patient Records' status buttons and the Patient Queue's row buttons both
 # post a plain <button name=... value=...> and let the route read which one was
 # pressed.
 #

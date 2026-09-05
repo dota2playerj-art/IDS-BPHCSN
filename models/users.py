@@ -142,7 +142,7 @@ def seed_demo_users():
 
 
 # Whose names may appear in "Assign to" on a booking. The Barangay Official is
-# excluded for the same reason they cannot open Appointment Scheduling at all --
+# excluded for the same reason they cannot open the Patient Queue at all --
 # they hold no clinical role, so a visit cannot be assigned to them.
 CLINICAL_ROLES = ("Admin", "Health Center Staff")
 

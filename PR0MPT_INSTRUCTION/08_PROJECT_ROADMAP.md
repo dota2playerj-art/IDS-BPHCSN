@@ -65,7 +65,7 @@ recorded at the end of this section rather than quietly deleted.
 What the figure means, stated plainly so it can be defended:
 
 All four core objectives from the approved Proposal are built and working against real stored
-data — Patient Records, Medicine Inventory, Appointment Scheduling with Community Notifications,
+data — Patient Records, Medicine Inventory, Patient Queue with Community Notifications,
 and Reports & Analytics. Each was exercised end to end on 4 September 2026 by driving the real
 forms over HTTP against the live database: a patient registered, edited and reopened; a dispense
 moved stock across its threshold and the low-stock alert reacted on every surface that reports it;
@@ -183,7 +183,7 @@ Deliverables — Original 15 screens
 
 ✓ Add/Edit Medicine
 
-✓ Appointment Scheduling
+✓ Patient Queue
 
 ✓ Community Notifications (Admin/Staff-facing)
 
@@ -292,9 +292,16 @@ Tasks
 
 ☑ Inventory CRUD — 19 fields, stock levels, expiry status, low-stock alerting
 
-☑ Appointment CRUD — advance booking with slot-conflict detection, walk-in check-in,
-  a same-day consultation queue, start/complete transitions guarded by a single-consultation
-  invariant, plus cancel, reschedule and no-show closure
+☑ Walk-in queue — check-in, a same-day consultation queue, and start/complete transitions
+  guarded by a single-consultation invariant
+
+  This line read "Appointment CRUD — advance booking with slot-conflict detection … plus
+  cancel, reschedule and no-show closure" until **2026-09-05**. All of that was built and all
+  of it worked; it was removed anyway, on the adviser's point that a government barangay health
+  center does not let a patient pick their own hour weeks ahead. Screen 08 is now the Patient
+  Queue. A fixed schedule of service days is the honest successor and is not yet built — the
+  days and services have to be confirmed with the health center first. See
+  `utils/unavailable.py` `advance_booking`, which Screen 08 quotes on itself.
 
 ☑ Consultations and Immunization — clinical record with validated vitals, paediatric growth
   measurements, and DOH EPI dose recording. Editing a saved consultation writes a field-by-field
@@ -843,7 +850,7 @@ Reports & Analytics about the same barangay.
   was never built and never will be on present reasoning: nothing in this project deletes an
   account, because the audit trail attributes past entries to it. Deactivation is the supported
   end of an account's life.
-- **Column sorting on Appointment Scheduling's queue**, and only there. Sorting itself is built:
+- **Column sorting on the Patient Queue's table**, and only there. Sorting itself is built:
   Patient Records sorts by Name, Age, Last Visit and Status, and Medicine Inventory by Medicine
   Name, Current Stock, Expiration Date and Status, over the rendered rows and composing with each
   screen's search box and Advanced Filter (`static/js/table-sort.js`, one comparator shared by
@@ -911,9 +918,9 @@ way it loses that trust is by being written once and never re-read while the sys
 | "User Management — the `users` table holds 3 accounts; the screen shows 7 fixed rows." | The screen lists the real roster and derives each role's permissions from the live `url_map`. Only the account *writes* are still disabled. |
 | "Audit Logs — real entries are being written, but the screen does not read them yet." | Screen 12 reads the trail through `get_audit_logs()`, filters it by module, and exports it. |
 | "Settings — nothing reads or writes it." | Nothing *writes* it. The Security pane *reads* live sign-in counts from the audit trail. |
-| "Screen 10: Print, Export to Excel and Export to PDF… not built." | All three are built. Seven screens have real `.xlsx` and `.pdf` download routes — Patient Records, Medicine Inventory, Appointment Scheduling, User Management, Audit Logs, Reports & Analytics and Community Reports; see `routes/roster_export.py`, `report_export.py` and `audit_export.py`. |
+| "Screen 10: Print, Export to Excel and Export to PDF… not built." | All three are built. Seven screens have real `.xlsx` and `.pdf` download routes — Patient Records, Medicine Inventory, Patient Queue, User Management, Audit Logs, Reports & Analytics and Community Reports; see `routes/roster_export.py`, `report_export.py` and `audit_export.py`. |
 | "Export and print… the controls exist in the markup and are decorative." | No export control in this project is decorative. |
-| "Search, sort, filter and export controls on most list screens are present but not wired." | All four are wired. Search, filter and export are built on every list screen; **sort** is built on Patient Records and Medicine Inventory, and is deliberately refused on Appointment Scheduling's queue, whose order is itself the answer. None of the four is still true as written. |
+| "Search, sort, filter and export controls on most list screens are present but not wired." | All four are wired. Search, filter and export are built on every list screen; **sort** is built on Patient Records and Medicine Inventory, and is deliberately refused on Patient Queue's queue, whose order is itself the answer. None of the four is still true as written. |
 | "Exporting only a ticked selection on Patient Records' bulk bar (`export_selection`)… is not [built]." | Built. The bulk bar carries Export Excel and Export PDF, which submit the ticked `patient_ids` by POST to `export-selection.xlsx` / `.pdf` per role and are assembled by `routes/roster_export.py` through the same machinery the full roster uses. They are the only exports in the project that are not GETs, because a selection has no stable URL to bookmark; the cover sheet says "a selection, not the register" where the roster's says the opposite. The `export_selection` reason is retired. |
 | "Sign-ins are not recorded." | `routes/auth.py` records successful sign-ins, refused attempts and attempts blocked on a deactivated account; `utils/security.py` records a session ended because its account was deactivated mid-visit. **Sign-outs are not recorded** — `logout()` clears the session and writes nothing — so these are sign-in counts rather than session counts. Screen 11 shows a real Last Login and Screen 12's Login Events card is live. |
 

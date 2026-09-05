@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% set active_nav = "appointment_scheduling" %}
-{% block title %}IDS-BPHCSN | Appointment Scheduling{% endblock %}
+{% block title %}IDS-BPHCSN | Patient Queue{% endblock %}
 
 {% block styles %}
   .toolbar-search{min-width:320px; max-width:420px;}
@@ -253,13 +253,13 @@
     <div class="breadcrumb-nav">
       <a href="{{ url_for(dashboard_endpoint) }}">Dashboard</a>
       <span class="sep material-symbols-outlined">chevron_right</span>
-      <span class="current">Appointment Scheduling</span>
+      <span class="current">Patient Queue</span>
     </div>{% endblock %}
 
 {% block content %}
     <div class="eyebrow">{{ health_center.name }}</div>
-    <div class="page-title">Appointment Scheduling</div>
-    <div class="page-desc">View, book, and manage patient appointments across all health center services.</div>
+    <div class="page-title">Patient Queue</div>
+    <div class="page-desc">Check patients in as they arrive, work today's queue in order, and see what each day of the month held.</div>
 
     <!-- STAT CARDS — the four figures that describe today's queue. Same card
          structure as before; the numbers now come from models/appointments.py
@@ -506,11 +506,11 @@
 
              Date, because this panel filters today's queue and only today's;
              a date picker here implied other days could be shown from it, and
-             they cannot. Other days are on the calendar and the Upcoming panel.
+             they cannot. Other days are on the calendar above.
 
              Healthcare Worker, because the queue table has no assigned-staff
-             column. It is on the Upcoming Bookings table below, which this
-             panel does not filter.
+             column. It was on the Upcoming Bookings table, and that table went
+             with advance booking.
 
            The two that remain are built from the rows actually in the queue, so
            no option can select a cohort that is not there -- the rule Screen 12's
@@ -539,7 +539,7 @@
             <label>Date</label>
             <div style="font-size:12.5px; color:var(--text-muted); line-height:1.5; padding-top:6px;">
               {{ queue_date | display_date }} &mdash; this panel filters today's queue only.
-              Other days are on the calendar and in Upcoming Bookings.
+              Other days are on the calendar above.
             </div>
           </div>
         </div>
@@ -691,7 +691,7 @@
           <span class="material-symbols-outlined" style="font-size:34px; color:var(--teal-dark);">event_busy</span>
         </div>
         <h5>{% if queue %}No matching patients{% else %}Nobody in today's queue yet{% endif %}</h5>
-        <p>{% if queue %}No one in today's queue matches your search. Try a different name or patient ID.{% else %}No appointments are booked for today and no one has checked in. Use Check In Patient when the first patient arrives.{% endif %}</p>
+        <p>{% if queue %}No one in today's queue matches your search. Try a different name or patient ID.{% else %}Nobody has checked in yet. Use Check In Patient when the first patient arrives.{% endif %}</p>
         <!-- One action, and it is the one this empty state's own sentence names:
              "Use Check In Patient when the first patient arrives." A second
              button offering a different action was never what an empty queue is
@@ -723,8 +723,36 @@
 {%- endif %}
         </div>
       </div>
+
 {%- endif %}
 
+      {#- WHAT THIS SCREEN DOES NOT DO, SAID ON IT.
+          Both sentences come from utils/unavailable.py, which is where every
+          other "this cannot be done and here is why" in the project lives. They
+          are stated rather than hung on a disabled control because there is no
+          control to hang them on: advance booking was removed, and closing a
+          patient who left was never built.
+
+          The first is here because this screen used to book. Somebody who used
+          that last week and cannot find it now has no way to tell a deliberate
+          removal from a fault unless the screen says which, and "no New
+          Appointment button" on its own says nothing at all.
+
+          The second is here because this is the table it is about. A row that
+          can only be left Waiting is a gap in the queue itself, and naming it
+          beside the queue is what stops it being rediscovered as a bug. #}
+      <div class="untracked mt-3">
+        <span class="material-symbols-outlined">event_busy</span>
+        <div>
+          <div class="untracked-title">Two things this screen does not do</div>
+          <div class="untracked-body">
+            {{ unavailable.advance_booking }}
+          </div>
+          <div class="untracked-body" style="margin-top:8px;">
+            {{ unavailable.queue_exit }}
+          </div>
+        </div>
+      </div>
 
     </div>
 
@@ -782,8 +810,8 @@
             <div id="checkInExistingPane">
               <form id="checkInExistingForm" method="post" action="{{ url_for(check_in_patient_endpoint) }}">
                 <div class="mode-hint">
-                  If they already have an appointment booked today it is checked in rather than
-                  duplicated; otherwise a walk-in is created.
+                  Records their arrival and puts them in today's queue, in the order
+                  they got here.
                 </div>
 
                 <label class="field-label" for="checkInSearch">Patient</label>
@@ -804,7 +832,11 @@
 {%- if patient.today_in_queue %}
                       <span class="po-queued">Already {{ patient.today_status }}</span>
 {%- elif patient.today_status %}
-                      <span class="po-booked">Booked{% if patient.today_booked_time %} {{ patient.today_booked_time }}{% endif %}</span>
+{#- Not in the queue but on today's list: they have already been seen, or their
+    visit was closed. It said "Booked" and a time, which was the booking they had
+    for today; nothing books a day any more, so the only records that reach this
+    branch are visits that already happened. It now says which. #}
+                      <span class="po-booked">{{ patient.today_status }} today</span>
 {%- endif %}
                     </span>
                   </label>

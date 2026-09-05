@@ -13,7 +13,7 @@ different totals.
 WHAT THIS ROLE MAY SEE, AND WHY THAT DECIDES THE SOURCES
 --------------------------------------------------------
 09_UI_Architecture §2 keeps the Barangay Official out of Patient Records,
-Medicine Inventory and Appointment Scheduling. This dashboard therefore draws
+Medicine Inventory and the Patient Queue. This dashboard therefore draws
 only from the two screens the role does hold:
 
     Reports & Analytics (Screen 10)   routes/report_views.py
@@ -73,8 +73,8 @@ LOCAL_UNTRACKED = {
     "events": (
         "Community health events are not recorded. Nothing here stores a "
         "barangay event, its date or its venue, so an events list would have to "
-        "invent its own. Clinic appointments are recorded, but they belong to "
-        "Appointment Scheduling and are not this role's to read."
+        "invent its own. Patient visits are recorded, but they belong to the "
+        "Patient Queue and are not this role's to read."
     ),
     "campaigns": (
         "Vaccination campaigns are not recorded. Individual doses are -- see "

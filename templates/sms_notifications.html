@@ -473,9 +473,12 @@
 {% if can_see_appointment_sms %}
     <!-- INDIVIDUAL APPOINTMENT MESSAGES.
          The other kind of message this system sends: one text to one patient
-         about one of their own appointments, sent from Appointment Scheduling or
-         the Patient Profile at the moment a booking is made, moved or called
-         off. It is listed here, apart from the broadcast history above, because
+         about one of their own appointments, sent by hand from the Patient Queue
+         or the Patient Profile at the moment a booking was made, moved or called
+         off. Nothing sends one any more -- advance booking was retired on
+         2026-09-05 and these three events cannot occur -- so this panel is a
+         closed record. It is listed here, apart from the broadcast history above,
+         because
          the two are different things -- a broadcast is what the barangay said to
          the community and names nobody; every row below names one patient.
 
@@ -491,9 +494,9 @@
             <div>
               <div class="detail-title">Individual appointment messages</div>
               <div class="detail-sub">
-                One message to one patient about their own booking. Sent by hand from
-                Appointment Scheduling or the Patient Profile after a booking is made,
-                moved or cancelled &mdash; never automatically.
+                One message to one patient about their own booking, sent by hand when this
+                system still booked visits ahead. Advance booking was retired, so nothing
+                adds to this list &mdash; it is a closed record, kept because it happened.
               </div>
             </div>
 {%- if appointment_sms %}
@@ -562,9 +565,9 @@
             </div>
             <h5>No appointment messages sent yet</h5>
             <p>
-              No patient has been texted about their own appointment from this system.
-              The offer to send one appears on Appointment Scheduling and the Patient
-              Profile immediately after a booking is made, moved or cancelled.
+              No patient was ever texted about their own appointment from this system.
+              These messages were offered after a booking was made, moved or cancelled;
+              advance booking has been retired, so this list stays empty.
             </p>
           </div>
 {% endif %}

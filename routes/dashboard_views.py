@@ -83,7 +83,7 @@ UNTRACKED = {
     ),
     # THERE IS NO "consultation_status" ENTRY ANY MORE, AND THAT IS THE POINT.
     # It said a consultation has no status of its own and pointed at the visit
-    # on Appointment Scheduling for the outcome. Nothing quotes it. The Status
+    # on the Patient Queue for the outcome. Nothing quotes it. The Status
     # column on the Recent Consultations table prints "Recorded" -- which is a
     # fact about the row rather than a gap in the system: a consultation that is
     # in this table is one that was written up, and that is all the column ever
@@ -186,7 +186,7 @@ def dashboard_context():
 
     # THE ONE VISIT IN PROGRESS, FOR THE DASHBOARD SHORTCUT.
     #
-    # Recording a consultation is reached through Appointment Scheduling, and
+    # Recording a consultation is reached through the Patient Queue, and
     # that is the right primary route -- the visit belongs to the appointment, so
     # the appointment is where it starts. What it is not is a good route back
     # into a consultation already under way: a clinician who navigated away has
@@ -197,7 +197,7 @@ def dashboard_context():
     # consultation the queue has already started, and it disappears the moment
     # that visit is completed.
     #
-    # get_active_consultation() is the same call Appointment Scheduling uses to
+    # get_active_consultation() is the same call the Patient Queue uses to
     # decide who may start a consultation, and it is deliberately not scoped to
     # today -- see its docstring. Reusing it means the dashboard and the queue
     # can never disagree about whether the room is occupied. It is read once at

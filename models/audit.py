@@ -33,6 +33,17 @@ from utils.dates import day_start_utc, today
 MODULE_CONSULTATIONS = "Consultation Records"
 MODULE_PATIENTS = "Patient Records"
 MODULE_INVENTORY = "Medicine Inventory"
+# KEPT AT ITS OLD SPELLING ON PURPOSE. Screen 08 was renamed Patient Queue on
+# 2026-09-05, and this was not renamed with it. The value is not a label the
+# screen shows -- it is the string stored in audit_logs.module on rows already
+# written, and one such row exists (the August 29 correction that closed a
+# consultation left open overnight). Changing the constant would file future
+# writes under a second pill and leave that row alone under the first, which
+# splits one module's history in the Audit Logs filter for no gain.
+#
+# Same ruling as the Administrator persona correction, which left 506 entries
+# under the name they were written with: an audit trail records what was true
+# when the row was written, and renaming a screen is not a reason to restate it.
 MODULE_APPOINTMENTS = "Appointment Scheduling"
 # The two immunisation tables, under one pill. Both halves of the Patient
 # Profile's Immunization Record tab write here: the DOH EPI doses and the

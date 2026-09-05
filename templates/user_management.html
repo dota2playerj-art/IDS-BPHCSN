@@ -37,7 +37,7 @@
       worded beside the button, not in UNTRACKED. #}
 
   {#- FORM FIELDS INSIDE THE DIALOGS. Same class names and the same values as
-      Register Patient and the booking dialog on Appointment Scheduling, so the
+      Register Patient and the Check In dialog on the Patient Queue, so the
       Add User form does not become this project's fourth way of drawing a
       labelled input. #}
   label.field-label{font-size:13px; font-weight:600; color:var(--text-dark); margin-bottom:6px; display:inline-block;}
@@ -71,7 +71,7 @@
 
   {#- Revoking access is destructive in intent even though it deletes nothing,
       so it is the only red control on this screen -- the same weight Patient
-      Records gives Mark Deceased and Appointment Scheduling gives Cancel. #}
+      Records gives Mark Deceased. #}
   .btn-danger-ids{
     background:#fff; border:1px solid #FECACA; color:var(--danger); border-radius:12px;
     padding:10px 16px; font-size:14px; font-weight:600; display:inline-flex; align-items:center;
@@ -1072,7 +1072,7 @@
 
   // A submit that did not save comes back with what was typed and the errors
   // beside the fields; this reopens the dialog on it. The same mechanism
-  // Appointment Scheduling uses for its booking dialog -- the state is already
+  // the Patient Queue uses for its Check In dialog -- the state is already
   // rendered above, so this only makes it visible again.
   //
   // IT WAITS FOR DOMContentLoaded, AND THE WAIT IS THE WHOLE FIX.

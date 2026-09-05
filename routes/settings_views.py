@@ -223,7 +223,7 @@ def _maintenance_state():
     consultation -- that is what an emergency is. What the screen owes them is
     the fact, before they press it, rather than a veto.
 
-    get_active_consultation() is the same call Appointment Scheduling asks "is
+    get_active_consultation() is the same call the Patient Queue asks "is
     the room free?" with, so this cannot report a consultation the queue screen
     does not show, or miss one it does.
     """
@@ -233,7 +233,7 @@ def _maintenance_state():
         "on": maintenance_mode(),
         "changed_at": display_timestamp(changed_at) if changed_at else None,
         "changed_by": changed_by,
-        # first + last, the same pair Appointment Scheduling's queue prints on
+        # first + last, the same pair the Patient Queue prints on
         # its rows. There is no full_name on a queue entry -- the appointment
         # join carries the patient's three name columns separately -- so the
         # middle name is left out here for the same reason that screen leaves it
@@ -396,11 +396,10 @@ def process_general_settings(form_data, actor_id, ip_address=None):
             "every appointment SMS and the heading on every PDF and Excel "
             "export, the barangay, municipality and province make up the "
             "address those exports and the sign-in page print, and the opening "
-            "and closing times are what the bookable appointment slots are "
-            "generated from — so a change to the times changes which times "
-            "Appointment Scheduling will accept. Messages already sent and files "
-            "already downloaded are unaffected; they carry the values that were "
-            "in force when they were produced"
+            "and closing times are the hours the health center publishes as its "
+            "own. Messages already sent and files already downloaded are "
+            "unaffected; they carry the values that were in force when they "
+            "were produced"
         ),
         ip_address=ip_address,
     )

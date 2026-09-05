@@ -354,17 +354,23 @@
 {%- endif %}
                 </div>
               </div>
-{#- Said plainly because changing these two changes what Appointment Scheduling
-    will ACCEPT, not merely what it offers -- validate_booking() refuses a time
-    outside the generated slots, and it reads the same slots the dropdown is
-    built from. An administrator moving the closing time an hour earlier is
-    narrowing the bookable day, and should know that before pressing Save rather
-    than when an operator cannot book a four o'clock. #}
+{#- WHAT THESE TWO STILL DECIDE, NOW THAT NOTHING IS BOOKED AGAINST THEM.
+    They used to generate the bookable slots on Appointment Scheduling, and this
+    hint said so. Advance booking was retired on 2026-09-05, so no dropdown is
+    built from them and nothing is refused for falling outside them.
+
+    They are not decoration, though, and the hint is corrected rather than
+    deleted. They are what the health center publishes as its own hours -- the
+    pair every letterhead and every printed record carries -- and the day still
+    has to be at least one 30-minute slot long, because models/settings.py checks
+    that against models/appointments.py SLOT_MINUTES. An administrator is owed
+    the truth about which of those two things is which. #}
               <div class="form-text-hint" style="margin-top:8px;">
                 Currently {{ general.opening_label }} to {{ general.closing_label }}.
-                Appointment slots are generated from the opening time in 30-minute steps, and the last one
-                starts a slot before closing &mdash; so these two times decide which times Appointment Scheduling
-                offers <em>and</em> which it will accept. Appointments already booked keep their times.
+                These are the hours the health center publishes as its own &mdash; they appear on exports and
+                printed records. Patients are seen in the order they arrive, so nothing is booked against
+                them and no visit is refused for falling outside them. The day must still be at least
+                30 minutes long.
               </div>
 
               <div class="pane-actions">

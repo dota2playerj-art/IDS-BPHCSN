@@ -63,7 +63,7 @@ project success and must be prioritized above all other work:
 1. Digitize and manage patient records (Patient Records, Register Patient, Patient Profile).
 2. Manage medicine and supplies inventory, including automated low-stock alerts (Medicine
    Inventory, Add/Edit Medicine).
-3. Schedule patient appointments and deliver community notifications (Appointment Scheduling,
+3. Work the daily patient queue and deliver community notifications (Patient Queue,
    Community Notifications).
 4. Generate automated healthcare reports (Reports & Analytics).
 
@@ -123,7 +123,7 @@ Responsibilities
 - Patient Profile Management
 - Consultation Records
 - Medicine Inventory
-- Appointment Scheduling
+- Patient Queue
 - Community Notifications
 - Reports and Analytics
 
@@ -246,7 +246,7 @@ Administrator Dashboard
 ├── Dashboard
 ├── Patient Records
 ├── Medicine Inventory
-├── Appointment Scheduling
+├── Patient Queue
 ├── Community Notifications
 ├── Reports & Analytics
 ├── User Management
@@ -423,7 +423,7 @@ Version 2.0
 
 Reconciled against the actual approved Capstone Proposal. Specific Objectives and System Scope
 reorganized to correctly prioritize the four core objective modules (Patient Records, Medicine
-Inventory, Appointment Scheduling + Community Notifications, Reports & Analytics) over
+Inventory, Patient Queue + Community Notifications, Reports & Analytics) over
 supporting infrastructure (User Management, Audit Logs, Settings). Added System Architecture
 (Client-Server, Star Topology). Full detail of what changed and why is preserved in
 10_PROPOSAL_RECONCILIATION_NOTES.md.

@@ -43,7 +43,7 @@ def inject_role_context():
 
     # Only the endpoints a role may actually reach are exposed. 09_UI_Architecture §2
     # restricts Barangay Official from Patient Records, Medicine Inventory and
-    # Appointment Scheduling, so those names are simply absent for that role — a shared
+    # the Patient Queue, so those names are simply absent for that role — a shared
     # template that reuses them then fails loudly instead of quietly emitting an Admin
     # URL the role would bounce straight off.
     #

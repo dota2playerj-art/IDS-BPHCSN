@@ -29,8 +29,9 @@ Six rather than the twenty-odd fields Screen 13 draws, and the line between them
 is not taste. Each of these six is a value some OTHER part of the running system
 already reads: the name is at the front of every appointment SMS and on every
 export letterhead, the three place names make up the address those letterheads
-and the login page print, and the two times are what the bookable time slots are
-built from. They were constants in five different files, which is the actual
+and the login page print, and the two times are the hours the facility publishes
+as its own. (Those two built the bookable time slots as well, until advance
+booking was retired on 2026-09-05.) They were constants in five different files, which is the actual
 problem this module solves -- one of them was `HEALTH_CENTER` in
 models/appointment_sms.py, three more were string literals repeated across the
 three export modules, and two were CLINIC_OPEN_HOUR and CLINIC_CLOSE_HOUR in
@@ -132,7 +133,7 @@ MAINTENANCE_OFF = "off"
 #
 # So an administrator who never opens Settings gets the system exactly as it
 # behaved before this module was written, which is the only acceptable default
-# for a change that reaches into SMS messages and booking validation.
+# for a change that reaches into SMS messages and every printed letterhead.
 DEFAULTS = {
     KEY_NAME: "Barangay Poblacion Health Center",
     KEY_BARANGAY: "Barangay Poblacion",
@@ -404,24 +405,6 @@ def display_time(value):
     return f"{hour12}:{minute:02d} {suffix}"
 
 
-def clinic_hours():
-    """(opening minutes, closing minutes) as integers past midnight.
-
-    Both are guaranteed parseable: validate_general_settings() refuses anything
-    else, and DEFAULTS holds valid strings, so the only way to a bad value is a
-    hand-edited row -- which falls back to the default rather than raising, since
-    an unparseable opening time must not take the booking screen down.
-    """
-    values = get_settings()
-    opening = to_minutes(values[KEY_OPENING])
-    closing = to_minutes(values[KEY_CLOSING])
-    if opening is None:
-        opening = to_minutes(DEFAULTS[KEY_OPENING])
-    if closing is None:
-        closing = to_minutes(DEFAULTS[KEY_CLOSING])
-    return opening, closing
-
-
 # ---------------------------------------------------------------------------
 # VALIDATION
 # ---------------------------------------------------------------------------
@@ -437,16 +420,24 @@ def validate_general_settings(values):
 
     THE TWO TIMES ARE CHECKED AGAINST EACH OTHER AS WELL AS INDIVIDUALLY.
     A closing time at or before the opening time is each field being valid on its
-    own and the pair being nonsense, and it is not a harmless nonsense: the
-    bookable slots are generated between them, so it would empty the time
-    dropdown on Appointment Scheduling and leave every booking refusable with no
-    time an operator could pick. The pair is refused on the closing time, because
-    that is the box that was almost certainly the one typed wrong.
+    own and the pair being nonsense. The pair is refused on the closing time,
+    because that is the box that was almost certainly the one typed wrong.
+
+    This paragraph used to say the nonsense was not harmless because the bookable
+    slots were generated between the two times, so an inverted pair emptied the
+    time dropdown on Appointment Scheduling. That stopped being true on
+    2026-09-05, when advance booking was retired: nothing generates slots and
+    nothing is booked. The rule stays, and so does the SLOT_MINUTES floor below,
+    because these two times are still what the health center publishes as its own
+    hours on every export and every printed record -- and a facility that closes
+    before it opens, or is open for twenty minutes, is not a fact worth printing.
     """
-    # Imported inside the function on purpose. models/appointments.py imports
-    # clinic_hours() from this module to build its time slots, so a top-level
-    # import here would close the loop; deferring it to call time breaks the
-    # cycle without either module having to know about the other's ordering.
+    # Imported inside the function, which is now belt and braces rather than
+    # necessary. models/appointments.py used to import clinic_hours() from this
+    # module to build its time slots, and a top-level import here would have
+    # closed that loop; the slots went with advance booking and so did
+    # clinic_hours(), so there is no cycle left to break. The deferral costs
+    # nothing and is left rather than churned.
     from models.appointments import SLOT_MINUTES
 
     errors = {}
@@ -481,16 +472,18 @@ def validate_general_settings(values):
         if closing <= opening:
             errors[KEY_CLOSING] = (
                 "The clinic must close after it opens. Closing at "
-                f"{display_time(closing_raw)} would leave no time to book in."
+                f"{display_time(closing_raw)} would leave no day at all."
             )
         elif closing - opening < SLOT_MINUTES:
-            # Refused rather than accepted-and-empty. A window shorter than one
-            # slot generates no slots at all, which reaches the operator as a
-            # booking form with an empty time dropdown and no explanation.
+            # Refused rather than accepted-and-empty. SLOT_MINUTES is the
+            # granularity this system reasons about a clinic day in, and a window
+            # shorter than one of them is not a day the health center could
+            # publish -- it would print on the letterhead as a facility open for
+            # twenty minutes.
             errors[KEY_CLOSING] = (
-                f"That leaves less than one {SLOT_MINUTES}-minute appointment "
-                f"slot. Appointments are booked in {SLOT_MINUTES}-minute slots, "
-                "so the clinic day has to be at least that long."
+                f"That leaves less than one {SLOT_MINUTES}-minute session. A "
+                f"clinic day is measured in {SLOT_MINUTES}-minute steps, so it "
+                "has to be at least that long."
             )
 
     return errors

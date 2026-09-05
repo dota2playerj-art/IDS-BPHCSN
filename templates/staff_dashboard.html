@@ -182,7 +182,7 @@
          ============================
          A way back INTO a visit already under way, not a second way to start
          one. Recording a consultation belongs to the appointment it came from,
-         and Appointment Scheduling -> Start Consultation -> Record Consultation
+         and Patient Queue -> Start Consultation -> Record Consultation
          stays the route that begins one; that is the standard arrangement and
          this does not replace it. What it fixes is the return trip: a clinician
          who navigated away mid-visit had to reload the queue and find the row
@@ -227,7 +227,7 @@
       <div class="panel-title" style="font-size:15px;">No active consultation right now</div>
       <div class="panel-sub">
         Nobody is currently being seen. A consultation starts from
-        <a href="{{ url_for(appointment_scheduling_endpoint) }}" style="color:var(--teal-dark); font-weight:600;">Appointment Scheduling</a>,
+        <a href="{{ url_for(appointment_scheduling_endpoint) }}" style="color:var(--teal-dark); font-weight:600;">Patient Queue</a>,
         by calling in a patient who has checked in; it will appear here while it is open.
       </div>
 {%- endif %}
@@ -237,7 +237,7 @@
     <div class="row g-3 mb-4">
       <div class="col"><a href="{{ url_for(register_patient_endpoint) }}" class="quick-action"><div class="quick-action-icon"><span class="material-symbols-outlined">person_add</span></div>Register Patient</a></div>
             <div class="col"><a href="{{ url_for(patient_records_endpoint) }}" class="quick-action"><div class="quick-action-icon"><span class="material-symbols-outlined">groups</span></div>View Patient Records</a></div>
-            <div class="col"><a href="{{ url_for(appointment_scheduling_endpoint) }}" class="quick-action"><div class="quick-action-icon"><span class="material-symbols-outlined">calendar_month</span></div>Schedule Appointment</a></div>
+            <div class="col"><a href="{{ url_for(appointment_scheduling_endpoint) }}" class="quick-action"><div class="quick-action-icon"><span class="material-symbols-outlined">calendar_month</span></div>Patient Queue</a></div>
             <div class="col"><a href="{{ url_for(medicine_inventory_endpoint) }}" class="quick-action"><div class="quick-action-icon"><span class="material-symbols-outlined">inventory_2</span></div>Update Medicine Stock</a></div>
             <div class="col"><a href="{{ url_for(sms_notifications_endpoint) }}" class="quick-action"><div class="quick-action-icon"><span class="material-symbols-outlined">campaign</span></div>View Notifications</a></div>
     </div>
@@ -269,7 +269,7 @@
                 </tr>
               </thead>
               <tbody>
-{#- The same rows Appointment Scheduling's queue table shows, in the same order
+{#- The same rows the Patient Queue's table shows, in the same order
     and with the same badge, because both read get_todays_appointments(). The
     time column prefers the arrival over the booked time for exactly the reason
     the queue sorts that way: once someone is in the building, when they got
@@ -397,7 +397,7 @@
             <div class="panel-title" style="font-size:15px;">{{ calendar_month.label }}</div>
             <a href="{{ url_for(appointment_scheduling_endpoint) }}" class="panel-link">Open<span class="material-symbols-outlined" style="font-size:15px;">chevron_right</span></a>
           </div>
-{#- Drawn from get_calendar_month(), the same builder Appointment Scheduling's
+{#- Drawn from get_calendar_month(), the same builder the Patient Queue's
     month grid uses, so the day marked today and the days marked as carrying
     appointments agree between the two screens. The two arrow buttons were
     removed rather than wired: this widget has no month of its own to page

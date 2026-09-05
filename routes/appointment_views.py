@@ -69,9 +69,9 @@ def appointment_scheduling_context(month=None):
         entry["immunization_count"] = child["attention_count"] if child else 0
         entry["immunization_next"] = child["next_label"] if child else None
 
-    # What today already holds for each patient, so the dialog can say "booked
-    # 09:15" or "already waiting" beside a name instead of letting the operator
-    # find out only after submitting. Keyed by patient row id.
+    # What today already holds for each patient, so the Check In dialog can say
+    # "already waiting" or "Completed today" beside a name instead of letting the
+    # operator find out only after submitting. Keyed by patient row id.
     today_by_patient = {}
     for entry in entries:
         # First wins: entries arrive in queue order, so an active queue row is
@@ -85,7 +85,6 @@ def appointment_scheduling_context(month=None):
         patient = dict(patient)
         entry = today_by_patient.get(patient["id"])
         patient["today_status"] = entry["status"] if entry else None
-        patient["today_booked_time"] = entry["booked_time"] if entry else None
         patient["today_in_queue"] = bool(entry and entry["in_queue"])
         patients.append(patient)
 

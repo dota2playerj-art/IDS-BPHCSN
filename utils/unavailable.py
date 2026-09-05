@@ -116,7 +116,7 @@ written to say what actually stopped that button. Nothing about "print" had gone
 false; it was simply answering a question the control was not asking.
 
 And then "print" went entirely, which is the other half of this file's rule. Its
-last two citations were the print icons on Appointment Scheduling, and those are
+last two citations were the print icons on the Patient Queue, and those are
 now working links into the patient's own profile. A shared reason is worth having
 while something quotes it and not one commit longer, so it was deleted rather
 than left describing screens that no longer ask.
@@ -160,7 +160,7 @@ reason to be gentler about it.
 "appointment_detail" has now gone the same way, and it is worth naming because
 it failed in the harder direction. It never collapsed outright: every clause in
 it stayed literally true, and it still misdirected, because "the booking's notes
-are on Appointment Scheduling" holds only for a booking in today's queue or
+are on the Patient Queue" holds only for a visit in today's queue or
 still to come. A note on a visit six weeks ago was on no screen at all. A reason
 can be accurate about where something is and still be the wrong answer to why a
 control is dead, and that is the version hardest to catch by re-reading. The
@@ -192,7 +192,7 @@ UNAVAILABLE = {
     # reader is meant to do with the file."
     #
     # That decision has now been taken, for all four screens that were left
-    # quoting this. Patient Records, Medicine Inventory, Appointment Scheduling
+    # quoting this. Patient Records, Medicine Inventory, the Patient Queue
     # and User Management each download a real spreadsheet and a real PDF -- the
     # columns are the ones their tables already show, the rows are the whole list
     # because these screens filter in the browser, and every file's cover sheet
@@ -243,7 +243,7 @@ UNAVAILABLE = {
     # THERE IS NO "print" ENTRY ANY MORE, AND THAT IS THE POINT.
     # It said a screen had no print layout, and it was true of every screen that
     # quoted it, right up to the last one. Its last two citations were the print
-    # icons on Appointment Scheduling's two tables, and those are now working
+    # icons on the Patient Queue's tables, and those are now working
     # links: printing from a booking opens that patient's profile with ?print=1,
     # the same answer Patient Records gives for its own rows. Nothing quotes this
     # any more, and a reason with nothing quoting it is exactly the drift this
@@ -297,7 +297,7 @@ UNAVAILABLE = {
     # and "a menu that was never built" is wrong because the menu exists and those
     # two screens open it.
     #
-    # The third screen still quoting this is Appointment Scheduling, and what
+    # The third screen still quoting this is the Patient Queue, and what
     # stops it is not the missing menu -- the menu is now sitting in a shared file
     # it could load in an afternoon. What stops it is that its queue's order is
     # already the answer to a question, and re-sorting it would throw that answer
@@ -308,9 +308,10 @@ UNAVAILABLE = {
     # Patient Records and then finds it disabled here is owed the difference
     # between the two screens, not a blanket claim they can already disprove.
     #
-    # If Appointment Scheduling's Upcoming Appointments panel ever gets its own
-    # Sort control, this reason does not cover it: that panel is a list of future
-    # bookings with no queue position, and the argument below does not apply to it.
+    # This once carved out an exception for the Upcoming Appointments panel, whose
+    # rows had no queue position and so were not covered by the argument below.
+    # That panel went with advance booking on 2026-09-05, and the carve-out went
+    # with it: this screen is one table now, and the reason covers all of it.
     # SHORTENED. Nine clauses, six of them argument -- and it is a tooltip, so
     # the argument was being made at a size nobody finishes reading. The reasons
     # are the ones above and they stay above: the queue's order is the answer to
@@ -328,6 +329,74 @@ UNAVAILABLE = {
     "pagination": (
         "Paging is not implemented. Every row is already on this page, so there "
         "is no second page to turn to."
+    ),
+
+    # ---- Scheduling ---------------------------------------------------------
+    # THESE TWO ARE A NEW KIND OF ENTRY FOR THIS FILE, AND THE DIFFERENCE IS
+    # WORTH STATING. Every reason above is a tooltip on a control that is drawn
+    # disabled. Neither of these has a control at all -- there is nothing to
+    # disable, because what they describe was taken out rather than left dead.
+    # They are rendered as stated text on the Patient Queue instead.
+    #
+    # The rule this file serves is still the rule: a screen either does a thing,
+    # or it says plainly that it does not. Deleting a feature and saying nothing
+    # is the version of a dead button that is hardest to find -- an operator who
+    # used advance booking last week and cannot find it this week has no way to
+    # tell "removed on purpose" from "broken this morning" unless the screen
+    # says which. So they are quoted, they are read, and if either stops being
+    # true they go the way "export" and "print" went.
+
+    # WHY NOTHING BOOKS A DAY THAT HAS NOT COME.
+    # Advance booking was built and it worked: a date, a half-hour slot, a
+    # conflict warning, reschedule, cancel, no-show, and a text to the patient.
+    # It was removed on 2026-09-05 anyway, because none of that was the problem.
+    # The problem was that it modelled a clinic this one is not. Barangay
+    # Poblacion sees people in the order they walk in; no one here is given ten
+    # o'clock next Thursday, and a screen that offered it read convincingly in a
+    # demonstration and wrongly in the building.
+    #
+    # THE SUCCESSOR IS NAMED BUT NOT DESCRIBED, DELIBERATELY.
+    # A real health center does publish a shape to its week -- one day for
+    # immunisation, another for prenatal -- and a fixed service-day schedule is
+    # the honest thing to build in place of what went. What those days are, and
+    # which services sit on them, has not been confirmed with the health center.
+    # Writing a plausible timetable into this sentence would be the same mistake
+    # that advance booking was, in a smaller font: a specific claim about how
+    # this facility runs, made up at a desk. So this says a schedule is planned
+    # and says nothing about its contents, and it stays that way until somebody
+    # has asked.
+    "advance_booking": (
+        "Appointments cannot be booked for a future day, and that is deliberate "
+        "rather than unfinished. This health center sees patients in the order "
+        "they arrive, so a visit is recorded when the person is at the desk -- "
+        "use Check In Patient. A fixed schedule of service days is planned, and "
+        "which days carry which services has still to be confirmed with the "
+        "health center, so none is stated here."
+    ),
+
+    # A GAP LEFT BY THE REMOVAL, NAMED RATHER THAN QUIETLY CARRIED.
+    # Cancel / No-show closed a booking, and it went with booking. It was never
+    # the queue's own closure: it acted on a row nobody had arrived for, and it
+    # refused outright once check_in_patient() had turned that row into a patient
+    # in the building. So nothing was taken away from the queue here -- but its
+    # absence makes visible something the queue never had.
+    #
+    # Somebody checks in, waits, and leaves before being seen. There is no honest
+    # thing to press. Mark Completed says a consultation happened; nothing says
+    # the patient went home. Today the row simply stays Waiting, and a queue that
+    # cannot be emptied of somebody who is not in the building is a queue that
+    # gradually stops describing the room.
+    #
+    # This is a feature, not a wording fix, and it is a task of its own: it needs
+    # a status the schema's CHECK does not currently admit, a guarded write like
+    # complete_consultation()'s, and a decision about whether "left before being
+    # seen" and "no-show" are the same fact. Naming it here is what stops it
+    # being rediscovered as a bug.
+    "queue_exit": (
+        "A patient who checks in and leaves before being seen cannot be closed "
+        "off the queue -- their row stays Waiting. Mark Completed is not it: it "
+        "records that the visit happened. Recording that somebody left is a "
+        "status this system does not yet have."
     ),
 
     # ---- Records ------------------------------------------------------------
@@ -374,7 +443,7 @@ UNAVAILABLE = {
     # Its first version listed "notes" among the fields "already in this row",
     # which was false: Appointment History has five columns before its actions
     # -- Date, Time, Purpose, Assigned To, Status -- and notes is not one of
-    # them. The rewrite said so and pointed the reader at Appointment Scheduling
+    # them. The rewrite said so and pointed the reader at the Patient Queue
     # instead, "under the patient's name". That was honest about the note
     # existing, and it was still a bad answer, because it is only true of a
     # booking that is in today's queue or still to come. A note on a visit six
