@@ -419,7 +419,7 @@ def appointment_scheduling():
 # only one of this task's eight exports that reads the query string: ?month= is a
 # real server-side parameter -- the calendar panel's own arrows submit it -- so the
 # button exports the month the operator is looking at, exactly as Audit Logs'
-# export carries its ?module=. The queue's and the upcoming list's own search and
+# export carries its ?module=. The queue's own search and
 # filter controls narrow rows in the browser and cannot come with it; the file's
 # cover sheet says which of the two it is for every control on the screen.
 @admin_bp.route('/appointment_scheduling/export.xlsx')

@@ -16,8 +16,6 @@ from models.appointments import (
     get_queue_entry,
     get_queue_stats,
     get_todays_appointments,
-    get_upcoming_appointments,
-    get_upcoming_stats,
     parse_month,
     queue_display_name,
     start_consultation,
@@ -89,7 +87,6 @@ def appointment_scheduling_context(month=None):
         patients.append(patient)
 
     reference = today()
-    upcoming = get_upcoming_appointments(from_date=reference)
 
     return {
         "queue": entries,
@@ -118,10 +115,6 @@ def appointment_scheduling_context(month=None):
         ),
         # The calendar panel, which until now was a hand-written July 2026 grid.
         "calendar": get_calendar_month(parse_month(month, reference), reference),
-        # Future bookings, listed apart from the queue above -- see the panel's
-        # own note in the template for why they are not merged.
-        "upcoming": upcoming,
-        "upcoming_stats": get_upcoming_stats(upcoming, reference),
     }
 
 

@@ -115,7 +115,7 @@ def _to_appointment(row):
     )
     # Whether this row is still a plan rather than a visit under way, and
     # therefore whether it can be moved or called off. Derived here, alongside
-    # the badge, so the queue, the upcoming list and the profile's Appointment
+    # the badge, so the queue and the profile's Appointment
     # History all decide it the same way -- and so the buttons a screen offers
     # are exactly the ones close_appointment() and reschedule_appointment()
     # would accept.
@@ -137,7 +137,7 @@ def _to_queue_entry(row):
     entry["booked_time"] = _clock(entry.get("appointment_time"))
     # Whether this row is still a plan rather than a visit in progress, and
     # therefore whether it can be moved or called off. Derived here, next to the
-    # other display fields, so the queue, the upcoming list and the profile all
+    # other display fields, so the queue and the profile both
     # decide it the same way -- and so the buttons a screen offers are exactly
     # the ones close_appointment() and reschedule_appointment() would accept.
     return entry
@@ -743,70 +743,6 @@ def parse_iso_date(value):
         return datetime.strptime(str(value).strip()[:10], "%Y-%m-%d").date()
     except ValueError:
         return None
-
-
-def _to_upcoming_entry(row, reference=None):
-    """A future booking with the fields the upcoming list and calendar print."""
-    entry = _to_queue_entry(row)
-    reference = reference or today()
-    booking_date = parse_iso_date(entry.get("appointment_date"))
-    entry["days_away"] = (booking_date - reference).days if booking_date else None
-    if entry["days_away"] == 1:
-        entry["when_label"] = "Tomorrow"
-    elif entry["days_away"] is not None and entry["days_away"] < 7:
-        entry["when_label"] = booking_date.strftime("%A")
-    elif booking_date:
-        entry["when_label"] = booking_date.strftime("%b %d")
-    else:
-        entry["when_label"] = ""
-    return entry
-
-
-def get_upcoming_appointments(limit=None, from_date=None):
-    """Bookings still to come, soonest first.
-
-    Strictly after the clinic-local today: everything dated today already appears
-    in the queue below, and a screen that listed it twice would leave the desk
-    unsure which of the two entries to act on.
-    """
-    reference = from_date or today()
-    placeholders = ", ".join("?" for _ in PENDING_STATUSES)
-    sql = (
-        _QUEUE_SELECT
-        + f"""
-        WHERE date(a.appointment_date) > ?
-          AND a.status IN ({placeholders})
-        ORDER BY a.appointment_date ASC, a.appointment_time IS NULL,
-                 a.appointment_time ASC, a.id ASC
-        """
-    )
-    parameters = [reference.isoformat(), *PENDING_STATUSES]
-    if limit:
-        sql += " LIMIT ?"
-        parameters.append(int(limit))
-
-    conn = get_db()
-    rows = conn.execute(sql, parameters).fetchall()
-    conn.close()
-    return [_to_upcoming_entry(row, reference) for row in rows]
-
-
-def get_upcoming_stats(entries=None, from_date=None):
-    """The figures the Upcoming Appointments panel prints above its list."""
-    reference = from_date or today()
-    if entries is None:
-        entries = get_upcoming_appointments(from_date=reference)
-
-    days = {entry["appointment_date"][:10] for entry in entries}
-    return {
-        "total": len(entries),
-        "next_seven_days": sum(
-            1 for entry in entries
-            if entry["days_away"] is not None and entry["days_away"] <= 7
-        ),
-        "tomorrow": sum(1 for entry in entries if entry["days_away"] == 1),
-        "days_with_bookings": len(days),
-    }
 
 
 def get_appointment_day_summary(start_date, end_date):

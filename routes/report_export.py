@@ -125,7 +125,7 @@ SHEET_SUMMARIES = {
     "diagnoses": "The most common diagnoses recorded inside the range.",
     "concerns": "Chronic conditions on the register, and the range's diagnoses.",
     "appointments": "Appointment outcomes per month, and the attendance rate.",
-    "services": "Which services the range's appointments were booked for.",
+    "services": "Which services the range's visits were recorded against.",
     "vaccination": "Immunisation coverage on the closing date, and doses given.",
     "demographics": "Age, sex and chronic-condition breakdowns of the register.",
     "seniors": "The senior cohort and the conditions recorded against it.",
@@ -769,7 +769,10 @@ def _appointments(context):
             ("Attended", window["attended"],
              "Completed, plus those in the clinic right now"),
             ("Cancelled or no-show", window["missed"], ""),
-            ("Still expected", window["expected"], "Booked, not yet resolved"),
+            ("Still expected", window["expected"],
+             "Booked and not yet resolved. Zero from September 2026 on, when "
+             "advance booking was retired — a visit is now recorded on the day "
+             "the patient arrives, so none is ever pending"),
             ("Resolved", window["resolved"],
              "Attended plus cancelled/no-show — a visit still to happen has "
              "neither succeeded nor failed"),
@@ -778,7 +781,9 @@ def _appointments(context):
             ("Missed rate (%)", window["missed_pct"],
              "Of the resolved appointments only"),
             ("Walk-ins", window["walk_ins"], ""),
-            ("Booked in advance", window["booked"], ""),
+            ("Booked in advance", window["booked"],
+             "Visits recorded before the day they happened. Only months before "
+             "September 2026 can hold any"),
         ]),
     ]
 

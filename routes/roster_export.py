@@ -65,7 +65,7 @@ The resolutions available were three, and two of them are worse:
 The third is what Screen 12's audit export already does about its own search box,
 and it is what these four do. Every cover sheet carries a "What this file covers"
 block naming the controls that were not applied, by name, per screen -- Patient
-Records has five, Medicine Inventory three, Appointment Scheduling five -- and
+Records has five, Medicine Inventory three, the Patient Queue three -- and
 states the row count so a reader can check the file against the screen's own
 footer.
 
@@ -202,20 +202,26 @@ INVENTORY_UNTRACKED = (
     ),
 )
 
-# Screen 08.
+# Screen 08. Rewritten on 2026-09-05, when advance booking was retired: two of
+# the four reasons here were about booking writes that no longer happen, and a
+# file that keeps explaining what it does not record about a feature the system
+# does not have is exactly the drift utils/unavailable.py exists to prevent.
+# What replaced them is not filler -- the removal made one genuinely new gap, and
+# it is named here as well as on the screen.
 APPOINTMENT_UNTRACKED = (
     (
-        "Who booked, moved or called off an appointment",
-        "The audit trail does not record appointment writes. Every row here "
-        "carries the staff member it is assigned to, because that is a stored "
-        "column -- but a reschedule or a cancellation overwrites the row and "
-        "leaves no trace of what it held before.",
+        "Who checked a patient in",
+        "The audit trail does not record queue writes. Every row here carries the "
+        "staff member the visit is assigned to, because that is a stored column, "
+        "but nothing says who took the arrival at the desk, who started the "
+        "consultation, or who closed it.",
     ),
     (
-        "Why an appointment was cancelled, or a patient did not attend",
-        "Cancelled and No-show are statuses with no reason field behind them. The "
-        "booking's notes are the operator's own text about the visit and are "
-        "reproduced in full here; they are not a cancellation reason.",
+        "That a patient left before being seen",
+        "There is no status for it. Somebody who checks in and goes home stays "
+        "Waiting on the queue, and Mark Completed is not the answer -- that "
+        "records that the visit happened. Any such row in this file reads as a "
+        "patient still in the building.",
     ),
     (
         "How long anybody waited",
@@ -300,12 +306,12 @@ def inventory_document(context, produced_by=""):
 
 
 def appointment_workbook(context, produced_by=""):
-    """Appointment Scheduling (Screen 08) as a workbook: bytes and a filename."""
+    """The Patient Queue (Screen 08) as a workbook: bytes and a filename."""
     return _workbook(_appointment_export(context, produced_by))
 
 
 def appointment_document(context, produced_by=""):
-    """Appointment Scheduling (Screen 08) as a PDF document: bytes and a filename."""
+    """The Patient Queue (Screen 08) as a PDF document: bytes and a filename."""
     return _document(_appointment_export(context, produced_by), produced_by)
 
 
@@ -976,7 +982,7 @@ def _inventory_export(context, produced_by):
 
 
 # ---------------------------------------------------------------------------
-# Screen 08 -- Appointment Scheduling
+# Screen 08 -- Patient Queue
 # ---------------------------------------------------------------------------
 
 QUEUE_COLUMNS = (
@@ -992,24 +998,11 @@ QUEUE_COLUMNS = (
     "Assigned to",
 )
 
-UPCOMING_COLUMNS = (
-    "Appointment ID",
-    "Patient",
-    "Patient ID",
-    "Service / Reason",
-    "Notes",
-    "Date",
-    "Day",
-    "Time",
-    "Assigned to",
-    "Status",
-)
-
 CALENDAR_COLUMNS = (
     "Date",
     "Day",
-    "Booked",
-    "Still to happen",
+    "Visits",
+    "Never closed",
     "In the queue",
     "Completed",
     "Cancelled or no-show",
@@ -1027,27 +1020,26 @@ def _appointment_export(context, produced_by):
 
     WHAT "THE FULL LIST" MEANS ON THIS SCREEN
     -----------------------------------------
-    Screen 08 is not one table. It shows three lists by default and they answer
-    three different questions: today's queue (who is here now), the calendar
-    (which days carry what load), and upcoming bookings (who is expected, and
-    when). The template says outright why the first and third are not merged -- a
-    booking for next Tuesday has no arrival time, no queue position and no action
-    available -- so a file holding only one of them would be an export of a third
-    of the screen.
+    Screen 08 is not one table. It shows two lists, and they answer two different
+    questions: today's queue (who is here now) and the calendar (what each day of
+    the month held). Both are in the file, on sheets of their own, in the order
+    the screen has them, and the cover names each one's scope.
 
-    All three are in the file, on sheets of their own, in the order the screen has
-    them, and the cover names each one's scope. The queue is today only, because
-    that is what a queue is. Upcoming is every pending booking after today, which
-    is the whole of what that panel lists rather than the five the reminder strip
-    above it shows. And the calendar sheet is the month the screen's calendar was
-    showing, day by day -- the one part of this file a control on the screen does
-    change, because ?month= is a real server-side parameter and the export route
-    reads the same one the screen's arrows submit.
+    The queue is today only, because that is what a queue is. The calendar sheet
+    is the month the screen's calendar was showing, day by day -- the one part of
+    this file a control on the screen does change, because ?month= is a real
+    server-side parameter and the export route reads the same one the screen's
+    arrows submit.
+
+    There was a third sheet, Upcoming, holding every pending booking after today.
+    It went with advance booking on 2026-09-05: nothing books a future day, so the
+    sheet could only ever have been empty, and an empty sheet headed "Upcoming
+    Appointments" reads as a query that failed rather than as a feature that was
+    retired. The summary figures that counted those bookings went with it. See
+    utils/unavailable.py `advance_booking`.
     """
     queue = context["queue"]
     queue_stats = context["queue_stats"]
-    upcoming = context["upcoming"]
-    upcoming_stats = context["upcoming_stats"]
     calendar = context["calendar"]
     queue_date = context["queue_date"]
 
@@ -1079,49 +1071,13 @@ def _appointment_export(context, produced_by):
                   "yet arrived. Status is what the screen's badge prints, so the "
                   "patient who may be brought in now reads 'Ready' rather than "
                   "'Waiting'."),
-            empty="Nobody is booked for today and nobody has checked in.",
+            empty="Nobody has checked in today.",
         )],
         heading=f"Today's Queue — {long_date(queue_date)}",
         intro=(
-            "Everyone booked for today or checked in today, whatever has since "
-            "happened to them: completed and cancelled rows stay on the queue for "
-            "the rest of the day, exactly as they do on the screen."
-        ),
-    )
-
-    upcoming_rows = [
-        [
-            _value(entry.get("reference")),
-            _value(_patient_name(entry)),
-            _value(entry.get("patient_reference")),
-            _value(entry.get("appointment_type") or "Consultation"),
-            _value(entry.get("notes")),
-            display_date(entry.get("appointment_date")),
-            _value(entry.get("when_label")),
-            _value(entry.get("booked_time")),
-            _value(entry.get("assigned_staff")),
-            _value(entry.get("status")),
-        ]
-        for entry in upcoming
-    ]
-
-    upcoming_sheet = sheet(
-        "Upcoming",
-        [table(
-            f"Booked after today — {_count_label(len(upcoming), 'appointment')}",
-            UPCOMING_COLUMNS,
-            upcoming_rows,
-            note=("Soonest first. Every pending booking dated after today, not the "
-                  "five the reminder strip on the screen shows. Anything dated "
-                  "today is on the previous sheet instead, so no appointment "
-                  "appears twice in this file."),
-            empty="Nothing is booked beyond today.",
-        )],
-        heading="Upcoming Appointments",
-        intro=(
-            "Future bookings, kept apart from today's queue for the reason the "
-            "screen keeps them apart: a booking for next week has no arrival time, "
-            "no queue position and no action available except waiting for the day."
+            "Everyone checked in today, whatever has since happened to them: "
+            "completed rows stay on the queue for the rest of the day, exactly as "
+            "they do on the screen."
         ),
     )
 
@@ -1147,11 +1103,11 @@ def _appointment_export(context, produced_by):
             f"{_count_label(calendar['month_total'], 'appointment')}",
             CALENDAR_COLUMNS,
             calendar_rows,
-            note=("One row per day that has something booked; days with nothing on "
-                  "them are left out rather than listed as zeroes. The four count "
+            note=("One row per day that had a visit; days with nothing on them "
+                  "are left out rather than listed as zeroes. The four count "
                   "columns are the buckets the screen's calendar legend uses, and "
-                  "they add up to Booked."),
-            empty=f"Nothing is booked in {calendar['label']}.",
+                  "they add up to the day's total."),
+            empty=f"Nothing was recorded in {calendar['label']}.",
         )],
         heading=f"Calendar — {calendar['label']}",
         intro=(
@@ -1165,7 +1121,7 @@ def _appointment_export(context, produced_by):
     summary = sheet(
         "Summary",
         [figures(
-            "The figures on the Appointment Scheduling stat cards and panel headers",
+            "The figures on the Patient Queue's stat cards and panel headers",
             [
                 ("Appointments today", queue_stats["total_today"],
                  f"{queue_stats['walk_ins']} walk-in"
@@ -1183,40 +1139,31 @@ def _appointment_export(context, produced_by):
                   if queue_stats["active_is_stale"]
                   else queue_stats["active_name"] or "The clinician is free")),
                 ("Completed today", queue_stats["completed"],
-                 f"Of the {queue_stats['total_today']} booked or checked in today"),
-                ("Booked but not yet arrived", queue_stats["not_arrived"],
-                 f"Still expected on {display_date(queue_date)}"),
-                ("Upcoming appointments", upcoming_stats["total"],
-                 "Across "
-                 f"{_count_label(upcoming_stats['days_with_bookings'], 'day')}, "
-                 f"{upcoming_stats['next_seven_days']} inside the next 7 days"),
-                (f"Booked in {calendar['label']}", calendar["month_total"],
-                 f"Of which {calendar['month_pending']} have still to happen"),
+                 f"Of the {queue_stats['total_today']} checked in today"),
+                (f"Visits in {calendar['label']}", calendar["month_total"],
+                 f"Of which {calendar['month_pending']} were never closed"),
             ],
-            note=("The queue figures are today's, at the health center; the "
-                  "upcoming figures cover every pending booking after today; the "
-                  "month figure covers the calendar month on the sheet before this "
-                  "one. Each row says which."),
+            note=("The queue figures are today's, at the health center; the month "
+                  "figure covers the calendar month on the sheet before this one. "
+                  "Each row says which."),
         )],
         heading="Summary",
     )
 
     cover = _cover_sheet(
-        "Appointment Scheduling",
-        "Today's queue, upcoming bookings and the calendar month",
+        "Patient Queue",
+        "Today's queue and the calendar month",
         produced_by,
         detail=[
             ("Queue date", long_date(queue_date)),
             ("In today's queue", len(queue)),
-            ("Upcoming after today", len(upcoming)),
             ("Calendar month", calendar["label"]),
         ],
         controls=[
             [
                 "The controls that were not applied",
-                "The queue's search box and its Advanced Filter service and status "
-                "controls, and the Upcoming panel's own search box and day chip. "
-                "All five narrow their tables in the browser only.",
+                "The queue's search box and its Advanced Filter service and "
+                "status controls. All three narrow the table in the browser only.",
             ],
             [
                 "The one control that was carried",
@@ -1227,34 +1174,31 @@ def _appointment_export(context, produced_by):
             ],
         ],
         index=[
-            ["Today's Queue",
-             "Everyone booked for or checked in today, in queue order."],
-            ["Upcoming", "Every pending booking dated after today, soonest first."],
-            ["Calendar", "The calendar month's load, one row per day with bookings."],
+            ["Today's Queue", "Everyone checked in today, in queue order."],
+            ["Calendar", "The month's load, one row per day that had visits."],
             ["Summary", "The figures the screen's stat cards and headers show."],
         ],
         intro=(
-            "Appointment Scheduling shows three lists side by side, and all "
-            "three are in this file on sheets of their own. Taken off the system on "
+            "The Patient Queue shows two lists, and both are in this file on "
+            "sheets of their own. Taken off the system on "
             f"{now().strftime('%B %d, %Y')}."
         ),
     )
 
     notes = _untracked_sheet(
         APPOINTMENT_UNTRACKED,
-        "The three lists are complete for what the system stores about a booking as "
-        "it stands. An appointment row is overwritten in place as it moves through "
-        "its statuses, so what this file holds is where every booking stands now. "
+        "Both lists are complete for what the system stores about a visit as it "
+        "stands. An appointment row is overwritten in place as it moves through "
+        "its statuses, so what this file holds is where every visit stands now. "
         "The following are not stored at all.",
     )
 
     return _assemble(
-        "Appointment Scheduling — Queue, Upcoming and Calendar",
-        (f"{display_date(queue_date)} queue · {len(upcoming)} upcoming · "
-         f"{calendar['label']}"),
-        _stem("Appointment Scheduling", "Queue and upcoming"),
+        "Patient Queue — Today's Queue and Calendar",
+        f"{display_date(queue_date)} queue · {calendar['label']}",
+        _stem("Patient Queue", "Queue and calendar"),
         cover,
-        [queue_sheet, upcoming_sheet, calendar_sheet, summary],
+        [queue_sheet, calendar_sheet, summary],
         notes,
     )
 

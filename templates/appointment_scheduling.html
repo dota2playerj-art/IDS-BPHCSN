@@ -473,20 +473,24 @@
         </div>
         <div class="d-flex align-items-center gap-2">
 {#- EXPORT. Two working links, and what they cover is wider than the toolbar they
-    sit in: this screen shows three lists by default -- today's queue, the upcoming
-    bookings below, and the calendar month beside them -- and a file holding only
-    the queue would be an export of a third of the screen. All three are in it, on
-    sheets of their own, and the cover names each one's scope.
+    sit in: this screen shows two lists -- today's queue and the calendar month
+    above it -- and a file holding only the queue would be half an export. Both are
+    in it, on sheets of their own, and the cover names each one's scope.
 
     The calendar's month comes with them, because ?month= is a real server-side
     parameter -- the same one the calendar's own arrows submit -- so the file holds
-    the month on screen. The two search boxes and the queue's service and status
-    filters cannot: they narrow rows in the browser and the server never sees
-    them. The cover sheet says which of the two every control on this screen is. #}
+    the month on screen. The search box and the queue's service and status filters
+    cannot: they narrow rows in the browser and the server never sees them. The
+    cover sheet says which of the two every control on this screen is.
+
+    There was a third sheet, Upcoming, and summary figures counting future
+    visits. Both went with advance booking -- see routes/roster_export.py
+    _appointment_export(), which says why an empty sheet would have been worse
+    than no sheet. #}
           <a class="btn-outline-teal" href="{{ url_for(appointments_excel_endpoint, month=calendar.month_start.strftime('%Y-%m')) }}" download
-             title="Download today's queue, every upcoming booking and this calendar month as an Excel workbook — the full lists, not as filtered on screen"><span class="material-symbols-outlined" style="font-size:18px;">description</span>Export Excel</a>
+             title="Download today's queue and this calendar month as an Excel workbook — the full lists, not as filtered on screen"><span class="material-symbols-outlined" style="font-size:18px;">description</span>Export Excel</a>
           <a class="btn-outline-teal" href="{{ url_for(appointments_pdf_endpoint, month=calendar.month_start.strftime('%Y-%m')) }}" download
-             title="Download today's queue, every upcoming booking and this calendar month as a PDF on the health center's letterhead — the full lists, not as filtered on screen"><span class="material-symbols-outlined" style="font-size:18px;">picture_as_pdf</span>Export PDF</a>
+             title="Download today's queue and this calendar month as a PDF on the health center's letterhead — the full lists, not as filtered on screen"><span class="material-symbols-outlined" style="font-size:18px;">picture_as_pdf</span>Export PDF</a>
           <!-- The one thing a desk does here: record somebody who is standing at
                it now. New Appointment stood beside this and is gone with advance
                booking; a patient is seen on the day they arrive. -->

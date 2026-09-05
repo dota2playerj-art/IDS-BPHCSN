@@ -357,7 +357,18 @@
           <div class="panel-title no-print">Appointment Statistics</div>
           <!-- The three bars partition every status the appointments CHECK
                admits, so a month's stack is that month's whole appointment
-               count. See _OUTCOME_BY_STATUS in models/appointments.py. -->
+               count. See _OUTCOME_BY_STATUS in models/appointments.py.
+
+               STILL EXPECTED IS KEPT THOUGH IT CAN NO LONGER GROW, AND THAT IS A
+               DECISION. Advance booking was retired on 2026-09-05; nothing can
+               reach Scheduled or Confirmed any more, so this category is zero
+               from here on and stays zero. Dropping it from the legend would
+               make the chart tidier and the reader worse off: somebody who has
+               seen this panel before would find a category simply missing, with
+               nothing saying whether it was removed or failed to load. An
+               honest zero, with a line under the legend saying why it is zero,
+               is the safer of the two. The bars still stack to the month total
+               either way, because a category of zero adds nothing. -->
           <div class="panel-sub">
             Monthly appointment outcomes &middot; {{ appt.total }} in this range
             ({{ appt.booked }} booked, {{ appt.walk_ins }} walk-in)
@@ -373,6 +384,13 @@
             <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--info);"></span>Still expected ({{ appt.expected }})</div>
             <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--danger);"></span>Cancelled or no-show ({{ appt.missed }})</div>
           </div>
+{%- if not appt.expected %}
+          <div class="panel-sub" style="margin-top:8px; line-height:1.55;">
+            <strong style="display:inline;">Still expected</strong> is zero, and stays zero: patients are seen in the
+            order they arrive, so no visit is recorded before it happens. It is kept in the legend because
+            older months can still hold one &mdash; this system booked visits ahead until September 2026.
+          </div>
+{%- endif %}
         </div>
       </div>
 {%- endif %}
