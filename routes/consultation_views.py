@@ -120,6 +120,7 @@ from models.general_vaccinations import (
     parse_general_vaccinations,
     record_general_vaccinations,
     vaccination_label,
+    vaccines_for_age,
 )
 from models.general_vaccinations import FIELD_LABELS as GENERAL_VACCINE_LABELS
 from models.immunizations import (
@@ -397,7 +398,7 @@ def _immunization_context(patient, consultation, visit_date, ticked=None):
     return status
 
 
-def _general_vaccination_context(consultation, submitted=None):
+def _general_vaccination_context(consultation, submitted=None, age_context=None):
     """The "Other Vaccinations Given" section's state for this visit.
 
     Deliberately much thinner than _immunization_context(). That one has to
@@ -415,6 +416,19 @@ def _general_vaccination_context(consultation, submitted=None):
 
     `submitted` carries the operator's selection back through a validation
     bounce, so a rejected save does not throw away what they had ticked or typed.
+
+    `age_context` decides which tick boxes get printed, and only that. The
+    section itself is still shown at every age -- that is the whole point of it,
+    and a rabies course given to a bitten infant is the case that settled it.
+    What the age changes is the length of the list: for a patient under one,
+    models.general_vaccinations.vaccines_for_age() drops the rows that age cannot
+    be given, so a health worker writing up a four-month-old is not reading past
+    a Td booster and a senior's pneumococcal dose to reach the row they want. The
+    free-text row is printed at every age and is never dropped, so the shorter
+    list is a shorter list of prompts and not a shorter list of possibilities.
+
+    Omitted (None) means the whole list, which is what every caller outside the
+    consultation form wants and what an unaged patient gets.
     """
     recorded = get_general_vaccinations_for_consultation(
         consultation["id"] if consultation else None
@@ -431,7 +445,9 @@ def _general_vaccination_context(consultation, submitted=None):
             "checked": key in ticked,
             "dose_value": doses.get(key, ""),
         }
-        for key, name, protects in COMMON_VACCINES
+        for key, name, protects in vaccines_for_age(
+            bool(age_context and age_context.get("is_infant"))
+        )
     ]
     rows.append({
         "key": OTHER_KEY,
@@ -663,7 +679,7 @@ def consultation_form_context(patient, appointment=None, consultation=None,
         # nowhere to be recorded before it existed, and a child can have both
         # this and their EPI doses at the same visit.
         "general_vaccination": _general_vaccination_context(
-            consultation, general_submitted
+            consultation, general_submitted, age_context
         ),
         # Offered for every patient at every age, like the section above and
         # unlike the EPI one -- there is no cohort a medicine belongs to. What

@@ -510,7 +510,16 @@
 
            A patient can have both. An infant may receive their scheduled
            Pentavalent above and a travel-related vaccine here at the same visit,
-           and both are written against this consultation. -->
+           and both are written against this consultation.
+
+           SHOWN AT EVERY AGE; THE TICK BOXES ARE NOT THE SAME AT EVERY AGE. For
+           a patient under one the server hands this loop a shortened
+           general_vaccination.rows — the vaccines an infant can actually be
+           given, plus the free-text row, which is never dropped. That is a
+           presentation decision made in one place (vaccines_for_age() in
+           models/general_vaccinations.py, which states which vaccine is dropped
+           at that age and why); this template asks no question about the
+           patient's age here at all, and prints whatever rows it is given. -->
       <div class="panel-card general-vaccine-card">
         <div class="section-head">
           <div class="section-icon"><span class="material-symbols-outlined">syringe</span></div>
@@ -597,6 +606,11 @@
           Tick what was given today. Ticked doses are dated {{ visit_date | display_date }},
           appear under Other Vaccinations on {{ patient.first_name }}'s profile, and need a
           dose number only where the vaccine has one &mdash; a rabies course, say.
+{%- if age_context.is_infant %}
+          Under {{ infant_age_years }} year old, so this list shows only the vaccines
+          {{ patient.first_name }} can be given at this age &mdash; anything else that was
+          given goes in Other vaccine, by name.
+{%- endif %}
 {%- if consultation %}
           A vaccination already on file for this visit cannot be removed here.
 {%- endif %}

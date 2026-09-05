@@ -505,3 +505,75 @@ vaccine name and preserved dose on the general path. A valid submit in the same
 session saved, closed the dialog, and redirected with the audit-log flash,
 confirming the success path is unchanged. Screenshots were captured but, like the
 rest of this folder, are not committed — they are full Patient Profile screens.
+
+## general-vaccination-infant-list/
+
+Verification of the age-aware option list in **Other Vaccinations Given** on
+Record / Edit Consultation.
+
+The section is offered at every age and still is — that was settled earlier by a
+real case, a rabies course given to an infant, and hiding the section from
+infants would have made that unrecordable. What was wrong was the list inside
+it: writing up a two-month-old, the health worker was offered a Td booster, a
+seasonal flu shot, a pneumococcal polysaccharide dose and a COVID-19 vaccine,
+none of which that patient can be given, and had to read past all four to reach
+the row they wanted.
+
+The threshold is **under one year** — `INFANT_AGE_YEARS` in
+`models/consultations.py`, the same constant that already decides whether a head
+circumference field appears, read through the same `age_context["is_infant"]`
+flag, which is computed against the consultation's own date so an old record is
+judged by how old the patient was at the visit. The trimmed list for that cohort
+is **Hepatitis B, Rabies, and the free-text Other vaccine row**. Every patient of
+one year and over sees the full six rows exactly as before. `vaccines_for_age()`
+in `models/general_vaccinations.py` states which vaccine is dropped at that age
+and why.
+
+Nothing became unrecordable. The free-text row is never trimmed, the parser was
+deliberately left alone, and a vaccine dropped from an infant's tick boxes is
+still stored by name through Other vaccine.
+
+### What was checked
+
+Against the HTML the routes actually rendered, not against what the context
+builder said it would render — the checkbox `value=` attributes were read back
+out of the response body.
+
+* Seven screens × both roles (Administrator and Health Center Staff), 14 cells:
+  a 2-month-old on Record Consultation, three infant Edit Consultation screens,
+  and a 3-year-old, an 11-year-old, a 60-year-old and a 79-year-old. Every
+  infant screen printed exactly `hepatitis-b, rabies, other`; every screen above
+  the threshold printed all seven rows in the original order. The section itself,
+  and the free-text row, appeared on all 14.
+* The full adult list byte-for-byte: each of the six vaccine keys, its printed
+  name and its "protects against" text still on the page.
+* A real save — Health Center Staff recording *Rabies dose 1* for the 2-month-old
+  on Record Consultation — stored `('Rabies', 1, '2026-09-05')` against that
+  patient.
+* A refused save on an infant's Edit Consultation: the form came back 200 with
+  the trimmed list intact, the operator's tick still checked, and the
+  out-of-range dose error reported. The trim survives a bounce.
+* The diagnosis restriction, unaffected: Staff still gets no `diagnosis` field
+  and Admin still does, Staff still gets the vaccination section, and Staff's
+  trimmed list is identical to Admin's.
+* An adult save still storing adult-only vaccines — Influenza and Pneumococcal
+  written against a 60-year-old's consultation.
+* The parser, untouched: a rabies dose parses, a free-text name parses, an
+  unknown key is still dropped rather than stored.
+* `app.url_map` dumped before and after the change and diffed — the route × role
+  matrix is identical, 98 rules, nothing added, removed or re-methoded.
+* `python app.py` starts clean on port 5001, `/` redirects and `/login` renders
+  200, with no warning or traceback in the log.
+
+### Reproducing it
+
+1. `python app.py`, then sign in as the Administrator.
+2. Open a consultation for a patient under one — PAT-097 is two months old and
+   has a queue entry In Consultation — and scroll to **Other Vaccinations
+   Given**. The section is there, with Hepatitis B, Rabies and Other vaccine,
+   and a line under the table saying the list is shortened for this age.
+3. Open Edit Consultation for an adult — consultation 36, a 60-year-old — and
+   confirm all six vaccines plus Other vaccine are still offered.
+4. Repeat both signed in as Health Center Staff. The lists are the same; the
+   Assessment & Plan fields are the only thing that differs between the roles.
+

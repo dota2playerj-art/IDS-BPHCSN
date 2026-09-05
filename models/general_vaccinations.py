@@ -42,6 +42,12 @@ reads it to decide anything about a patient; the row that gets stored carries th
 vaccine's name as text, so a vaccine nobody anticipated is recorded exactly as
 well as one on the list.
 
+One thing does now read the list -- vaccines_for_age() drops the rows an infant
+cannot be given before the form prints them -- and that is still not policy about
+a patient. It decides what a screen offers, not what a record may say: every row
+it drops remains typeable in the free-text row, and no stored record is read,
+graded or changed by it.
+
 That is the opposite of EPI_SCHEDULE, which *is* national policy, is closed, and
 is the yardstick every EPI status is measured against. Storing a name here rather
 than a code is the same decision read from the other side: a code only earns its
@@ -80,6 +86,70 @@ COMMON_VACCINES = (
 
 VACCINE_NAMES = {key: name for key, name, _ in COMMON_VACCINES}
 VACCINE_KEYS = frozenset(VACCINE_NAMES)
+
+# The rows above that a patient under INFANT_AGE_YEARS can plausibly be given.
+#
+# WHY THE LIST IS TRIMMED FOR INFANTS AND NOT FOR ANYONE ELSE
+# -----------------------------------------------------------
+# The section is offered at every age and stays offered at every age -- see the
+# module docstring for why, and routes/consultation_views.py for the guard it
+# deliberately does not have. What is age-aware is only which tick boxes the
+# form bothers to print, and only for the youngest cohort, because that is where
+# the full list stopped reading as a list of choices and started reading as a
+# list of mistakes: a health worker writing up a four-month-old was offered a Td
+# booster, a seasonal flu shot and a pneumococcal polysaccharide dose, none of
+# which that child can be given, and had to read past all three to reach the one
+# that could.
+#
+# Each exclusion is a real age restriction rather than a tidying-up:
+#
+#   Tetanus / Td   Td is licensed from seven years. An infant's tetanus and
+#                  diphtheria protection comes from the Pentavalent doses of the
+#                  EPI schedule, which the section above this one records.
+#   Influenza      Seasonal influenza vaccine is not given before six months,
+#                  and what is given between six and eleven months is a paediatric
+#                  half dose the health center refers rather than stocks.
+#   Pneumococcal   The infant's pneumococcal vaccine is PCV, and PCV is an EPI
+#                  schedule dose recorded in the section above. What this row
+#                  means is the adult polysaccharide vaccine, which is a
+#                  sixty-and-over product.
+#   COVID-19       No COVID-19 vaccine is authorised in the Philippines for
+#                  children under one.
+#
+# What survives is what an infant genuinely receives outside the EPI schedule:
+#
+#   Hepatitis B    The birth dose is real, and a dose given somewhere the EPI
+#                  record cannot reach it still has to be written down.
+#   Rabies         Post-exposure prophylaxis has no lower age limit at all. A
+#                  bitten infant is treated, and this is the row that records it.
+#                  It is also the scenario that proved this section had to stay
+#                  visible for infants rather than be hidden from them.
+#
+# And OTHER_KEY is never trimmed. The free-text row is what keeps this a shorter
+# list rather than a shorter set of possibilities: anything an infant is given
+# that these two do not cover is typed in by name, exactly as it is at any other
+# age. Nothing becomes unrecordable.
+INFANT_VACCINE_KEYS = frozenset({"hepatitis-b", "rabies"})
+
+
+def vaccines_for_age(is_infant=False):
+    """The COMMON_VACCINES rows to offer a patient of this age, in list order.
+
+    `is_infant` is age_context["is_infant"] -- the project's one under-one flag,
+    computed in models.consultations.consultation_age_context() against the
+    consultation's own date, so an old record is judged by how old the patient
+    was at the visit. It is passed in rather than recomputed here because this
+    module knows nothing about birthdays and should not start: one age
+    computation, read by the growth fields, the EPI section and now this one.
+
+    An unknown birthdate yields is_infant False and therefore the whole list,
+    which is the right way round -- a patient nobody has aged is not an infant
+    this form may make assumptions about, and offering too much is a cluttered
+    screen where offering too little would be a missing record.
+    """
+    if not is_infant:
+        return COMMON_VACCINES
+    return tuple(row for row in COMMON_VACCINES if row[0] in INFANT_VACCINE_KEYS)
 
 # The free-text row. Its name comes from the operator rather than the list, which
 # is what keeps the list a convenience instead of a limit.
