@@ -1,27 +1,16 @@
 """Administrator screens. Mounted at /admin."""
 from flask import Blueprint, flash, redirect, render_template, request, session, url_for
 
-from models.appointment_sms import BOOKED, CANCELLED_EVENT, RESCHEDULED
 from models.consultations import PEDIATRIC_AGE_YEARS
 from models.immunizations import get_immunization_alert
 from models.inventory import get_inventory_item_by_id, get_low_stock_alert
 from models.patients import get_patient_by_id
 from routes.appointment_views import (
-    NEW_PATIENT_MODE,
-    appointment_return_url,
     appointment_scheduling_context,
-    booking_mode,
-    process_book_appointment,
-    process_cancel_appointment,
     process_check_in,
     process_complete_consultation,
-    process_new_patient_booking,
-    process_new_patient_booking_request,
     process_new_patient_check_in,
-    process_reschedule_appointment,
-    process_send_appointment_sms,
     process_start_consultation,
-    offer_appointment_sms,
 )
 from routes.audit_export import (
     audit_document,
@@ -47,9 +36,6 @@ from routes.inventory_views import (
     process_archive_medicine,
 )
 from routes.patient_views import (
-    booking_details,
-    booking_query_args,
-    booking_requested,
     check_in_reason,
     check_in_requested,
     patient_profile_context,
@@ -304,18 +290,6 @@ def register_patient(patient_id=None):
                     )
                 )
                 return redirect(url_for("admin.appointment_scheduling"))
-            # The same handoff for the New Appointment dialog's new-patient
-            # path: the record now exists, so book the visit it was opened for
-            # and land back on the screen the operator started from.
-            if patient is None and booking_requested(request.form):
-                appointment_id, message = process_new_patient_booking(
-                    saved_id,
-                    booking_details(request.form),
-                    session.get("user_id"),
-                )
-                flash(message)
-                offer_appointment_sms(appointment_id, BOOKED)
-                return redirect(url_for("admin.appointment_scheduling"))
             # Save & Register Another. The record is saved -- the branch above
             # only runs on a row id returned by the very same
             # process_register_patient() the ordinary Save calls -- so what is
@@ -351,7 +325,6 @@ def register_patient(patient_id=None):
             form=address_prefill_form(request.args) if patient is None else None,
             check_in=check_in_requested(request.args),
             check_in_reason_text=check_in_reason(request.args),
-            booking=booking_details(request.args) if booking_requested(request.args) else None,
         ),
     )
 
@@ -479,101 +452,6 @@ def export_appointment_scheduling_pdf():
     return pdf_response(appointment_document(
         appointment_scheduling_context(month=request.args.get("month")),
         produced_by=exported_by(),
-    ))
-
-
-# New Appointment: book a future visit. Two paths through one endpoint, because
-# they are one decision made in one dialog -- pick an existing patient, or
-# register a new one first. The second validates the booking here and then hands
-# off to Register Patient carrying it, so an unsound date is caught before a
-# permanent patient record is created against it.
-@admin_bp.route('/appointment_scheduling/book', methods=["POST"])
-@login_required
-@role_required("Admin")
-def book_appointment():
-    if booking_mode(request.form) == NEW_PATIENT_MODE:
-        details, context = process_new_patient_booking_request(request.form)
-        if details is None:
-            return render_template('appointment_scheduling.html', **context)
-        return redirect(
-            url_for("admin.register_patient", **booking_query_args(details))
-        )
-
-    appointment_id, context, message = process_book_appointment(
-        request.form, session.get("user_id")
-    )
-    if appointment_id:
-        flash(message)
-        # The booking is saved; the offer to tell the patient rides along to the
-        # screen the redirect lands on. Nothing is sent by this call -- see the
-        # section note in routes/appointment_views.py.
-        offer_appointment_sms(appointment_id, BOOKED)
-        return redirect(url_for("admin.appointment_scheduling"))
-    # Field errors and unacknowledged conflicts are shown inside the reopened
-    # dialog, next to what they refer to, rather than as a flash above the page.
-    return render_template('appointment_scheduling.html', **context)
-
-
-# Calling a booking off, and moving one. POST only, like every other action on
-# this screen: they change records, so there is no URL to navigate to.
-#
-# Both accept ?return_to=profile:<patient_id> so the Patient Profile's
-# Appointment History can use the same two endpoints and land back where the
-# operator was working, rather than needing endpoints of its own.
-@admin_bp.route('/appointment_scheduling/cancel', methods=["POST"])
-@login_required
-@role_required("Admin")
-def cancel_appointment():
-    appointment_id, message = process_cancel_appointment(request.form)
-    flash(message)
-    # Set only when a booking was genuinely just cancelled. A no-show closes the
-    # same dialog and returns no id, so no message is offered for it -- see
-    # process_cancel_appointment() for why that is a decision, not a gap.
-    offer_appointment_sms(
-        appointment_id, CANCELLED_EVENT, request.form.get("return_to")
-    )
-    return redirect(appointment_return_url(
-        request.form, "admin.appointment_scheduling", "admin.patient_profile",
-    ))
-
-
-@admin_bp.route('/appointment_scheduling/reschedule', methods=["POST"])
-@login_required
-@role_required("Admin")
-def reschedule_appointment():
-    appointment_id, context, message = process_reschedule_appointment(request.form)
-    if context is None:
-        flash(message)
-        offer_appointment_sms(
-            appointment_id, RESCHEDULED, request.form.get("return_to")
-        )
-        return redirect(appointment_return_url(
-            request.form, "admin.appointment_scheduling", "admin.patient_profile",
-        ))
-    return render_template('appointment_scheduling.html', **context)
-
-
-# Send one SMS confirmation to one patient about one of their own appointments.
-#
-# POST only, and guarded like every other action on this screen. It is a separate
-# endpoint from the community broadcast send for the same reason
-# appointment_sms_messages is a separate table from sms_broadcasts: a broadcast is
-# what the barangay said to everybody, and this is one message to one named
-# patient about their own visit. The two share the gateway (utils/sms.py) and
-# nothing else.
-#
-# The redirect lands wherever the operator was working -- the same return_to
-# field the cancel and reschedule endpoints honour -- so sending a confirmation
-# from a patient's profile does not tip them onto Appointment Scheduling.
-@admin_bp.route('/appointment_scheduling/send-sms', methods=["POST"])
-@login_required
-@role_required("Admin")
-def send_appointment_sms():
-    flash(process_send_appointment_sms(
-        request.form, session.get("user_id"), request.remote_addr
-    ))
-    return redirect(appointment_return_url(
-        request.form, "admin.appointment_scheduling", "admin.patient_profile",
     ))
 
 

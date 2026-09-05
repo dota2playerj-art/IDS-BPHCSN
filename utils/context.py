@@ -13,7 +13,6 @@ from models.settings import (
     display_time,
     get_settings,
 )
-from routes.appointment_views import take_appointment_sms_offer
 from utils.dates import now, today
 from utils.names import initials
 from utils.roles import normalize_role
@@ -73,24 +72,11 @@ def inject_role_context():
             "archive_medicine_endpoint": "staff_archive_medicine",
             "appointment_scheduling_endpoint": "staff_appointment_scheduling",
             "check_in_patient_endpoint": "staff_check_in_patient",
-            "book_appointment_endpoint": "staff_book_appointment",
-            "cancel_appointment_endpoint": "staff_cancel_appointment",
-            "reschedule_appointment_endpoint": "staff_reschedule_appointment",
             "start_consultation_endpoint": "staff_start_consultation",
             "complete_consultation_endpoint": "staff_complete_consultation",
             "record_consultation_endpoint": "staff_record_consultation",
             "edit_consultation_endpoint": "staff_edit_consultation",
             "sms_notifications_endpoint": "staff_sms_notifications",
-            # The individual appointment confirmation. Present for the two roles
-            # that book, move and cancel appointments in the first place, and
-            # absent for the Barangay Official -- who has no Appointment
-            # Scheduling screen, so no booking of theirs could ever produce the
-            # offer this endpoint answers. Health Center Staff has it even though
-            # they are view-only on community broadcasts: the confirmed ruling
-            # keeps them out of what the barangay says to everybody, and this is
-            # the opposite thing -- one patient being told about their own visit,
-            # which is squarely their own scope.
-            "send_appointment_sms_endpoint": "staff_send_appointment_sms",
             # Export Excel and Export PDF on Screens 03, 06 and 08. Named per
             # role for the same reason every endpoint above is: these three
             # templates are each rendered by two blueprints, and each role must
@@ -141,15 +127,11 @@ def inject_role_context():
             "archive_medicine_endpoint": "archive_medicine",
             "appointment_scheduling_endpoint": "appointment_scheduling",
             "check_in_patient_endpoint": "check_in_patient",
-            "book_appointment_endpoint": "book_appointment",
-            "cancel_appointment_endpoint": "cancel_appointment",
-            "reschedule_appointment_endpoint": "reschedule_appointment",
             "start_consultation_endpoint": "start_consultation",
             "complete_consultation_endpoint": "complete_consultation",
             "record_consultation_endpoint": "record_consultation",
             "edit_consultation_endpoint": "edit_consultation",
             "sms_notifications_endpoint": "sms_notifications",
-            "send_appointment_sms_endpoint": "send_appointment_sms",
             # Only the two broadcast-holding roles get a send endpoint at all. The
             # Health Staff branch above has none, which is what makes that role
             # view-only -- there is no URL for a forged POST to reach.
@@ -257,17 +239,6 @@ def inject_role_context():
     # Staff is view-only (individual patient scheduling is their scope, not broadcast).
     context["can_broadcast"] = normalized_role in {"admin", "barangay official"}
 
-    # The SMS confirmation offered after a booking, a move or a cancellation, or
-    # None -- which is every render but the one immediately after one of those
-    # three saves. Consumed here, once, exactly as get_flashed_messages() consumes
-    # a flash: the offer belongs beside the message confirming the save that
-    # produced it, and the two travel together to whichever screen the operator
-    # was redirected to. See the section note in routes/appointment_views.py.
-    #
-    # Building it reads the appointment and the patient back from the database,
-    # so the message previewed on screen is composed from the record as it stands
-    # at render time rather than from what the form said.
-    context["appointment_sms_offer"] = take_appointment_sms_offer()
 
     # THE HEALTH CENTER'S OWN IDENTITY, ON EVERY RENDER.
     #

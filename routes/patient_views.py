@@ -117,52 +117,6 @@ def check_in_reason(source):
     return (source.get(CHECK_IN_REASON_FIELD) or "").strip()[:CHECK_IN_REASON_MAX]
 
 
-# The New Appointment dialog's "New patient" path uses the same mechanism one
-# step further: the booking is for somebody who has no record yet, so Register
-# Patient opens carrying the appointment that has already been agreed at the
-# desk, and saving the form registers them *and* books it.
-#
-# The details are validated before this form is ever opened (see
-# process_new_patient_booking_request), so what rides along here is a booking
-# already known to be sound -- and it is validated once more on the way out,
-# because hidden fields are only ever a claim about what was sent.
-BOOKING_FLAG_FIELD = "book_appointment"
-
-# form/query field -> the key the booking model and validator use. Written out
-# rather than reusing the model's names directly so the query string stays
-# readable and cannot collide with the patient form's own fields.
-BOOKING_FIELDS = {
-    "booking_date": "appointment_date",
-    "booking_time": "appointment_time",
-    "booking_type": "appointment_type",
-    "booking_staff": "assigned_staff_id",
-    "booking_notes": "notes",
-}
-
-
-def booking_requested(source):
-    """True when this Register Patient submit came from the New Appointment dialog."""
-    return (source.get(BOOKING_FLAG_FIELD) or "").strip().lower() in _CHECK_IN_TRUE
-
-
-def booking_details(source):
-    """The booking carried on the form/query, in the shape the model validates."""
-    return {
-        model_key: (source.get(field) or "").strip()
-        for field, model_key in BOOKING_FIELDS.items()
-    }
-
-
-def booking_query_args(values):
-    """A validated booking rendered as the query string Register Patient opens with."""
-    args = {BOOKING_FLAG_FIELD: "1"}
-    for field, model_key in BOOKING_FIELDS.items():
-        value = (values.get(model_key) or "").strip()
-        if value:
-            args[field] = value
-    return args
-
-
 # Save & Register Another. The submit button carries this name/value pair, the
 # shape this project already uses wherever one form has more than one action --
 # Patient Records' status buttons and Appointment Scheduling's queue buttons both
@@ -782,8 +736,7 @@ def patient_to_form(patient):
 
 def register_patient_context(form=None, errors=None, duplicates=None,
                              acknowledge_duplicate=False, patient=None,
-                             check_in=False, check_in_reason_text="",
-                             booking=None):
+                             check_in=False, check_in_reason_text=""):
     """Context for the patient form.
 
     `patient` set means edit mode: the template switches its wording, shows the
@@ -798,17 +751,11 @@ def register_patient_context(form=None, errors=None, duplicates=None,
     mode -- an existing patient is checked in from the dialog's other path, not
     by re-saving their record.
 
-    `booking` is the same idea for the New Appointment dialog: a dict of already
-    validated booking details, rendered as hidden fields so saving the form both
-    registers the patient and books the visit. Ignored in edit mode for the same
-    reason, and mutually exclusive with `check_in` -- the two come from different
-    dialogs and a form cannot have been opened by both.
     """
     if patient is not None and form is None:
         form = patient_to_form(patient)
 
-    booking = dict(booking) if booking and patient is None else None
-    check_in = bool(check_in) and patient is None and booking is None
+    check_in = bool(check_in) and patient is None
 
     return {
         "patient": patient,
@@ -832,16 +779,6 @@ def register_patient_context(form=None, errors=None, duplicates=None,
         # the same two strings and cannot drift out of agreement.
         "save_action_field": SAVE_ACTION_FIELD,
         "save_and_register_another": SAVE_AND_REGISTER_ANOTHER,
-        # Same mechanism again for the advance-booking path. `booking` is what
-        # the notice at the top of the form reads; `booking_hidden` is the
-        # name/value pairs that carry it to the next submit.
-        "booking": booking,
-        "booking_flag_field": BOOKING_FLAG_FIELD,
-        "booking_hidden": (
-            [(field, booking.get(model_key) or "")
-             for field, model_key in BOOKING_FIELDS.items()]
-            if booking else []
-        ),
     }
 
 
@@ -887,17 +824,16 @@ def process_register_patient(form_data, patient=None):
     the caller should redirect to that profile, a context means the caller should
     re-render the form.
 
-    The check-in intent -- and the advance-booking intent, which works the same
-    way -- is read off the submitted form and threaded back into every context
-    this builds, so a first-time patient whose form bounces on a validation error
-    or a duplicate warning is still on that path when she finally saves.
+    The check-in intent is read off the submitted form and threaded back into
+    every context this builds, so a first-time patient whose form bounces on a
+    validation error or a duplicate warning is still on that path when she
+    finally saves.
     """
     values = _extract_form(form_data)
     # Ignored in edit mode by register_patient_context(); read unconditionally so
     # every branch below can pass the same intent through.
     check_in = check_in_requested(form_data)
     reason = check_in_reason(form_data)
-    booking = booking_details(form_data) if booking_requested(form_data) else None
 
     errors = validate_patient_form(values)
     if errors:
@@ -910,7 +846,6 @@ def process_register_patient(form_data, patient=None):
             acknowledge_duplicate=form_data.get("confirm_duplicate") == "yes",
             check_in=check_in,
             check_in_reason_text=reason,
-            booking=booking,
         )
 
     if patient is not None:
@@ -923,7 +858,7 @@ def process_register_patient(form_data, patient=None):
     if duplicates and form_data.get("confirm_duplicate") != "yes":
         return None, register_patient_context(
             form=values, duplicates=duplicates, acknowledge_duplicate=True,
-            check_in=check_in, check_in_reason_text=reason, booking=booking,
+            check_in=check_in, check_in_reason_text=reason,
         )
 
     return create_patient(values), None
