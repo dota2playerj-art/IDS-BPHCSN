@@ -160,7 +160,18 @@
           <div class="panel-sub" style="line-height:1.6;">
             {{ immunization_coverage.enrolled }} patient{{ '' if immunization_coverage.enrolled == 1 else 's' }}
             {{ 'has' if immunization_coverage.enrolled == 1 else 'have' }} at least one dose on record, from
-            {{ immunization_coverage.doses_given }} dose{{ '' if immunization_coverage.doses_given == 1 else 's' }} given.
+{#- "recorded", then the split. The sentence used to say "given", which was true
+    of every row it counted until a dose could be entered as one reported from
+    another facility. The total still counts all of them -- they are all doses
+    the patient has had -- and the clause names how many this health center did
+    not give, so the figure cannot be read as its own workload. #}
+            {{ immunization_coverage.doses_given }} dose{{ '' if immunization_coverage.doses_given == 1 else 's' }} recorded
+{%- if immunization_coverage.doses_reported %}
+            ({{ immunization_coverage.doses_administered }} given here,
+            {{ immunization_coverage.doses_reported }} reported as given elsewhere).
+{%- else %}
+            here.
+{%- endif %}
             Of the {{ immunization_coverage.eligible_children }} registered child{{ '' if immunization_coverage.eligible_children == 1 else 'ren' }}
             the DOH schedule still applies to,
             {{ immunization_coverage.up_to_date_children }} {{ 'is' if immunization_coverage.up_to_date_children == 1 else 'are' }} up to date.

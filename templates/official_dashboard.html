@@ -168,8 +168,16 @@
           <div class="stat-icon" style="background:#DBEAFE;"><span class="material-symbols-outlined" style="color:var(--info);">vaccines</span></div>
           <div class="stat-value">{{ immunization_coverage.doses_given }}</div>
           <div class="stat-label">Immunization Doses Recorded</div>
+{#- Recorded, not given. This card is read by the Barangay Official, whose
+    figures leave the health center, and the two readings are no longer the same
+    number: some of these doses were given at another hospital and reported here.
+    The total is the honest answer to "how many doses are on file"; the line
+    under it says how many of them this health center actually administered. #}
           <div class="stat-trend" style="color:var(--text-muted);" title="{{ untracked.campaigns }}">
             {{ immunization_coverage.enrolled }} patient{{ '' if immunization_coverage.enrolled == 1 else 's' }} with a dose &middot; campaigns not tracked
+{%- if immunization_coverage.doses_reported %}
+            <span style="display:block;">{{ immunization_coverage.doses_administered }} given here &middot; {{ immunization_coverage.doses_reported }} reported as given elsewhere</span>
+{%- endif %}
           </div>
         </div>
       </div>
@@ -317,6 +325,10 @@
           <div class="panel-sub" style="margin-top:10px;">
             What is recorded: {{ immunization_coverage.doses_given }} dose{{ '' if immunization_coverage.doses_given == 1 else 's' }}
             across {{ immunization_coverage.enrolled }} patient{{ '' if immunization_coverage.enrolled == 1 else 's' }},
+{%- if immunization_coverage.doses_reported %}
+            of which {{ immunization_coverage.doses_administered }} were given at this health center and
+            {{ immunization_coverage.doses_reported }} were reported as given elsewhere,
+{%- endif %}
             with {{ immunization_coverage.needing_attention }} child{{ 'ren' if immunization_coverage.needing_attention != 1 }} currently behind the DOH schedule.
           </div>
         </div>

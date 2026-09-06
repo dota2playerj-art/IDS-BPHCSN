@@ -412,7 +412,14 @@ def _summary_sheet(context, sections):
                      f"{coverage['up_to_date_children']} of "
                      f"{coverage['eligible_children']} registered children, as of "
                      f"{display_date(window['end'])}"))
-        rows.append(("Immunisation doses given", coverage["window"]["doses_given"], ranged))
+        # Split rather than totalled. This sheet is the summary somebody quotes
+        # from, and "doses given" has to mean doses this health center gave.
+        rows.append(("Immunisation doses given here",
+                     coverage["window"]["doses_administered"], ranged))
+        rows.append(("Doses reported as given elsewhere",
+                     coverage["window"]["doses_reported"],
+                     f"{ranged}, by the date reported. Recorded at a consultation "
+                     "here; administered at another facility"))
     if "inventory" in sections:
         inventory = context["inventory_report"]
         rows.append(("Inventory items in service", inventory["total_items"], standing))
@@ -826,14 +833,27 @@ def _vaccination(context):
                  f"reported as of the range's closing date, {closing}. There is no "
                  "such thing as a child being up to date \"during\" a period.")),
         figures("Doses", [
-            ("Doses given in this range", coverage["window"]["doses_given"],
+            ("Doses given here in this range",
+             coverage["window"]["doses_administered"],
              f"{display_date(window['start'])} to {closing}"),
+            ("Doses reported as given elsewhere, in this range",
+             coverage["window"]["doses_reported"],
+             "Administered at another facility and reported to this health "
+             "center at a consultation. A dose whose date is not known appears "
+             "in no range"),
             ("Children dosed in this range", coverage["window"]["children_dosed"],
              "Distinct children"),
-            ("Doses on record, all time", coverage["doses_given"], ""),
+            ("Doses on record, all time", coverage["doses_given"],
+             f"{coverage['doses_administered']} given here, "
+             f"{coverage['doses_reported']} reported as given elsewhere"),
             ("Patients with at least one dose", coverage["enrolled"],
              "The only reading of programme membership the data supports"),
-        ]),
+        ], note=("The coverage figures above count every dose a child has had, "
+                 "wherever it was given -- a child vaccinated at another "
+                 "hospital is protected and is not behind the schedule. These "
+                 "dose counts are the health center's own activity, so the two "
+                 "kinds are reported separately and never summed into one "
+                 "\"doses given\".")),
     ]
 
 

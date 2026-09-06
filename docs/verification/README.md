@@ -25,6 +25,28 @@ So the evidence lives on the machine that produced it. What is committed is this
 file, naming what was captured and how to produce it again, so the absence is
 stated rather than left for someone to trip over.
 
+## dose-given-elsewhere/
+
+Verification of the change that lets a health worker record an EPI dose as
+**previously given elsewhere** — at another hospital or in another barangay —
+without this health center claiming to have administered it. From capstone
+adviser testing: an infant showed **Overdue** for doses the child had already
+received, and the only way to clear that reading was to tick "given today", which
+would have filed another facility's work as this one's, on today's date, under
+the name of a health worker who never gave it.
+
+The exact scenario was driven end to end in a real browser on a real infant
+record — PAT-025, three months old, four doses showing Overdue of which three had
+actually been given elsewhere. Recording three as reported took him to `4 of 14
+scheduled doses given · 3 reported as given elsewhere · 1 overdue · 3 due now`;
+the one genuine Overdue survived, which is the half of the test that matters.
+One of the three went in with no date at all, because the mother did not
+remember the day and the record must not invent one.
+
+The details — every screen the distinction appears on, every entry the parser
+refuses, the diagnosis-restriction and EPI-tracking regression runs, and how to
+reproduce it — are in `dose-given-elsewhere/README.md`.
+
 ## retire-advance-booking/
 
 Verification of the five-commit retirement of **advance booking** and the rename

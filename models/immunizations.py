@@ -43,13 +43,56 @@ check-in message and the dashboard card all read its output; none of them works
 it out again. This is the same arrangement get_low_stock_alert() has for stock
 and _apply_queue_flow() has for the queue, and for the same reason -- a second
 implementation would eventually disagree with the first about a real child.
+
+
+A DOSE GIVEN SOMEWHERE ELSE IS STILL A DOSE
+-------------------------------------------
+Capstone testing found an infant sitting at Overdue for doses the child had
+already been given -- at another hospital, in another barangay. The parent said
+so at the counter and there was nowhere to put it. The only way to clear the
+Overdue reading was to tick "given today", which would have recorded another
+facility's vaccination as this health center's own work, on the wrong date, under
+the name of a health worker who never gave it.
+
+So every dose now carries a `source`, and it holds one of exactly two values:
+
+    SOURCE_ADMINISTERED   this health center gave it
+    SOURCE_REPORTED       it was reported to us, at a real consultation, as
+                          already given somewhere else
+
+Two rules follow from that, and they pull in opposite directions on purpose.
+
+    IT COUNTS.   _dose_status() asks only whether a dose is on file, not where it
+                 came from. A reported dose is Completed, the child stops showing
+                 as Overdue, and the coverage figures count them as protected --
+                 which they are. Grading the two differently would put this
+                 module back to calling a vaccinated child a defaulter, which is
+                 the defect it was changed to fix.
+
+    IT IS SAID.  Every screen that prints a dose says which kind it is, and none
+                 of them may blend the two. dose_source_label() is the one place
+                 those words are written, so the profile row, the consultation
+                 form, the visit panel and the audit line cannot each invent a
+                 different phrase for the same fact.
+
+The date follows the same honesty rule the rest of this project keeps. A reported
+dose may have no date at all -- a parent who remembers the hospital may not
+remember the day -- and the column is nullable for exactly that case. A dose this
+health center administered still must say when: the table's CHECK enforces that
+half, so the nullability is one-sided rather than a general loosening. Anything
+reading date_administered therefore has to cope with None, and `date_known` on
+each schedule entry is what a screen asks rather than testing the date itself.
+
+This is the split HL7 FHIR draws with Immunization.primarySource, and it is the
+same instinct the separation from models/general_vaccinations.py comes from: say
+what is actually known, and never let a record claim more than that.
 """
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from database.connection import get_db
 from models.consultations import PEDIATRIC_AGE_YEARS, as_date
 from models.patients import add_months, calculate_age
-from utils.dates import resolve_range, today
+from utils.dates import display_date, resolve_range, today
 
 # ---------------------------------------------------------------------------
 # The Department of Health Expanded Program on Immunization infant schedule.
@@ -142,6 +185,70 @@ STATUS_BADGE_CLASS = {
 # the check-in message and the dashboard card cannot each pick a different pair.
 NEEDS_ATTENTION = (OVERDUE, DUE_NOW)
 
+# Where a dose on file came from. Exactly the two values the table's CHECK
+# permits, spelled here so no caller writes the string itself. See the module
+# header, and migrate_add_immunization_source.py for the case that produced them.
+SOURCE_ADMINISTERED = "administered"
+SOURCE_REPORTED = "reported"
+SOURCES = (SOURCE_ADMINISTERED, SOURCE_REPORTED)
+
+# THE ONE PLACE THE DISTINCTION IS PUT INTO WORDS.
+#
+# Every screen that shows a dose reads these, so the Patient Profile, the
+# consultation form, the visit panel on a history row, the coverage report and
+# the audit line all say the same thing about the same record. A second wording
+# invented on one screen is how "reported" quietly becomes indistinguishable from
+# "administered" on that screen and nowhere else.
+#
+# The reported label names the health center's position rather than the parent's
+# claim: the system knows the dose was not given here, and it does not know that
+# the account of where it was given is true. "Given elsewhere" would assert the
+# second; "Reported -- given elsewhere" asserts only the first, and says out loud
+# that the record rests on a report.
+SOURCE_LABELS = {
+    SOURCE_ADMINISTERED: "Given at this health center",
+    SOURCE_REPORTED: "Reported — given elsewhere",
+}
+
+# The short form, for a badge with a column of table beside it.
+SOURCE_SHORT_LABELS = {
+    SOURCE_ADMINISTERED: "Given here",
+    SOURCE_REPORTED: "Reported — elsewhere",
+}
+
+# The consultation form's second column of tick boxes posts under this name, each
+# valued "CODE:DOSE" exactly as the "given today" boxes are. It lives here rather
+# than beside IMMUNIZATION_FIELD in routes/consultation_views.py because
+# parse_reported_doses() below is what reads it, and the name a parser reads
+# belongs next to the parser -- the arrangement models/general_vaccinations.py
+# already uses for VACCINE_FIELD.
+IMMUNIZATION_ELSEWHERE_FIELD = "immunizations_elsewhere"
+
+# Printed wherever a reported dose's date would go and there is none. Not a dash:
+# a dash reads as "this field is empty", and what is true here is that the dose
+# happened and nobody at this health center knows the day. Saying so is the whole
+# reason the column is nullable.
+UNKNOWN_DATE_TEXT = "Date not known"
+
+# How far back a reported dose may be dated when the patient has no birth date on
+# file to check it against. The same limit, for the same reason, that the
+# correction dialog applies in routes/vaccination_correction_views.py: without a
+# birthday there is no real floor, and a typo in the year is the error worth
+# catching.
+MAX_BACKDATE_YEARS = 10
+
+
+def dose_source_label(source, short=False):
+    """'Reported — given elsewhere' for a stored source value.
+
+    Falls back to the stored value itself for anything the vocabulary does not
+    contain, rather than to the administered label. A row holding an unexpected
+    source is a row whose provenance is unknown, and the one thing a screen must
+    not do with it is print "Given at this health center".
+    """
+    table = SOURCE_SHORT_LABELS if short else SOURCE_LABELS
+    return table.get(source, str(source or ""))
+
 
 def due_date_for(birth_date, due_value, due_unit):
     """When one scheduled dose falls due for a child born on birth_date.
@@ -180,7 +287,7 @@ def get_immunizations_for_patient(patient_id):
     rows = conn.execute(
         """
         SELECT i.id, i.patient_id, i.consultation_id, i.vaccine_code, i.dose_number,
-               i.date_administered, i.administered_by, i.notes, i.created_at,
+               i.source, i.date_administered, i.administered_by, i.notes, i.created_at,
                u.full_name AS administered_by_name
         FROM immunizations i
         JOIN users u ON u.id = i.administered_by
@@ -200,8 +307,8 @@ def get_immunizations_for_consultation(consultation_id):
     conn = get_db()
     rows = conn.execute(
         """
-        SELECT i.id, i.vaccine_code, i.dose_number, i.date_administered, i.notes,
-               u.full_name AS administered_by_name
+        SELECT i.id, i.vaccine_code, i.dose_number, i.source, i.date_administered,
+               i.notes, u.full_name AS administered_by_name
         FROM immunizations i
         JOIN users u ON u.id = i.administered_by
         WHERE i.consultation_id = ?
@@ -215,7 +322,29 @@ def get_immunizations_for_consultation(consultation_id):
     for dose in given:
         dose["vaccine"] = VACCINE_NAMES.get(dose["vaccine_code"], dose["vaccine_code"])
         dose["label"] = dose_label(dose["vaccine_code"], dose["dose_number"])
+        annotate_source(dose)
     return given
+
+
+def annotate_source(record):
+    """Add the three provenance keys a screen reads, in place. Returns the record.
+
+    `reported`, `source_label` and `date_known` are derived from `source` and
+    `date_administered` here rather than in each template, so a screen asks one
+    boolean instead of comparing a stored string it could compare wrongly --
+    `record.source == 'Reported'` is silently False for every row, and would
+    print a dose given at another hospital as this health center's own work.
+
+    Every list of doses this module hands out goes through it: the patient's
+    history, one consultation's doses, and each entry in the schedule.
+    """
+    source = record.get("source") or SOURCE_ADMINISTERED
+    record["source"] = source
+    record["reported"] = source == SOURCE_REPORTED
+    record["source_label"] = dose_source_label(source)
+    record["source_short_label"] = dose_source_label(source, short=True)
+    record["date_known"] = record.get("date_administered") is not None
+    return record
 
 
 def dose_label(code, dose_number):
@@ -241,10 +370,13 @@ def get_immunization_status(patient, on_date=None, records=None):
 
         applicable      the EPI infant schedule still applies (under 5)
         schedule        one entry per scheduled dose, in schedule order, each
-                        carrying its status, badge class and administered detail
+                        carrying its status, badge class, administered detail and
+                        -- where a dose is on file -- where that dose came from
         attention_items the Overdue and Due Now entries, most urgent first
         extra_records   doses on file that the current schedule does not list
-        counts          completed / due_now / overdue / upcoming / total
+        counts          completed / due_now / overdue / upcoming / total, plus
+                        how many of the completed ones were reported rather than
+                        given here
         next_due        the soonest dose not yet given, or None
         summary         one line a screen can print without composing it itself
 
@@ -272,8 +404,12 @@ def get_immunization_status(patient, on_date=None, records=None):
         records = get_immunizations_for_patient(patient["id"]) if patient else []
 
     # Keyed by (code, dose) so a scheduled dose can find its record in one look.
+    # Annotated on the way in, so a caller that handed `records` in -- the roster
+    # readers below do, to avoid a query per child -- gets provenance on those
+    # rows too rather than only on the schedule built from them.
     given_by_key = {
-        (record["vaccine_code"], record["dose_number"]): record for record in records
+        (record["vaccine_code"], record["dose_number"]): annotate_source(record)
+        for record in records
     }
 
     schedule = []
@@ -309,12 +445,27 @@ def get_immunization_status(patient, on_date=None, records=None):
             "date_administered": given["date_administered"] if given else None,
             "administered_by_name": given["administered_by_name"] if given else None,
             "consultation_id": given["consultation_id"] if given else None,
-            # What the form's checkbox posts back.
+            # Where this dose came from, for the row that has one. None on a dose
+            # not yet given -- there is no provenance to report about something
+            # that has not happened, and a default of "administered" there would
+            # be a claim about a dose nobody has given.
+            "source": given["source"] if given else None,
+            "reported": bool(given and given["reported"]),
+            "source_label": given["source_label"] if given else None,
+            "source_short_label": given["source_short_label"] if given else None,
+            # False for a reported dose whose date nobody knows, and for a dose
+            # not yet given. A screen asks this rather than testing the date,
+            # because those two cases print different sentences.
+            "date_known": bool(given and given["date_known"]),
+            # What the form's checkboxes post back -- both of them, the one that
+            # records a dose as given today and the one that records it as
+            # reported from elsewhere.
             "key": f"{code}:{dose_number}",
+            "reported_date_field": reported_date_field(f"{code}:{dose_number}"),
         })
 
     extra_records = [
-        record for record in records
+        annotate_source(record) for record in records
         if (record["vaccine_code"], record["dose_number"]) not in SCHEDULE_KEYS
     ]
     for record in extra_records:
@@ -322,6 +473,11 @@ def get_immunization_status(patient, on_date=None, records=None):
 
     counts = {status: sum(1 for item in schedule if item["status"] == status)
               for status in STATUS_ORDER}
+    # How many of the completed doses this health center did not give. Counted
+    # here rather than by each screen filtering the schedule itself, so the
+    # profile's summary line, the report card and the flash message all report
+    # the same number.
+    reported_count = sum(1 for item in schedule if item["reported"])
     attention_items = sorted(
         (item for item in schedule if item["needs_attention"]),
         key=lambda item: (_STATUS_RANK[item["status"]], item["due_date"] or reference),
@@ -343,20 +499,33 @@ def get_immunization_status(patient, on_date=None, records=None):
         "due_count": counts[DUE_NOW],
         "overdue_count": counts[OVERDUE],
         "upcoming_count": counts[UPCOMING],
+        "reported_count": reported_count,
+        "administered_count": counts[COMPLETED] - reported_count,
         "total_doses": TOTAL_SCHEDULED_DOSES,
         "attention_count": counts[OVERDUE] + counts[DUE_NOW],
         "needs_attention": bool(counts[OVERDUE] + counts[DUE_NOW]) and applicable,
         "next_due": next_due,
-        "summary": _summarise(counts, applicable),
+        "summary": _summarise(counts, applicable, reported_count),
         "pediatric_age_years": PEDIATRIC_AGE_YEARS,
         "grace_period_days": GRACE_PERIOD_DAYS,
     }
 
 
-def _summarise(counts, applicable):
-    """The one-line reading every screen prints rather than composing its own."""
+def _summarise(counts, applicable, reported_count=0):
+    """The one-line reading every screen prints rather than composing its own.
+
+    The reported clause is printed only when there is one to print. A standing
+    "0 reported as given elsewhere" on every child's summary would be noise, and
+    the sentence has to stay readable on the queue tooltip as well as the profile
+    -- but where a dose did come from somewhere else, the headline figure says so
+    rather than leaving the distinction to be discovered further down the page.
+    """
     given = counts[COMPLETED]
     parts = [f"{given} of {TOTAL_SCHEDULED_DOSES} scheduled doses given"]
+    if reported_count:
+        parts.append(
+            f"{reported_count} reported as given elsewhere"
+        )
     if not applicable:
         parts.append("EPI infant schedule no longer applies at this age")
         return " · ".join(parts)
@@ -397,7 +566,7 @@ def _roster_statuses(on_date=None):
     rows = conn.execute(
         """
         SELECT i.id, i.patient_id, i.consultation_id, i.vaccine_code, i.dose_number,
-               i.date_administered, i.administered_by, i.notes, i.created_at,
+               i.source, i.date_administered, i.administered_by, i.notes, i.created_at,
                u.full_name AS administered_by_name
         FROM immunizations i
         JOIN users u ON u.id = i.administered_by
@@ -506,16 +675,41 @@ def get_immunization_coverage(on_date=None, start=None, end=None, months=6):
     enrolled = conn.execute(
         "SELECT COUNT(DISTINCT patient_id) FROM immunizations"
     ).fetchone()[0]
-    doses_given = conn.execute("SELECT COUNT(*) FROM immunizations").fetchone()[0]
+    # Split by source, all time and in the window, because "doses given" and
+    # "doses this health center gave" stopped being the same number the day a
+    # dose could be recorded as given elsewhere. A single total would credit
+    # another hospital's work to this one on the Barangay Official's dashboard,
+    # which is the one screen in the project a figure leaves the building from.
+    #
+    # Both halves are returned rather than one being chosen here. Coverage is
+    # about the child and counts every dose; activity is about the health center
+    # and counts only its own -- and the screens that print each say which they
+    # mean.
+    by_source = {
+        row[0]: row[1]
+        for row in conn.execute(
+            "SELECT source, COUNT(*) FROM immunizations GROUP BY source"
+        )
+    }
+    doses_given = sum(by_source.values())
+    # A dose with no date is in no window. That is arithmetic rather than a
+    # decision -- substr(NULL) is NULL and NULL BETWEEN anything is not true --
+    # but it is also the right answer: a dose whose date nobody knows cannot
+    # honestly be counted into a particular month.
     scoped = conn.execute(
         """
-        SELECT COUNT(*) AS doses, COUNT(DISTINCT patient_id) AS children
+        SELECT COUNT(*) AS doses,
+               COUNT(DISTINCT patient_id) AS children,
+               SUM(CASE WHEN source = ? THEN 1 ELSE 0 END) AS reported
         FROM immunizations
         WHERE substr(date_administered, 1, 10) BETWEEN ? AND ?
         """,
-        (window["start"].isoformat(), window["end"].isoformat()),
+        (SOURCE_REPORTED, window["start"].isoformat(), window["end"].isoformat()),
     ).fetchone()
     conn.close()
+
+    scoped_reported = scoped["reported"] or 0
+    reported = by_source.get(SOURCE_REPORTED, 0)
 
     alert = get_immunization_alert(on_date=on_date)
     return {
@@ -524,10 +718,14 @@ def get_immunization_coverage(on_date=None, start=None, end=None, months=6):
             "end": window["end"],
             "custom": window["custom"],
             "doses_given": scoped["doses"],
+            "doses_administered": scoped["doses"] - scoped_reported,
+            "doses_reported": scoped_reported,
             "children_dosed": scoped["children"],
         },
         "enrolled": enrolled,
         "doses_given": doses_given,
+        "doses_administered": doses_given - reported,
+        "doses_reported": reported,
         "needing_attention": alert["child_count"],
         "overdue_children": alert["overdue_child_count"],
         "awaiting_first_dose": len(alert["patient_ids"] - _patients_with_doses()),
@@ -578,8 +776,16 @@ def get_dose_coverage(on_date=None):
         # "schedule" list by iterating EPI_SCHEDULE in this same order, one entry
         # per row, so index i here is index i there for every child.
         counts = {status_name: 0 for status_name in STATUS_ORDER}
+        # Of the children counted Completed for this dose, how many had it
+        # somewhere else. Counted alongside the statuses rather than derived
+        # afterwards, so the two figures come from one pass over one list and
+        # cannot describe different cohorts.
+        reported = 0
         for status in eligible:
-            counts[status["schedule"][index]["status"]] += 1
+            entry = status["schedule"][index]
+            counts[entry["status"]] += 1
+            if entry["reported"]:
+                reported += 1
         doses.append({
             "code": code,
             "vaccine": vaccine,
@@ -589,6 +795,13 @@ def get_dose_coverage(on_date=None):
             "label": dose_label(code, dose_number),
             "timing": note,
             "given": counts[COMPLETED],
+            # `given` is the coverage figure and counts every child who has had
+            # this dose, wherever they had it -- that is what protection means.
+            # These two say how that figure is made up, so a coverage percentage
+            # can be read without it being mistaken for a count of what this
+            # health center administered.
+            "administered": counts[COMPLETED] - reported,
+            "reported": reported,
             "overdue": counts[OVERDUE],
             "due_now": counts[DUE_NOW],
             "upcoming": counts[UPCOMING],
@@ -610,6 +823,8 @@ def get_dose_coverage(on_date=None):
             "protects": VACCINE_PROTECTS[code],
             "dose_count": len(entries),
             "given": given,
+            "administered": sum(dose["administered"] for dose in entries),
+            "reported": sum(dose["reported"] for dose in entries),
             "scheduled": scheduled,
             "coverage_pct": round(given * 100 / scheduled) if scheduled else None,
             "overdue": sum(dose["overdue"] for dose in entries),
@@ -622,6 +837,8 @@ def get_dose_coverage(on_date=None):
         "doses": doses,
         "by_vaccine": by_vaccine,
         "total_given": sum(dose["given"] for dose in doses),
+        "total_administered": sum(dose["administered"] for dose in doses),
+        "total_reported": sum(dose["reported"] for dose in doses),
         "total_scheduled": TOTAL_SCHEDULED_DOSES * cohort,
         "total_overdue": sum(dose["overdue"] for dose in doses),
         "total_due_now": sum(dose["due_now"] for dose in doses),
@@ -661,15 +878,196 @@ def parse_dose_keys(raw_keys):
     return keys
 
 
+def reported_date_field(key):
+    """'PENTA:2' -> 'elsewhere_date_PENTA_2'. The per-row date box's field name.
+
+    Built here rather than spelled in the template, for the reason
+    models/general_vaccinations.dose_field() exists: the form that prints the box
+    and the parser that reads it back have to agree about the name, and two
+    string literals in two files agree only until one of them is edited.
+
+    The colon becomes an underscore because the key is going into an HTML `name`
+    and a JavaScript selector, where a colon has to be escaped and eventually
+    will not be.
+    """
+    return "elsewhere_date_" + str(key or "").replace(":", "_")
+
+
+# What the consultation form's error summary calls each of those date boxes.
+#
+# The summary at the top of the page prints field_labels.get(field, field), so
+# without this a mistyped date would be reported as "elsewhere_date_PENTA_2" --
+# a field name, to a health worker, at the moment they are being told something
+# is wrong. Built from EPI_SCHEDULE through the same two functions the form and
+# the parser use, so a schedule revision cannot leave a label behind.
+REPORTED_DATE_LABELS = {
+    reported_date_field(f"{row[0]}:{row[3]}"):
+        f"{dose_label(row[0], row[3])} — date given elsewhere"
+    for row in EPI_SCHEDULE
+}
+
+
+def validate_reported_date(raw, patient, visit_date=None):
+    """Read one 'given elsewhere' date box. Returns (iso_text_or_None, error).
+
+    BLANK IS A VALID ANSWER, and it is the one thing this validator does that the
+    correction dialog's date check in routes/vaccination_correction_views.py
+    deliberately does not. There the date is a fact the health center holds about
+    its own work and its absence is a defect; here it belongs to another
+    facility's records, and a parent who remembers their child was vaccinated at
+    the hospital where they were born may genuinely not remember the day. Forcing
+    a date would mean forcing an invented one, and an invented date in a clinical
+    record is worse than an absent one -- which is why the column is nullable and
+    why this returns (None, None) rather than an error.
+
+    What it does hold a date to, once one is typed:
+
+        a real date            anything else is a typo, not a record
+        not in the future      a dose cannot have been given after today
+        not after this visit   "previously given" means before the encounter that
+                               is recording it. A date later than the visit
+                               describes something that has not happened yet from
+                               this record's point of view.
+        not before birth       the child did not exist to be vaccinated
+        within living memory   where no birth date is on file to check against,
+                               MAX_BACKDATE_YEARS catches a mistyped year, which
+                               is the error a free date box actually produces
+    """
+    text = str(raw or "").strip()
+    if not text:
+        return None, None
+
+    try:
+        parsed = datetime.strptime(text, "%Y-%m-%d").date()
+    except ValueError:
+        return None, (
+            "Enter a valid date in YYYY-MM-DD format, or leave it blank if the "
+            "date it was given is not known."
+        )
+
+    now = today()
+    if parsed > now:
+        return None, (
+            "The date cannot be in the future — a dose reported for "
+            f"{display_date(parsed)} has not been given yet."
+        )
+
+    visit = as_date(visit_date) if visit_date is not None else now
+    if parsed > visit:
+        return None, (
+            "A dose given elsewhere must have been given before this visit. "
+            f"{display_date(parsed)} is after {display_date(visit)}."
+        )
+
+    birth_text = patient.get("birth_date") if patient else None
+    if birth_text:
+        birth = as_date(birth_text)
+        if parsed < birth:
+            first_name = (patient or {}).get("first_name") or "this patient"
+            return None, (
+                f"The date cannot be before {first_name} was born "
+                f"({display_date(birth)})."
+            )
+    elif parsed.year < now.year - MAX_BACKDATE_YEARS:
+        return None, (
+            f"The date cannot be more than {MAX_BACKDATE_YEARS} years ago. This "
+            "patient has no birth date on file to check it against."
+        )
+
+    return parsed.isoformat(), None
+
+
+def parse_reported_doses(form_data, patient, visit_date=None, given_today=()):
+    """Read the "previously given elsewhere" ticks. Returns (entries, errors).
+
+    `entries` is [{'code', 'dose_number', 'date', 'key', 'label'}] in schedule
+    order, ready for record_reported_immunizations(). `errors` is {field:
+    message}, which the caller merges into the consultation form's own errors so
+    one refusal summary covers the whole page -- the shape
+    parse_general_vaccinations() already uses.
+
+    The tick boxes go through parse_dose_keys(), the same gate the "given today"
+    boxes do, so a hand-made POST cannot report a dose the DOH schedule does not
+    list any more than it can record one.
+
+    A DOSE TICKED IN BOTH COLUMNS IS REFUSED, NOT RESOLVED. The two claims are
+    incompatible -- this health center either gave the dose today or it did not
+    -- and picking one silently would store a clinical fact nobody asserted. So
+    the save stops and says which dose is contradicting itself, and the operator
+    decides. That is the same treatment a vaccine name typed into the free-text
+    row with the box left unticked gets, and for the same reason: a save about to
+    discard or invent what somebody entered says so instead.
+    """
+    raw_keys = (form_data.getlist(IMMUNIZATION_ELSEWHERE_FIELD)
+                if hasattr(form_data, "getlist")
+                else (form_data.get(IMMUNIZATION_ELSEWHERE_FIELD) or []))
+    keys = parse_dose_keys(raw_keys)
+    conflicting = set(given_today or ())
+
+    entries, errors = [], {}
+    for code, dose_number in keys:
+        key = f"{code}:{dose_number}"
+        field = reported_date_field(key)
+
+        if (code, dose_number) in conflicting:
+            errors[field] = (
+                f"{dose_label(code, dose_number)} is ticked both as given today "
+                "and as previously given elsewhere. Choose one."
+            )
+            continue
+
+        date_text, date_error = validate_reported_date(
+            form_data.get(field), patient, visit_date
+        )
+        if date_error:
+            errors[field] = date_error
+            continue
+
+        entries.append({
+            "code": code,
+            "dose_number": dose_number,
+            "date": date_text,
+            "key": key,
+            "label": dose_label(code, dose_number),
+        })
+
+    # A date typed against a row whose box was never ticked is a save about to
+    # discard what somebody entered. Say so rather than drop it silently --
+    # exactly what parse_general_vaccinations() does with an unticked free-text
+    # name. Only rows whose box is genuinely absent are checked, so a row already
+    # refused above is not told off twice.
+    ticked = {f"{code}:{dose_number}" for code, dose_number in keys}
+    for row in EPI_SCHEDULE:
+        key = f"{row[0]}:{row[3]}"
+        if key in ticked:
+            continue
+        field = reported_date_field(key)
+        if field in errors or not str(form_data.get(field) or "").strip():
+            continue
+        errors[field] = (
+            f"Tick “previously given elsewhere” for {dose_label(row[0], row[3])} "
+            "to record this date, or clear the date."
+        )
+
+    return entries, errors
+
+
 def record_immunizations(patient_id, dose_keys, administered_by, date_administered,
                          consultation_id=None):
-    """Write the doses given at one visit. Returns the (code, dose) pairs stored.
+    """Write the doses THIS HEALTH CENTER gave at one visit. Returns the pairs stored.
 
     INSERT OR IGNORE against the table's UNIQUE (patient_id, vaccine_code,
     dose_number): a dose already on file is left exactly as it was rather than
     being re-dated to today. Double-clicking Save must not rewrite the history of
-    when a child was actually vaccinated, and a dose given at another facility
-    and recorded earlier is not superseded by a tick box.
+    when a child was actually vaccinated, and a dose recorded earlier as given at
+    another facility is not superseded by a tick box -- that constraint is now
+    doing two jobs, and the second one is new.
+
+    `source` is written explicitly rather than left to the column default. The
+    default exists for rows migrated from before the distinction existed; a row
+    this function writes is a positive claim that a health worker here
+    administered the dose, and a claim that large should be made in the INSERT
+    where it can be read.
     """
     if not dose_keys:
         return []
@@ -684,13 +1082,72 @@ def record_immunizations(patient_id, dose_keys, administered_by, date_administer
             """
             INSERT OR IGNORE INTO immunizations
                 (patient_id, consultation_id, vaccine_code, dose_number,
-                 date_administered, administered_by)
-            VALUES (?, ?, ?, ?, ?, ?)
+                 source, date_administered, administered_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (patient_id, consultation_id, code, dose_number, day, administered_by),
+            (patient_id, consultation_id, code, dose_number,
+             SOURCE_ADMINISTERED, day, administered_by),
         )
         if cursor.rowcount:
             stored.append((code, dose_number))
+    conn.commit()
+    conn.close()
+    return stored
+
+
+def record_reported_immunizations(patient_id, entries, recorded_by,
+                                  consultation_id=None):
+    """Write doses reported at one visit as already given elsewhere.
+
+    `entries` is [{'code', 'dose_number', 'date'}], where `date` is an ISO string
+    or None -- None being the honest answer when the parent remembers the
+    hospital but not the day. Returns the (code, dose_number, date) triples
+    actually stored, so the caller can name them in a flash message and an audit
+    line without re-reading the table.
+
+    THE CONSULTATION IS REQUIRED HERE, NOT IN THE SCHEMA.
+    Nothing is written without a consultation_id, and that is the rule this
+    project applies to every clinical fact: a record exists because a health
+    worker learned something at a real encounter, not because a screen offered a
+    field. The column cannot enforce it -- consultation_id is nullable because a
+    deleted consultation sets it NULL and the vaccination still happened -- so
+    the refusal lives here, at the only place that writes SOURCE_REPORTED.
+
+    Everything else is deliberately identical to record_immunizations() above:
+    the same INSERT OR IGNORE against the same UNIQUE constraint, so a dose
+    already on file is left exactly as it is. A child who really was given
+    Pentavalent 1 here last month does not have that record overwritten by a
+    parent's recollection that it happened somewhere else, and a double-submitted
+    form adds nothing twice.
+
+    `recorded_by` goes into administered_by, and that is the one column whose
+    name now reads slightly wide of what it holds. It is not renamed: it is a
+    foreign key on every dose ever recorded, and renaming it would rewrite
+    seventeen rows of history to fix a word. What matters is that no screen
+    prints it as "administered by" for a reported dose -- SOURCE_LABELS is what
+    keeps that true, and the Patient Profile prints "Recorded by" instead.
+    """
+    if not entries or not consultation_id:
+        return []
+
+    stored = []
+    conn = get_db()
+    for entry in entries:
+        day = entry.get("date")
+        if day is not None and hasattr(day, "isoformat"):
+            day = day.isoformat()
+        cursor = conn.execute(
+            """
+            INSERT OR IGNORE INTO immunizations
+                (patient_id, consultation_id, vaccine_code, dose_number,
+                 source, date_administered, administered_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (patient_id, consultation_id, entry["code"], entry["dose_number"],
+             SOURCE_REPORTED, day, recorded_by),
+        )
+        if cursor.rowcount:
+            stored.append((entry["code"], entry["dose_number"], day))
     conn.commit()
     conn.close()
     return stored
@@ -741,7 +1198,7 @@ def get_immunization_by_id(record_id):
     row = conn.execute(
         """
         SELECT i.id, i.patient_id, i.consultation_id, i.vaccine_code, i.dose_number,
-               i.date_administered, i.administered_by, i.notes, i.created_at,
+               i.source, i.date_administered, i.administered_by, i.notes, i.created_at,
                u.full_name AS administered_by_name
         FROM immunizations i
         JOIN users u ON u.id = i.administered_by
@@ -750,13 +1207,17 @@ def get_immunization_by_id(record_id):
         (record_id,),
     ).fetchone()
     conn.close()
-    return dict(row) if row else None
+    # Annotated like every other dose this module hands out, so the correction
+    # dialog reads `record["reported"]` rather than comparing the stored string
+    # itself -- and so it knows whether this record may be left without a date.
+    return annotate_source(dict(row)) if row else None
 
 
 def correct_immunization(record_id, vaccine_code, dose_number, date_administered):
     """Correct one recorded dose's vaccine, dose number and date. Deliberate path.
 
-    Returns "corrected", "missing" or "duplicate". Never removes the row: this
+    Returns "corrected", "missing", "duplicate" or "date_required". Never
+    removes the row: this
     is the correction capability routes/consultation_views.py's
     _apply_immunization_edit() says belongs on a path of its own, and a
     correction moves a record's field values rather than making the record go
@@ -780,15 +1241,28 @@ def correct_immunization(record_id, vaccine_code, dose_number, date_administered
     on the right patient.
     """
     day = date_administered
-    day = day.isoformat() if hasattr(day, "isoformat") else str(day)
+    if day is not None:
+        day = day.isoformat() if hasattr(day, "isoformat") else str(day)
 
     conn = get_db()
     row = conn.execute(
-        "SELECT patient_id FROM immunizations WHERE id = ?", (record_id,)
+        "SELECT patient_id, source FROM immunizations WHERE id = ?", (record_id,)
     ).fetchone()
     if row is None:
         conn.close()
         return "missing"
+
+    # A correction may not turn a dose this health center administered into an
+    # undated one. The table's CHECK would refuse the UPDATE anyway and raise an
+    # IntegrityError up through the route; naming the outcome here is what lets
+    # the dialog say something a person can act on, exactly as "duplicate" does
+    # for the UNIQUE constraint below. The correction dialog does not offer a
+    # blank date on such a record, so this is the server's own refusal rather
+    # than the form's -- the distinction routes/consultation_views.py draws
+    # between a field a screen does not offer and a field the server refuses.
+    if day is None and row["source"] != SOURCE_REPORTED:
+        conn.close()
+        return "date_required"
 
     clash = conn.execute(
         """

@@ -26,7 +26,11 @@ from models.consultations import (
 )
 from models.dispensing import get_dispensing_for_patient
 from models.general_vaccinations import get_general_vaccinations_for_patient
-from models.immunizations import dose_label, get_immunization_status
+from models.immunizations import (
+    UNKNOWN_DATE_TEXT,
+    dose_label,
+    get_immunization_status,
+)
 from models.patients import (
     ALLERGY_OPTIONS,
     BLOOD_TYPES,
@@ -601,6 +605,13 @@ def patient_profile_context(patient_id):
         "appointments": get_appointments_for_patient(patient_id),
         "immunization": immunization,
         "show_immunizations": show_immunizations,
+        # What the page prints where a reported dose's date would go and there is
+        # none. From the model rather than typed into the template, so the
+        # profile, the consultation form and the flash message say it the same
+        # way -- and so it stays a sentence rather than becoming a dash, which
+        # would read as an empty field instead of as "this dose happened and
+        # nobody here knows the day".
+        "immunization_unknown_date_text": UNKNOWN_DATE_TEXT,
         "doses_by_consultation": _doses_by_consultation(immunization["records"]),
         "general_vaccinations": general_vaccinations,
         # The Immunization Record tab is worth opening if either half has

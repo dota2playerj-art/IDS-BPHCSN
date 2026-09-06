@@ -197,20 +197,49 @@ CREATE TABLE appointments (
     FOREIGN KEY (assigned_staff_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
--- One row per dose actually administered. The schedule these are measured
--- against is NOT here: the DOH Expanded Program on Immunization infant schedule
--- is national policy, identical in every barangay and changed only by DOH
--- circular, so it lives as EPI_SCHEDULE in models/immunizations.py alongside the
--- other controlled vocabularies. See that module's header for the full reasoning.
+-- One row per dose a child has had. The schedule these are measured against is
+-- NOT here: the DOH Expanded Program on Immunization infant schedule is national
+-- policy, identical in every barangay and changed only by DOH circular, so it
+-- lives as EPI_SCHEDULE in models/immunizations.py alongside the other
+-- controlled vocabularies. See that module's header for the full reasoning.
 --
 -- vaccine_code is the stable identity ('PENTA'), not the display name: renaming
 -- a vaccine on screen must not orphan the records already written against it.
+--
+-- `source` says WHOSE dose this is a record of, and it exists because a child
+-- vaccinated somewhere else was being called a defaulter here. It holds one of
+-- two values and there is no third:
+--
+--   'administered'  this health center gave it. Somebody here held the syringe,
+--                   on date_administered, and administered_by names them.
+--   'reported'      it was reported to us during a consultation as already
+--                   given elsewhere -- another hospital, another barangay. The
+--                   health center did not give it and does not claim to have.
+--
+-- That is the distinction HL7 FHIR draws with Immunization.primarySource. Both
+-- count as Completed against the schedule, because the child is protected either
+-- way; what the flag changes is what every screen SAYS about the dose. See
+-- migrate_add_immunization_source.py for the case that produced it.
+--
+-- date_administered is nullable, and the CHECK below is what makes that
+-- one-sided. A dose this health center administered must still say when -- that
+-- is a fact its own staff hold. A reported dose may not have one: a parent who
+-- remembers their child had BCG at the hospital where they were born may not
+-- remember the day, and stamping today's date on it to fill the column would be
+-- inventing precision the record does not have.
+--
+-- A reported dose still requires a real consultation, but no column here says so
+-- and none can: consultation_id must stay nullable because a deleted
+-- consultation sets it NULL and the vaccination still happened. The rule lives
+-- in models/immunizations.record_reported_immunizations(), which refuses to
+-- write one without a consultation, and nothing else writes 'reported'.
 --
 -- UNIQUE (patient_id, vaccine_code, dose_number) is the clinically important
 -- constraint. A child cannot receive the same dose twice, and a schema that
 -- permits it will eventually hold it -- which would make a defaulting child look
 -- up to date. It is also what lets a double-submitted form be absorbed by
--- INSERT OR IGNORE instead of duplicating a dose.
+-- INSERT OR IGNORE instead of duplicating a dose, and what stops a dose recorded
+-- as given elsewhere being recorded a second time as given here.
 --
 -- consultation_id is SET NULL rather than CASCADE on purpose: the vaccination
 -- happened whether or not its paperwork survives.
@@ -220,10 +249,13 @@ CREATE TABLE immunizations (
     consultation_id INTEGER,
     vaccine_code TEXT NOT NULL,
     dose_number INTEGER NOT NULL,
-    date_administered TEXT NOT NULL,
+    source TEXT NOT NULL DEFAULT 'administered'
+        CHECK (source IN ('administered', 'reported')),
+    date_administered TEXT,
     administered_by INTEGER NOT NULL,
     notes TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CHECK (source = 'reported' OR date_administered IS NOT NULL),
     UNIQUE (patient_id, vaccine_code, dose_number),
     FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
     FOREIGN KEY (consultation_id) REFERENCES consultations(id) ON DELETE SET NULL,

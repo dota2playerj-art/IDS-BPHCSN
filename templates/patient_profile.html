@@ -121,6 +121,20 @@
     display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600;
     padding:4px 11px; border-radius:999px; white-space:nowrap;
   }
+  /* WHERE A DOSE CAME FROM — not a status, and deliberately not dressed as one.
+     The status badges above answer "how urgent is this?"; this answers "who gave
+     it?", which is a different question about the same row. It sits under a
+     Completed badge on a dose reported from another hospital, so it has to read
+     as an annotation rather than as a competing verdict: outlined, smaller,
+     amber-on-cream rather than any of the four status fills. Borrowing green
+     here would let a dose this health center never touched read at a glance as
+     its own completed work, which is precisely what the column exists to stop. */
+  .badge-source{
+    display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:600;
+    padding:2px 8px; border-radius:999px; white-space:nowrap;
+    background:#F1F5F9; color:#475569; border:1px solid #CBD5E1;
+  }
+  .badge-reported{background:#FFF7ED; color:#9A3412; border-color:#FED7AA;}
   .badge-active{background:#DCFCE7; color:#15803D;}
   .badge-followup{background:#FEF3C7; color:#B45309;}
   .badge-prenatal{background:#DBEAFE; color:#1D4ED8;}
@@ -744,12 +758,24 @@
 {%- set visit_doses = doses_by_consultation.get(consultation.id) %}
 {%- if visit_doses %}
                         <div style="margin-top:16px; padding-top:14px; border-top:1px solid var(--border-color);">
-                          <div class="info-label" style="margin-bottom:8px;">Immunizations Given at This Visit</div>
+{#- "Recorded at", not "Given at". The heading used to say Given, and for every
+    row it then held that was true. It stopped being true the moment a dose could
+    be entered here as one the parent reported from another hospital: that dose
+    belongs to this visit -- it was learned at it and is stored against it -- but
+    it was not given at it, and a heading that said so would be the one place in
+    the project where a reported dose is still described as this health center's
+    own work. Each row then says which of the two it is. #}
+                          <div class="info-label" style="margin-bottom:8px;">Immunizations Recorded at This Visit</div>
 {%- for dose in visit_doses %}
                           <div style="font-size:13px; color:var(--text-dark); padding:5px 0;">
-                            <span class="material-symbols-outlined" style="font-size:15px; vertical-align:-2px; color:var(--teal-dark);">vaccines</span>
+                            <span class="material-symbols-outlined" style="font-size:15px; vertical-align:-2px; color:{{ '#B45309' if dose.reported else 'var(--teal-dark)' }};">{{ 'history' if dose.reported else 'vaccines' }}</span>
                             {{ dose.label }}
+{%- if dose.reported %}
+                            <span class="badge-source badge-reported">{{ dose.source_short_label }}</span>
+                            <span style="color:var(--text-muted);">&middot; {% if dose.date_known %}{{ dose.date_administered | display_date }}{% else %}{{ immunization_unknown_date_text | lower }}{% endif %} &middot; recorded by {{ dose.administered_by_name }}</span>
+{%- else %}
                             <span style="color:var(--text-muted);">&middot; {{ dose.date_administered | display_date }} &middot; by {{ dose.administered_by_name }}</span>
+{%- endif %}
                           </div>
 {%- endfor %}
                         </div>
@@ -1050,9 +1076,32 @@
                   <td style="color:var(--text-muted); font-size:12.5px;">{{ item.protects }}</td>
                   <td style="color:var(--text-muted); font-size:12.5px;">{{ item.timing }}</td>
                   <td>{{ item.due_date | display_date if item.due_date else '—' }}</td>
-                  <td>{{ item.date_administered | display_date if item.date_administered else '—' }}</td>
-                  <td>{{ item.administered_by_name or '—' }}</td>
-                  <td><span class="badge-status {{ item.badge_class }}">{{ item.status }}</span></td>
+{#- THREE CELLS SAY WHERE A DOSE CAME FROM, AND THAT IS DELIBERATE REDUNDANCY.
+    A dose reported as given elsewhere counts as Completed, which is correct --
+    the child is protected and must stop showing as Overdue. The risk that
+    creates is that a reader scanning the Status column sees the same green badge
+    for a dose this health center gave and one it did not, and takes the record
+    to be saying more than it says. So the date says whether it is even known,
+    the "administered by" column refuses to name anyone as having administered a
+    dose nobody here administered, and the status carries the provenance badge
+    directly under it. Any one of the three read alone is still honest. #}
+                  <td>
+{%- if item.date_known %}{{ item.date_administered | display_date }}
+{%- elif item.reported %}<span style="color:var(--text-muted); font-style:italic;">{{ immunization_unknown_date_text }}</span>
+{%- else %}&mdash;{% endif %}
+                  </td>
+                  <td>
+{%- if item.reported %}
+                    <span style="color:var(--text-muted);">Not given here</span>
+{%- if item.administered_by_name %}<span style="display:block; font-size:11.5px; color:var(--text-muted);">Recorded by {{ item.administered_by_name }}</span>{% endif %}
+{%- else %}{{ item.administered_by_name or '—' }}{% endif %}
+                  </td>
+                  <td>
+                    <span class="badge-status {{ item.badge_class }}">{{ item.status }}</span>
+{%- if item.reported %}
+                    <span class="badge-source badge-reported" style="margin-top:4px;">{{ item.source_short_label }}</span>
+{%- endif %}
+                  </td>
 {%- if can_correct %}
                   <td class="text-end">
 {#- Only a dose that has actually been recorded has anything to correct. A row
@@ -1062,13 +1111,16 @@
     recorded during a consultation, and this path only puts right what that
     path already wrote. #}
 {%- if item.given %}
-                    <button type="button" class="action-icon" title="Correct this record — {{ item.label }}, given {{ item.date_administered | display_date }}"
+                    <button type="button" class="action-icon" title="Correct this record — {{ item.label }}, {% if item.reported %}{{ item.source_label | lower }}{% if item.date_known %} on {{ item.date_administered | display_date }}{% else %}, {{ immunization_unknown_date_text | lower }}{% endif %}{% else %}given {{ item.date_administered | display_date }}{% endif %}"
                             data-bs-toggle="modal" data-bs-target="#correctVaccinationModal"
                             data-kind="{{ correction.epi_kind }}"
                             data-record-id="{{ item.record_id }}"
                             data-label="{{ item.label }}"
                             data-vaccine="{{ item.code }}:{{ item.dose_number }}"
-                            data-date="{{ item.date_administered }}"
+                            data-date="{{ item.date_administered or '' }}"
+                            data-source="{{ item.source }}"
+                            data-source-label="{{ item.source_label }}"
+                            data-date-optional="{{ '1' if item.reported else '0' }}"
                             data-recorded-by="{{ item.administered_by_name or '' }}"><span class="material-symbols-outlined" style="font-size:18px;">edit</span></button>
 {%- elif item.needs_attention and immunization_next_step %}
 {#- A Due or Overdue row still has no action -- there is nothing recorded to
@@ -1115,22 +1167,39 @@
                 <tbody>
 {%- for record in immunization.extra_records %}
                   <tr>
-                    <td style="font-weight:600;">{{ record.label }}</td>
-                    <td>{{ record.date_administered | display_date }}</td>
-                    <td>{{ record.administered_by_name }}</td>
+                    <td style="font-weight:600;">
+                      {{ record.label }}
+{%- if record.reported %}
+                      <span class="badge-source badge-reported" style="margin-top:4px;">{{ record.source_short_label }}</span>
+{%- endif %}
+                    </td>
+                    <td>
+{%- if record.date_known %}{{ record.date_administered | display_date }}
+{%- elif record.reported %}<span style="color:var(--text-muted); font-style:italic;">{{ immunization_unknown_date_text }}</span>
+{%- else %}&mdash;{% endif %}
+                    </td>
+                    <td>
+{%- if record.reported %}
+                      <span style="color:var(--text-muted);">Not given here</span>
+{%- if record.administered_by_name %}<span style="display:block; font-size:11.5px; color:var(--text-muted);">Recorded by {{ record.administered_by_name }}</span>{% endif %}
+{%- else %}{{ record.administered_by_name }}{% endif %}
+                    </td>
 {%- if can_correct %}
                     <td class="text-end">
 {#- Correctable like any other recorded dose. The dialog adds this row's own
     vaccine to its list when the current schedule no longer carries it, so the
     date on a dose from a superseded schedule revision can be put right without
     the record being forced onto a pairing that would misname what was given. #}
-                      <button type="button" class="action-icon" title="Correct this record — {{ record.label }}, given {{ record.date_administered | display_date }}"
+                      <button type="button" class="action-icon" title="Correct this record — {{ record.label }}, {% if record.reported %}{{ record.source_label | lower }}{% if record.date_known %} on {{ record.date_administered | display_date }}{% else %}, {{ immunization_unknown_date_text | lower }}{% endif %}{% else %}given {{ record.date_administered | display_date }}{% endif %}"
                               data-bs-toggle="modal" data-bs-target="#correctVaccinationModal"
                               data-kind="{{ correction.epi_kind }}"
                               data-record-id="{{ record.id }}"
                               data-label="{{ record.label }}"
                               data-vaccine="{{ record.vaccine_code }}:{{ record.dose_number }}"
-                              data-date="{{ record.date_administered }}"
+                              data-date="{{ record.date_administered or '' }}"
+                              data-source="{{ record.source }}"
+                              data-source-label="{{ record.source_label }}"
+                              data-date-optional="{{ '1' if record.reported else '0' }}"
                               data-recorded-by="{{ record.administered_by_name or '' }}"><span class="material-symbols-outlined" style="font-size:18px;">edit</span></button>
                     </td>
 {%- endif %}
@@ -1416,7 +1485,7 @@
                 and it stays on {{ patient.first_name }}'s file under the corrected details.
               </p>
               <p id="correctSubject" style="margin-bottom:16px; font-size:13.5px; color:var(--text-muted);">
-{%- if cstate %}Correcting: {{ cstate.current.label }}{% if cstate.current.recorded_by %}, recorded by {{ cstate.current.recorded_by }}{% endif %}.{% endif %}
+{%- if cstate %}Correcting: {{ cstate.current.label }}{% if cstate.current.reported and cstate.current.source_label %} &mdash; {{ cstate.current.source_label }}{% endif %}{% if cstate.current.recorded_by %}, recorded by {{ cstate.current.recorded_by }}{% endif %}.{% endif %}
               </p>
 
               <div id="correctEpiFields" style="margin-bottom:16px;{% if cstate and not state_is_epi %} display:none;{% endif %}">
@@ -1473,14 +1542,31 @@
                 </div>
               </div>
 
+{#- THE DATE, AND THE ONE RECORD WHOSE DATE MAY BE BLANK.
+    Every record this dialog corrects is one the health center administered,
+    except one: an EPI dose stored as reported from another facility. That date
+    lives in somebody else's files and may genuinely be unknown, so for that one
+    kind the field is optional and says so — both here, where the dialog comes
+    back from a refused submit, and in the script at the foot of this file, which
+    fills it from the button that opened it. Two paths, one wording, because the
+    hint is what tells the operator whether clearing this field will be accepted.
+
+    `reported_now` reads the reopened record's own source, never the form's: a
+    submission does not get to declare its own date optional. #}
+{%- set reported_now = cstate.current.reported if cstate else false %}
               <div style="margin-bottom:16px;">
-                <label class="field-label" for="correctDate">Date given</label>
+                <label class="field-label" for="correctDate">Date given <span id="correctDateOptional" style="font-weight:500; color:var(--text-muted);{% if not reported_now %} display:none;{% endif %}">(optional)</span></label>
                 <input type="date" class="form-control{% if cerr.get(correction.date_field) %} is-invalid{% endif %}" id="correctDate" name="{{ correction.date_field }}" max="{{ correction.today }}"
                        value="{{ cform.get(correction.date_field, '') if cstate else '' }}">
 {%- if cerr.get(correction.date_field) %}
                 <div class="field-error">{{ cerr.get(correction.date_field) }}</div>
 {%- else %}
-                <div class="field-hint">The day the vaccine was actually administered. It cannot be in the future or before {{ patient.first_name }} was born.</div>
+                <div class="field-hint" id="correctDateHint"
+                     data-hint-required="The day the vaccine was actually administered. It cannot be in the future or before {{ patient.first_name }} was born."
+                     data-hint-optional="This dose is recorded as given elsewhere, so the date belongs to another facility's records. Leave it blank if it is not known — it cannot be in the future or before {{ patient.first_name }} was born.">
+{%- if reported_now %}This dose is recorded as given elsewhere, so the date belongs to another facility's records. Leave it blank if it is not known — it cannot be in the future or before {{ patient.first_name }} was born.
+{%- else %}The day the vaccine was actually administered. It cannot be in the future or before {{ patient.first_name }} was born.{% endif %}
+                </div>
 {%- endif %}
               </div>
 
@@ -1676,6 +1762,8 @@
     var nameInput    = document.getElementById('correctVaccineName');
     var doseInput    = document.getElementById('correctDose');
     var dateInput    = document.getElementById('correctDate');
+    var dateHint     = document.getElementById('correctDateHint');
+    var dateOptional = document.getElementById('correctDateOptional');
     var subject      = document.getElementById('correctSubject');
 
     // Hidden AND disabled. Hiding alone would still post the inactive half's
@@ -1722,10 +1810,38 @@
         doseInput.value = button.dataset.dose || '';
       }
 
+      // WHETHER THIS RECORD'S DATE MAY BE LEFT BLANK.
+      //
+      // True for one kind of row only: an EPI dose stored as reported from
+      // another facility, whose date lives in another facility's records and may
+      // never have been known. The row says so on the button; the server asks
+      // the stored record the same question in _parse_epi() and that answer is
+      // the one that governs. This only makes the dialog say what the server
+      // will do, so an operator clearing a date is not guessing whether it will
+      // be accepted.
+      //
+      // The two hint texts are read off the element rather than written here,
+      // because the server renders the same two sentences into it on a refused
+      // submit -- one wording, in one place, whichever path drew the dialog.
+      var dateOptionalNow = button.dataset.dateOptional === '1';
+      if(dateOptional){ dateOptional.style.display = dateOptionalNow ? '' : 'none'; }
+      if(dateHint){
+        var hint = dateOptionalNow
+          ? dateHint.dataset.hintOptional
+          : dateHint.dataset.hintRequired;
+        if(hint){ dateHint.textContent = hint; }
+      }
+
       // Says what is being corrected, in the words the table used, so the dialog
-      // and the row cannot appear to be about different records.
+      // and the row cannot appear to be about different records. A dose reported
+      // from elsewhere says so here too: the operator is about to change a
+      // record whose provenance is the whole reason it reads differently on the
+      // page behind, and a dialog that omitted it would be the one surface where
+      // the two kinds look alike.
       var recordedBy = button.dataset.recordedBy;
+      var sourceLabel = button.dataset.sourceLabel;
       subject.textContent = 'Correcting: ' + (button.dataset.label || 'this record')
+        + (dateOptionalNow && sourceLabel ? ' — ' + sourceLabel : '')
         + (recordedBy ? ', recorded by ' + recordedBy : '') + '.';
     });
   })();

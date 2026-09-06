@@ -82,6 +82,24 @@
   table.appt-table tbody tr:last-child td{border-bottom:none;}
   table.appt-table tbody tr.dose-attention{background:rgba(180,83,9,0.05);}
   .reason-text{color:var(--text-muted); font-size:12.5px;}
+
+  /* PREVIOUSLY GIVEN ELSEWHERE — the second column of the dose table.
+     Deliberately NOT wearing any of the four status badge colours above. Those
+     four say how urgent a dose is; this says who gave it, which is a different
+     question, and borrowing green would make a dose from another hospital read
+     as this health center's completed work at a glance. Slate, and an outline
+     rather than a fill, so it reads as an annotation on the record rather than
+     as a fifth status. */
+  .badge-source{
+    display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:600;
+    padding:2px 8px; border-radius:999px; white-space:nowrap;
+    background:#F1F5F9; color:#475569; border:1px solid #CBD5E1;
+  }
+  .badge-reported{background:#FFF7ED; color:#9A3412; border-color:#FED7AA;}
+  .elsewhere-tick{display:flex; align-items:center; gap:7px; font-size:12.5px; font-weight:600; color:var(--text-dark); cursor:pointer; margin-bottom:6px;}
+  .elsewhere-date{font-size:12.5px; padding:5px 8px; max-width:170px;}
+  .elsewhere-date:disabled{background:#F1F5F9; color:var(--text-muted); cursor:not-allowed;}
+  .elsewhere-hint{font-size:11px; color:var(--text-muted); margin-top:3px;}
   .form-check-input{width:18px; height:18px; cursor:pointer;}
   .form-check-input:checked{background-color:var(--teal); border-color:var(--teal);}
 
@@ -432,10 +450,21 @@
 {%- endif %}
 
         <div style="overflow-x:auto;">
-          <table class="appt-table" style="width:100%; border-collapse:separate; border-spacing:0; font-size:13.5px;">
+          <table class="appt-table" id="epiDoseTable" style="width:100%; border-collapse:separate; border-spacing:0; font-size:13.5px;">
             <thead>
               <tr>
-                <th style="width:44px;">Give</th>
+                <th style="width:44px;">Given<br>today</th>
+                <!-- THE SECOND COLUMN, AND WHY IT IS A SECOND COLUMN.
+                     A dose the child had at another hospital or in another
+                     barangay is not a dose this health center gave, and until
+                     this column existed the only way to stop the schedule
+                     calling such a child Overdue was to tick the box on the
+                     left — filing somebody else's vaccination as this health
+                     center's own work, on today's date, under this operator's
+                     name. Two columns rather than one control with two meanings,
+                     because the two claims are genuinely different facts and the
+                     form should make choosing between them a visible act. -->
+                <th style="width:230px;">Previously given elsewhere</th>
                 <th>Vaccine / Dose</th>
                 <th>Protects against</th>
                 <th>Recommended age</th>
@@ -455,11 +484,39 @@
                        evidence that a dose was never given. This now covers
                        doses recorded at this very visit, which is what makes the
                        form add-only. -->
-                  <span class="material-symbols-outlined" style="font-size:19px; color:var(--success);" title="Recorded on {{ item.date_administered | display_date }} — a dose on file cannot be removed from this form">task_alt</span>
+                  <span class="material-symbols-outlined" style="font-size:19px; color:{{ '#B45309' if item.reported else 'var(--success)' }};"
+                        title="{% if item.reported %}{{ item.source_label }} ({% if item.date_known %}{{ item.date_administered | display_date }}{% else %}{{ unknown_date_text | lower }}{% endif %}){% else %}Recorded on {{ item.date_administered | display_date }}{% endif %} — a dose on file cannot be removed from this form">{{ 'history' if item.reported else 'task_alt' }}</span>
 {%- else %}
-                  <input type="checkbox" class="form-check-input" name="{{ immunization_field }}"
+                  <input type="checkbox" class="form-check-input dose-today" name="{{ immunization_field }}"
                          value="{{ item.key }}" id="dose{{ loop.index }}"{% if item.checked %} checked{% endif %}
+                         data-pair="{{ item.key }}"
                          aria-label="Record {{ item.label }} as given at this visit">
+{%- endif %}
+                </td>
+                <td>
+{%- if item.locked %}
+                  <span class="reason-text">&mdash;</span>
+{%- else %}
+                  {#- The box and its date live in one cell so they read as one
+                      answer to one question. The date is optional and says so on
+                      the box itself: a parent who remembers the hospital may not
+                      remember the day, and a date field that demanded an answer
+                      would be a field that got an invented one. #}
+                  <label class="elsewhere-tick">
+                    <input type="checkbox" class="form-check-input dose-elsewhere" name="{{ immunization_elsewhere_field }}"
+                           value="{{ item.key }}" id="elsewhere{{ loop.index }}"{% if item.reported_checked %} checked{% endif %}
+                           data-pair="{{ item.key }}" data-date-field="{{ item.reported_date_field }}"
+                           aria-label="Record {{ item.label }} as previously given elsewhere">
+                    <span>Given elsewhere</span>
+                  </label>
+                  <input type="date" class="form-control elsewhere-date{% if errors.get(item.reported_date_field) %} is-invalid{% endif %}"
+                         name="{{ item.reported_date_field }}" id="{{ item.reported_date_field }}"
+                         value="{{ item.reported_date_value }}" max="{{ visit_date }}"
+                         aria-label="Date {{ item.label }} was given elsewhere, if known">
+                  <div class="elsewhere-hint">Date if known — leave blank if not</div>
+{%- if errors.get(item.reported_date_field) %}
+                  <div class="invalid-feedback d-block">{{ errors.get(item.reported_date_field) }}</div>
+{%- endif %}
 {%- endif %}
                 </td>
                 <td><label for="dose{{ loop.index }}" style="font-weight:600; cursor:{{ 'default' if item.locked else 'pointer' }};">{{ item.label }}</label></td>
@@ -467,7 +524,14 @@
                 <td class="reason-text">{{ item.timing }}{% if item.due_date %} &middot; {{ item.due_date | display_date }}{% endif %}</td>
                 <td><span class="badge-status {{ item.badge_class }}">{{ item.status }}</span></td>
                 <td class="reason-text">
-{%- if item.given_here %}Recorded at this visit{% if item.date_administered %} &middot; {{ item.date_administered | display_date }}{% endif %}
+{#- A reported dose is named as one FIRST, before any date or visit wording. The
+    whole feature is that this cell never reads the same for a dose given here
+    and a dose given somewhere else, and putting the badge after the date would
+    let a hurried reader take the first thing in the cell for the whole answer. #}
+{%- if item.reported %}
+                  <span class="badge-source badge-reported">{{ item.source_short_label }}</span>
+                  <span style="display:block; margin-top:3px;">{% if item.date_known %}{{ item.date_administered | display_date }}{% else %}{{ unknown_date_text }}{% endif %}{% if item.given_here %} &middot; reported at this visit{% endif %}</span>
+{%- elif item.given_here %}Recorded at this visit{% if item.date_administered %} &middot; {{ item.date_administered | display_date }}{% endif %}
 {%- elif item.given %}{{ item.date_administered | display_date }}{% if item.administered_by_name %} &middot; {{ item.administered_by_name }}{% endif %}
 {%- else %}&mdash;{% endif %}
                 </td>
@@ -485,7 +549,12 @@
     in the comment on the locked cell above. The operator at the form is asking
     what this screen will let them do, so that is all it now says. #}
         <div class="cohort-note">
-          Ticked doses are recorded against this consultation and dated {{ visit_date | display_date }}.
+          Doses ticked <strong style="display:inline;">Given today</strong> are recorded against this
+          consultation and dated {{ visit_date | display_date }}, with your name as the person who gave them.
+          Doses ticked <strong style="display:inline;">Given elsewhere</strong> are recorded as reported to
+          you at this visit — another hospital, another barangay — and are never shown as given here.
+          Both stop the child counting as overdue for that dose; only one of them claims this health
+          center administered it, so a dose cannot be ticked in both columns.
           A dose already on file cannot be changed or removed here, whichever visit recorded it.
 {%- if consultation %}
           You can still add a dose that was missed. Every addition is written to the audit log.
@@ -1055,6 +1124,73 @@
 
     button.addEventListener('click', addLine);
     refresh();
+  })();
+
+  // EPI DOSES — keep "given today" and "previously given elsewhere" from both
+  // being ticked for the same dose.
+  //
+  // THIS IS A CONVENIENCE, NOT THE RULE. The rule lives in
+  // models.immunizations.parse_reported_doses(), which refuses a submission
+  // carrying both and names the dose that contradicts itself. That refusal is
+  // what governs: this page can be submitted with scripting off, rebuilt by a
+  // tool, or posted directly, and none of those run a line of this.
+  //
+  // What it does buy is that the operator finds out at the moment of clicking
+  // rather than after a save bounces — and the date box, which means nothing
+  // without its tick, is disabled and cleared when the tick goes away, so a date
+  // left behind from a change of mind cannot come back as "tick the box or clear
+  // the date" on the next save.
+  (function(){
+    var table = document.getElementById('epiDoseTable');
+    if(!table){ return; }
+
+    // Keyed on the "CODE:DOSE" pair the two boxes share, which is exactly what
+    // the server matches them on. Reading the pair off the element rather than
+    // pairing by row position means a later change to the table's layout cannot
+    // quietly pair the wrong two boxes.
+    var pairs = {};
+    Array.prototype.forEach.call(
+      table.querySelectorAll('.dose-today, .dose-elsewhere'),
+      function(box){
+        var key = box.getAttribute('data-pair');
+        if(!key){ return; }
+        pairs[key] = pairs[key] || {};
+        pairs[key][box.classList.contains('dose-today') ? 'today' : 'elsewhere'] = box;
+      }
+    );
+
+    Object.keys(pairs).forEach(function(key){
+      var today = pairs[key].today;
+      var elsewhere = pairs[key].elsewhere;
+      if(!today || !elsewhere){ return; }
+      // The field name comes off the element, put there by
+      // models.immunizations.reported_date_field(). Spelling it in JavaScript
+      // would be a second copy of a name the parser actually reads.
+      var dateBox = document.getElementById(elsewhere.getAttribute('data-date-field'));
+
+      function onChange(changed){
+        if(changed === today && today.checked){ elsewhere.checked = false; }
+        if(changed === elsewhere && elsewhere.checked){ today.checked = false; }
+        if(!dateBox){ return; }
+        dateBox.disabled = !elsewhere.checked;
+        // Cleared rather than merely greyed, but ONLY on a click. A disabled
+        // input submits nothing either way; what this prevents is re-ticking the
+        // box and getting back a date the operator had already decided against.
+        if(!elsewhere.checked){ dateBox.value = ''; }
+      }
+
+      today.addEventListener('change', function(){ onChange(today); });
+      elsewhere.addEventListener('change', function(){ onChange(elsewhere); });
+
+      // ON LOAD, NOTHING IS CLEARED. A form that bounced on "tick the box or
+      // clear the date" comes back with that date still typed and its box still
+      // unticked -- that is the whole state the message is about, and emptying
+      // the field here would answer the operator's error for them and leave the
+      // message pointing at a field that no longer holds anything. So a date box
+      // with something in it stays live whatever its tick says; only an empty
+      // one starts disabled.
+      if(dateBox){ dateBox.disabled = !elsewhere.checked && !dateBox.value; }
+    });
   })();
 </script>
 {% endblock %}

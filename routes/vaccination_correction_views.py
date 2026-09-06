@@ -174,7 +174,7 @@ def _snapshot(kind, record):
     }
 
 
-def _validate_date(raw, patient):
+def _validate_date(raw, patient, required=True):
     """The one date rule both kinds are held to. Returns (date_text, error).
 
     Shared rather than written twice because it is the same clinical claim in
@@ -188,10 +188,21 @@ def _validate_date(raw, patient):
 
     The third falls back to MAX_BACKDATE_YEARS where no birth date is on file, so
     a record for a patient registered without one is still held to something.
+
+    `required` is False for exactly one kind of record: an EPI dose stored as
+    reported from another facility. Its date belongs to somebody else's files and
+    may genuinely be unknown -- models/immunizations.py explains why the column is
+    nullable for that case and only that case -- so a correction to such a record
+    must be able to leave it, or put it back to, blank. Every other record here
+    is one this health center administered, and for those an absent date is still
+    a refusal: correcting a record must not be a way to remove a fact the
+    original entry was required to supply.
     """
     text = str(raw or "").strip()
     if not text:
-        return None, "Enter the date the vaccine was actually given."
+        if required:
+            return None, "Enter the date the vaccine was actually given."
+        return None, None
 
     try:
         parsed = datetime.strptime(text, "%Y-%m-%d").date()
@@ -253,7 +264,14 @@ def _parse_epi(form_data, record, patient):
     if pair is None:
         errors[VACCINE_FIELD] = "Choose the vaccine and dose from the DOH EPI schedule."
 
-    date_text, date_error = _validate_date(form_data.get(DATE_FIELD), patient)
+    # Blank is permitted only where the stored record is one reported from
+    # elsewhere. The question is asked of the RECORD, never of the form: a POST
+    # cannot declare its own date optional by claiming a source, because the
+    # source is read from the row being corrected.
+    date_text, date_error = _validate_date(
+        form_data.get(DATE_FIELD), patient,
+        required=not record.get("reported"),
+    )
     if date_error:
         errors[DATE_FIELD] = date_error
 
@@ -438,6 +456,12 @@ def _reopen(kind, record_id, record, form_data, errors, banner):
             ),
             "label": KINDS[kind]["label"](record),
             "recorded_by": record["administered_by_name"],
+            # Carried so the reopened dialog says the same thing about this
+            # record's date that the dialog opened from the button says. Only an
+            # EPI row has a source; a general vaccination is always one the
+            # health center gave and its date is always required.
+            "reported": bool(record.get("reported")),
+            "source_label": record.get("source_label") or "",
         },
     }
 
@@ -521,6 +545,21 @@ def process_vaccination_correction(form_data, user_id, ip_address=None):
     outcome = spec["apply"](record_id, values)
     if outcome == "missing":
         return patient_id, None, "That vaccination record could not be found."
+    if outcome == "date_required":
+        # The model's own refusal, reached only if a record's source changed
+        # between _parse_epi() reading it and correct_immunization() writing --
+        # or if a POST reached here by some path that skipped the parse. Reopened
+        # like any other field error rather than flashed away, because it is
+        # fixed by typing a date into the dialog that is still on screen.
+        refusal = (
+            "A dose recorded as given at this health center must say when it "
+            "was given. Enter the date, or leave the record as it is. Nothing "
+            "has been saved."
+        )
+        return patient_id, _reopen(
+            kind, record_id, before_record, form_data,
+            {DATE_FIELD: refusal}, refusal,
+        ), None
     if outcome == "duplicate":
         # A conflict, not a mistyping -- but it is fixed the same way the field
         # errors above are, by changing what is in the dialog and saving again.

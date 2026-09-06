@@ -124,11 +124,18 @@ from models.general_vaccinations import (
 )
 from models.general_vaccinations import FIELD_LABELS as GENERAL_VACCINE_LABELS
 from models.immunizations import (
+    EPI_SCHEDULE,
+    IMMUNIZATION_ELSEWHERE_FIELD,
+    REPORTED_DATE_LABELS,
+    UNKNOWN_DATE_TEXT,
     dose_label,
     get_immunization_status,
     get_immunizations_for_consultation,
     parse_dose_keys,
+    parse_reported_doses,
     record_immunizations,
+    record_reported_immunizations,
+    reported_date_field,
 )
 from models.patients import get_patient_by_id
 from utils.dates import display_date, today
@@ -349,7 +356,8 @@ def _consultation_to_form(consultation):
     return values
 
 
-def _immunization_context(patient, consultation, visit_date, ticked=None):
+def _immunization_context(patient, consultation, visit_date, ticked=None,
+                          reported_submitted=None):
     """The "Immunizations Given Today" section's state for this visit.
 
     Every scheduled dose is offered, not only the ones outstanding, because a
@@ -357,8 +365,18 @@ def _immunization_context(patient, consultation, visit_date, ticked=None):
     where they are in it. What differs per dose is whether it can still be
     ticked:
 
-        already on file        locked, with the date it was actually given
+        already on file        locked, with where it came from and when
         not yet given          free to tick, badged Due / Overdue / Upcoming
+
+    A dose that is free to tick can be ticked two different ways, and the second
+    one is why this feature exists. "Given today" records a dose this health
+    center has just administered. "Previously given elsewhere" records a dose the
+    parent has told the health worker about -- given at another hospital or in
+    another barangay -- which is a fact learned at this consultation and stored
+    against it, but is emphatically not this health center's own work. The child
+    stops showing Overdue either way; only the second one is honest about a dose
+    the health center did not give, and before it existed the only way to clear a
+    false Overdue was to claim the dose as this health center's own.
 
     ANY recorded dose is locked -- including one this very consultation recorded.
     It used to be that a dose given at this visit stayed an ordinary ticked
@@ -374,8 +392,9 @@ def _immunization_context(patient, consultation, visit_date, ticked=None):
     vaccination that has already happened. The consequence is that this form is
     add-only for immunisations: see _apply_immunization_edit().
 
-    `ticked` carries the operator's selection back through a validation bounce,
-    so a rejected save does not throw away which boxes they had checked.
+    `ticked` and `reported_submitted` carry the operator's selection back through
+    a validation bounce, so a rejected save does not throw away which boxes they
+    had checked or the date they had typed against one of them.
     """
     status = get_immunization_status(patient, on_date=visit_date)
     this_visit = {
@@ -384,6 +403,8 @@ def _immunization_context(patient, consultation, visit_date, ticked=None):
             consultation["id"] if consultation else None
         )
     }
+    reported_ticked = set((reported_submitted or {}).get("ticked", ()))
+    reported_dates = (reported_submitted or {}).get("dates", {})
 
     for item in status["schedule"]:
         pair = (item["code"], item["dose_number"])
@@ -395,6 +416,11 @@ def _immunization_context(patient, consultation, visit_date, ticked=None):
             item["checked"] = item["given_here"]
         else:
             item["checked"] = item["key"] in ticked
+        # Never pre-ticked from the record. A dose already reported is locked
+        # like any other dose on file, so this box only ever comes back ticked
+        # because the operator ticked it on the submission that bounced.
+        item["reported_checked"] = item["key"] in reported_ticked
+        item["reported_date_value"] = reported_dates.get(item["key"], "")
     return status
 
 
@@ -571,10 +597,37 @@ def _submitted_general_vaccinations(form_data):
     }
 
 
+def _submitted_reported_doses(form_data):
+    """The "previously given elsewhere" ticks and dates, for replay through a bounce.
+
+    Built the same way _submitted_general_vaccinations() above is, and for the
+    same reason: a form that bounces on one bad date must come back holding every
+    other box the operator ticked. A dose reported at the counter is something
+    the parent said out loud once, and losing it to a validation error means
+    asking them to say it again.
+
+    Every scheduled row's date box is read, not only the ticked ones, so a date
+    typed against a row whose box was missed comes back with the date still in
+    it -- which is what makes parse_reported_doses()'s "tick the box or clear the
+    date" refusal something the operator can act on rather than a message about a
+    field that has been emptied.
+    """
+    return {
+        "ticked": (form_data.getlist(IMMUNIZATION_ELSEWHERE_FIELD)
+                   if hasattr(form_data, "getlist") else []),
+        "dates": {
+            f"{row[0]}:{row[3]}": (
+                form_data.get(reported_date_field(f"{row[0]}:{row[3]}")) or ""
+            ).strip()
+            for row in EPI_SCHEDULE
+        },
+    }
+
+
 def consultation_form_context(patient, appointment=None, consultation=None,
                               form=None, errors=None, ticked=None,
                               general_submitted=None, dispensing_submitted=None,
-                              restrict_submitted=None):
+                              restrict_submitted=None, reported_submitted=None):
     """Everything the Record / Edit Consultation screen renders.
 
     `consultation` set means edit mode: the template switches its wording, shows
@@ -660,7 +713,7 @@ def consultation_form_context(patient, appointment=None, consultation=None,
         # consultation's own label map is left exactly as it was, so the audit
         # trail still describes only the fields it describes.
         "field_labels": dict(FIELD_LABELS, **GENERAL_VACCINE_LABELS,
-                             **DISPENSING_LABELS),
+                             **DISPENSING_LABELS, **REPORTED_DATE_LABELS),
         # (field, label, unit, low, high, whole) -- the form prints the unit in
         # each field's hint and the range in its out-of-range message, from the
         # same tuples the validator checks against.
@@ -670,10 +723,16 @@ def consultation_form_context(patient, appointment=None, consultation=None,
         # Only computed for the cohort the schedule applies to; the template
         # renders the section inside the same is_pediatric guard.
         "immunization": (
-            _immunization_context(patient, consultation, visit_date, ticked)
+            _immunization_context(patient, consultation, visit_date, ticked,
+                                  reported_submitted)
             if age_context["is_pediatric"] else None
         ),
         "immunization_field": IMMUNIZATION_FIELD,
+        # The second column of tick boxes in that section: the dose the child
+        # already had somewhere else. Named to the template from here rather than
+        # spelled in the markup, exactly as the field above it is.
+        "immunization_elsewhere_field": IMMUNIZATION_ELSEWHERE_FIELD,
+        "unknown_date_text": UNKNOWN_DATE_TEXT,
         # Offered for every patient, with no age guard at all -- that is the
         # whole point of the section. An adult receiving a hepatitis B dose had
         # nowhere to be recorded before it existed, and a child can have both
@@ -785,6 +844,19 @@ def process_record_consultation(appointment_id, form_data, user_id,
     ticked = form_data.getlist(IMMUNIZATION_FIELD) if age_context["is_pediatric"] else []
     dose_keys = parse_dose_keys(ticked)
 
+    # The doses reported at this visit as already given somewhere else. Behind
+    # the same age gate and dropped by the same rule, because they are graded
+    # against the same schedule: the reading a reported dose changes is the EPI
+    # schedule's Overdue, and outside the under-five cohort there is no such
+    # reading to change. `given_today` is handed in so a dose ticked in both
+    # columns is refused rather than silently resolved -- see
+    # models.immunizations.parse_reported_doses().
+    reported_entries, reported_errors = (
+        parse_reported_doses(form_data, patient, context["visit_date"], dose_keys)
+        if age_context["is_pediatric"] else ([], {})
+    )
+    reported_submitted = _submitted_reported_doses(form_data)
+
     # No age guard here, deliberately: a general vaccination is a record that a
     # vaccine was given, which is true of a patient of any age. The EPI doses
     # above are gated because the schedule they are graded against only covers
@@ -809,6 +881,7 @@ def process_record_consultation(appointment_id, form_data, user_id,
         values, age_context, require_diagnosis=may_diagnose
     )
     errors.update(general_errors)
+    errors.update(reported_errors)
     errors.update(dispense_errors)
     if errors:
         return None, consultation_form_context(
@@ -816,6 +889,7 @@ def process_record_consultation(appointment_id, form_data, user_id,
             ticked=set(ticked), general_submitted=general_submitted,
             dispensing_submitted=dispense_submitted,
             restrict_submitted=restrict,
+            reported_submitted=reported_submitted,
         ), (
             f"{len(errors)} field{'s' if len(errors) != 1 else ''} "
             f"need{'s' if len(errors) == 1 else ''} attention. "
@@ -859,6 +933,20 @@ def process_record_consultation(appointment_id, form_data, user_id,
         dose_keys=dose_keys,
         administered_by=user_id,
         date_administered=context["visit_date"],
+        consultation_id=consultation_id,
+    )
+
+    # The doses the parent reported at this visit as already given elsewhere.
+    # Same table, same consultation anchor -- and deliberately NOT the visit
+    # date: each carries the date it was reportedly given, or none at all where
+    # nobody knows it. That is the difference between the two calls and the
+    # reason there are two. Writing these through record_immunizations() with the
+    # visit date would file another facility's work as this one's, on today, in
+    # this operator's name, which is the defect the whole feature exists to end.
+    reported = record_reported_immunizations(
+        patient_id=patient["id"],
+        entries=reported_entries,
+        recorded_by=user_id,
         consultation_id=consultation_id,
     )
 
@@ -911,8 +999,23 @@ def process_record_consultation(appointment_id, form_data, user_id,
             f" {len(given)} immunisation{'s' if len(given) != 1 else ''} recorded: "
             + ", ".join(dose_label(code, dose) for code, dose in given) + "."
         )
+    if reported:
+        # Worded as what the record now says rather than as what was ticked. The
+        # operator needs to be able to read this line back and see that the
+        # health center has not claimed the dose -- so it says "reported as given
+        # elsewhere", and it says which of them went in without a date, because
+        # that is the part they may still be able to fill in from a card in the
+        # parent's bag before the family leaves.
+        message += (
+            " {} dose{} recorded as previously given elsewhere: ".format(
+                len(reported), "s" if len(reported) != 1 else "")
+            + ", ".join(_reported_labels(reported)) + "."
+        )
+    if given or reported:
         # Say what is still outstanding while the parent is still in the room --
-        # a catch-up visit is the moment that information is worth anything.
+        # a catch-up visit is the moment that information is worth anything. Read
+        # after both writes, so a dose just reported from elsewhere has already
+        # stopped counting as outstanding by the time this sentence is composed.
         after_doses = get_immunization_status(patient, on_date=context["visit_date"])
         if after_doses["attention_items"]:
             message += (
@@ -995,13 +1098,15 @@ def _dispensing_message(dispensed, failures):
 
 
 def _apply_immunization_edit(patient, consultation_id, consultation, ticked,
-                             user_id, age_context):
+                             user_id, age_context, reported_entries=None):
     """Record any newly ticked doses for this visit. Add-only.
 
-    Returns (added, removed) as lists of (code, dose_number). `removed` is always
-    empty and is kept in the signature because the audit line, the flash message
-    and the caller all read it; the day a deliberate correction path exists it is
-    what that path will report through.
+    Returns (added, removed, reported). `added` and `removed` are lists of
+    (code, dose_number); `reported` is the (code, dose_number, date) triples
+    record_reported_immunizations() stored. `removed` is always empty and is kept
+    in the signature because the audit line, the flash message and the caller all
+    read it; the day a deliberate correction path exists it is what that path
+    will report through.
 
     WHY THIS NO LONGER REMOVES ANYTHING
     -----------------------------------
@@ -1028,9 +1133,16 @@ def _apply_immunization_edit(patient, consultation_id, consultation, ticked,
 
     Adding is unchanged. Only doses not already on file anywhere are candidates,
     so saving an edit still cannot re-date somebody else's vaccination.
+
+    A dose reported as previously given elsewhere is added the same way and under
+    the same rules -- add-only, never re-dating what is already on file -- and
+    comes back as the third element of the return so the audit line can name it
+    separately. It has to be named separately: "immunisations added: BCG" would
+    describe a dose this health center gave, and the point of the whole feature
+    is that the record never says that about a dose it did not give.
     """
     if not age_context["is_pediatric"]:
-        return [], []
+        return [], [], []
 
     current = {
         (dose["vaccine_code"], dose["dose_number"])
@@ -1044,13 +1156,41 @@ def _apply_immunization_edit(patient, consultation_id, consultation, ticked,
         date_administered=consultation["consultation_date"],
         consultation_id=consultation_id,
     )
-    return added, []
+    reported = record_reported_immunizations(
+        patient_id=patient["id"],
+        entries=[entry for entry in (reported_entries or [])
+                 if (entry["code"], entry["dose_number"]) not in current],
+        recorded_by=user_id,
+        consultation_id=consultation_id,
+    )
+    return added, [], reported
 
 
 def _general_labels(entries):
     """['Hepatitis B', 'Rabies dose 3'] for a list of stored entries."""
     return [vaccination_label(entry["vaccine_name"], entry["dose_number"])
             for entry in entries]
+
+
+def _reported_labels(stored):
+    """['BCG (Mar 04, 2026)', 'OPV dose 1 (date not known)'] for reported doses.
+
+    `stored` is what record_reported_immunizations() returns: (code, dose, date)
+    triples, the date being None where nobody knew it.
+
+    The date is printed inside the label rather than left off, and an absent one
+    is named rather than skipped. A flash message listing "BCG, OPV dose 1" would
+    read identically whether both dates were captured or neither was, and the
+    whole point of the entry is that the record says exactly as much as is
+    actually known about each dose.
+    """
+    return [
+        "{} ({})".format(
+            dose_label(code, dose),
+            display_date(day) if day else UNKNOWN_DATE_TEXT.lower(),
+        )
+        for code, dose, day in stored
+    ]
 
 
 def _apply_general_vaccination_edit(patient, consultation_id, consultation,
@@ -1085,7 +1225,8 @@ def _apply_general_vaccination_edit(patient, consultation_id, consultation,
     )
 
 
-def _describe_dose_changes(added, removed, general_added=(), dispensed=()):
+def _describe_dose_changes(added, removed, general_added=(), dispensed=(),
+                           reported=()):
     """The vaccination and dispensing half of an audit line.
 
     Returns (summary, changed_labels).
@@ -1098,6 +1239,12 @@ def _describe_dose_changes(added, removed, general_added=(), dispensed=()):
     phrases rather than pooled into one count, so an entry read months later still
     says which kind of record moved -- a scheduled infant dose, an adult booster
     and twenty tablets off a shelf are not interchangeable facts.
+
+    A dose reported as previously given elsewhere gets a fourth phrase of its
+    own, for the same reason and more sharply. Folded into "Immunisations added"
+    it would put a permanent, uneditable claim in the audit trail that this
+    health center administered a dose it never touched -- and the audit trail is
+    the one record in the project that cannot later be put right.
 
     Dispensing earns its place in the audit trail more plainly than either
     vaccination does: it is the only edit reachable from this form that changes a
@@ -1118,6 +1265,12 @@ def _describe_dose_changes(added, removed, general_added=(), dispensed=()):
             + ", ".join(dose_label(code, dose) for code, dose in removed)
         )
         changed.append("immunisations removed")
+    if reported:
+        parts.append(
+            "Doses recorded as previously given elsewhere: "
+            + ", ".join(_reported_labels(reported))
+        )
+        changed.append("doses reported as given elsewhere")
     if general_added:
         parts.append(
             "Other vaccinations added: " + ", ".join(_general_labels(general_added))
@@ -1190,6 +1343,16 @@ def process_edit_consultation(consultation_id, form_data, user_id, ip_address=No
     # Judge a follow-up date against the visit it belongs to, not against today.
     values["_consultation_date"] = before["consultation_date"]
     ticked = form_data.getlist(IMMUNIZATION_FIELD) if age_context["is_pediatric"] else []
+    # Reported doses are validated against the VISIT's date, not today's. A dose
+    # given elsewhere must predate the encounter that recorded it, and on an edit
+    # that encounter is the one being edited -- judging it against today would
+    # let a date after the visit through on any record opened later.
+    reported_entries, reported_errors = (
+        parse_reported_doses(form_data, patient, before["consultation_date"],
+                             parse_dose_keys(ticked))
+        if age_context["is_pediatric"] else ([], {})
+    )
+    reported_submitted = _submitted_reported_doses(form_data)
     general_entries, general_errors = parse_general_vaccinations(form_data)
     general_submitted = _submitted_general_vaccinations(form_data)
 
@@ -1208,6 +1371,7 @@ def process_edit_consultation(consultation_id, form_data, user_id, ip_address=No
         values, age_context, require_diagnosis=may_diagnose
     )
     errors.update(general_errors)
+    errors.update(reported_errors)
     errors.update(dispense_errors)
     if errors:
         return None, consultation_form_context(
@@ -1215,6 +1379,7 @@ def process_edit_consultation(consultation_id, form_data, user_id, ip_address=No
             general_submitted=general_submitted,
             dispensing_submitted=dispense_submitted,
             restrict_submitted=restrict if may_diagnose else None,
+            reported_submitted=reported_submitted,
         ), (
             f"{len(errors)} field{'s' if len(errors) != 1 else ''} "
             f"need{'s' if len(errors) == 1 else ''} attention. "
@@ -1260,8 +1425,9 @@ def process_edit_consultation(consultation_id, form_data, user_id, ip_address=No
     # rendered as a locked fact rather than a checkbox, so no submission -- however
     # it was produced -- can delete one. See _apply_immunization_edit() for why
     # removal belongs on its own deliberate path instead.
-    added, removed = _apply_immunization_edit(
-        patient, consultation_id, before, ticked, user_id, age_context
+    added, removed, reported = _apply_immunization_edit(
+        patient, consultation_id, before, ticked, user_id, age_context,
+        reported_entries,
     )
     general_added = _apply_general_vaccination_edit(
         patient, consultation_id, before, general_entries, user_id
@@ -1284,7 +1450,7 @@ def process_edit_consultation(consultation_id, form_data, user_id, ip_address=No
         before, after, FIELD_LABELS, formatters=AUDIT_FORMATTERS
     )
     dose_summary, dose_changed = _describe_dose_changes(
-        added, removed, general_added, dispensed
+        added, removed, general_added, dispensed, reported
     )
     if dose_summary:
         summary = f"{summary}; {dose_summary}" if summary else dose_summary

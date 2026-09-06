@@ -355,11 +355,22 @@
       <div class="col-md-3 col-sm-6">
         <div class="stat-card">
           <div class="stat-icon" style="background:rgba(34,197,94,0.15);"><span class="material-symbols-outlined" style="color:var(--success);">vaccines</span></div>
-          <div class="stat-value">{{ immunization_coverage.window.doses_given }}</div>
-          <div class="stat-label">Immunization Doses Given</div>
+{#- THE HEADLINE IS WHAT THIS HEALTH CENTER ADMINISTERED, NOT EVERY DOSE ON FILE.
+    A dose recorded as given elsewhere is a real dose and it counts towards a
+    child being up to date, which the coverage card beside this one reports. It
+    is not activity of this health center, and this card is an activity figure --
+    printed on a report that leaves the building. Crediting another hospital's
+    work to this one would be the exact confusion the source column was added to
+    end, so the headline counts only what was administered here and the reported
+    doses are named underneath, where they stay visible and stay unclaimed. #}
+          <div class="stat-value">{{ immunization_coverage.window.doses_administered }}</div>
+          <div class="stat-label">Immunization Doses Given Here</div>
           <div class="stat-trend" style="color:var(--text-muted);">
             {{ window.start | display_date }} &ndash; {{ window.end | display_date }} &middot;
             to {{ immunization_coverage.window.children_dosed }} child{{ '' if immunization_coverage.window.children_dosed == 1 else 'ren' }}
+{%- if immunization_coverage.window.doses_reported %}
+            <span style="display:block;">plus {{ immunization_coverage.window.doses_reported }} dated in this range but reported as given elsewhere</span>
+{%- endif %}
           </div>
         </div>
       </div>

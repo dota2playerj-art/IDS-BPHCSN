@@ -153,16 +153,38 @@ def main():
             if new[column] != value:
                 problems.append(f"id={consultation_id}.{column}: {value!r} -> {new[column]!r}")
 
-    # The clinical columns the seeded rows carry must be intact, not merely equal
-    # to a blank they were silently reset to.
+    # The clinical text the rows carry must be intact, not merely equal to a
+    # blank they were silently reset to.
+    #
+    # ONLY chief_complaint IS ASSERTED HERE, AND diagnosis DELIBERATELY IS NOT.
+    #
+    # This asked for both when it was written, and both were right then: every
+    # consultation on file had been written up by an account that could fill in
+    # both fields. That stopped being true when the diagnosis restriction went in.
+    # Health Center Staff and BHWs take the intake and give the vaccinations;
+    # `diagnosis` and `treatment_plan` are the licensed clinician's, are stripped
+    # out of any submission by a role that may not write them, and go in NULL for
+    # the Administrator to complete later -- see models/consultations.py
+    # DOCTOR_ONLY_FIELDS and routes/consultation_views._apply_clinical_authority().
+    #
+    # So a staff-recorded visit awaiting its diagnosis is the restriction working
+    # exactly as designed, and this assertion was reporting it as lost clinical
+    # text -- a re-run of this migration failing because a later feature did its
+    # job. chief_complaint is asked of every role and every record, so it is the
+    # half that remains a real invariant, and it is the half still checked.
     populated = conn.execute(
-        "SELECT COUNT(*) FROM consultations "
-        "WHERE chief_complaint IS NOT NULL AND diagnosis IS NOT NULL"
+        "SELECT COUNT(*) FROM consultations WHERE chief_complaint IS NOT NULL"
     ).fetchone()[0]
     if populated != before_count:
         problems.append(
-            f"{before_count - populated} pre-existing rows lost their clinical text"
+            f"{before_count - populated} pre-existing rows lost their chief complaint"
         )
+    awaiting_diagnosis = conn.execute(
+        "SELECT COUNT(*) FROM consultations WHERE diagnosis IS NULL"
+    ).fetchone()[0]
+    if awaiting_diagnosis:
+        print(f"{awaiting_diagnosis} consultation(s) have no diagnosis yet -- recorded "
+              "by a role that may not write one, awaiting the Administrator")
 
     null_updated = conn.execute(
         "SELECT COUNT(*) FROM consultations WHERE updated_at IS NULL"

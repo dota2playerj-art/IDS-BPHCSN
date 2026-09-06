@@ -134,11 +134,25 @@ def main():
                 if new_row[column] != value:
                     problems.append(f"{table} id={row_id}.{column}: {value!r} -> {new_row[column]!r}")
 
+    # WHAT THIS CHECKS IS THAT NOTHING IS MISSING, NOT THAT NOTHING WAS ADDED.
+    #
+    # It used to compare the live column list against an exact expected list, and
+    # that was right while this was the only migration that touched the table.
+    # migrate_add_immunization_source.py then added `source`, and this assertion
+    # began reporting a correctly evolved table as damage on every re-run -- a
+    # migration failing because a later migration did its job.
+    #
+    # A creating migration is answerable for what it created still being there.
+    # It is not answerable for what came after, and it must not forbid it.
     columns = [row[1] for row in conn.execute("PRAGMA table_info(immunizations)")]
     expected = ["id", "patient_id", "consultation_id", "vaccine_code", "dose_number",
                 "date_administered", "administered_by", "notes", "created_at"]
-    if columns != expected:
-        problems.append(f"columns are {columns}, expected {expected}")
+    missing = [name for name in expected if name not in columns]
+    if missing:
+        problems.append(f"columns {missing} are missing; live columns are {columns}")
+    added_since = [name for name in columns if name not in expected]
+    if added_since:
+        print(f"columns added by later migrations: {added_since}")
 
     live_indexes = {
         row[0] for row in conn.execute(
@@ -182,7 +196,20 @@ def main():
             else:
                 print("UNIQUE (patient, vaccine, dose): rejects a repeated dose")
 
-        # NOT NULL must reject a dose with no date.
+        # A dose with no date must still be rejected -- but WHICH constraint
+        # rejects it depends on how far the database has been migrated.
+        #
+        # As this migration built it, date_administered was NOT NULL and refused
+        # every undated row. migrate_add_immunization_source.py relaxed that into
+        # a CHECK so a dose reported as given at another facility may be undated,
+        # while a dose this health center administered still may not -- and this
+        # probe, which names no source, takes the 'administered' default and is
+        # refused by the CHECK instead.
+        #
+        # The clinical guarantee is identical either way: no row can claim this
+        # health center gave a dose without saying when. So both refusals pass,
+        # and the message says which one is live. Only an undated dose being
+        # ACCEPTED is a failure.
         try:
             conn.execute("BEGIN")
             conn.execute(
@@ -192,13 +219,19 @@ def main():
                 (anchor["patient_id"], anchor["user_id"]),
             )
             conn.execute("ROLLBACK")
-            problems.append("NOT NULL did not reject a dose with no date")
+            problems.append("an undated administered dose was not rejected")
         except sqlite3.IntegrityError as exc:
             conn.execute("ROLLBACK")
-            if "NOT NULL constraint failed" not in str(exc):
-                problems.append(f"undated dose rejected by {exc} rather than NOT NULL")
-            else:
+            text = str(exc)
+            if "NOT NULL constraint failed" in text:
                 print("NOT NULL (date_administered): rejects an undated dose")
+            elif "CHECK constraint failed" in text and "date_administered" in text:
+                print("CHECK (administered doses are dated): rejects an undated dose "
+                      "-- date_administered has since been relaxed for reported doses")
+            else:
+                problems.append(
+                    f"undated dose rejected by {exc} rather than by the date rule"
+                )
 
         left_behind = conn.execute(
             "SELECT COUNT(*) FROM immunizations WHERE vaccine_code = '__PROBE__'"
