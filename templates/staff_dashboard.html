@@ -1,6 +1,10 @@
 ﻿{% extends "base.html" %}
 {% set active_nav = "dashboard" %}
-{% block title %}IDS-BPHCSN | Staff Dashboard{% endblock %}
+{#- The clinical floor's dashboard, served to Health Center Staff and to the
+    Doctor from the one route (routes/staff.py says why the two share it). Only
+    its name follows the role; every panel on it is the same for both. #}
+{% set dashboard_title = "Doctor Dashboard" if current_role == "doctor" else "Staff Dashboard" %}
+{% block title %}IDS-BPHCSN | {{ dashboard_title }}{% endblock %}
 
 {% block styles %}
   .stat-card{
@@ -91,7 +95,7 @@
 {% block content %}
     <div class="mb-1">
       <div class="eyebrow">{{ health_center.name }}</div>
-      <div class="page-title">Staff Dashboard</div>
+      <div class="page-title">{{ dashboard_title }}</div>
     </div>
     {#- WAS "All Systems Operational" (green dot) and "Secure Connection" (wifi
         icon) here. Both were fixed text, on this screen and six others. Nothing in

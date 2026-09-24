@@ -594,8 +594,8 @@ def process_maintenance_mode(form_data, actor_id, ip_address=None):
             ACTION_MAINTENANCE_ENABLED,
             module=MODULE_SETTINGS,
             details=(
-                f"Maintenance mode turned ON by {actor_phrase}. Health Center "
-                "Staff and Barangay Official accounts are refused on every "
+                f"Maintenance mode turned ON by {actor_phrase}. Doctor, Health "
+                "Center Staff and Barangay Official accounts are refused on every "
                 "screen and at the sign-in form for as long as it stays on, and "
                 "are shown a page saying the system is temporarily closed rather "
                 "than being signed out — their sessions are left intact, so they "
@@ -626,8 +626,8 @@ def process_maintenance_mode(form_data, actor_id, ip_address=None):
         ACTION_MAINTENANCE_DISABLED,
         module=MODULE_SETTINGS,
         details=(
-            f"Maintenance mode turned OFF by {actor_phrase}. Health Center Staff "
-            "and Barangay Official accounts can sign in and use every screen "
+            f"Maintenance mode turned OFF by {actor_phrase}. Doctor, Health Center "
+            "Staff and Barangay Official accounts can sign in and use every screen "
             "their role admits them to again, with immediate effect: the check "
             "runs on each request rather than at sign-in, so anyone who was "
             "sitting on the maintenance page is back at work on their next "
@@ -636,7 +636,7 @@ def process_maintenance_mode(form_data, actor_id, ip_address=None):
         ip_address=ip_address,
     )
     return (
-        "Maintenance mode is OFF. Health Center Staff and Barangay Officials can "
+        "Maintenance mode is OFF. Doctors, Health Center Staff and Barangay Officials can "
         "use the system again — anyone still holding the maintenance page is back "
         "at work on their next click, without signing in again."
     )

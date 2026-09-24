@@ -388,7 +388,7 @@ def login():
             session["full_name"] = user["full_name"]
             session["role"] = user["role"]
 
-            # Written once here rather than in each of the four dispatch
+            # Written once here rather than in each of the dispatch
             # branches below: the entry records that this account was admitted,
             # which is true identically whichever dashboard it then lands on.
             _log_sign_in(user, ip_address)
@@ -399,6 +399,12 @@ def login():
                 return redirect(url_for("admin.admin_dashboard"))
             elif normalized_role == "health staff":
                 session["role"] = "Health Staff"
+                return redirect(url_for("staff.staff_dashboard"))
+            elif normalized_role == "doctor":
+                # The Doctor works the clinical floor's screens, so lands on
+                # its dashboard. routes/staff.py says why the two roles share
+                # one blueprint.
+                session["role"] = "Doctor"
                 return redirect(url_for("staff.staff_dashboard"))
             elif normalized_role == "barangay official":
                 session["role"] = "Barangay Official"
@@ -475,6 +481,6 @@ def dashboard():
     normalized_role = normalize_role(user["role"])
     if normalized_role == "admin":
         return redirect(url_for("admin.admin_dashboard"))
-    if normalized_role == "health staff":
+    if normalized_role in {"health staff", "doctor"}:
         return redirect(url_for("staff.staff_dashboard"))
     return redirect(url_for("official.official_dashboard"))

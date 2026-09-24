@@ -50,7 +50,12 @@ def inject_role_context():
     # These stay unqualified ("admin_dashboard", not "admin.admin_dashboard"): the
     # templates pass them straight to url_for(), and utils/endpoints.py maps the flat
     # names onto their blueprint-qualified endpoints.
-    if normalized_role == "health staff":
+    # The Doctor is on the clinical floor with Health Center Staff: the same
+    # /staff/* screens, so the same endpoint names (routes/staff.py says why the
+    # two share a blueprint). What the Doctor may do on those screens that staff
+    # may not is not an endpoint question and is not decided here -- see
+    # models/consultations.py can_diagnose().
+    if normalized_role in {"health staff", "doctor"}:
         context = {
             "sidebar_role_label": "Health Staff",
             "sidebar_user_name": "Angela Cruz",
@@ -94,6 +99,16 @@ def inject_role_context():
             "appointments_excel_endpoint": "staff_export_appointment_scheduling_excel",
             "appointments_pdf_endpoint": "staff_export_appointment_scheduling_pdf",
         }
+        if normalized_role == "doctor":
+            # Defaults only, as for every role: the account's own full name
+            # replaces the name and initials further down. The label under it
+            # names the role, because the demo account's name is a placeholder
+            # until the RHU physician's real name is confirmed.
+            context.update({
+                "sidebar_role_label": "Doctor",
+                "sidebar_user_name": "RHU Physician",
+                "sidebar_user_initials": "RP",
+            })
     elif normalized_role == "admin":
         context = {
             # The line under the name in the profile chip. It names the person
@@ -224,19 +239,20 @@ def inject_role_context():
 
     # The sidebar's Medicine Inventory badge lives in base.html, which every screen
     # extends, so the count has to come from here rather than from each route. Only
-    # the two roles that hold inventory access get it: 09_UI_Architecture §2 keeps
+    # the roles that hold inventory access get it: 09_UI_Architecture §2 keeps
     # the Barangay Official out of inventory entirely, and their sidebar has no
     # Medicine Inventory item to badge in the first place.
     #
     # Read from models.inventory.get_low_stock_alert() -- the same call the two
     # dashboards use -- so the badge cannot drift from the figure the dashboards
     # and Medicine Inventory itself report.
-    if normalized_role in {"admin", "health staff"}:
+    if normalized_role in {"admin", "doctor", "health staff"}:
         context["low_stock_count"] = get_low_stock_alert()["low_stock_count"]
 
     # Broadcast authority per the confirmed team ruling: Administrator and Barangay
     # Official compose/send/schedule community announcements and SMS; Health Center
-    # Staff is view-only (individual patient scheduling is their scope, not broadcast).
+    # Staff is view-only (individual patient scheduling is their scope, not broadcast),
+    # and so is the Doctor, who sees SMS Notifications exactly as staff do.
     context["can_broadcast"] = normalized_role in {"admin", "barangay official"}
 
 

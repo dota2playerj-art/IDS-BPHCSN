@@ -51,6 +51,8 @@ Worth keeping the sequence visible, because it is the rule working: the entry wa
 added in the same commit as the account that needs it, rather than on speculation
 years earlier or as a fix months later when somebody noticed the wrong initials.
 """
+import re
+
 
 TITLES = frozenset({
     "dr.", "dr", "mr.", "mrs.", "ms.", "engr.", "kagawad", "hon.", "hon",
@@ -61,6 +63,8 @@ TITLES = frozenset({
 # one entry rather than two that could come to disagree. TITLES above stays
 # readable as the list a person maintains; this is what the loop actually asks.
 _TITLE_WORDS = frozenset(title.rstrip(".") for title in TITLES)
+
+_PARENTHETICAL = re.compile(r"\([^)]*\)")
 
 
 def initials(name, empty=""):
@@ -75,9 +79,13 @@ def initials(name, empty=""):
     names an account that definitely exists, so a blank would read as the name
     having gone missing rather than as there being nobody.
     """
+    # A parenthetical is a note about the name, not part of it: the demo Doctor
+    # account is "RHU Physician (demo)" until the physician's real name is
+    # confirmed, and its circle should read "RP", not "R(".
+    bare = _PARENTHETICAL.sub(" ", str(name or ""))
     parts = [
         word
-        for word in str(name or "").replace(".", " ").split()
+        for word in bare.replace(".", " ").split()
         if word.lower() not in _TITLE_WORDS
     ]
     if not parts:

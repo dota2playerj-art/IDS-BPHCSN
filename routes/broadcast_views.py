@@ -76,7 +76,8 @@ DETAIL_RECIPIENT_LIMIT = 8
 # on a screen they do reach would route around the restriction rather than
 # honour it. They keep the whole broadcast half of this screen, which names
 # nobody.
-APPOINTMENT_SMS_ROLES = {"admin", "health staff"}
+# The Doctor reads it exactly as Health Center Staff do: same screen, same rows.
+APPOINTMENT_SMS_ROLES = {"admin", "doctor", "health staff"}
 APPOINTMENT_SMS_LIMIT = 25
 
 

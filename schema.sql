@@ -1,11 +1,15 @@
 PRAGMA foreign_keys = ON;
 
+-- role: four values. 'Doctor' was added by migrate_add_doctor_role.py when the
+-- RHU's field data separated system administration (the Administrator, a
+-- barangay Kagawad) from clinical authority (the RHU physician). A database
+-- built from this file already has it; an older one gets it from that script.
 CREATE TABLE users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
     full_name TEXT NOT NULL,
-    role TEXT NOT NULL CHECK (role IN ('Admin', 'Health Center Staff', 'Barangay Official')),
+    role TEXT NOT NULL CHECK (role IN ('Admin', 'Doctor', 'Health Center Staff', 'Barangay Official')),
     email TEXT,
     phone TEXT,
     is_active INTEGER NOT NULL DEFAULT 1,

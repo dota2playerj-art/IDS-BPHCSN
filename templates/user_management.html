@@ -101,12 +101,13 @@
   .user-id{color:var(--text-muted); font-size:12.5px;}
   .muted-cell{color:var(--text-muted);}
 
-  {#- Three pills for the three roles the schema's CHECK constraint allows.
+  {#- Four pills for the four roles the schema's CHECK constraint allows.
       The mockup also styled Nurse, Midwife, Pharmacist and Barangay Health
       Worker; those roles cannot be stored, so their classes are gone with the
-      rows that used them. #}
+      rows that used them. Doctor was added with the role itself. #}
   .role-pill{font-size:11.5px; font-weight:600; padding:4px 11px; border-radius:999px; white-space:nowrap; display:inline-flex; align-items:center; gap:5px;}
   .role-admin{background:#EDE9FE; color:var(--purple);}
+  .role-doctor{background:#FEF3C7; color:#92400E;}
   .role-staff{background:#DBEAFE; color:#1D4ED8;}
   .role-official{background:var(--teal-light); color:var(--teal-dark);}
 
@@ -617,7 +618,7 @@
 
                 <div class="col-md-6">
                   <label class="field-label" for="addRole">Role<span class="req">*</span></label>
-                  {#- The three roles the schema's CHECK constraint allows, read
+                  {#- The four roles the schema's CHECK constraint allows, read
                       from models/users.py::ROLE_CHOICES rather than written out
                       here, so a role this list offered but the database would
                       reject cannot exist. The mockup's Nurse, Midwife,

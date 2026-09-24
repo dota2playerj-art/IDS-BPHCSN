@@ -310,6 +310,7 @@ _BLUEPRINT_PREFIXES = ("staff_", "official_")
 
 ROLE_STYLES = {
     "admin": ("role-admin", "shield_person"),
+    "doctor": ("role-doctor", "stethoscope"),
     "health staff": ("role-staff", "medical_services"),
     "barangay official": ("role-official", "account_balance"),
 }

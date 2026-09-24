@@ -1,7 +1,25 @@
-"""Health Center Staff screens. Mounted at /staff.
+"""The clinical floor: Health Center Staff and the Doctor. Mounted at /staff.
 
 Several of these render the same templates as the Admin blueprint; they exist
 separately so each role's URL space and role_required guard stay explicit.
+
+WHY THE DOCTOR IS HERE RATHER THAN IN A BLUEPRINT OF THEIR OWN
+--------------------------------------------------------------
+The Doctor role was added when the RHU's field data showed that clinical
+authority belongs to the RHU physician, not to the Administrator (a barangay
+Kagawad). The Doctor works the same screens Health Center Staff do -- Patient
+Records, Patient Profile, Register Patient, the Patient Queue, Record
+Consultation, Medicine Inventory, and SMS Notifications read-only -- and every
+one of them is already built here from a context builder shared with the
+Administrator's copy. A /doctor/* blueprint would have been these same 24
+views a third time, each able to drift from the other two.
+
+So every route in this file admits CLINICAL_FLOOR_ROLES, and what separates the
+Doctor from Health Center Staff is not which screen they reach but what the
+screen lets them do. That is decided per request from the signed-in account's
+stored role (utils.security.current_role()), inside the shared builders, and is
+enforced there whichever blueprint the request came through -- see
+models/consultations.py can_diagnose().
 """
 from flask import Blueprint, flash, redirect, render_template, request, session, url_for
 
@@ -62,10 +80,16 @@ from utils.security import login_required, role_required
 
 staff_bp = Blueprint("staff", __name__, url_prefix="/staff")
 
+# Who works the clinical floor. Every screen in this file admits exactly these
+# two roles; the permissions that differ between them are asked inside the views.
+# The Barangay Official is not here, and neither is the Administrator, who has
+# their own copies of these screens under /admin.
+CLINICAL_FLOOR_ROLES = ("Health Staff", "Doctor")
+
 
 @staff_bp.route('/dashboard')
 @login_required
-@role_required("Health Staff")
+@role_required(*CLINICAL_FLOOR_ROLES)
 def staff_dashboard():
     # Every panel has room for a handful of rows; the counts above them are the
     # true totals, not the length of those lists. Same builder as the
@@ -75,7 +99,7 @@ def staff_dashboard():
 
 @staff_bp.route('/patient_records')
 @login_required
-@role_required("Health Staff")
+@role_required(*CLINICAL_FLOOR_ROLES)
 def staff_patient_records():
     """Screen 03. `?search=` is the header's global search box arriving here --
     it is the only thing that box does, and this route is where it lands for
@@ -95,7 +119,7 @@ def staff_patient_records():
 # Administrator downloads are the same roster.
 @staff_bp.route('/patient_records/export.xlsx')
 @login_required
-@role_required("Health Staff")
+@role_required(*CLINICAL_FLOOR_ROLES)
 def staff_export_patient_records_excel():
     return excel_response(patient_roster_workbook(
         patient_records_context(),
@@ -105,7 +129,7 @@ def staff_export_patient_records_excel():
 
 @staff_bp.route('/patient_records/export.pdf')
 @login_required
-@role_required("Health Staff")
+@role_required(*CLINICAL_FLOOR_ROLES)
 def staff_export_patient_records_pdf():
     return pdf_response(patient_roster_document(
         patient_records_context(),
@@ -133,7 +157,7 @@ def staff_export_patient_records_pdf():
 # has to open to discover was pointless.
 @staff_bp.route('/patient_records/export-selection.xlsx', methods=["POST"])
 @login_required
-@role_required("Health Staff")
+@role_required(*CLINICAL_FLOOR_ROLES)
 def staff_export_patient_selection_excel():
     context = patient_selection_context(request.form)
     if context is None:
@@ -147,7 +171,7 @@ def staff_export_patient_selection_excel():
 
 @staff_bp.route('/patient_records/export-selection.pdf', methods=["POST"])
 @login_required
-@role_required("Health Staff")
+@role_required(*CLINICAL_FLOOR_ROLES)
 def staff_export_patient_selection_pdf():
     context = patient_selection_context(request.form)
     if context is None:
@@ -164,7 +188,7 @@ def staff_export_patient_selection_pdf():
 # other Staff view: a Barangay Official never reaches it.
 @staff_bp.route('/patient_records/archive', methods=["POST"])
 @login_required
-@role_required("Health Staff")
+@role_required(*CLINICAL_FLOOR_ROLES)
 def staff_archive_patients():
     flash(process_archive_patients(request.form))
     return redirect(url_for("staff.staff_patient_records"))
@@ -181,7 +205,7 @@ def staff_archive_patients():
 # copy can validate or audit a correction differently from the other's.
 @staff_bp.route('/patient_profile/<int:patient_id>/correct-vaccination', methods=["POST"])
 @login_required
-@role_required("Health Staff")
+@role_required(*CLINICAL_FLOOR_ROLES)
 def staff_correct_vaccination(patient_id):
     corrected_for, reopen, message = process_vaccination_correction(
         request.form, session.get("user_id"), ip_address=request.remote_addr
@@ -205,7 +229,7 @@ def staff_correct_vaccination(patient_id):
 
 @staff_bp.route('/patient_profile/<int:patient_id>')
 @login_required
-@role_required("Health Staff")
+@role_required(*CLINICAL_FLOOR_ROLES)
 def staff_patient_profile(patient_id):
     context = patient_profile_context(patient_id)
     if context is None:
@@ -216,7 +240,7 @@ def staff_patient_profile(patient_id):
 
 @staff_bp.route('/medicine_inventory')
 @login_required
-@role_required("Health Staff")
+@role_required(*CLINICAL_FLOOR_ROLES)
 def staff_medicine_inventory():
     return render_template('medicine_inventory.html', **medicine_inventory_context())
 
@@ -226,7 +250,7 @@ def staff_medicine_inventory():
 # namespace in utils/endpoints.py stays unambiguous.
 @staff_bp.route('/medicine_inventory/export.xlsx')
 @login_required
-@role_required("Health Staff")
+@role_required(*CLINICAL_FLOOR_ROLES)
 def staff_export_medicine_inventory_excel():
     return excel_response(inventory_workbook(
         medicine_inventory_context(),
@@ -236,7 +260,7 @@ def staff_export_medicine_inventory_excel():
 
 @staff_bp.route('/medicine_inventory/export.pdf')
 @login_required
-@role_required("Health Staff")
+@role_required(*CLINICAL_FLOOR_ROLES)
 def staff_export_medicine_inventory_pdf():
     return pdf_response(inventory_document(
         medicine_inventory_context(),
@@ -249,7 +273,7 @@ def staff_export_medicine_inventory_pdf():
 # staff_archive_patients above has.
 @staff_bp.route('/medicine_inventory/archive', methods=["POST"])
 @login_required
-@role_required("Health Staff")
+@role_required(*CLINICAL_FLOOR_ROLES)
 def staff_archive_medicine():
     flash(process_archive_medicine(request.form))
     return redirect(url_for("staff.staff_medicine_inventory"))
@@ -262,7 +286,7 @@ def staff_archive_medicine():
 @staff_bp.route('/add_edit_medicine', methods=["GET", "POST"])
 @staff_bp.route('/add_edit_medicine/<int:medicine_id>', methods=["GET", "POST"])
 @login_required
-@role_required("Health Staff")
+@role_required(*CLINICAL_FLOOR_ROLES)
 def staff_add_edit_medicine(medicine_id=None):
     item = None
     if medicine_id is not None:
@@ -289,7 +313,7 @@ def staff_add_edit_medicine(medicine_id=None):
 # current month. The queue below it is always today's and is unaffected.
 @staff_bp.route('/appointment_scheduling')
 @login_required
-@role_required("Health Staff")
+@role_required(*CLINICAL_FLOOR_ROLES)
 def staff_appointment_scheduling():
     return render_template(
         'appointment_scheduling.html',
@@ -302,7 +326,7 @@ def staff_appointment_scheduling():
 # the calendar's arrows submit, so the file holds the month on screen.
 @staff_bp.route('/appointment_scheduling/export.xlsx')
 @login_required
-@role_required("Health Staff")
+@role_required(*CLINICAL_FLOOR_ROLES)
 def staff_export_appointment_scheduling_excel():
     return excel_response(appointment_workbook(
         appointment_scheduling_context(month=request.args.get("month")),
@@ -312,7 +336,7 @@ def staff_export_appointment_scheduling_excel():
 
 @staff_bp.route('/appointment_scheduling/export.pdf')
 @login_required
-@role_required("Health Staff")
+@role_required(*CLINICAL_FLOOR_ROLES)
 def staff_export_appointment_scheduling_pdf():
     return pdf_response(appointment_document(
         appointment_scheduling_context(month=request.args.get("month")),
@@ -325,7 +349,7 @@ def staff_export_appointment_scheduling_pdf():
 # other Staff view: a Barangay Official never reaches them.
 @staff_bp.route('/appointment_scheduling/check-in', methods=["POST"])
 @login_required
-@role_required("Health Staff")
+@role_required(*CLINICAL_FLOOR_ROLES)
 def staff_check_in_patient():
     flash(process_check_in(request.form, session.get("user_id")))
     return redirect(url_for("staff.staff_appointment_scheduling"))
@@ -333,7 +357,7 @@ def staff_check_in_patient():
 
 @staff_bp.route('/appointment_scheduling/start-consultation', methods=["POST"])
 @login_required
-@role_required("Health Staff")
+@role_required(*CLINICAL_FLOOR_ROLES)
 def staff_start_consultation():
     flash(process_start_consultation(request.form))
     return redirect(url_for("staff.staff_appointment_scheduling"))
@@ -344,7 +368,7 @@ def staff_start_consultation():
 # happened during the visit is a separate screen and is not wired here.
 @staff_bp.route('/appointment_scheduling/complete-consultation', methods=["POST"])
 @login_required
-@role_required("Health Staff")
+@role_required(*CLINICAL_FLOOR_ROLES)
 def staff_complete_consultation():
     flash(process_complete_consultation(request.form))
     return redirect(url_for("staff.staff_appointment_scheduling"))
@@ -357,7 +381,7 @@ def staff_complete_consultation():
 # History.
 @staff_bp.route('/consultation/record/<int:appointment_id>', methods=["GET", "POST"])
 @login_required
-@role_required("Health Staff")
+@role_required(*CLINICAL_FLOOR_ROLES)
 def staff_record_consultation(appointment_id):
     if request.method == "POST":
         # ip_address is passed for the same reason the edit route below passes
@@ -388,7 +412,7 @@ def staff_record_consultation(appointment_id):
 # the patient or the visit date.
 @staff_bp.route('/consultation/edit/<int:consultation_id>', methods=["GET", "POST"])
 @login_required
-@role_required("Health Staff")
+@role_required(*CLINICAL_FLOOR_ROLES)
 def staff_edit_consultation(consultation_id):
     if request.method == "POST":
         patient_id, context, message = process_edit_consultation(
@@ -416,7 +440,7 @@ def staff_edit_consultation(consultation_id):
 # routes/broadcast_views.py.
 @staff_bp.route('/sms_notifications')
 @login_required
-@role_required("Health Staff")
+@role_required(*CLINICAL_FLOOR_ROLES)
 def staff_sms_notifications():
     return render_template('sms_notifications.html', **sms_notifications_context())
 
@@ -428,7 +452,7 @@ def staff_sms_notifications():
 @staff_bp.route('/register-patient', methods=["GET", "POST"])
 @staff_bp.route('/register-patient/<int:patient_id>', methods=["GET", "POST"])
 @login_required
-@role_required("Health Staff")
+@role_required(*CLINICAL_FLOOR_ROLES)
 def staff_register_patient(patient_id=None):
     patient = None
     if patient_id is not None:

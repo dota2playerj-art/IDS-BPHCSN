@@ -109,22 +109,36 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from database.connection import get_db
 
-# The single source of truth for the three SEEDED login accounts (audit item 21
-# -- seed_users.py was removed so these were the only credentials in the
-# project). full_name matches the personas rendered in the sidebar by
+# The single source of truth for the SEEDED login accounts (audit item 21 --
+# seed_users.py was removed so these were the only credentials in the project).
+# full_name matches the personas rendered in the sidebar by
 # inject_role_context().
+#
+# THE FOURTH ONE, AND WHY ITS NAME IS A PLACEHOLDER.
+# "doctor" was added with the Doctor role, when the RHU's field data showed that
+# clinical authority belongs to the RHU physician and not to the Administrator,
+# who is a barangay Kagawad. The physician's real name is not yet confirmed, so
+# the account is named for what it is -- "RHU Physician (demo)" -- rather than
+# given an invented person's name that could be mistaken for a real one. The
+# team renames it through Edit User once the name is confirmed; the username
+# stays "doctor" for the life of the account, for the reason update_user()
+# gives. A live database created before this role existed gets the same account
+# from migrate_add_doctor_role.py, which reads it from this list.
 #
 # They are no longer the only accounts that can exist: create_user() below adds
 # them from User Management. They are still the only ones written from source,
 # and seed_demo_users() still runs only into an empty table, so nothing here
 # touches an account an administrator created.
 #
-# Their passwords would not pass the strength rule further down this file, and
-# they are not re-checked against it. That is stated in full beside the rule.
+# The first three accounts' passwords would not pass the strength rule further
+# down this file, and they are not re-checked against it. That is stated in full
+# beside the rule. The Doctor account's does pass it: it was written after the
+# rule existed, and migrate_add_doctor_role.py refuses to create it otherwise.
 DEMO_USERS = [
     ("admin", "(retired demo password)", "Kagawad Antonio Acido", "Admin"),
     ("staff", "(retired demo password)", "Health Center Staff", "Health Center Staff"),
     ("official", "(retired demo password)", "Barangay Official", "Barangay Official"),
+    ("doctor", "(retired demo password)", "RHU Physician (demo)", "Doctor"),
 ]
 
 
@@ -143,8 +157,9 @@ def seed_demo_users():
 
 # Whose names may appear in "Assign to" on a booking. The Barangay Official is
 # excluded for the same reason they cannot open the Patient Queue at all --
-# they hold no clinical role, so a visit cannot be assigned to them.
-CLINICAL_ROLES = ("Admin", "Health Center Staff")
+# they hold no clinical role, so a visit cannot be assigned to them. The Doctor
+# is the clinical role above all others and is included.
+CLINICAL_ROLES = ("Admin", "Doctor", "Health Center Staff")
 
 
 def get_clinical_staff():
@@ -192,9 +207,10 @@ def get_all_users():
         ORDER BY
             CASE role
                 WHEN 'Admin' THEN 0
-                WHEN 'Health Center Staff' THEN 1
-                WHEN 'Barangay Official' THEN 2
-                ELSE 3
+                WHEN 'Doctor' THEN 1
+                WHEN 'Health Center Staff' THEN 2
+                WHEN 'Barangay Official' THEN 3
+                ELSE 4
             END,
             full_name COLLATE NOCASE
         """
@@ -258,7 +274,7 @@ def get_user_by_username(username):
 # Creating an account
 # ---------------------------------------------------------------------------
 
-# The three role strings the schema's CHECK constraint allows, paired with the
+# The four role strings the schema's CHECK constraint allows, paired with the
 # label the form shows. The stored value is the left half and it is exactly what
 # schema.sql permits -- so a role that would be rejected by the database cannot
 # be offered by the form, and validate_new_user_form() below rejects anything
@@ -270,8 +286,16 @@ def get_user_by_username(username):
 # treats the two spellings as one role for every comparison; this list is the
 # stored form, and showing the stored form is what makes the audit entry, the
 # roster and the database read the same word.
+#
+# "Doctor" is the licensed clinician and the only role that may diagnose, write
+# a treatment plan, seal a consultation, read a sealed one, or declare a patient
+# deceased -- see models/consultations.py can_diagnose(). It is listed second,
+# beside the Administrator, because those are the two roles an Administrator
+# most needs to tell apart when choosing: one runs the system, the other treats
+# patients, and after the RHU field data they are no longer the same person.
 ROLE_CHOICES = (
     ("Admin", "Administrator"),
+    ("Doctor", "Doctor"),
     ("Health Center Staff", "Health Center Staff"),
     ("Barangay Official", "Barangay Official"),
 )
@@ -282,6 +306,11 @@ ROLE_LABELS = dict(ROLE_CHOICES)
 # because the last-administrator guard below and the roster's ordering both
 # select on it and must not come to disagree about its spelling.
 ADMIN_ROLE = "Admin"
+
+# The role string the RHU physician's account is stored as. Named for the same
+# reason ADMIN_ROLE is: migrate_add_doctor_role.py widens the CHECK constraint
+# to admit it and must spell it exactly as this module does.
+DOCTOR_ROLE = "Doctor"
 
 # WHAT A USERNAME MAY BE.
 # Narrow on purpose. A username is typed at a login form by someone who may have
@@ -336,8 +365,8 @@ FULL_NAME_MAX_LENGTH = 100
 # project does not have and has not invented one to look like it has. What is
 # here is the shape of the check, working, with its scope stated.
 #
-# THE THREE SEEDED ACCOUNTS WOULD FAIL THIS RULE, AND THEY ARE NOT RE-CHECKED.
-# "(retired demo password)" is nine characters. That is a true and slightly awkward fact, and
+# THE THREE ORIGINAL SEEDED ACCOUNTS WOULD FAIL THIS RULE, AND THEY ARE NOT
+# RE-CHECKED. "(retired demo password)" is nine characters. That is a true and slightly awkward fact, and
 # it is left true rather than papered over: this rule governs passwords set from
 # now on, seed_demo_users() is unchanged, and nothing re-validates a stored hash
 # because a hash cannot be re-validated -- the password is not recoverable from
@@ -560,7 +589,7 @@ def password_policy():
                 "no capital letter.",
             ),
             (
-                "The three seeded demo accounts were never checked against this",
+                "The three original seeded demo accounts were never checked against this",
                 "This rule governs passwords set from now on. A stored hash "
                 "cannot be re-validated, because the password is not recoverable "
                 "from it -- which is the entire reason it is stored that way.",
