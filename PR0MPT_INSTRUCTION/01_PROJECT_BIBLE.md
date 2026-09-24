@@ -75,19 +75,44 @@ four core objectives above, not separate objectives to design or build independe
 
 # Target Users
 
-The system supports three user roles.
+The system supports four user roles. The fourth, Doctor, was added on 2026-09-25; the
+decision record below says why.
 
 ## Administrator
 
+The Administrator is Kagawad Antonio Acido, chair of the barangay Health Committee — a barangay
+official, **not a physician**. The role administers the system and holds no clinical authority.
+
 Responsibilities
 
-- Full system access
+- Full system administration (accounts, settings, backup, maintenance mode)
 - User management
 - Dashboard monitoring
 - Reports
 - Inventory supervision
 - System settings
 - Audit logs
+- Record consultation intake (complaint, vital signs, vaccinations, dispensing) — not the
+  diagnosis or treatment plan
+
+---
+
+## Doctor
+
+The RHU physician. The demo account is named "RHU Physician (demo)" until the real doctor's name
+is confirmed.
+
+Responsibilities
+
+- Diagnose, and record the treatment plan
+- Mark a consultation Restricted when it holds privileged information, and lift that mark
+- Read a Restricted consultation in full
+- Declare a patient deceased, and reverse that status
+- Everything Health Center Staff do on the clinical floor: register patients, work the patient
+  queue, record consultations, dispense medicines, update inventory, view SMS notifications
+
+The Doctor has no User Management, Audit Logs, Settings or Reports & Analytics, and is blocked by
+maintenance mode like every role but the Administrator.
 
 ---
 
@@ -96,11 +121,13 @@ Responsibilities
 Responsibilities
 
 - Register patients
-- Update consultations
+- Record consultation intake (complaint, vital signs, vaccinations, dispensing) — not the
+  diagnosis or treatment plan, which are the Doctor's
 - Manage appointments
 - Dispense medicines
 - Update inventory
 - View notifications
+- Change a patient's status between Active and Inactive (not Deceased, which is the Doctor's)
 
 ---
 
@@ -112,6 +139,43 @@ Responsibilities
 - Receive health announcements
 - Monitor public health activities
 - Access authorized information only
+
+---
+
+# Decision Record — Clinical Authority Belongs to the Doctor (2026-09-25)
+
+**Decision.** A fourth role, **Doctor**, was added, and clinical authority was moved to it from the
+Administrator. Only the Doctor may enter or edit a consultation's **diagnosis** and **treatment
+plan**, **seal** a consultation as Restricted or lift a seal, **read** a sealed consultation, and
+**declare a patient deceased** (or reverse that status).
+
+**Why.** Clinical authority had been given to the Administrator on the assumption that the
+Administrator was the health center's licensed doctor. That stopped being true when the
+Administrator's persona was corrected: the Administrator is **Kagawad Antonio Acido**, chair of the
+barangay Health Committee, an elected barangay official and not a physician. Field data gathered
+from the RHU of San Francisco, Surigao del Norte, then showed two genuinely separate jobs:
+
+- **System administration** — accounts, settings, backup, maintenance mode — is the Kagawad's.
+- **Clinical authority** — consultation diagnosis, medical certificates, declaring death — is the
+  RHU doctor's.
+- Nurses and midwives (Health Center Staff) carry out the doctor's orders, run programmes, take
+  the intake and refer patients.
+
+The system as it stood let the only account that could diagnose be held by someone not licensed to.
+The Administrator is not the doctor, and no part of this project may say it is.
+
+**What the Administrator keeps.** Every system-administration power: User Management, Audit Logs,
+Settings, Backup, Maintenance Mode, Reports & Analytics, and its operational screens. On Record
+Consultation it now records intake exactly as Health Center Staff do. Under RA 11166 it sees the
+"Restricted — Doctor access only" placeholder on a sealed consultation, as Health Center Staff do.
+
+**What did not change.** A diagnosis the Administrator account wrote before this decision keeps its
+text and its attribution. A seal the Administrator set stays set and stays attributed to it. No
+audit entry was rewritten. The last-Administrator guard still protects the Administrator role.
+
+**Open question for the team.** The Doctor was deliberately not given Reports & Analytics. Whether
+the RHU physician should see the community-level consultation and diagnosis figures there is a
+decision for the team, not something this change assumed.
 
 ---
 
@@ -129,7 +193,7 @@ Responsibilities
 
 ## Supporting Infrastructure Modules
 
-These are necessary for the system to function securely with three distinct roles, but are not
+These are necessary for the system to function securely with four distinct roles, but are not
 themselves core objectives from the approved Proposal. They should be built after the core
 objective modules are functional, not treated as equal priority.
 
@@ -260,6 +324,15 @@ Health Center Staff
 ├── Appointments
 ├── Medicine Inventory
 └── Notifications
+
+Doctor (the Health Center Staff menu, served from the same screens)
+
+├── Dashboard
+├── Patient Records
+├── Register Patient
+├── Medicine Inventory
+├── Patient Queue
+└── SMS Notifications
 
 Barangay Official
 
@@ -427,3 +500,10 @@ Inventory, Patient Queue + Community Notifications, Reports & Analytics) over
 supporting infrastructure (User Management, Audit Logs, Settings). Added System Architecture
 (Client-Server, Star Topology). Full detail of what changed and why is preserved in
 10_PROPOSAL_RECONCILIATION_NOTES.md.
+
+Version 2.1 (2026-09-25)
+
+Four roles. Added the Doctor role and moved clinical authority — diagnosis, treatment plan,
+sealing and reading Restricted consultations, declaring death — to it from the Administrator, who
+is a barangay Kagawad and not a physician. See "Decision Record — Clinical Authority Belongs to the
+Doctor".

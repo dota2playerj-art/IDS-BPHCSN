@@ -1,7 +1,7 @@
 # IDS-BPHCSN UI ARCHITECTURE DOCUMENT
 
 Version: 2.0
-Status: Approved. Sections 1, 2, 3, 5, 7 and 8 reconciled against the built system on 2026-08-15 and re-checked on 2026-08-21; section 10 added. Sections 11, 12 and 13 added 2026-08-21. Section 17 added 2026-08-26. Section 1's inventory and section 2's per-role screen lists re-counted on 2026-09-05, when My Account was added as Screen 21.
+Status: Approved. Sections 1, 2, 3, 5, 7 and 8 reconciled against the built system on 2026-08-15 and re-checked on 2026-08-21; section 10 added. Sections 11, 12 and 13 added 2026-08-21. Section 17 added 2026-08-26. Section 1's inventory and section 2's per-role screen lists re-counted on 2026-09-05, when My Account was added as Screen 21. Section 18 added 2026-09-25, with the Doctor role threaded through sections 1–4 and 11.
 Prepared For: Integrated Digital System for Barangay Poblacion Health Center Services and Community Notifications (IDS-BPHCSN)
 Institution: Northeastern Mindanao Colleges (NEMCO)
 
@@ -38,25 +38,25 @@ The **Primary Role(s)** column is not a description kept in step by hand. It is 
 |---|--------|----------|------------------|---------|
 | 1 | Login Page | `login.html` | All roles (unguarded) | Authenticate users and route them to the correct role-based dashboard. ✅ Approved |
 | 2 | Administrator Dashboard | `admin_dashboard.html` | Administrator | Full operational overview: patient, appointment, inventory, and SMS figures plus recent activity. ✅ Approved |
-| 3 | Patient Records | `patient_records.html` | Administrator, Health Center Staff | Browse, search, filter, and manage all registered patients. |
-| 4 | Register Patient | `register_patient.html` | Administrator, Health Center Staff | Capture new patient personal, emergency contact, and medical information. |
-| 5 | Patient Profile | `patient_profile.html` | Administrator, Health Center Staff | A single patient's full record across six tabs (personal, medical, consultation, medicine, vaccination, appointment history). |
-| 6 | Medicine Inventory | `medicine_inventory.html` | Administrator, Health Center Staff | Track medicine stock, expiration, and low-stock/near-expiry status. |
-| 7 | Add/Edit Medicine | `add_edit_medicine.html` | Administrator, Health Center Staff | Create or update a medicine record's details and stock. |
-| 8 | Patient Queue | `appointment_scheduling.html` | Administrator, Health Center Staff | Check patients in as they arrive, work the live consultation queue, and read the month's calendar. Renamed from Appointment Scheduling on 2026-09-05; the file name is unchanged. |
-| 9 | SMS Notifications | `sms_notifications.html` | Administrator, Health Center Staff, Barangay Official | Compose, send, and record SMS broadcasts to a real recipient audience. Specified as "Community Notifications" in `03_SCREEN_SPECIFICATIONS.md`; same screen. |
+| 3 | Patient Records | `patient_records.html` | Administrator, Doctor, Health Center Staff | Browse, search, filter, and manage all registered patients. |
+| 4 | Register Patient | `register_patient.html` | Administrator, Doctor, Health Center Staff | Capture new patient personal, emergency contact, and medical information. |
+| 5 | Patient Profile | `patient_profile.html` | Administrator, Doctor, Health Center Staff | A single patient's full record across six tabs (personal, medical, consultation, medicine, vaccination, appointment history). |
+| 6 | Medicine Inventory | `medicine_inventory.html` | Administrator, Doctor, Health Center Staff | Track medicine stock, expiration, and low-stock/near-expiry status. |
+| 7 | Add/Edit Medicine | `add_edit_medicine.html` | Administrator, Doctor, Health Center Staff | Create or update a medicine record's details and stock. |
+| 8 | Patient Queue | `appointment_scheduling.html` | Administrator, Doctor, Health Center Staff | Check patients in as they arrive, work the live consultation queue, and read the month's calendar. Renamed from Appointment Scheduling on 2026-09-05; the file name is unchanged. |
+| 9 | SMS Notifications | `sms_notifications.html` | Administrator, Doctor, Health Center Staff, Barangay Official | Compose, send, and record SMS broadcasts to a real recipient audience. Specified as "Community Notifications" in `03_SCREEN_SPECIFICATIONS.md`; same screen. |
 | 10 | Reports & Analytics | `reports_analytics.html` | Administrator, Barangay Official | Consultation, inventory, registration, and immunisation reporting, over a selectable date range. Export Excel, Export PDF and Print are all built. |
 | 11 | User Management | `user_management.html` | Administrator only | List every account that can sign in, with the screens each role's guards admit it to. Account writes are built: Add User, Edit User, Reset Password, and Deactivate/Reactivate, with the last-Administrator guard on the last two. |
 | 12 | Audit Logs | `audit_logs.html` | Administrator only | Monitor and filter recorded system activity by user, date, and action. |
-| 13 | Settings | `settings.html` | Administrator only | Configuration screen, part live. **General Settings is stored and read back** — the health center's name, barangay, municipality, province and the clinic's opening/closing times are written to the `settings` table and consumed by the SMS composer, all three export modules, the booking slot generator and every template header. **Password Policy, the sign-in figures, the database size and version are read from the running system** and are not editable anywhere. **Backup downloads a real, verified copy of the database.** **Maintenance Mode is live** — an Administrator can close the system to Health Center Staff and Barangay Officials, who are shown a 503 maintenance page and keep their sessions; Administrator access is structurally unaffected, so there is no self-lockout. The remaining panes sit in per-pane disabled fieldsets. User Preferences, Notification Settings and Clear Cache were removed outright. |
-| 14 | Health Center Staff Dashboard | `staff_dashboard.html` | Health Center Staff | Operational overview scoped to staff duties — no admin modules. |
+| 13 | Settings | `settings.html` | Administrator only | Configuration screen, part live. **General Settings is stored and read back** — the health center's name, barangay, municipality, province and the clinic's opening/closing times are written to the `settings` table and consumed by the SMS composer, all three export modules, the booking slot generator and every template header. **Password Policy, the sign-in figures, the database size and version are read from the running system** and are not editable anywhere. **Backup downloads a real, verified copy of the database.** **Maintenance Mode is live** — an Administrator can close the system to Doctors, Health Center Staff and Barangay Officials, who are shown a 503 maintenance page and keep their sessions; Administrator access is structurally unaffected, so there is no self-lockout. The remaining panes sit in per-pane disabled fieldsets. User Preferences, Notification Settings and Clear Cache were removed outright. |
+| 14 | Health Center Staff Dashboard | `staff_dashboard.html` | Health Center Staff, Doctor (titled "Doctor Dashboard") | Operational overview scoped to staff duties — no admin modules. |
 | 15 | Barangay Official Dashboard | `official_dashboard.html` | Barangay Official | Community-facing overview — no patient, inventory, or user data. |
 | 16 | Health Programs | `health_programs.html` | Barangay Official | Programme membership, derived from patient records. Programmes with no source in the schema report their own absence. |
 | 17 | Vaccination Campaigns | `vaccination_campaigns.html` | Barangay Official | Immunisation coverage against the DOH EPI schedule. The reporting unit is the scheduled dose, not a named campaign. |
 | 18 | Community Reports | `community_reports.html` | Barangay Official | Community-level health summary, built from `reports_analytics_context()` so it cannot report the barangay differently from Screen 10. Exports a real spreadsheet and PDF. |
 | 19 | Notifications | `notifications.html` | Barangay Official | Notification centre. Presentation only — there is no notifications table. |
-| 20 | Record / Edit Consultation | `record_consultation.html` | Administrator, Health Center Staff | Write up the clinical record of a visit, and edit one already recorded. Two modes of one template and one context builder. See §10. |
-| 21 | My Account | `my_account.html` | All three roles (`login_required`) | The signed-in person's own details, and a self-service password change requiring the current password. The only screen guarded by `login_required` rather than `role_required`, because what it reaches is one row — the caller's own — rather than a role's worth of screens. Entered from the header profile chip; it has no sidebar entry. |
+| 20 | Record / Edit Consultation | `record_consultation.html` | Administrator, Doctor, Health Center Staff (diagnosis and treatment plan: Doctor only — §18) | Write up the clinical record of a visit, and edit one already recorded. Two modes of one template and one context builder. See §10. |
+| 21 | My Account | `my_account.html` | All four roles (`login_required`) | The signed-in person's own details, and a self-service password change requiring the current password. The only screen guarded by `login_required` rather than `role_required`, because what it reaches is one row — the caller's own — rather than a role's worth of screens. Entered from the header profile chip; it has no sidebar entry. |
 
 **One screen is not backed by data: 19, Notifications.** It is rendered as `render_template('notifications.html')` with no context, because there is no `notifications` table. Nothing on it should be quoted as a system output; recorded activity lives on Screen 12.
 
@@ -131,7 +131,27 @@ MAIN MENU
 - **Navigation hierarchy:** Single group, operational only — no "Administration" section is rendered for this role.
 - **Accessible screens (11 of 21):** Login, Health Center Staff Dashboard, Patient Records, Register Patient, Patient Profile, Medicine Inventory, Add/Edit Medicine, Patient Queue, Record / Edit Consultation, SMS Notifications, My Account.
 - **Restricted screens:** Reports & Analytics, User Management, Audit Logs, Settings, and all four Barangay Official screens.
-- **Resolved:** an earlier note here hedged that staff might get SMS "send/view only, not necessarily full broadcast history depending on future rule confirmation". The rule is settled in code — Health Center Staff render the same SMS screen as the Administrator, including the full broadcast history, and may send. `routes/staff.py` and `routes/admin.py` build it from one shared context builder.
+- **Resolved:** an earlier note here hedged that staff might get SMS "send/view only, not necessarily full broadcast history depending on future rule confirmation". The rule is settled in code — Health Center Staff render the same SMS screen as the Administrator, including the full broadcast history, and **do not send**: there is no `/staff/sms_notifications/send` route, so the compose control is absent rather than hidden. (This line previously said staff "may send", which the code has never allowed.) `routes/staff.py` and `routes/admin.py` build it from one shared context builder.
+- **No diagnosis.** On Record Consultation this role records the intake; the diagnosis and treatment plan are the Doctor's. It may move a patient between Active and Inactive but not to or from Deceased. See §18.
+
+### Doctor
+
+**Sidebar Menu Structure:** identical to Health Center Staff's, from the same template.
+
+```
+MAIN MENU
+├── Dashboard            (the clinical dashboard, titled "Doctor Dashboard")
+├── Patient Records
+├── Register Patient
+├── Medicine Inventory   [low-stock count badge, omitted when zero]
+├── Patient Queue
+└── SMS Notifications    (view-only, as Health Center Staff see it)
+```
+
+- **Navigation hierarchy:** Single group, operational only. No "Administration" section.
+- **Accessible screens (11 of 21):** exactly Health Center Staff's list above. The Doctor is added to every `/staff/*` guard rather than given a copy of those routes; `accessible_screens("Doctor")` returns the same list as `accessible_screens("Health Center Staff")`.
+- **Restricted screens:** Reports & Analytics, User Management, Audit Logs, Settings, the other two dashboards, and all four Barangay Official screens. Maintenance mode blocks this role.
+- **What only this role may do** — diagnose, write the treatment plan, seal and unseal a consultation, read a sealed one, declare or reverse Deceased — is §18.
 
 ### Barangay Official
 
@@ -192,7 +212,25 @@ Login
  → Logout
 ```
 
-The staff flow is the administrator's operational flow minus Reports & Analytics and the Administration group. It is served by the same templates and the same context builders, under `role_required("Health Staff")` guards.
+The staff flow is the administrator's operational flow minus Reports & Analytics and the Administration group. It is served by the same templates and the same context builders, under `role_required("Health Staff", "Doctor")` guards. SMS Notifications is view-only for this role.
+
+### Doctor Flow
+
+```
+Login
+ → Doctor Dashboard (the clinical dashboard)
+   → Patient Records → (Mark Deceased / reverse it — this role only)
+                     → Patient Profile → Consultation History → (View / Edit / Restrict or Lift)
+   → Register Patient → (Save)
+   → Patient Queue → (Check in)
+                   → Start Consultation → Record Consultation
+                                        → (Diagnosis, treatment plan, optional Restricted seal)
+   → Medicine Inventory → Add/Edit Medicine
+   → SMS Notifications → (History — view only)
+ → Logout
+```
+
+The same screens as the staff flow, and the only flow in which the diagnosis, the seal and the Deceased status can be set. See §18.
 
 ### Barangay Official Flow
 
@@ -234,7 +272,8 @@ nothing: a `<div>` reading "Search patient name or ID...", a pill reading "Synce
 just now", and a bell with a red dot. All three appeared on all 21 screens for
 all three roles. They are now the following, and the rule above is unchanged —
 the header is still never redesigned *per screen*. What varies is per **role**,
-which is the same axis §2 already scopes the sidebar on.
+which is the same axis §2 already scopes the sidebar on. The Doctor's header is Health Center
+Staff's in every row below.
 
 | Element | Administrator | Health Center Staff | Barangay Official | Notes |
 |---|---|---|---|---|
@@ -439,7 +478,7 @@ So "the Administrator cannot see this data" is not true. "The Administrator does
 "Full system access" in `01_PROJECT_BIBLE.md` should be read as it is read in real EHR and enterprise systems, and as this build implements it:
 
 1. **Full oversight and data visibility** — the Administrator can see the state of the whole system, achieved through Reports & Analytics, both dashboards, and Audit Logs. No figure in the system is invisible to them.
-2. **Full access to every screen within the Administrator's own operational scope** — clinical records, inventory, scheduling, user management, settings and the audit trail. There is no screen in that scope an Administrator is refused.
+2. **Full access to every screen within the Administrator's own operational scope** — clinical records, inventory, scheduling, user management, settings and the audit trail. There is no screen in that scope an Administrator is refused. What the Administrator does **not** hold is clinical authority. Since 2026-09-25 it records consultation intake but not a diagnosis, cannot seal a consultation, sees the placeholder on a sealed one, and cannot declare a patient deceased. Those are the Doctor's (§18). "Full system access" has never meant the right to practise medicine.
 3. **Not** literal reachability of every role-specific URL regardless of function. No production EHR grants the system administrator the community-health-worker's outreach console on the strength of the job title; it grants oversight of the data that console reports on.
 
 Read that way there is no contradiction. The Administrator has full oversight *of* barangay programme and immunisation activity — via Reports & Analytics — without holding the Barangay Official's screens. Rank confers oversight; function confers the screen.
@@ -911,6 +950,86 @@ numbered barangays.
 `06_DESIGN_CONTENT_LIBRARY.md` §Project Location now **states** these outright instead of deferring,
 and says why. That is the actual fix. Every other change in these two commits was cleanup; the
 placeholder was the defect.
+
+---
+
+## 18. Design Decision — Clinical Authority Belongs to the Doctor, Not the Administrator
+
+**Read this before giving the Administrator any clinical permission back. The Administrator is not the doctor.**
+
+### Context
+
+Diagnosis, treatment planning and the RA 11166 confidentiality seal were built to belong to the
+Administrator, because the Administrator was taken to be the health center's licensed doctor. Two
+things made that wrong:
+
+1. The Administrator's persona was corrected to **Kagawad Antonio Acido**, chair of the barangay
+   Health Committee. He is an elected barangay official, not a physician.
+2. Field data gathered from the **RHU of San Francisco, Surigao del Norte** showed two separate
+   jobs. System administration (accounts, settings, backup, maintenance mode) is the Kagawad's.
+   Clinical authority (consultation diagnosis, medical certificates, declaring death) is the RHU
+   doctor's. Nurses and midwives carry out the doctor's orders, run programmes, take the intake and
+   refer patients.
+
+So the only account the system allowed to diagnose was held by someone not licensed to.
+
+### Decision
+
+A fourth role, **Doctor**, holds clinical authority, and the Administrator does not:
+
+| | Doctor | Administrator | Health Center Staff |
+|---|---|---|---|
+| Diagnosis and treatment plan | Writes | Intake only | Intake only |
+| Seal / lift a consultation | Yes | No | No |
+| Read a sealed consultation | In full | Placeholder | Placeholder |
+| Set or reverse Deceased | Yes | No | No |
+| Active ↔ Inactive | Yes | Yes | Yes |
+| User Management, Audit Logs, Settings, Backup, Maintenance | No | Yes | No |
+| Reports & Analytics | No (open question) | Yes | No |
+| Blocked by maintenance mode | Yes | No | Yes |
+
+### How it is built, and where to look
+
+- **One definition.** `utils/roles.py::holds_clinical_authority()` names the Doctor.
+  `can_diagnose()`, `can_view_restricted()` (`models/consultations.py`) and `can_declare_death()`
+  (`models/patients.py`) all delegate to it. Each is asked of the signed-in account's **stored**
+  role, never of the request.
+- **Screens.** The Doctor shares the clinical floor's `/staff/*` routes with Health Center Staff
+  (`routes/staff.py::CLINICAL_FLOOR_ROLES`) rather than having a third copy of the same 24 views.
+  What differs is decided inside the shared builders.
+- **Sealing** is `POST /staff/patient_profile/<id>/restrict-consultation`, guarded
+  `role_required("Doctor")`, the one route on that blueprint guarded differently from its
+  neighbours. There is no `/admin/` copy, and `process_consultation_restriction()` asks the role
+  again itself.
+- **Deceased** is refused in `routes/patient_views.py::process_archive_patients()` for every role
+  but the Doctor, before anything is written. The status dialog does not offer it to them.
+- **Audit Logs** are the Administrator's, so an edit entry on a sealed consultation names the
+  diagnosis as changed and does not quote it (`models/consultations.py::audit_formatters()`).
+- **Schema.** `users.role` admits `'Doctor'`. `migrate_add_doctor_role.py` widens the CHECK on an
+  existing database with the documented table rebuild and adds the demo account `doctor` ("RHU
+  Physician (demo)"), to be renamed through Edit User once the physician's name is confirmed.
+
+### What did not change
+
+Consultations diagnosed under the Administrator account keep their text and attribution. Seals the
+Administrator set stay set, show the placeholder to the Administrator and Health Center Staff, and
+show in full to the Doctor. No audit entry was rewritten. The last-Administrator guard is unchanged.
+
+### Known limits, stated rather than hidden
+
+- **The database backup is the whole database.** Settings → Backup gives the Administrator a copy
+  of `app.db`, sealed text included. That is inherent in a system administrator being able to back
+  the system up. The seal governs what the application shows, not the file.
+- **Audit entries written before 2026-09-25** quote diagnoses as they were edited, as the rule then
+  allowed. A consultation edited while unsealed and sealed later still has that earlier entry.
+  History is not rewritten.
+
+### Open question for the team
+
+Whether the Doctor should also have **Reports & Analytics** was deliberately left out of this
+change. The screen's consultation figures and top-diagnoses ranking are the clinician's own
+material, and the ranking already excludes sealed diagnoses for every viewer. Granting it is one
+guard and one sidebar entry. The decision is the team's.
 
 ---
 

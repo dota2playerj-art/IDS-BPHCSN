@@ -2,7 +2,7 @@
 
 Version: 2.0
 
-Status: Screens 01–15 approved. Screens 16–20 specified from the built system and reconciled against the code on 2026-08-15. Screen 21 (My Account) specified 2026-09-05; the file and screen counts and the Screen 11 and Screen 13 entries in the reconciliation section were re-checked against the running system on the same date.
+Status: Screens 01–15 approved. Screens 16–20 specified from the built system and reconciled against the code on 2026-08-15. Screen 21 (My Account) specified 2026-09-05; the file and screen counts and the Screen 11 and Screen 13 entries in the reconciliation section were re-checked against the running system on the same date. The Doctor role and the clinical-authority split added 2026-09-25 — see "Clinical Authority and the Doctor Role".
 
 ---
 
@@ -54,6 +54,7 @@ Authenticate authorized users.
 Authorized Users
 
 - Administrator
+- Doctor
 - Health Center Staff
 - Barangay Official
 
@@ -541,6 +542,8 @@ Roles
 
 Administrator
 
+Doctor
+
 Health Center Staff
 
 Barangay Official
@@ -861,8 +864,9 @@ Write up the clinical record of a completed visit, and edit a record already wri
 
 Authorized Users
 
-- Administrator
-- Health Center Staff
+- Administrator (intake only)
+- Doctor
+- Health Center Staff (intake only)
 
 Entry Points
 
@@ -886,9 +890,11 @@ Fields
 
 Chief complaint
 
-Diagnosis
+Diagnosis (Doctor only)
 
-Treatment plan / medicines given
+Treatment plan / medicines given (Doctor only)
+
+Mark this consultation Restricted (Doctor only)
 
 Additional notes
 
@@ -934,7 +940,9 @@ The form is add-only for immunisations. A previously recorded dose cannot be rem
 
 Backend Notes
 
-One template, `record_consultation.html`, rendered by two blueprints with one shared context builder in `routes/consultation_views.py`, so the Administrator and Health Center Staff variants cannot drift apart. Each route keeps its own role guard and its own redirect target.
+One template, `record_consultation.html`, rendered by two blueprints with one shared context builder in `routes/consultation_views.py`, so the Administrator's variant and the clinical floor's (Health Center Staff and Doctor) cannot drift apart. Each route keeps its own role guard and its own redirect target.
+
+Only the Doctor is drawn, required and allowed to save the diagnosis and treatment plan. For the Administrator and Health Center Staff the panel is titled "Notes & Follow-up" and says the Doctor records the assessment. A diagnosis in a submission from either role is discarded server-side. See "Clinical Authority and the Doctor Role".
 
 Recording is anchored to a queue entry and completes it on save.
 
@@ -955,10 +963,11 @@ Show the signed-in person their own account details, and let them change their o
 Authorized Users
 
 - Administrator
+- Doctor
 - Health Center Staff
 - Barangay Official
 
-All three, identically. This is the one screen in the system guarded by `@login_required` rather than `@role_required`, because what it reaches is not a role's worth of screens — it is one row, the caller's own.
+All four, identically. This is the one screen in the system guarded by `@login_required` rather than `@role_required`, because what it reaches is not a role's worth of screens — it is one row, the caller's own.
 
 Navigation
 
@@ -1009,6 +1018,48 @@ Name, role and username are deliberately not editable here. That is the same bou
 There is no photograph, contact detail or preference of any kind, because nothing in this application stores or reads one.
 
 Both outcomes are audited. A successful change writes "Changed own account password"; a refused one writes "Refused own-password change attempt", in the same shape the sign-in entries use, so an attempt against a password somebody does not know is as visible as a refused sign-in.
+
+---
+
+# Clinical Authority and the Doctor Role (added 2026-09-25)
+
+The system has **four** roles: Administrator, Doctor, Health Center Staff, Barangay Official. The
+Doctor was added when field data from the RHU of San Francisco, Surigao del Norte, showed that
+clinical authority is the RHU physician's, while the Administrator — Kagawad Antonio Acido, a
+barangay official and not a physician — administers the system. The decision record is in
+`01_PROJECT_BIBLE.md` and `09_IDS-BPHCSN_UI_Architecture_FROM-CLAUDE.md` §18.
+
+**Which screens the Doctor reaches.** Exactly Health Center Staff's: Login, the clinical dashboard
+(Screen 14, titled "Doctor Dashboard" for this role), Patient Records, Register Patient, Patient
+Profile, Medicine Inventory, Add/Edit Medicine, Patient Queue, Record / Edit Consultation, SMS
+Notifications (view-only, as staff see it) and My Account. The Doctor is refused User Management,
+Audit Logs, Settings and Reports & Analytics.
+
+**What only the Doctor may do on those screens**, enforced on the server from the signed-in
+account's stored role, not by hiding a control:
+
+| Action | Screen | Doctor | Administrator | Health Center Staff |
+|---|---|---|---|---|
+| Enter or edit Diagnosis and Treatment Plan | 20 | Yes | No — intake only | No — intake only |
+| Mark a consultation Restricted, or lift it | 05, 20 | Yes | No | No |
+| Read a Restricted consultation's diagnosis and plan | 05, 20 | Yes | Placeholder | Placeholder |
+| Set a patient to Deceased, or reverse Deceased | 03 | Yes | No | No |
+| Move a patient between Active and Inactive | 03 | Yes | Yes | Yes |
+
+A field a role may not write is not drawn for it, and a submission carrying it anyway has it
+discarded before validation. On an edit, the stored value is put back and the refusal is recorded
+in the audit trail, without the submitted text. The placeholder a non-Doctor sees reads
+**"Restricted — Doctor access only"**. The sealed text is not in the page at all.
+
+**Screen 12.** An audit entry for an edit to a Restricted consultation names the diagnosis or
+treatment plan as changed and does not quote either value, because Audit Logs are read by the
+Administrator.
+
+**Screen 10 and 18.** A Restricted diagnosis is left out of the top-diagnoses ranking for every
+viewer, as before.
+
+**History.** Diagnoses written, and seals set, under the Administrator account before 2026-09-25
+are unchanged and keep their attribution.
 
 ---
 
