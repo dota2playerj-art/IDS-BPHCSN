@@ -585,7 +585,13 @@
          already holds. Rendering all three and hiding one beats building the row
          at open time: the form wiring stays declarative and there is no branch in
          which a button ends up without its form or name attribute. -->
-    <div class="modal fade" id="archivePatientModal" tabindex="-1" aria-labelledby="archivePatientModalLabel" aria-hidden="true">
+    {#- data-can-declare-death is the server's answer to whether this viewer may
+        move a record to or from Deceased (models/patients.py can_declare_death),
+        read by the script below. It decides what the dialog offers and nothing
+        else: routes/patient_views.py process_archive_patients() asks again at the
+        write, and refuses any other role whatever this page offered. #}
+    <div class="modal fade" id="archivePatientModal" tabindex="-1" aria-labelledby="archivePatientModalLabel" aria-hidden="true"
+         data-can-declare-death="{{ '1' if can_declare_death else '' }}" data-doctor-only-status="{{ doctor_only_status }}">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content" style="border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.12);">
           <div class="modal-header">
@@ -600,12 +606,27 @@
             <p id="archiveMixed" style="margin-bottom:0; display:none; color:var(--danger);">
               The selected records are not all on the same status. Select patients that currently share one status, then set them together.
             </p>
+{%- if not can_declare_death %}
+            {#- Said rather than left as a dialog with no buttons in it. A record
+                already marked Deceased offers this role nothing, and an empty
+                footer would read as a fault. #}
+            <p id="archiveDoctorOnly" style="margin-bottom:0; display:none;">
+              <strong><span id="archiveDoctorOnlyTarget">This record</span> is marked {{ doctor_only_status }}.</strong>
+              Only the Doctor can change a {{ doctor_only_status }} record &mdash; declaring a death, and
+              reversing one, is a clinical decision. Ask the Doctor if this status is wrong.
+            </p>
+{%- endif %}
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+{#- Drawn only for the Doctor, who alone may declare a death. For every other
+    role the button is absent, not disabled, and the server refuses the status
+    whatever posts it. #}
+{%- if can_declare_death %}
             <button type="submit" form="archiveForm" name="status" value="Deceased" class="btn-outline-teal status-option" data-status="Deceased">
               <span class="material-symbols-outlined" style="font-size:18px;">person_off</span>Mark Deceased
             </button>
+{%- endif %}
             <button type="submit" form="archiveForm" name="status" value="Inactive" class="btn-primary-teal status-option" data-status="Inactive">
               <span class="material-symbols-outlined" style="font-size:18px;">archive</span>Mark Inactive
             </button>
@@ -810,10 +831,28 @@
       }
 
       // No single current status means nothing can be offered safely.
+      var doctorOnly = document.getElementById('archiveDoctorOnly');
+      if(doctorOnly){ doctorOnly.style.display = 'none'; }
       if(!currentStatus){
         options.forEach(function(button){ button.style.display = 'none'; });
         prompt.style.display = 'none';
         mixed.style.display = '';
+        return;
+      }
+
+      // A Deceased record can be moved only by the Doctor, in either direction
+      // (models/patients.py DOCTOR_ONLY_STATUS). For anyone else there is
+      // nothing to offer, so the dialog says who can instead of showing an
+      // empty footer. The server refuses the move regardless of this.
+      if(!archiveModal.dataset.canDeclareDeath &&
+         currentStatus === archiveModal.dataset.doctorOnlyStatus){
+        options.forEach(function(button){ button.style.display = 'none'; });
+        prompt.style.display = 'none';
+        mixed.style.display = 'none';
+        if(doctorOnly){
+          document.getElementById('archiveDoctorOnlyTarget').textContent = target.textContent;
+          doctorOnly.style.display = '';
+        }
         return;
       }
 

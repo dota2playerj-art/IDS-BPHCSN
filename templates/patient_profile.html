@@ -3,9 +3,9 @@
 {#- Whether this render may offer the Correct action on a vaccination record.
 
     It is a test for the endpoint's existence, not a role name. utils/context.py
-    hands `correct_vaccination_endpoint` to exactly the two roles whose blueprint
-    registers a correction route -- Administrator and Health Center Staff -- and
-    to nobody else, so the control is offered precisely where a POST would be
+    hands `correct_vaccination_endpoint` to exactly the roles whose blueprint
+    registers a correction route -- the Administrator, and Health Center Staff
+    and the Doctor on the clinical floor -- and to nobody else, so the control is offered precisely where a POST would be
     admitted. Asking "is there a URL for this?" rather than "is this an admin?"
     is what keeps the button and the guard from ever disagreeing: adding or
     withdrawing the endpoint moves both at once. #}
@@ -14,10 +14,10 @@
 
     Built exactly as can_correct above is, and for the same reason: it asks
     whether a URL exists rather than whether a role matches. utils/context.py
-    hands `restrict_consultation_endpoint` to the Administrator alone, because
-    that blueprint is the only one that registers the route -- there is no staff
-    equivalent to hide, which is what makes hiding this control presentation
-    rather than the permission.
+    hands `restrict_consultation_endpoint` to the Doctor alone, because the only
+    route registered for it is guarded to the Doctor -- the Administrator held
+    it while taken to be the doctor, and no longer does. Hiding this control from
+    every other role is presentation; the guard is the permission.
 
     It is deliberately NOT the same question as `may_view_restricted`, which the
     server answers separately and which decides whether the sealed text is in
@@ -607,7 +607,7 @@
             <span class="material-symbols-outlined">lock</span>
             <div>
               <strong>{{ withheld_count }} of these consultation{{ 's' if consultations|length != 1 else '' }} {{ 'are' if withheld_count != 1 else 'is' }} Restricted</strong>
-              The Administrator has marked {{ 'them' if withheld_count != 1 else 'it' }} as holding sensitive medical
+              The Doctor has marked {{ 'them' if withheld_count != 1 else 'it' }} as holding sensitive medical
               information, so the diagnosis and treatment plan are not shown to your role and are not
               part of this page. Everything else about {{ 'those visits' if withheld_count != 1 else 'that visit' }}
               &mdash; the date, the chief complaint, the vital signs, any vaccinations given and anything
@@ -658,7 +658,7 @@
                   <td>{{ consultation.recorded_by }}</td>
                   <td><span class="badge-status badge-completed">Completed</span>
 {%- if consultation.is_restricted %}
-{#- Shown to BOTH roles, and that is deliberate. For the Administrator it is the
+{#- Shown to EVERY role, and that is deliberate. For the Doctor it is the
     only way to see at a glance which records are sealed. For everyone else it is
     the honest label on a row whose Diagnosis cell they cannot read -- a system
     that withheld the content and also hid the fact of the seal would leave a
@@ -710,7 +710,7 @@
                               data-date="{{ consultation.consultation_date | display_date }}"
                               data-recorded-by="{{ consultation.recorded_by_name }}"
                               data-restricted="{{ '1' if consultation.is_restricted else '0' }}"
-                              title="{% if consultation.is_restricted %}Lift the restriction — the diagnosis and treatment plan become legible to Health Center Staff again{% else %}Mark Restricted — withhold the diagnosis and treatment plan from Health Center Staff{% endif %}">
+                              title="{% if consultation.is_restricted %}Lift the restriction — the diagnosis and treatment plan become legible to Health Center Staff and the Administrator again{% else %}Mark Restricted — withhold the diagnosis and treatment plan from Health Center Staff and the Administrator{% endif %}">
                         <span class="material-symbols-outlined" style="font-size:18px;">{% if consultation.is_restricted %}lock{% else %}lock_open{% endif %}</span>
                       </button>
 {%- endif %}
@@ -742,8 +742,8 @@
                           <div class="info-item" style="grid-column:1/-1;"><div class="info-label">Chief Complaint</div><div class="info-value">{{ consultation.chief_complaint_display }}</div></div>
 {#- Both values arrive redacted or not, decided on the server before this page
     was built. `withheld` is true only when something was actually taken out of
-    THIS entry for THIS reader, so the Administrator -- who has nothing withheld
-    -- never sees the muted styling, and an unsealed record never carries it. #}
+    THIS entry for THIS reader, so the Doctor -- who has nothing withheld --
+    never sees the muted styling, and an unsealed record never carries it. #}
                           <div class="info-item" style="grid-column:1/-1;"><div class="info-label">Diagnosis</div><div class="info-value{% if consultation.withheld %} restricted-value{% endif %}">{{ consultation.diagnosis_display }}</div></div>
                           <div class="info-item" style="grid-column:1/-1;"><div class="info-label">Treatment Plan / Medicines Given</div><div class="info-value{% if consultation.withheld %} restricted-value{% endif %}">{{ consultation.treatment_plan_display }}</div></div>
                           <div class="info-item" style="grid-column:1/-1;"><div class="info-label">Additional Notes</div><div class="info-value">{{ consultation.remarks_display }}</div></div>
@@ -823,7 +823,7 @@
 {#- The seal, explained inside the panel it applies to, in whichever of the two
     voices fits the reader.
 
-    The Administrator is told what OTHER people cannot see, because they can see
+    The Doctor is told what OTHER people cannot see, because they can see
     everything on this panel and would otherwise have no indication the record is
     sealed at all beyond a badge two rows up. Everybody else is told what is
     missing and why, beside the placeholder itself.
@@ -836,7 +836,7 @@
                           <div>
 {%- if may_view_restricted %}
                             <strong>This consultation is Restricted</strong>
-                            You are seeing it in full. Health Center Staff and BHWs see
+                            You are seeing it in full. Health Center Staff, BHWs and the Administrator see
                             &ldquo;{{ restricted_placeholder }}&rdquo; where the diagnosis and treatment plan are
                             above; everything else on this panel is visible to them.
 {%- if consultation.restricted_by_name %}
@@ -844,10 +844,10 @@
 {%- endif %}
 {%- else %}
                             <strong>The diagnosis and treatment plan for this visit are restricted</strong>
-                            The Administrator has marked this consultation as holding sensitive medical
+                            The Doctor has marked this consultation as holding sensitive medical
                             information, so those two fields are withheld from your role and are not part of
                             this page. Everything else here &mdash; the vital signs, any doses given and anything
-                            dispensed &mdash; is the complete record. Ask the Administrator if you need the
+                            dispensed &mdash; is the complete record. Ask the Doctor if you need the
                             assessment itself.
 {%- endif %}
                           </div>
@@ -1630,9 +1630,10 @@
 
               <div id="restrictOnBody">
                 <p style="margin-bottom:10px; font-size:13.5px;">
-                  The diagnosis and treatment plan on this visit will be withheld from Health Center
-                  Staff and BHWs. They will see &ldquo;{{ restricted_placeholder }}&rdquo; in their
-                  place &mdash; not a blank, so nobody reads the record as never having been written up.
+                  The diagnosis and treatment plan on this visit will be withheld from every other
+                  role &mdash; Health Center Staff, BHWs and the Administrator. They will see
+                  &ldquo;{{ restricted_placeholder }}&rdquo; in their place &mdash; not a blank, so
+                  nobody reads the record as never having been written up.
                 </p>
 {#- The half a clinician most needs to be sure of before using this. A seal that
     also broke dispensing would be a seal nobody dared set, and the whole design
@@ -1651,7 +1652,8 @@
               <div id="restrictOffBody" style="display:none;">
                 <p style="margin-bottom:10px; font-size:13.5px;">
                   The diagnosis and treatment plan on this visit will become legible again to Health
-                  Center Staff and BHWs, and views of it will no longer be recorded as withheld.
+                  Center Staff, BHWs and the Administrator, and views of it will no longer be
+                  recorded as withheld.
                 </p>
                 <p style="margin-bottom:16px; font-size:13.5px;">
                   The record itself is unchanged either way &mdash; this only decides who may read it.

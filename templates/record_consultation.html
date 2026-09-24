@@ -916,11 +916,11 @@
         <div class="alert-ids alert-info-ids" style="margin-bottom:16px;">
           <span class="material-symbols-outlined">stethoscope</span>
           <div>
-            <strong>Diagnosis and treatment plan are recorded by the Administrator</strong>
+            <strong>Diagnosis and treatment plan are recorded by the Doctor</strong>
             Deciding what a patient has and what to do about it is a licensed act, so those
             two fields are not part of this form for your role. Record the complaint, the
             measurements, any vaccinations given and anything dispensed, and save &mdash; the
-            record is complete for what you are recording. The Administrator adds the
+            record is complete for what you are recording. The Doctor adds the
             assessment to this same visit afterwards.
           </div>
         </div>
@@ -985,8 +985,9 @@
     sure of before they use it: sealing a record must not stop the health worker
     at the counter handing over the medicine on it. #}
           <div class="form-text-hint" style="margin-top:6px;">
-            The diagnosis and treatment plan above are then withheld from Health Center
-            Staff and BHWs, who see &ldquo;{{ restricted_placeholder }}&rdquo; in their place.
+            The diagnosis and treatment plan above are then withheld from every other role
+            &mdash; Health Center Staff, BHWs and the Administrator &mdash; who see
+            &ldquo;{{ restricted_placeholder }}&rdquo; in their place.
             Everything else on this visit &mdash; the date, the complaint, the vital signs,
             any vaccinations and anything dispensed &mdash; stays visible to them, so intake
             and dispensing are unaffected. Use it for anything you judge sensitive; HIV
@@ -1006,7 +1007,7 @@
     clinician who put a sensitive detail here having sealed the record would have
     sealed the wrong box. The rule is one sentence and it is worth one line. #}
 {%- if can_diagnose %}
-          <div class="form-text-hint">Visible to Health Center Staff whether or not this consultation is Restricted &mdash; anything sensitive belongs in the diagnosis or treatment plan above.</div>
+          <div class="form-text-hint">Visible to Health Center Staff and the Administrator whether or not this consultation is Restricted &mdash; anything sensitive belongs in the diagnosis or treatment plan above.</div>
 {%- endif %}
         </div>
 

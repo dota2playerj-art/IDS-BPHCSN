@@ -42,18 +42,24 @@ WHO MAY WRITE A DIAGNOSIS, AND WHO MAY READ A SEALED ONE
 Two rules were added to this module together, and they are one rule seen from
 each end. See DOCTOR_ONLY_FIELDS and the confidentiality block beneath it.
 
-The short version: Health Center Staff and BHWs are not licensed to diagnose, so
-they do not write `diagnosis` or `treatment_plan` -- and the Administrator, who
-is the licensed clinician, can seal an individual entry so those same two fields
-are withheld from everyone else. Everything else about a visit stays open to the
-staff who take the intake and hand the medicine over.
+The short version: only the Doctor is licensed to diagnose, so only the Doctor
+writes `diagnosis` or `treatment_plan` -- and the Doctor can seal an individual
+entry so those same two fields are withheld from everyone else, the
+Administrator included. Everything else about a visit stays open to the staff
+who take the intake and hand the medicine over.
+
+These were the Administrator's until the RHU's field data separated the two
+jobs: the Administrator is a barangay Kagawad who runs the system, and the RHU
+doctor is the clinician. Diagnoses the Administrator account wrote before then
+stay exactly as written and attributed, and so does any seal it set; what moved
+is who may write, seal and read from now on.
 """
 from datetime import datetime
 
 from database.connection import get_db
 from models.patients import calculate_age, format_age
 from utils.dates import recent_months, resolve_range, today
-from utils.roles import normalize_role
+from utils.roles import holds_clinical_authority
 
 # Growth monitoring cohort -- DOH Operation Timbang Plus / WHO 0-59 months.
 PEDIATRIC_AGE_YEARS = 5
@@ -142,9 +148,9 @@ MISSING_TEXT = "Not recorded"
 # Diagnosing a patient and deciding their treatment is a licensed act. Health
 # Center Staff and Barangay Health Workers take the intake -- the complaint, the
 # vitals, the growth measurements -- give the vaccinations and hand over the
-# medicine the doctor prescribed; they do not decide what the patient has. The
-# Administrator account in this system is the licensed doctor, so these two
-# fields are theirs.
+# medicine the doctor prescribed; they do not decide what the patient has, and
+# neither does the Administrator, who is a barangay Kagawad running the system
+# rather than a physician. These two fields are the Doctor's.
 #
 # This tuple is the single authority on that, in the same way
 # allowed_growth_fields() is the single authority on which measurements an age
@@ -165,22 +171,28 @@ DOCTOR_ONLY_FIELDS = ("diagnosis", "treatment_plan")
 #
 # It names the role that CAN read it rather than the reason it is sealed. The
 # reason would be the disclosure: "Restricted — HIV" protects nothing.
-RESTRICTED_PLACEHOLDER = "Restricted — Administrator access only"
+RESTRICTED_PLACEHOLDER = "Restricted — Doctor access only"
 
 
 def can_diagnose(role):
     """Whether this role may enter a diagnosis and a treatment plan.
 
-    The Administrator is the licensed doctor and is the only role that may. A
-    Barangay Official reaches no consultation screen at all, so in practice this
-    separates the Administrator from Health Center Staff and BHWs.
+    The Doctor is the licensed clinician and is the only role that may. The
+    Administrator and Health Center Staff both reach the consultation form and
+    both record the intake on it; neither writes these two fields. A Barangay
+    Official reaches no consultation screen at all.
+
+    It was the Administrator's until the RHU's field data showed the
+    Administrator is a Kagawad, not the doctor. The answer now comes from
+    utils.roles.holds_clinical_authority(), the one definition every clinical
+    permission in this system shares.
 
     Asked of the SIGNED-IN ACCOUNT'S stored role, never of anything a request
     carried. That is what makes it a permission rather than a preference -- see
     routes/consultation_views.py, where the answer comes from
     utils.security.current_role() and cannot be reached by a form field.
     """
-    return normalize_role(role) == "admin"
+    return holds_clinical_authority(role)
 
 
 def can_view_restricted(role):
@@ -193,6 +205,11 @@ def can_view_restricted(role):
     Written as a delegation so that stays true by construction -- if the write
     rule ever moves, the read rule moves with it rather than being a second copy
     that quietly disagrees.
+
+    So the Administrator, who administers the system and can open every patient
+    profile, is shown the placeholder on a sealed record exactly as Health
+    Center Staff are. Under RA 11166 the treating clinician is the reader who
+    needs privileged information, and a system administrator is not one.
     """
     return can_diagnose(role)
 
@@ -216,8 +233,8 @@ def redact(consultation, viewer_can_view):
     `withheld` says whether anything was actually taken out, which is what the
     profile reads to decide whether to explain itself, and what
     routes/patient_views.py counts to decide whether the view is worth an audit
-    entry. It is False for an unsealed record and False for the Administrator,
-    who had nothing withheld from them.
+    entry. It is False for an unsealed record and False for the Doctor, who had
+    nothing withheld from them.
     """
     values = dict(consultation)
     if viewer_can_view or not values.get("is_restricted"):
@@ -345,6 +362,37 @@ def _audit_renderer(field):
 # Passed to models.audit.describe_changes() so an audit entry reads in the same
 # units and wording the screens use.
 AUDIT_FORMATTERS = {field: _audit_renderer(field) for field in CONSULTATION_FIELDS}
+
+# What an audit entry says in place of a sealed field's value.
+AUDIT_WITHHELD_TEXT = "[withheld — Restricted]"
+
+
+def audit_formatters(sealed):
+    """The formatters for one consultation's edit entry, given whether it is sealed.
+
+    WHY AN EDIT ENTRY MAY NOT QUOTE A SEALED DIAGNOSIS ANY MORE.
+    An edit entry says what moved, "Diagnosis: "old" → "new"", quoting the text.
+    That was safe while the Administrator was taken to be the doctor: Audit Logs
+    are Administrator-only, and the only reader was the person the seal was
+    never meant to keep out. The Administrator is now a Kagawad who may not read
+    a sealed diagnosis on the Patient Profile, and an audit trail that quoted it
+    would hand over, one screen away and in an exportable file, exactly what the
+    profile withholds.
+
+    So for a consultation sealed before or after the save, the two
+    DOCTOR_ONLY_FIELDS are named as changed and their values are not written.
+    The entry still says that the diagnosis moved, when and by whom, which is
+    what an audit is for; what the diagnosis says stays on the record itself,
+    behind the seal. An unsealed record is quoted as before -- its diagnosis is
+    legible on the profile to everyone who can read this trail.
+
+    This governs entries written from now on. Entries already in the trail are
+    never rewritten.
+    """
+    if not sealed:
+        return AUDIT_FORMATTERS
+    withheld = {field: (lambda _value: AUDIT_WITHHELD_TEXT) for field in DOCTOR_ONLY_FIELDS}
+    return dict(AUDIT_FORMATTERS, **withheld)
 
 
 def _to_consultation(row):
@@ -982,10 +1030,27 @@ def update_consultation(consultation_id, values, age_context):
 
     The audit entry is written by the caller, which is the only place that knows
     who is acting and from where.
+
+    A SAVE THAT CHANGES NOTHING WRITES NOTHING, and returns 0.
+    It used to run the UPDATE regardless, which stamped updated_at on a save that
+    moved no field -- so the profile then labelled the visit "edited" while the
+    flash beside it said "No changes". It mattered more once only the Doctor may
+    diagnose: a forged submission from another role carrying a diagnosis has
+    that field put back to the stored value by _apply_clinical_authority(), and
+    what remains is exactly such a save. The refusal must leave the record
+    byte-identical, not with a fresh timestamp and an "edited" label that point
+    at an edit nobody was allowed to make. The comparison is `IS`, which treats
+    two NULLs as equal, in the same statement as the write, so there is no gap
+    between checking and writing for another save to land in.
     """
     record = store_values(values, age_context)
     assignments = ", ".join(f"{field} = ?" for field in CONSULTATION_FIELDS)
-    parameters = [record[field] for field in CONSULTATION_FIELDS] + [consultation_id]
+    unchanged = " AND ".join(f"{field} IS ?" for field in CONSULTATION_FIELDS)
+    parameters = (
+        [record[field] for field in CONSULTATION_FIELDS]
+        + [consultation_id]
+        + [record[field] for field in CONSULTATION_FIELDS]
+    )
 
     # strftime(...'%f') rather than CURRENT_TIMESTAMP, which is only accurate to
     # the second. created_at is second-precision and an unedited row copies it
@@ -998,7 +1063,7 @@ def update_consultation(consultation_id, values, age_context):
     cursor = conn.execute(
         f"UPDATE consultations SET {assignments}, "
         "updated_at = strftime('%Y-%m-%d %H:%M:%f', 'now') "
-        "WHERE id = ?",
+        f"WHERE id = ? AND NOT ({unchanged})",
         parameters,
     )
     conn.commit()

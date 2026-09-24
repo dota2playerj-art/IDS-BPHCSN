@@ -1,8 +1,8 @@
 """Shared context builders for the Record / Edit Consultation screen.
 
-The consultation form is rendered by two blueprints -- once for the
-Administrator and once for Health Center Staff -- from the same template with the
-same data and the same validation. The logic lives here so the two role variants
+The consultation form is rendered by two blueprints -- the Administrator's, and
+the clinical floor's that Health Center Staff and the Doctor share -- from the
+same template with the same data and the same validation. The logic lives here so the two role variants
 cannot drift apart; the routes stay thin and each keeps its own role_required
 guard and its own redirect target.
 
@@ -21,14 +21,20 @@ of it is here:
   patient, the visit date, nor who originally recorded it.
 
 
-WHAT THE TWO ROLES MAY PUT ON THIS FORM, AND WHY THE SERVER DECIDES IT
------------------------------------------------------------------------
+WHAT EACH ROLE MAY PUT ON THIS FORM, AND WHY THE SERVER DECIDES IT
+------------------------------------------------------------------
 Diagnosing a patient and deciding their treatment is a licensed act, and the
-Administrator account is the licensed clinician. Health Center Staff and BHWs
-record the intake -- the complaint, the vitals, the growth measurements -- give
-the vaccinations and hand over medicine the doctor has prescribed. They do not
-write `diagnosis` or `treatment_plan` (models/consultations.py
-DOCTOR_ONLY_FIELDS), and this module is where that stops being a claim.
+Doctor is the licensed clinician. Health Center Staff and BHWs record the
+intake -- the complaint, the vitals, the growth measurements -- give the
+vaccinations and hand over medicine the doctor has prescribed. The
+Administrator, a barangay Kagawad who runs the system, can do the same intake
+on this form and no more. None of them writes `diagnosis` or `treatment_plan`
+(models/consultations.py DOCTOR_ONLY_FIELDS), and this module is where that
+stops being a claim.
+
+Until the RHU's field data separated the two jobs, the Administrator was taken
+to be the doctor and held these fields. The rule below is unchanged; the role it
+names is not.
 
 IT IS ENFORCED IN THREE INDEPENDENT PLACES, AND THE ONE ON THE PAGE IS THE
 WEAKEST OF THEM ON PURPOSE:
@@ -74,7 +80,6 @@ from models.audit import (
     log_action,
 )
 from models.consultations import (
-    AUDIT_FORMATTERS,
     CONSULTATION_FIELDS,
     DOCTOR_ONLY_FIELDS,
     FIELD_LABELS,
@@ -82,6 +87,7 @@ from models.consultations import (
     NUMERIC_LIMITS,
     PEDIATRIC_AGE_YEARS,
     RESTRICTED_PLACEHOLDER,
+    audit_formatters,
     can_diagnose,
     can_view_restricted,
     consultation_age_context,
@@ -146,7 +152,7 @@ from utils.security import current_role
 # description cannot disagree about it.
 IMMUNIZATION_FIELD = "immunizations"
 
-# The Administrator's "Restricted" checkbox on this form, and the field the
+# The Doctor's "Restricted" checkbox on this form, and the field the
 # Patient Profile's own seal dialog posts. Named here for the reason
 # IMMUNIZATION_FIELD is: the template that draws the box, the parser that reads
 # it and the audit description that reports it must not be able to disagree about
@@ -179,8 +185,7 @@ def _apply_clinical_authority(values, stored, role):
         recording   the two fields are set to None. The record is saved without a
                     diagnosis, which is the honest state of a visit whose intake
                     has been taken and whose clinical judgement has not yet been
-                    made. The Administrator adds it later through Edit
-                    Consultation.
+                    made. The Doctor adds it later through Edit Consultation.
 
         editing     the two fields are set back to WHAT THE RECORD ALREADY HOLDS.
                     Not to None -- that is the trap this function exists to
@@ -255,7 +260,7 @@ def _log_refused_diagnosis(refused, patient, consultation_id, role, user_id,
             "validation and nothing was stored from "
             f"{'them' if len(refused) != 1 else 'it'}; the rest of the "
             "submission was saved normally. Diagnosis and treatment planning are "
-            "restricted to the Administrator, who is the licensed clinician, so "
+            "restricted to the Doctor, who is the licensed clinician, so "
             "these fields are not rendered for this role at all — a submission "
             "carrying them did not come from the form as it is drawn. The "
             "submitted text is deliberately not recorded here: it is an "
@@ -307,11 +312,12 @@ def _log_restriction(outcome, consultation_id, patient, user_id, ip_address,
         action = ACTION_CONSULTATION_RESTRICTED
         details = (
             f"{subject} Marked Restricted. Its diagnosis and treatment plan are "
-            "now withheld from every role but Administrator, which is the role "
-            "licensed to record them; the visit date, chief complaint, vital "
-            "signs, immunisations and dispensing on the same record stay legible "
-            "to Health Center Staff, who take the intake and hand the medicine "
-            "over. Health workers who open this patient's profile are shown a "
+            "now withheld from every role but Doctor, which is the role licensed "
+            "to record them, the Administrator included; the visit date, chief "
+            "complaint, vital signs, immunisations and dispensing on the same "
+            "record stay legible to Health Center Staff, who take the intake and "
+            "hand the medicine over. Anyone else who opens this patient's profile "
+            "is shown a "
             "placeholder naming the restriction rather than an empty field, and "
             "each such view is recorded. The condition itself is deliberately "
             "not named in this entry"
@@ -321,7 +327,8 @@ def _log_restriction(outcome, consultation_id, patient, user_id, ip_address,
         details = (
             f"{subject} Restriction lifted. Its diagnosis and treatment plan are "
             "legible again to every role that can open the patient's profile, "
-            "including Health Center Staff, and views of it are no longer "
+            "including Health Center Staff and the Administrator, and views of it "
+            "are no longer "
             "recorded as withheld. The record is unchanged — nothing about what "
             "the consultation says was edited by this, only who may read it"
         )
@@ -835,7 +842,7 @@ def process_record_consultation(appointment_id, form_data, user_id,
     # anything is stored -- exactly the shape of the growth-field rule below it,
     # and for the same stated reason: the form not offering a field is not the
     # same as the server refusing it. `stored` is None because this is a new
-    # record, so both fields go in NULL and the Administrator writes them later.
+    # record, so both fields go in NULL and the Doctor writes them later.
     values, refused = _apply_clinical_authority(values, None, role)
     # The schedule only applies to the paediatric cohort, so doses submitted for
     # anyone else are dropped here rather than stored -- the same second refusal
@@ -1394,7 +1401,7 @@ def process_edit_consultation(consultation_id, form_data, user_id, ip_address=No
 
     # The seal moves with the save, in whichever direction the checkbox is now.
     #
-    # AN UNTICKED BOX LIFTS A SEAL, AND ONLY THE ADMINISTRATOR CAN PRODUCE ONE.
+    # AN UNTICKED BOX LIFTS A SEAL, AND ONLY THE DOCTOR CAN PRODUCE ONE.
     # That is a deliberate exception to the add-only rule the vaccination and
     # dispensing sections of this same form follow, and the reason those two are
     # add-only does not apply here. Their rule exists because an absent checkbox
@@ -1446,8 +1453,14 @@ def process_edit_consultation(consultation_id, form_data, user_id, ip_address=No
     )
 
     after = get_consultation_by_id(consultation_id)
+    # Sealed on either side of this save means the entry names the doctor-only
+    # fields that moved and does not quote them: Audit Logs are read by the
+    # Administrator, who may not read a sealed diagnosis. See audit_formatters().
     summary, changed = describe_changes(
-        before, after, FIELD_LABELS, formatters=AUDIT_FORMATTERS
+        before, after, FIELD_LABELS,
+        formatters=audit_formatters(
+            bool(before["is_restricted"]) or bool(after["is_restricted"])
+        ),
     )
     dose_summary, dose_changed = _describe_dose_changes(
         added, removed, general_added, dispensed, reported
@@ -1525,14 +1538,15 @@ def _restriction_message(outcome, patient, consultation):
             f"{patient['first_name']}'s consultation of "
             f"{display_date(consultation['consultation_date'])} is now Restricted "
             "— its diagnosis and treatment plan are withheld from Health Center "
-            "Staff, who still see the visit, the vitals and what was dispensed."
+            "Staff and the Administrator, who still see the visit, the vitals and "
+            "what was dispensed."
         )
     if outcome == "lifted":
         return (
             f"The restriction on {patient['first_name']}'s consultation of "
             f"{display_date(consultation['consultation_date'])} has been lifted "
             "— its diagnosis and treatment plan are legible to Health Center "
-            "Staff again."
+            "Staff and the Administrator again."
         )
     return ""
 
@@ -1558,9 +1572,10 @@ def _restriction_message(outcome, patient, consultation):
 # the recording form is worked at speed with a patient in the room, and a
 # deliberate act belongs on the screen where records are reviewed.
 #
-# There is NO Health Center Staff copy of the route this feeds, and that is the
-# enforcement rather than a decoration of it -- the same arrangement that makes
-# the Staff role view-only on community broadcasts. See routes/admin.py.
+# The route that feeds it is the Doctor's alone: role_required("Doctor"), on the
+# clinical floor's blueprint beside the screens it is reached from, with no copy
+# under /admin. It used to be /admin/... only, when the Administrator was taken
+# to be the doctor. See routes/staff.py.
 # ---------------------------------------------------------------------------
 def process_consultation_restriction(form_data, user_id, ip_address=None):
     """Seal or unseal one consultation from the Patient Profile.
@@ -1575,14 +1590,22 @@ def process_consultation_restriction(form_data, user_id, ip_address=None):
     the page it was loaded from may since have gone stale -- the same reasoning
     process_vaccination_correction() and process_archive_patients() both state.
 
-    THE ROLE IS NOT CHECKED HERE, AND THAT IS NOT AN OMISSION. This function is
-    reachable through exactly one route, which carries @role_required("Admin");
-    there is no Health Center Staff endpoint for it to be reached through, so
-    there is no request from another role for a check here to catch. Duplicating
-    the guard would suggest the route's own is not sufficient, which is the
-    opposite of what this project's other POST-only administrative paths say
-    about themselves.
+    THE ROLE IS CHECKED HERE AS WELL AS ON THE ROUTE, AND THAT IS NEW.
+    This used to say a second check would be redundant, because the only route
+    carried @role_required("Admin") and sat alone under /admin. The route now
+    sits on the clinical floor's blueprint, where every neighbour admits Health
+    Center Staff too -- so the one guard that differs from the twenty-four around
+    it is one careless copy of a neighbour's decorator away from admitting the
+    wrong role, and nothing would fail loudly if it did. Asking can_diagnose()
+    here, of the stored account, makes that edit harmless: the seal is refused
+    and nothing is written, whichever route delivered the request.
     """
+    if not can_diagnose(current_role()):
+        return None, (
+            "Only the Doctor can mark a consultation Restricted or lift a "
+            "restriction. Nothing was changed."
+        )
+
     direction = str(form_data.get(RESTRICT_ACTION_FIELD) or "").strip().lower()
     if direction not in (RESTRICT_ON, RESTRICT_OFF):
         return None, "That is not something this system can do to a consultation."

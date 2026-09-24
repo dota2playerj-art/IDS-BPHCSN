@@ -64,7 +64,7 @@ def inject_role_context():
             "patient_records_endpoint": "staff_patient_records",
             "patient_profile_endpoint": "staff_patient_profile",
             # Correcting one recorded vaccination from the profile's Immunization
-            # Record tab. Present for exactly the two roles that record
+            # Record tab. Present for exactly the roles that record
             # vaccinations in the first place -- the Barangay Official has no
             # Patient Profile at all, so the name is simply absent for them and
             # a shared template reusing it would fail loudly rather than emit a
@@ -108,6 +108,14 @@ def inject_role_context():
                 "sidebar_role_label": "Doctor",
                 "sidebar_user_name": "RHU Physician",
                 "sidebar_user_initials": "RP",
+                # Sealing one consultation as Restricted, from the profile's
+                # Consultation History tab. Present for THIS ROLE ONLY: the
+                # route behind it is guarded to the Doctor, because deciding
+                # that a diagnosis is privileged belongs to the role licensed to
+                # write one. patient_profile.html guards on `is defined`, so
+                # every other role gets no control rather than a URL it would
+                # bounce off.
+                "restrict_consultation_endpoint": "restrict_consultation",
             })
     elif normalized_role == "admin":
         context = {
@@ -126,15 +134,9 @@ def inject_role_context():
             "patient_records_endpoint": "patient_records",
             "patient_profile_endpoint": "patient_profile",
             "correct_vaccination_endpoint": "correct_vaccination",
-            # Sealing one consultation as Restricted, from the profile's
-            # Consultation History tab. Present for THIS ROLE ONLY, and the
-            # absence elsewhere is the same kind of absence send_broadcast_endpoint
-            # has for Health Center Staff: there is no staff route behind this
-            # name to expose, because deciding that a diagnosis is privileged
-            # belongs to the role licensed to write one. patient_profile.html
-            # guards on `is defined`, so the other role gets no control rather
-            # than a URL it would bounce off.
-            "restrict_consultation_endpoint": "restrict_consultation",
+            # No restrict_consultation_endpoint. The Administrator held it while
+            # taken to be the doctor; sealing is the Doctor's now, and there is
+            # no /admin/... route behind the name to hand over.
             "register_patient_endpoint": "register_patient",
             "archive_patients_endpoint": "archive_patients",
             "medicine_inventory_endpoint": "medicine_inventory",

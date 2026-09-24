@@ -145,12 +145,15 @@ def current_role():
     not a header. That is what lets it be the authority behind a permission
     rather than a convenience.
 
-    It exists because two decisions now have to be made per request from the
+    It exists because clinical decisions have to be made per request from the
     role, away from the decorators that were previously the only thing asking:
-    whether this person may write a diagnosis, and whether they may read one that
-    has been sealed (models/consultations.py can_diagnose / can_view_restricted).
-    Both are asked inside the shared view builders, which serve two blueprints
-    each and so cannot read the answer off their own guard.
+    whether this person may write a diagnosis, whether they may read one that has
+    been sealed (models/consultations.py can_diagnose / can_view_restricted), and
+    whether they may declare a patient deceased (models/patients.py
+    can_declare_death). All three are the Doctor's, and all are asked inside the
+    shared view builders -- which serve two blueprints each, and the clinical
+    floor's blueprint admits Health Center Staff and the Doctor alike -- so none
+    of them can be read off the route's own guard.
 
     It costs no query. get_current_user() caches the row on flask.g for the life
     of the request, and every guarded request has already fetched it.

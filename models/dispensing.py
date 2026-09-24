@@ -817,9 +817,11 @@ def get_dispensing_by_consultation(consultation_ids):
 
     Not redacted, for the reason get_dispensing_for_consultation() above is not:
     the only screen behind it is that dashboard panel, which prints the medicines
-    and reads no diagnosis from these rows. It is also Administrator-only -- the
-    Health Center Staff dashboard has no such table -- so both the caller and the
-    role point the same way.
+    and reads no diagnosis from these rows. That is the whole reason, and it is
+    worth saying because a second one used to be given: the panel is on the
+    Administrator's dashboard only. That no longer helps -- the Administrator may
+    not read a sealed diagnosis either -- so the safety rests on no diagnosis
+    being read here at all, which is true of the query, not of who calls it.
     """
     ids = [int(value) for value in consultation_ids if value]
     if not ids:

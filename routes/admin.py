@@ -24,7 +24,6 @@ from routes.dashboard_views import dashboard_context
 from routes.broadcast_views import process_send_broadcast, sms_notifications_context
 from routes.consultation_views import (
     edit_consultation_context,
-    process_consultation_restriction,
     process_edit_consultation,
     process_record_consultation,
     record_consultation_context,
@@ -526,43 +525,14 @@ def edit_consultation(consultation_id):
     return render_template('record_consultation.html', **context)
 
 
-# Sealing one consultation as Restricted, or lifting a seal. POST only, like
-# correct_vaccination and archive_patients above and for the same reason: it
-# changes who may read a clinical record, so there is no URL anyone can navigate
-# to.
-#
-# THERE IS NO HEALTH CENTER STAFF COPY OF THIS ROUTE, AND THAT ABSENCE IS THE
-# ENFORCEMENT.
-# Every other screen in this pair has one -- staff_correct_vaccination,
-# staff_record_consultation, staff_edit_consultation -- because both roles hold
-# those capabilities. This one is the Administrator's alone: they are the
-# licensed clinician, the seal covers the two fields only they may write, and a
-# role that cannot write a diagnosis has no business deciding whether one is
-# privileged. So the guard is not that a staff request is refused here; it is
-# that there is no /staff/... URL for a forged request to be aimed at in the
-# first place, which is the same arrangement that makes the Staff role view-only
-# on community broadcasts (see routes/broadcast_views.py). Hiding the control in
-# patient_profile.html is presentation; this is the permission.
-#
-# A Barangay Official is stopped by role_required and lands on their own
-# dashboard, and has no Patient Profile to reach it from in any case.
-@admin_bp.route('/patient_profile/<int:patient_id>/restrict-consultation',
-                methods=["POST"])
-@login_required
-@role_required("Admin")
-def restrict_consultation(patient_id):
-    sealed_for, message = process_consultation_restriction(
-        request.form, session.get("user_id"), ip_address=request.remote_addr
-    )
-    flash(message)
-    # The record's own patient wins over the one in the URL, exactly as it does
-    # in correct_vaccination above: the id in the path is what the page was
-    # rendered for, the id resolved here is read from the stored row.
-    return redirect(url_for(
-        "admin.patient_profile",
-        patient_id=sealed_for or patient_id,
-        tab="consult",
-    ))
+# NO ROUTE HERE SEALS A CONSULTATION, AND THAT ABSENCE IS THE ENFORCEMENT.
+# One did, while the Administrator was taken to be the health center's doctor.
+# The RHU's field data showed the Administrator is a barangay Kagawad who runs
+# the system and the RHU physician is the clinician, so deciding that a
+# diagnosis is privileged -- and reading one that is -- moved to the Doctor.
+# The route is routes/staff.py restrict_consultation, guarded to the Doctor
+# alone, and process_consultation_restriction() asks the role again itself.
+# There is no /admin/... URL for a request from this role to be aimed at.
 
 
 @admin_bp.route('/sms_notifications')

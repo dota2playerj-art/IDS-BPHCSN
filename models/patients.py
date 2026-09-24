@@ -20,6 +20,7 @@ from utils.dates import (
     today,
 )
 from utils.phone import is_valid_ph_mobile, to_local_ph_mobile
+from utils.roles import holds_clinical_authority
 
 # The vocabularies the Register Patient form offers. The template renders its
 # <select>/radio/chip options from these same tuples, so a constrained field
@@ -103,8 +104,21 @@ EARLIEST_BIRTH_YEAR = 1900
 SENIOR_AGE = 60
 
 # Lifecycle values permitted by the patients.status CHECK constraint. Records are
-# never hard-deleted; only Health Center Staff and Administrator may change this.
+# never hard-deleted. Health Center Staff, the Doctor and the Administrator may
+# move a record between Active and Inactive; only the Doctor may move one to or
+# from Deceased -- see DOCTOR_ONLY_STATUS.
 PATIENT_STATUSES = ("Active", "Inactive", "Deceased")
+
+# THE ONE STATUS ONLY THE DOCTOR MAY SET, OR TAKE AWAY.
+# Declaring a death is a clinical act, and at the RHU it is the doctor's: the
+# field data gathered there is explicit that nurses and midwives do not declare
+# death, and the Administrator is a barangay Kagawad, not a physician. So
+# marking a patient Deceased needs clinical authority, and so does reversing it
+# -- a record wrongly marked Deceased drops out of the broadcast audiences and
+# the queue, and bringing a patient "back" is the same judgement made the other
+# way. Active <-> Inactive is clerical and stays open to every role that holds
+# Patient Records.
+DOCTOR_ONLY_STATUS = "Deceased"
 
 # status -> the badge class Screen 03/04 already define in their stylesheets.
 STATUS_BADGE_CLASS = {
@@ -131,8 +145,33 @@ def allowed_status_transitions(current_status):
 
     An unrecognised status (a hand-edited row) yields all three, so the dialog
     still offers a way out rather than presenting no options at all.
+
+    These are the transitions the lifecycle allows. Which of them a given person
+    may make is status_change_needs_doctor()'s question, asked separately: a
+    move to or from Deceased is legal and is still refused to everyone but the
+    Doctor.
     """
     return tuple(status for status in PATIENT_STATUSES if status != current_status)
+
+
+def can_declare_death(role):
+    """Whether this role may mark a patient Deceased or reverse that status.
+
+    Only the Doctor. Delegates to utils.roles.holds_clinical_authority(), the one
+    definition every clinical permission in this system shares, so the rule for
+    declaring death and the rule for diagnosing cannot come to name different
+    roles. Asked of the signed-in account's STORED role, never of the request.
+    """
+    return holds_clinical_authority(role)
+
+
+def status_change_needs_doctor(current_status, target_status):
+    """Whether moving a record from one status to another is the Doctor's to make.
+
+    True whenever either end is DOCTOR_ONLY_STATUS: setting Deceased, and taking
+    it away again. False for Active <-> Inactive.
+    """
+    return DOCTOR_ONLY_STATUS in (current_status, target_status)
 
 
 def get_patient_statuses(patient_ids):

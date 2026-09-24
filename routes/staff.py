@@ -14,12 +14,18 @@ one of them is already built here from a context builder shared with the
 Administrator's copy. A /doctor/* blueprint would have been these same 24
 views a third time, each able to drift from the other two.
 
-So every route in this file admits CLINICAL_FLOOR_ROLES, and what separates the
-Doctor from Health Center Staff is not which screen they reach but what the
-screen lets them do. That is decided per request from the signed-in account's
-stored role (utils.security.current_role()), inside the shared builders, and is
-enforced there whichever blueprint the request came through -- see
-models/consultations.py can_diagnose().
+So every screen in this file admits CLINICAL_FLOOR_ROLES, and what separates
+the Doctor from Health Center Staff is not which screen they reach but what the
+screen lets them do: whether the diagnosis and treatment plan are drawn and
+accepted, whether a sealed consultation is readable, whether a patient may be
+marked deceased or brought back from it. Those are decided per request from the
+signed-in account's stored role (utils.security.current_role()), inside the
+shared builders, and are enforced there whichever blueprint the request came
+through -- see models/consultations.py can_diagnose().
+
+The one route that is not a screen both roles share is restrict_consultation,
+which seals a consultation. Only the Doctor may, so it is guarded to the Doctor
+alone -- the one guard in this file that differs from its neighbours.
 """
 from flask import Blueprint, flash, redirect, render_template, request, session, url_for
 
@@ -37,6 +43,7 @@ from routes.appointment_views import (
 from routes.broadcast_views import sms_notifications_context
 from routes.consultation_views import (
     edit_consultation_context,
+    process_consultation_restriction,
     process_edit_consultation,
     process_record_consultation,
     record_consultation_context,
@@ -224,6 +231,42 @@ def staff_correct_vaccination(patient_id):
         "staff.staff_patient_profile",
         patient_id=corrected_for or patient_id,
         tab="vaccine",
+    ))
+
+
+# Sealing one consultation as Restricted, or lifting a seal. POST only, like
+# the correction route above and for the same reason: it changes who may read a
+# clinical record, so there is no URL anyone can navigate to.
+#
+# THE DOCTOR'S ALONE, AND GUARDED DIFFERENTLY FROM EVERY ROUTE AROUND IT.
+# Deciding that a diagnosis is privileged belongs to the role licensed to write
+# one, and a role that cannot write a diagnosis has no business deciding whether
+# one is sealed. This lived under /admin while the Administrator was taken to be
+# the doctor; the Administrator is a barangay Kagawad, so there is now no
+# /admin/... copy and this guard names the Doctor and nobody else. Health Center
+# Staff reach this blueprint's other routes and are refused this one, and
+# process_consultation_restriction() asks the stored role a second time in case
+# this decorator is ever copied from a neighbour. Hiding the control in
+# patient_profile.html is presentation; this is the permission.
+#
+# Named restrict_consultation, unprefixed, because it has no counterpart in any
+# other blueprint for the flat endpoint namespace to confuse it with.
+@staff_bp.route('/patient_profile/<int:patient_id>/restrict-consultation',
+                methods=["POST"])
+@login_required
+@role_required("Doctor")
+def restrict_consultation(patient_id):
+    sealed_for, message = process_consultation_restriction(
+        request.form, session.get("user_id"), ip_address=request.remote_addr
+    )
+    flash(message)
+    # The record's own patient wins over the one in the URL, exactly as it does
+    # in staff_correct_vaccination above: the id in the path is what the page
+    # was rendered for, the id resolved here is read from the stored row.
+    return redirect(url_for(
+        "staff.staff_patient_profile",
+        patient_id=sealed_for or patient_id,
+        tab="consult",
     ))
 
 

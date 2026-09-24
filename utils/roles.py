@@ -26,3 +26,24 @@ def normalize_role(role):
     if normalized in {"barangay official", "official"}:
         return "barangay official"
     return normalized
+
+
+# THE ONE ROLE THAT HOLDS CLINICAL AUTHORITY.
+# Diagnosing, deciding a treatment, deciding that a diagnosis is privileged and
+# sealing it, reading one that is sealed, and declaring a patient dead are all
+# licensed clinical acts, and at the RHU they are the doctor's. They used to be
+# the Administrator's, on the assumption that the Administrator was the doctor;
+# the Administrator is a barangay Kagawad, and that assumption is gone.
+#
+# Every one of those permissions delegates here -- models/consultations.py
+# can_diagnose() and can_view_restricted(), models/patients.py
+# can_declare_death() -- so they are one rule rather than several copies of it
+# that could come to name different roles. It lives in this module rather than
+# in either model because models/consultations.py imports models/patients.py,
+# and a rule both need cannot sit in the one the other cannot import.
+CLINICAL_AUTHORITY_ROLE = "doctor"
+
+
+def holds_clinical_authority(role):
+    """Whether this role is the licensed clinician. Only the Doctor is."""
+    return normalize_role(role) == CLINICAL_AUTHORITY_ROLE

@@ -36,11 +36,13 @@ from models.patients import (
     BLOOD_TYPES,
     CIVIL_STATUSES,
     CONDITION_OPTIONS,
+    DOCTOR_ONLY_STATUS,
     EMERGENCY_RELATIONSHIPS,
     MUNICIPALITIES,
     PATIENT_STATUSES,
     PROVINCES,
     SEXES,
+    can_declare_death,
     collect_list_field,
     create_patient,
     find_possible_duplicates,
@@ -50,6 +52,7 @@ from models.patients import (
     get_patient_statuses,
     get_patient_stats,
     set_patient_status,
+    status_change_needs_doctor,
     update_patient,
     validate_patient_form,
 )
@@ -264,6 +267,14 @@ def patient_records_context(search=""):
         "stats": get_patient_stats(),
         "filter_options": _filter_options(patients),
         "search_term": (search or "").strip()[:HEADER_SEARCH_MAX],
+        # Whether the status dialog may offer Deceased, and may offer anything
+        # at all on a record that already holds it. Answered from the signed-in
+        # account's stored role, like every clinical permission here; the
+        # template asks this rather than comparing role strings.
+        # process_archive_patients() asks the same question again at the write,
+        # which is the half that is the permission.
+        "can_declare_death": can_declare_death(current_role()),
+        "doctor_only_status": DOCTOR_ONLY_STATUS,
     }
 
 
@@ -383,6 +394,23 @@ def process_archive_patients(form_data):
     if status == current_status:
         subject = "That record is" if len(current) == 1 else "Those records are"
         return f"No change. {subject} already marked {status}."
+
+    # DECLARING DEATH, AND REVERSING IT, IS THE DOCTOR'S.
+    # Asked here, at the write, of the signed-in account's stored role -- not of
+    # anything the form carried -- and before set_patient_status() is reached,
+    # so a refused request writes nothing at all. The status dialog does not
+    # offer these moves to any other role, which makes that the presentation;
+    # this is the permission, and a POST built by hand meets it just the same.
+    # Active <-> Inactive is not asked about and stays with every role that
+    # reaches this screen. See models/patients.py DOCTOR_ONLY_STATUS.
+    if status_change_needs_doctor(current_status, status) and not can_declare_death(
+        current_role()
+    ):
+        return (
+            f"Only the Doctor can mark a patient {DOCTOR_ONLY_STATUS} or change a "
+            f"{DOCTOR_ONLY_STATUS} record's status — declaring a death is a "
+            "clinical decision. Nothing was changed."
+        )
 
     changed = set_patient_status(ids, status)
     noun = "record" if changed == 1 else "records"

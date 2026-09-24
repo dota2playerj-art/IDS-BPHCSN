@@ -87,10 +87,12 @@ CREATE TABLE consultations (
     height REAL,
     head_circumference REAL,
     follow_up_date TEXT,
-    -- THE CONFIDENTIALITY SEAL. Set by the Administrator -- the licensed doctor
-    -- -- on an entry they judge to be sensitive, and read by every screen that
+    -- THE CONFIDENTIALITY SEAL. Set by the Doctor -- the licensed clinician --
+    -- on an entry they judge to be sensitive, and read by every screen that
     -- would otherwise show this record's diagnosis or treatment plan to anyone
-    -- else. RA 11166 makes HIV status privileged medical information with
+    -- else, the Administrator included. (It was the Administrator's until the
+    -- RHU's field data showed the Administrator is a barangay Kagawad, not the
+    -- doctor; a seal set under that account stays set.) RA 11166 makes HIV status privileged medical information with
     -- criminal penalties for unauthorised disclosure, and it is not the only
     -- such rule; nothing here guesses which diagnoses are covered, because a
     -- system that guessed would be wrong in both directions. The clinician
