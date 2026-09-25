@@ -25,6 +25,7 @@ from routes.report_export import (
     pdf_response,
 )
 from routes.report_views import reports_analytics_context
+from routes.schedule_views import service_schedule_request
 from utils.security import login_required, role_required
 
 official_bp = Blueprint("official", __name__, url_prefix="/official")
@@ -190,3 +191,16 @@ def export_community_reports_pdf():
 @role_required("Barangay Official")
 def notifications():
     return render_template('notifications.html')
+
+
+# The Service Schedule, read-only, for the Barangay Official -- what the barangay
+# can tell residents runs on which day. The same builder as the other roles'
+# copies, and a GET with no POST counterpart anywhere in this blueprint, so this
+# role's access stays read-only in the same structural sense Reports & Analytics'
+# does.
+@official_bp.route('/service_schedule')
+@login_required
+@role_required("Barangay Official")
+def official_service_schedule():
+    context, _message = service_schedule_request(request.args)
+    return render_template('service_schedule.html', **context)

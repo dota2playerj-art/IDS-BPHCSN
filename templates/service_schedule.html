@@ -1,0 +1,365 @@
+{% extends "base.html" %}
+{% set active_nav = "service_schedule" %}
+{% block title %}IDS-BPHCSN | Service Schedule{% endblock %}
+
+{#- Which services the health center runs on which days. Read by all four roles;
+    changed only by the Administrator, through the side panel drawn when
+    `panel` is set (routes/schedule_views.py says why that is presentation and
+    the /admin guard is the permission).
+
+    IT IS ALLOWED TO BE EMPTY, AND SAYS SO. The health center's days have not
+    been confirmed, so nothing is seeded -- see migrate_add_service_schedule.py.
+    An empty schedule is drawn as a statement, not as seven blank days, so it
+    cannot be read as "nothing runs on any day". #}
+
+{% block styles %}
+  .page-desc{font-size:14px; color:var(--text-muted); margin-top:4px; max-width:720px;}
+
+  .panel-card{
+    background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:24px; margin-bottom:24px;
+  }
+  .panel-title{font-size:18px; font-weight:600; color:var(--text-dark);}
+  .panel-sub{font-size:13px; color:var(--text-muted); margin-top:2px;}
+
+  /* TODAY */
+  .today-list{list-style:none; padding:0; margin:14px 0 0;}
+  .today-list li{display:flex; gap:12px; align-items:flex-start; padding:10px 0; border-bottom:1px solid var(--border-color);}
+  .today-list li:last-child{border-bottom:none;}
+  .today-list .material-symbols-outlined{color:var(--teal); font-size:20px; margin-top:1px;}
+  .svc-name{font-weight:600; color:var(--text-dark); font-size:14px;}
+  .svc-days{font-size:12.5px; color:var(--text-muted);}
+  .svc-note{font-size:12.5px; color:var(--text-dark); margin-top:3px; background:var(--bg); border-radius:8px; padding:6px 10px;}
+
+  /* THE WEEK */
+  .week-day{display:flex; gap:16px; padding:14px 0; border-bottom:1px solid var(--border-color);}
+  .week-day:last-child{border-bottom:none;}
+  .week-day-name{width:110px; flex-shrink:0; font-weight:600; font-size:13.5px; color:var(--text-dark);}
+  .week-day.is-today .week-day-name{color:var(--teal-dark);}
+  .today-tag{
+    display:inline-block; margin-left:4px; padding:1px 6px; border-radius:6px; background:var(--teal-light);
+    color:var(--teal-dark); font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.03em;
+  }
+  .week-day-entries{flex:1; display:flex; flex-wrap:wrap; gap:8px;}
+  .svc-chip{
+    display:inline-flex; align-items:center; gap:6px; background:var(--teal-light); color:var(--teal-dark);
+    border-radius:999px; padding:5px 12px; font-size:12.5px; font-weight:600;
+  }
+  .svc-chip .wk{font-weight:500; color:var(--text-muted); font-size:11.5px;}
+  .nothing{font-size:12.5px; color:#9CA3AF;}
+
+  /* ALL ENTRIES */
+  table.sched-table{width:100%; border-collapse:separate; border-spacing:0; font-size:13.5px;}
+  table.sched-table thead th{
+    text-align:left; color:var(--text-muted); font-weight:600; font-size:11.5px; letter-spacing:0.03em;
+    text-transform:uppercase; padding:12px 14px; border-bottom:1px solid var(--border-color); white-space:nowrap;
+  }
+  table.sched-table tbody td{padding:14px; border-bottom:1px solid var(--border-color); color:var(--text-dark); vertical-align:top;}
+  table.sched-table tbody tr:last-child td{border-bottom:none;}
+  table.sched-table tbody tr.row-target{background:rgba(22,155,146,0.06);}
+  .upcoming{font-size:12px; color:var(--text-muted); margin-top:3px;}
+  .row-actions{display:flex; gap:8px; justify-content:flex-end;}
+  .btn-sm-teal{padding:6px 12px !important; font-size:12.5px !important; text-decoration:none;}
+  .btn-danger-outline{
+    background:#fff; border:1px solid var(--danger); color:var(--danger); border-radius:12px; padding:10px 16px;
+    font-size:14px; font-weight:600; display:flex; align-items:center; gap:6px; white-space:nowrap; text-decoration:none;
+  }
+  .btn-danger-outline:hover{background:#FEF2F2; color:#B91C1C;}
+  .btn-danger-solid{
+    background:var(--danger); border:none; color:#fff; border-radius:12px; padding:10px 16px;
+    font-size:14px; font-weight:600; display:flex; align-items:center; gap:6px; white-space:nowrap;
+  }
+
+  /* THE ADMINISTRATOR'S PANEL */
+  label.field-label{font-size:13px; font-weight:600; color:var(--text-dark); margin-bottom:6px; display:inline-block;}
+  label.field-label .req{color:var(--danger); margin-left:2px;}
+  label.field-label .opt{color:var(--text-muted); font-weight:500; margin-left:4px;}
+  .edit-panel .form-control{
+    height:48px; border-radius:12px; border:1px solid var(--border-color); font-size:14px; color:var(--text-dark);
+  }
+  .edit-panel textarea.form-control{height:auto; min-height:88px;}
+  .edit-panel .form-control:focus{border-color:var(--teal); box-shadow:0 0 0 3px rgba(22,155,146,0.12);}
+  .edit-panel .form-control.is-invalid{border-color:var(--danger);}
+  .form-text-hint{font-size:12px; color:var(--text-muted); margin-top:4px; line-height:1.5;}
+  .field-error{font-size:12.5px; color:var(--danger); margin-top:4px;}
+  .tick-group{display:flex; flex-wrap:wrap; gap:6px;}
+  .tick-group.is-invalid .tick span{border-color:var(--danger);}
+  .tick{position:relative; margin:0;}
+  .tick input{position:absolute; opacity:0; pointer-events:none;}
+  .tick span{
+    display:inline-block; border:1px solid var(--border-color); border-radius:10px; padding:7px 11px;
+    font-size:13px; font-weight:500; color:var(--text-dark); cursor:pointer; background:#fff; user-select:none;
+  }
+  .tick input:checked + span{background:var(--teal); border-color:var(--teal); color:#fff;}
+  .tick input:focus-visible + span{outline:2px solid var(--teal); outline-offset:2px;}
+
+  .alert-ids{border-radius:12px; border:1px solid; padding:14px 16px; font-size:13.5px; display:flex; gap:12px; align-items:flex-start; margin-bottom:16px;}
+  .alert-danger-ids{background:#FEF2F2; border-color:#FECACA; color:#B91C1C;}
+  .alert-ids .material-symbols-outlined{font-size:20px; margin-top:1px;}
+  .alert-ids strong{display:block; font-size:13.5px; margin-bottom:2px;}
+{% endblock %}
+
+{% block breadcrumb %}
+
+    <div class="breadcrumb-nav">
+      <a href="{{ url_for(dashboard_endpoint) }}">Dashboard</a>
+      <span class="sep material-symbols-outlined">chevron_right</span>
+      <span class="current">Service Schedule</span>
+    </div>{% endblock %}
+
+{% block content %}
+    <div class="eyebrow">{{ health_center.name }}</div>
+    <div class="page-title">Service Schedule</div>
+    <div class="page-desc">Which services the health center runs on which days.
+      Patients are still seen in the order they walk in, whatever the day. This
+      schedule says what is on. It does not turn anybody away.</div>
+
+    <div class="row g-4 mt-1">
+      <div class="{{ 'col-lg-8' if panel else 'col-12' }}">
+
+{%- if total_entries == 0 %}
+{#- The one empty state, for the whole screen. There is no separate "today"
+    box and no seven empty days under it: with nothing entered at all, both
+    would say the same thing three times and the empty week would read as a
+    facility that runs nothing. #}
+        <div class="untracked mb-4" id="scheduleEmpty">
+          <span class="material-symbols-outlined">event_busy</span>
+          <div>
+            <div class="untracked-title">No service days have been entered yet</div>
+            <div class="untracked-body">
+              Nobody has confirmed with the health center which services run on
+              which days yet, so the schedule is empty. It has not been filled
+              with a guess.
+{%- if panel %}
+              Add each service with the panel on the right once its days are known.
+{%- else %}
+              The Administrator will enter the days once they are confirmed.
+{%- endif %}
+              Until then, patients are checked in and seen as they arrive, as they
+              always have been.
+            </div>
+          </div>
+        </div>
+{%- else %}
+
+        <!-- TODAY — the same question the Patient Queue answers at its top, from
+             the same calculation (models/service_schedule.py services_on()). -->
+        <div class="panel-card" id="scheduleToday">
+          <div class="panel-title">Running today</div>
+          <div class="panel-sub">{{ schedule_today | full_date }}</div>
+{%- if todays_services %}
+          <ul class="today-list">
+{%- for entry in todays_services %}
+            <li>
+              <span class="material-symbols-outlined">event_available</span>
+              <div>
+                <div class="svc-name">{{ entry.service }}</div>
+                <div class="svc-days">{{ entry.days_text }}</div>
+{%- if entry.note %}
+                <div class="svc-note">{{ entry.note }}</div>
+{%- endif %}
+              </div>
+            </li>
+{%- endfor %}
+          </ul>
+{%- else %}
+          <div class="untracked mt-3">
+            <span class="material-symbols-outlined">event_busy</span>
+            <div>
+              <div class="untracked-title">Nothing on the schedule runs today</div>
+              <div class="untracked-body">None of the {{ total_entries }} service{{ '' if total_entries == 1 else 's' }} on the schedule falls on this {{ schedule_today.strftime('%A') }}. Patients are still checked in and seen as usual.</div>
+            </div>
+          </div>
+{%- endif %}
+        </div>
+
+        <!-- THE WEEK — every day, including the empty ones, so an empty Thursday
+             reads as empty rather than as missing. A service tied to weeks of the
+             month says which weeks, right beside its name. -->
+        <div class="panel-card" id="scheduleWeek">
+          <div class="panel-title">The week</div>
+          <div class="panel-sub">Each service under every day it runs</div>
+          <div class="mt-2">
+{%- for day in week %}
+            <div class="week-day{% if day.number == schedule_today.isoweekday() %} is-today{% endif %}">
+              <div class="week-day-name">{{ day.name }}{% if day.number == schedule_today.isoweekday() %}<span class="today-tag">Today</span>{% endif %}</div>
+              <div class="week-day-entries">
+{%- for entry in day.entries %}
+                <span class="svc-chip" title="{{ entry.days_text }}{% if entry.note %} — {{ entry.note }}{% endif %}">{{ entry.service }}{% if not entry.every_week %}<span class="wk">{{ entry.weeks_short }} only</span>{% endif %}</span>
+{%- else %}
+                <span class="nothing">Nothing scheduled</span>
+{%- endfor %}
+              </div>
+            </div>
+{%- endfor %}
+          </div>
+        </div>
+
+        <!-- ALL ENTRIES — each once, with its note in full. The week above repeats
+             an entry under every day it runs, which is the right way to read a
+             week and the wrong place to change one. -->
+        <div class="panel-card" id="scheduleEntries">
+          <div class="panel-title">All entries</div>
+          <div class="panel-sub">{{ total_entries }} service{{ '' if total_entries == 1 else 's' }} on the schedule</div>
+          <div class="table-responsive mt-2">
+            <table class="sched-table">
+              <thead>
+                <tr>
+                  <th>Service</th>
+                  <th>Days</th>
+                  <th>Note</th>
+{%- if panel %}
+                  <th style="text-align:right;">Actions</th>
+{%- endif %}
+                </tr>
+              </thead>
+              <tbody>
+{%- for entry in entries %}
+                <tr id="entry-{{ entry.id }}"{% if panel and panel.target and panel.target.id == entry.id %} class="row-target"{% endif %}>
+                  <td class="svc-name">{{ entry.service }}</td>
+                  <td>
+                    {{ entry.days_text }}
+{%- if entry.upcoming %}
+                    <div class="upcoming">Next: {% for day in entry.upcoming %}{{ day | display_date }}{{ ', ' if not loop.last }}{% endfor %}</div>
+{%- endif %}
+                  </td>
+                  <td>{% if entry.note %}{{ entry.note }}{% else %}<span class="nothing">—</span>{% endif %}</td>
+{%- if panel %}
+                  <td>
+                    <div class="row-actions">
+                      <a class="btn-outline-teal btn-sm-teal" href="{{ url_for(service_schedule_endpoint, edit=entry.id) }}#schedulePanel"
+                         title="Change the service, days or note of this entry">
+                        <span class="material-symbols-outlined" style="font-size:16px;">edit</span>Edit
+                      </a>
+                      <a class="btn-danger-outline btn-sm-teal" href="{{ url_for(service_schedule_endpoint, delete=entry.id) }}#schedulePanel"
+                         title="Remove this entry from the schedule">Delete</a>
+                    </div>
+                  </td>
+{%- endif %}
+                </tr>
+{%- endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+{%- endif %}
+
+      </div>
+
+{%- if panel %}
+{%- set form = panel.form %}
+{%- set errors = panel.errors %}
+{%- set target = panel.target %}
+      <!-- THE ADMINISTRATOR'S PANEL. Drawn for this role only; the routes it
+           posts to exist under /admin and nowhere else. Add is the resting state,
+           ?edit=<id> fills it with one entry and ?delete=<id> turns it into a
+           confirmation. A refused submit re-renders this page with the panel
+           holding what was typed. -->
+      <div class="col-lg-4">
+        <div class="panel-card edit-panel" id="schedulePanel">
+{%- if panel.mode == 'delete' %}
+          <div class="panel-title">Delete this entry?</div>
+          <div class="panel-sub">It comes off the schedule and the Patient Queue straight away.</div>
+          <div class="mt-3 mb-3">
+            <div class="svc-name">{{ target.service }}</div>
+            <div class="svc-days">{{ target.days_text }}</div>
+{%- if target.note %}
+            <div class="svc-note">{{ target.note }}</div>
+{%- endif %}
+          </div>
+          <div class="form-text-hint mb-3">The audit trail keeps a record of what the entry said, so the deletion can be traced. The entry itself cannot be restored. Add it again if you need it back.</div>
+          <form method="post" action="{{ url_for(delete_schedule_entry_endpoint, entry_id=target.id) }}" class="d-flex gap-2">
+            <button type="submit" class="btn-danger-solid">Delete entry</button>
+            <a class="btn-outline-teal" href="{{ url_for(service_schedule_endpoint) }}">Cancel</a>
+          </form>
+{%- else %}
+{%- if panel.mode == 'edit' %}
+          <div class="panel-title">Edit entry</div>
+          <div class="panel-sub">{{ target.service }} &middot; {{ target.days_text }}</div>
+          <form method="post" action="{{ url_for(edit_schedule_entry_endpoint, entry_id=target.id) }}" novalidate class="mt-3">
+{%- else %}
+          <div class="panel-title">Add a service</div>
+          <div class="panel-sub">One service and the days it runs</div>
+          <form method="post" action="{{ url_for(add_schedule_entry_endpoint) }}" novalidate class="mt-3">
+{%- endif %}
+{%- if errors %}
+            <div class="alert-ids alert-danger-ids" role="alert">
+              <span class="material-symbols-outlined">error</span>
+              <div><strong>The entry was not saved.</strong>Correct the fields marked below. Everything you typed is still here.</div>
+            </div>
+{%- endif %}
+
+            <div class="mb-3">
+              <label class="field-label" for="scheduleService">Service<span class="req">*</span></label>
+              <input type="text" class="form-control{% if errors.service %} is-invalid{% endif %}" id="scheduleService"
+                     name="service" value="{{ form.service }}" list="scheduleServiceNames" autocomplete="off"
+                     aria-describedby="scheduleServiceHint">
+              <datalist id="scheduleServiceNames">
+{%- for name in service_suggestions %}
+                <option value="{{ name }}">
+{%- endfor %}
+              </datalist>
+{%- if errors.service %}
+              <div class="field-error">{{ errors.service }}</div>
+{%- endif %}
+              <div class="form-text-hint" id="scheduleServiceHint">Use the name the health center uses for it. {% if service_suggestions %}Names already on the schedule are suggested as you type, so each service is spelled one way.{% else %}The schedule is empty, so there are no names to suggest yet.{% endif %} Up to {{ service_max_length }} characters.</div>
+            </div>
+
+            <div class="mb-3">
+              <span class="field-label">Days it runs<span class="req">*</span></span>
+              <div class="tick-group{% if errors.weekdays %} is-invalid{% endif %}" role="group" aria-label="Days it runs">
+{%- for number, name in weekday_names.items() %}
+                <label class="tick"><input type="checkbox" name="weekdays" value="{{ number }}"{% if number | string in form.weekdays %} checked{% endif %}><span>{{ name[:3] }}</span></label>
+{%- endfor %}
+              </div>
+{%- if errors.weekdays %}
+              <div class="field-error">{{ errors.weekdays }}</div>
+{%- endif %}
+              <div class="form-text-hint">For a service that runs every weekday, tick Monday to Friday.</div>
+            </div>
+
+            <div class="mb-3">
+              <span class="field-label">Weeks of the month<span class="opt">optional</span></span>
+              <div class="tick-group{% if errors.weeks %} is-invalid{% endif %}" role="group" aria-label="Weeks of the month">
+{%- for number, label in week_ordinals.items() %}
+                <label class="tick"><input type="checkbox" name="weeks" value="{{ number }}"{% if number | string in form.weeks %} checked{% endif %}><span>{{ label }}</span></label>
+{%- endfor %}
+              </div>
+{%- if errors.weeks %}
+              <div class="field-error">{{ errors.weeks }}</div>
+{%- endif %}
+              <div class="form-text-hint">Leave these blank if it runs every week. For a service held only on
+                some weeks, tick them: Wednesday with the 2nd and 4th means the 2nd and 4th Wednesday of
+                every month.</div>
+            </div>
+
+            <div class="mb-3">
+              <label class="field-label" for="scheduleNote">Note<span class="opt">optional</span></label>
+              <textarea class="form-control{% if errors.note %} is-invalid{% endif %}" id="scheduleNote" name="note">{{ form.note }}</textarea>
+{%- if errors.note %}
+              <div class="field-error">{{ errors.note }}</div>
+{%- endif %}
+              <div class="form-text-hint">Anything that decides whether it actually runs, such as who has to request it or who has to be there. Up to {{ note_max_length }} characters.</div>
+            </div>
+
+            <div class="d-flex gap-2 flex-wrap">
+              <button type="submit" class="btn-primary-teal">
+                <span class="material-symbols-outlined" style="font-size:18px;">{{ 'save' if panel.mode == 'edit' else 'add' }}</span>{{ 'Save changes' if panel.mode == 'edit' else 'Add to schedule' }}
+              </button>
+{%- if panel.mode == 'edit' %}
+              <a class="btn-outline-teal" href="{{ url_for(service_schedule_endpoint) }}">Cancel</a>
+{%- endif %}
+            </div>
+          </form>
+{%- endif %}
+        </div>
+      </div>
+{%- endif %}
+    </div>
+
+    <div class="scope-note mt-2">
+      <strong>This schedule is information, not a rule.</strong> Nothing here stops a
+      patient from being checked in or seen on a day their service is not listed.
+      A walk-in who is unwell is seen whatever the day. It is not connected to SMS,
+      so changing it texts nobody.
+    </div>
+{% endblock %}

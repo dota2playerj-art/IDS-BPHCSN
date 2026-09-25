@@ -306,7 +306,7 @@ def _signed_in_account():
     # ROUTE IN THE APPLICATION.
     #
     # This is the reason the feature is four lines rather than a project. There
-    # are 89 guarded routes and this function is the only way any of them is
+    # are 95 guarded routes and this function is the only way any of them is
     # reached, so the switch covers all of them by construction -- not because
     # somebody remembered to decorate them, and not by a list that a route added
     # next month could be left off. A new route inherits the restriction by

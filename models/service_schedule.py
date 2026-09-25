@@ -184,6 +184,9 @@ def _decorate(row):
     entry["weekdays"] = _parse_numbers(row["weekdays"], WEEKDAY_NAMES)
     entry["weeks"] = _parse_numbers(row["weeks_of_month"], WEEK_ORDINALS)
     entry["days_text"] = describe_days(entry["weekdays"], entry["weeks"])
+    # "2nd & 4th", for the chip beside a service in the week view. Empty for a
+    # service that runs every week.
+    entry["weeks_short"] = " & ".join(WEEK_ORDINALS[w] for w in entry["weeks"])
     entry["note"] = (row["note"] or "").strip()
     return entry
 

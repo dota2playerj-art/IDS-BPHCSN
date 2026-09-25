@@ -84,9 +84,13 @@ from models.audit import (
     ACTION_CONSULTATION_UNRESTRICTED,
     ACTION_DIAGNOSIS_REFUSED,
     ACTION_RESTRICTED_WITHHELD,
+    ACTION_SCHEDULE_ENTRY_ADDED,
+    ACTION_SCHEDULE_ENTRY_DELETED,
+    ACTION_SCHEDULE_ENTRY_EDITED,
     MODULE_AUTH,
     MODULE_CONFIDENTIALITY,
     MODULE_IMMUNIZATIONS,
+    MODULE_SERVICE_SCHEDULE,
     MODULE_SETTINGS,
     MODULE_SMS,
     MODULE_USERS,
@@ -361,6 +365,20 @@ _ICONS = {
     ACTION_CONSULTATION_UNRESTRICTED: "no_encryption",
     ACTION_RESTRICTED_WITHHELD: "visibility_off",
     ACTION_DIAGNOSIS_REFUSED: "gpp_bad",
+    # The three service-schedule entries, one glyph each for the reason the
+    # three phrases are separate: a reviewer looking for "when was prenatal day
+    # dropped" is scanning for a removal and must not have to read an edit to
+    # rule it out. `event_available` for an entry going on and `event_busy` for
+    # one coming off, an opposite pair on the maintenance pair's argument;
+    # `date_range` for an edit, the glyph the Service Schedule carries in the
+    # sidebar, so the entry and the screen that wrote it read as one place.
+    # All three were already drawn in this project's templates before this -- the
+    # Patient Queue draws `event_busy`, the Patient Profile `event_available`,
+    # and Community Reports `date_range` -- which is the available check that
+    # the fixed font subset in static/fonts carries them.
+    ACTION_SCHEDULE_ENTRY_ADDED: "event_available",
+    ACTION_SCHEDULE_ENTRY_EDITED: "date_range",
+    ACTION_SCHEDULE_ENTRY_DELETED: "event_busy",
 }
 _MODULE_ICONS = {
     MODULE_SMS: "campaign",
@@ -390,6 +408,9 @@ _MODULE_ICONS = {
     # entry arrives looking like confidentiality rather than like one of the four
     # specific events it is not.
     MODULE_CONFIDENTIALITY: "shield_lock",
+    # Reached only by a future schedule action that is not one of the three
+    # above.
+    MODULE_SERVICE_SCHEDULE: "date_range",
 }
 
 

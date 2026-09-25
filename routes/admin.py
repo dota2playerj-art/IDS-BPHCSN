@@ -48,6 +48,12 @@ from routes.patient_views import (
     registered_patient_name,
     save_and_register_another_requested,
 )
+from routes.schedule_views import (
+    process_add_entry,
+    process_delete_entry,
+    process_edit_entry,
+    service_schedule_request,
+)
 from routes.settings_views import (
     TAB_GENERAL,
     TAB_MAINTENANCE,
@@ -913,3 +919,75 @@ def download_backup():
     return backup_download_response(
         session.get("user_id"), request.remote_addr
     )
+
+
+# THE SERVICE SCHEDULE -- the Administrator's copy, and the only one that writes.
+#
+# The screen is read by all four roles, each through its own blueprint (the
+# other three are /staff/service_schedule and /official/service_schedule), from
+# the one builder in routes/schedule_views.py. What only this copy has is the
+# side panel and the three POST routes under it.
+#
+# ?edit=<id> and ?delete=<id> open the panel on one entry. An id that is not on
+# the schedule any more is said above the screen rather than silently ignored.
+@admin_bp.route('/service_schedule')
+@login_required
+@role_required("Admin")
+def service_schedule():
+    context, message = service_schedule_request(request.args)
+    if context is None:
+        flash(message)
+        return redirect(url_for("admin.service_schedule"))
+    return render_template('service_schedule.html', **context)
+
+
+# ADD, EDIT AND DELETE A SCHEDULE ENTRY. POST only, and Admin only.
+#
+# THE GUARD IS THE ENFORCEMENT. These three are the only way the schedule
+# changes, and there is no copy of them in /staff or /official: a Health Center
+# Staff, Doctor or Barangay Official account posting a forged form here is
+# redirected by role_required() before the view runs, and nothing is written.
+# Hiding the form from those roles (schedule_views._can_edit) is presentation.
+#
+# No GET on any of them. They change stored values, so there is no URL a link,
+# a bookmark or a prefetch could reach.
+#
+# Add and Edit return a rendered page rather than a redirect when the submit was
+# refused, because they carry typing that must survive: the panel comes back
+# with the messages beside the fields and every value still in it -- the same
+# treatment add_user(), edit_user() and save_general_settings() give theirs.
+# Delete carries nothing typed, so every outcome of it is a flash and a redirect.
+@admin_bp.route('/service_schedule/add', methods=["POST"])
+@login_required
+@role_required("Admin")
+def add_service_schedule_entry():
+    entry, context, message = process_add_entry(
+        request.form, session.get("user_id"), request.remote_addr
+    )
+    if entry is None:
+        return render_template('service_schedule.html', **context)
+    flash(message)
+    return redirect(url_for("admin.service_schedule"))
+
+
+@admin_bp.route('/service_schedule/<int:entry_id>/edit', methods=["POST"])
+@login_required
+@role_required("Admin")
+def edit_service_schedule_entry(entry_id):
+    entry, context, message = process_edit_entry(
+        entry_id, request.form, session.get("user_id"), request.remote_addr
+    )
+    if context is not None:
+        return render_template('service_schedule.html', **context)
+    flash(message)
+    return redirect(url_for("admin.service_schedule"))
+
+
+@admin_bp.route('/service_schedule/<int:entry_id>/delete', methods=["POST"])
+@login_required
+@role_required("Admin")
+def delete_service_schedule_entry(entry_id):
+    flash(process_delete_entry(
+        entry_id, session.get("user_id"), request.remote_addr
+    ))
+    return redirect(url_for("admin.service_schedule"))

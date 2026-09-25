@@ -82,6 +82,12 @@ def inject_role_context():
             "record_consultation_endpoint": "staff_record_consultation",
             "edit_consultation_endpoint": "staff_edit_consultation",
             "sms_notifications_endpoint": "staff_sms_notifications",
+            # The Service Schedule, read-only. There is no add/edit/delete
+            # endpoint in this branch, and none in the Barangay Official's:
+            # the only routes that write to the schedule are under /admin, so a
+            # template reusing one of those names for these roles fails loudly
+            # rather than emitting a URL they would bounce off.
+            "service_schedule_endpoint": "staff_service_schedule",
             # Export Excel and Export PDF on Screens 03, 06 and 08. Named per
             # role for the same reason every endpoint above is: these three
             # templates are each rendered by two blueprints, and each role must
@@ -157,6 +163,13 @@ def inject_role_context():
             "record_consultation_endpoint": "record_consultation",
             "edit_consultation_endpoint": "edit_consultation",
             "sms_notifications_endpoint": "sms_notifications",
+            # The Service Schedule, and the three writes only this role has.
+            # schedule_views._can_edit() decides whether the form is drawn; these
+            # names are what it posts to, and they exist for no other role.
+            "service_schedule_endpoint": "service_schedule",
+            "add_schedule_entry_endpoint": "add_service_schedule_entry",
+            "edit_schedule_entry_endpoint": "edit_service_schedule_entry",
+            "delete_schedule_entry_endpoint": "delete_service_schedule_entry",
             # Only the two broadcast-holding roles get a send endpoint at all. The
             # Health Staff branch above has none, which is what makes that role
             # view-only -- there is no URL for a forged POST to reach.
@@ -194,6 +207,8 @@ def inject_role_context():
             "dashboard_endpoint": "official_dashboard",
             "sms_notifications_endpoint": "official_sms_notifications",
             "send_broadcast_endpoint": "official_send_sms_broadcast",
+            # Read-only, like the clinical floor's copy; see the note there.
+            "service_schedule_endpoint": "official_service_schedule",
             "reports_analytics_endpoint": "official_reports_analytics",
             "reports_excel_endpoint": "official_export_reports_analytics_excel",
             "reports_pdf_endpoint": "official_export_reports_analytics_pdf",

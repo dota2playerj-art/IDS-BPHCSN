@@ -86,6 +86,7 @@ from routes.patient_views import (
 )
 from routes.report_export import analytics_pdf, analytics_workbook
 from routes.report_views import reports_analytics_context
+from routes.schedule_views import service_schedule_request
 from routes.vaccination_correction_views import process_vaccination_correction
 from utils.security import login_required, role_required
 
@@ -613,3 +614,16 @@ def staff_register_patient(patient_id=None):
             check_in_reason_text=check_in_reason(request.args),
         ),
     )
+
+
+# The Service Schedule, read-only, for Health Center Staff and the Doctor. The
+# same screen and the same builder as the Administrator's copy; the difference is
+# that this blueprint has no route that writes to it, so there is nothing here a
+# forged form could reach. ?edit= and ?delete= are ignored for these roles --
+# service_schedule_request() only reads them for an Administrator.
+@staff_bp.route('/service_schedule')
+@login_required
+@role_required(*CLINICAL_FLOOR_ROLES)
+def staff_service_schedule():
+    context, _message = service_schedule_request(request.args)
+    return render_template('service_schedule.html', **context)
