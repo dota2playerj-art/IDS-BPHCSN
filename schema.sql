@@ -499,6 +499,42 @@ CREATE TABLE settings (
     FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
+-- Which services the health center runs on which days, one service per row,
+-- entered by the Administrator. It is the successor to advance booking: the
+-- facility decides the days, and patients walk in. It is read-only information
+-- -- nothing refuses a check-in or a consultation because of it.
+--
+-- NO ROW IS EVER SEEDED. The health center's real days have not been confirmed,
+-- and a plausible timetable here would be read as a fact. The screens that read
+-- this table say plainly when it is empty. See migrate_add_service_schedule.py.
+--
+-- The days are two columns and there is no "pattern type" column:
+--   weekdays        ISO weekday numbers, ascending: '1' Monday .. '7' Sunday
+--   weeks_of_month  NULL for every week, or which occurrences in the month:
+--                   '2,4' is the 2nd and 4th
+-- so "daily, Monday to Friday" is ('1,2,3,4,5', NULL), "every Monday and
+-- Thursday" is ('1,4', NULL), and "every 2nd and 4th Wednesday" is ('3', '2,4').
+-- The pattern is what the two columns say, so it cannot disagree with them.
+-- Weeks run 1st to 4th only: most months have no 5th occurrence of a weekday.
+CREATE TABLE service_schedule (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    service TEXT NOT NULL CHECK (length(trim(service)) > 0),
+    weekdays TEXT NOT NULL CHECK (
+        weekdays <> '' AND weekdays NOT GLOB '*[^1-7,]*'
+    ),
+    weeks_of_month TEXT CHECK (
+        weeks_of_month IS NULL
+        OR (weeks_of_month <> '' AND weeks_of_month NOT GLOB '*[^1-4,]*')
+    ),
+    note TEXT,
+    created_by INTEGER,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by INTEGER,
+    updated_at TEXT,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
 CREATE INDEX idx_patients_last_name ON patients(last_name);
 CREATE INDEX idx_consultations_patient_date ON consultations(patient_id, consultation_date);
 -- Answers "has this queue entry already been written up?" before a second

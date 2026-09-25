@@ -117,6 +117,16 @@ MODULE_SETTINGS = "Settings"
 # Logs screen which law the sealed record falls under, which is most of the
 # disclosure the seal exists to prevent.
 MODULE_CONFIDENTIALITY = "Medical Confidentiality"
+# The health center's service schedule: which services run on which days.
+#
+# ITS OWN MODULE RATHER THAN A CORNER OF MODULE_SETTINGS. Both are the facility's
+# own configuration, but they are read by different people for different
+# questions. Settings is the facility's identity and the switch that closes the
+# system; this is what the barangay was told runs on which day, and "when did
+# immunisation move off the 2nd Wednesday, and who moved it" is a question a
+# health worker or an official asks without wanting a list of backup downloads
+# in the way.
+MODULE_SERVICE_SCHEDULE = "Service Schedule"
 
 # Activity phrases, in the same voice as the ones on that screen ("Updated
 # patient record", "Updated stock quantity").
@@ -462,6 +472,22 @@ ACTION_RESTRICTED_WITHHELD = "Withheld restricted consultation from view"
 # by every Administrator, and carried into every audit export.
 ACTION_DIAGNOSIS_REFUSED = "Refused clinical judgement from an unlicensed role"
 
+# The three service-schedule entries, all under MODULE_SERVICE_SCHEDULE.
+#
+# THREE PHRASES RATHER THAN ONE "Changed service schedule", for the reason
+# creation, editing and deactivation of accounts are three: a reviewer asking
+# "was prenatal day ever dropped" is looking for a deletion, and it must not read
+# the same as a note being reworded.
+#
+# `details` on a deletion carries everything the row said -- service, days and
+# note -- because once the row is gone that entry is the only copy of it. An
+# edit carries the before and after of each field that moved, in the
+# "Label: before → after" shape the Audit Logs panel draws side by side, and a
+# save that moved nothing writes no entry at all.
+ACTION_SCHEDULE_ENTRY_ADDED = "Added service schedule entry"
+ACTION_SCHEDULE_ENTRY_EDITED = "Edited service schedule entry"
+ACTION_SCHEDULE_ENTRY_DELETED = "Deleted service schedule entry"
+
 # Every action that means somebody was turned away at the login form. Grouped so
 # the Security Events figure counts refusals rather than one particular kind of
 # refusal -- adding a fourth outcome later must not silently shrink that number.
@@ -506,7 +532,15 @@ REFUSAL_ACTIONS = (ACTION_LOGIN_FAILED, ACTION_LOGIN_BLOCKED)
 # been altered" -- and counting a download as an alteration would be the worst
 # kind of wrong, because it would report data as having changed when what
 # happened was that a copy of it left unchanged.
-NON_RECORD_MODULES = (MODULE_SMS, MODULE_AUTH, MODULE_USERS, MODULE_SETTINGS)
+#
+# MODULE_SERVICE_SCHEDULE joins them on the Settings argument exactly: an entry
+# saying which days a service runs is the facility's configuration, not a
+# clinical or stock row, and adding prenatal day to the schedule has altered
+# nobody's record.
+NON_RECORD_MODULES = (
+    MODULE_SMS, MODULE_AUTH, MODULE_USERS, MODULE_SETTINGS,
+    MODULE_SERVICE_SCHEDULE,
+)
 
 # The same exclusion drawn one level finer, for the one module whose entries are
 # not all of a kind.
