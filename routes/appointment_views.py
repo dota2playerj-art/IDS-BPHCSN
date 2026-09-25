@@ -22,6 +22,7 @@ from models.appointments import (
 )
 from models.immunizations import get_immunization_alert, get_immunization_status
 from models.patients import get_all_patients, get_patient_by_id
+from models.service_schedule import get_entries as get_schedule_entries, services_on
 from utils.dates import today
 
 # Only a living, active record may be checked in. An Inactive or Deceased patient
@@ -115,6 +116,31 @@ def appointment_scheduling_context(month=None):
         ),
         # The calendar panel, which until now was a hand-written July 2026 grid.
         "calendar": get_calendar_month(parse_month(month, reference), reference),
+        "services_today": _services_today(reference),
+    }
+
+
+def _services_today(reference):
+    """What the Service Schedule says runs on `reference`, for the strip at the top.
+
+    Asked about the SAME date the queue below it is built for, rather than
+    reading the clock a second time, so the strip and the queue cannot describe
+    two different days across midnight.
+
+    `total` travels with the list because the two empty answers are different
+    facts and the strip words them differently: a schedule nobody has filled in
+    yet cannot say what runs today at all, while a filled schedule with nothing
+    on today is a real answer about today.
+
+    INFORMATION ONLY. Nothing in this module reads the result: check-in, the
+    queue order and Start Consultation are decided exactly as they were before
+    the schedule existed. A walk-in who is unwell is seen on any day.
+    """
+    entries = get_schedule_entries()
+    return {
+        "date": reference,
+        "services": services_on(reference, entries),
+        "total": len(entries),
     }
 
 

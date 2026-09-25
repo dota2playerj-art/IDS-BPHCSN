@@ -173,6 +173,26 @@
   }
   .reason-text{color:var(--text-muted); font-size:12.5px;}
 
+  /* SERVICES TODAY -- the strip under the page title. A plain band rather than a
+     panel-card, so it reads as a line of information about the day and not as
+     a section of the queue with rules of its own. */
+  .services-today{
+    display:flex; gap:14px; align-items:flex-start; background:#fff; border:1px solid var(--border-color);
+    border-left:4px solid var(--teal); border-radius:12px; padding:14px 18px; margin-top:16px;
+  }
+  .services-today.is-empty{border-left-color:#D1D5DB; background:var(--bg);}
+  .services-today > .material-symbols-outlined{font-size:22px; color:var(--teal-dark); margin-top:1px;}
+  .services-today.is-empty > .material-symbols-outlined{color:#9CA3AF;}
+  .st-head{display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;}
+  .st-title{font-size:13.5px; font-weight:700; color:var(--text-dark);}
+  .st-date{font-size:12.5px; color:var(--text-muted);}
+  .st-link{font-size:12.5px; font-weight:600; color:var(--teal-dark); text-decoration:none; margin-left:auto;}
+  .st-link:hover{text-decoration:underline;}
+  .st-list{display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;}
+  .st-item{background:var(--teal-light); color:var(--teal-dark); border-radius:10px; padding:6px 12px; font-size:13px; font-weight:600;}
+  .st-item .st-note{display:block; font-weight:400; font-size:12px; color:var(--text-dark); margin-top:2px;}
+  .st-body{font-size:12.5px; color:var(--text-muted); line-height:1.55; margin-top:4px;}
+
   /* CHECK-IN DIALOG */
   .patient-pick{max-height:280px; overflow-y:auto; border:1px solid var(--border-color); border-radius:12px;}
   /* position:relative is load-bearing, not decoration. The radio below is
@@ -260,6 +280,45 @@
     <div class="eyebrow">{{ health_center.name }}</div>
     <div class="page-title">Patient Queue</div>
     <div class="page-desc">Check patients in as they arrive, work today's queue in order, and see what each day of the month held.</div>
+
+{#- SERVICES TODAY, from the Service Schedule (routes/appointment_views.py
+    _services_today()). This is the schedule's daily use: the desk sees what is
+    running before the first patient arrives.
+
+    IT RESTRICTS NOTHING, AND SAYS SO. Nothing on this screen reads it -- a
+    patient is checked in and seen whatever is or is not listed, which is how
+    the RHU describes these facilities working.
+
+    Two empty states, worded apart because they are different facts. With
+    nothing entered at all the strip cannot know what runs today, and must not
+    read as "nothing runs today"; with a filled schedule and nothing on today,
+    that is exactly what it says. #}
+{%- set st = services_today %}
+    <div class="services-today{% if not st.services %} is-empty{% endif %}" id="servicesToday">
+      <span class="material-symbols-outlined">{{ 'event_available' if st.services else 'event_busy' }}</span>
+      <div style="flex:1;">
+        <div class="st-head">
+          <span class="st-title">Services today</span>
+          <span class="st-date">{{ st.date | full_date }}</span>
+          <a class="st-link" href="{{ url_for(service_schedule_endpoint) }}">Service Schedule</a>
+        </div>
+{%- if st.services %}
+        <div class="st-list">
+{%- for entry in st.services %}
+          <div class="st-item" title="{{ entry.days_text }}">{{ entry.service }}{% if entry.note %}<span class="st-note">{{ entry.note }}</span>{% endif %}</div>
+{%- endfor %}
+        </div>
+        <div class="st-body">Walk-ins for anything else are checked in and seen as usual.</div>
+{%- elif st.total == 0 %}
+        <div class="st-body">No service days have been entered yet, so this cannot say what runs
+          today. The Administrator enters them on the Service Schedule once the health center
+          confirms them. Patients are checked in and seen as they arrive either way.</div>
+{%- else %}
+        <div class="st-body">Nothing on the service schedule runs on this {{ st.date.strftime('%A') }}.
+          Patients are checked in and seen as usual.</div>
+{%- endif %}
+      </div>
+    </div>
 
     <!-- STAT CARDS — the four figures that describe today's queue. Same card
          structure as before; the numbers now come from models/appointments.py

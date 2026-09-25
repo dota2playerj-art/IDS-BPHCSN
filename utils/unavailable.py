@@ -355,23 +355,27 @@ UNAVAILABLE = {
     # o'clock next Thursday, and a screen that offered it read convincingly in a
     # demonstration and wrongly in the building.
     #
-    # THE SUCCESSOR IS NAMED BUT NOT DESCRIBED, DELIBERATELY.
+    # THE SUCCESSOR IS BUILT, AND THIS STILL NAMES NO DAY, DELIBERATELY.
     # A real health center does publish a shape to its week -- one day for
-    # immunisation, another for prenatal -- and a fixed service-day schedule is
-    # the honest thing to build in place of what went. What those days are, and
-    # which services sit on them, has not been confirmed with the health center.
-    # Writing a plausible timetable into this sentence would be the same mistake
-    # that advance booking was, in a smaller font: a specific claim about how
-    # this facility runs, made up at a desk. So this says a schedule is planned
-    # and says nothing about its contents, and it stays that way until somebody
-    # has asked.
+    # immunisation, another for prenatal -- and this sentence used to say that a
+    # fixed service-day schedule was "planned". It is built now: the Service
+    # Schedule screen, filled in by the Administrator, with today's services in
+    # the strip at the top of this screen. So "planned" went.
+    #
+    # What did not change is that the days themselves have not been confirmed
+    # with the health center, and the schedule ships empty for that reason (see
+    # migrate_add_service_schedule.py). Writing a plausible timetable into this
+    # sentence would be the same mistake that advance booking was, in a smaller
+    # font: a specific claim about how this facility runs, made up at a desk. So
+    # the sentence points at where the days are kept, which stays true whether
+    # the schedule is empty or full, and says nothing about what they are.
     "advance_booking": (
         "Appointments cannot be booked for a future day, and that is deliberate "
         "rather than unfinished. This health center sees patients in the order "
         "they arrive, so a visit is recorded when the person is at the desk -- "
-        "use Check In Patient. A fixed schedule of service days is planned, and "
-        "which days carry which services has still to be confirmed with the "
-        "health center, so none is stated here."
+        "use Check In Patient. Which services run on which days is kept on the "
+        "Service Schedule, entered by the Administrator from what the health "
+        "center confirms."
     ),
 
     # A GAP LEFT BY THE REMOVAL, NAMED RATHER THAN QUIETLY CARRIED.
