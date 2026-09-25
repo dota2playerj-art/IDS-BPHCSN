@@ -25,6 +25,28 @@ So the evidence lives on the machine that produced it. What is committed is this
 file, naming what was captured and how to produce it again, so the absence is
 stated rather than left for someone to trip over.
 
+## stale-suite-assertions/
+
+A pass through the verification suites that were failing before the Doctor-role
+work began: 17 checks in dispensing, plus checks in Add User, My Account and
+account management. Each failure was classed either as a stale assertion (the
+application had since changed on purpose) or as a real defect.
+
+**30 were stale.** The causes are the "medicine" → "item" rename in 5747d94, the
+Administrator's persona correction in f7e2607, the audited password-change
+refusal in ef47b94, a reworded password rule, and counts and dates written in as
+literals. Each was corrected to check the same property, and one check that had
+been passing vacuously was repaired.
+
+**2 checks are a real defect, reported and not fixed.** An Administrator who
+deactivates their own account is sent to the login page with "Invalid security
+credentials." The message written for that moment is never shown. It has failed
+since the commit that introduced it. Severity is low: the deactivation itself is
+correct. It is left for the team to decide.
+
+Details, the commit behind each stale assertion, and the two ways to close the
+defect are in `stale-suite-assertions/README.md`.
+
 ## dose-given-elsewhere/
 
 Verification of the change that lets a health worker record an EPI dose as
