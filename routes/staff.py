@@ -14,18 +14,20 @@ one of them is already built here from a context builder shared with the
 Administrator's copy. A /doctor/* blueprint would have been these same 24
 views a third time, each able to drift from the other two.
 
-So every screen in this file admits CLINICAL_FLOOR_ROLES, and what separates
-the Doctor from Health Center Staff is not which screen they reach but what the
-screen lets them do: whether the diagnosis and treatment plan are drawn and
-accepted, whether a sealed consultation is readable, whether a patient may be
-marked deceased or brought back from it. Those are decided per request from the
+So every clinical-floor screen in this file admits CLINICAL_FLOOR_ROLES, and
+what separates the Doctor from Health Center Staff there is not which screen
+they reach but what the screen lets them do: whether the diagnosis and
+treatment plan are drawn and accepted, whether a sealed consultation is
+readable, whether a patient may be marked deceased or brought back from it. Those are decided per request from the
 signed-in account's stored role (utils.security.current_role()), inside the
 shared builders, and are enforced there whichever blueprint the request came
 through -- see models/consultations.py can_diagnose().
 
-The one route that is not a screen both roles share is restrict_consultation,
-which seals a consultation. Only the Doctor may, so it is guarded to the Doctor
-alone -- the one guard in this file that differs from its neighbours.
+Two things here are the Doctor's alone, and their guards name the Doctor rather
+than CLINICAL_FLOOR_ROLES. restrict_consultation seals a consultation, which
+only the Doctor may do. Reports & Analytics (Screen 10) and its two exports are
+the second: the Doctor reads the same figures the Administrator and the Barangay
+Official do, from the same builder, and Health Center Staff do not reach them.
 """
 from flask import Blueprint, flash, redirect, render_template, request, session, url_for
 
@@ -82,13 +84,17 @@ from routes.patient_views import (
     registered_patient_name,
     save_and_register_another_requested,
 )
+from routes.report_export import analytics_pdf, analytics_workbook
+from routes.report_views import reports_analytics_context
 from routes.vaccination_correction_views import process_vaccination_correction
 from utils.security import login_required, role_required
 
 staff_bp = Blueprint("staff", __name__, url_prefix="/staff")
 
-# Who works the clinical floor. Every screen in this file admits exactly these
-# two roles; the permissions that differ between them are asked inside the views.
+# Who works the clinical floor. Every clinical-floor screen in this file admits
+# exactly these two roles; the permissions that differ between them are asked
+# inside the views. The routes guarded to the Doctor alone say so where they
+# are defined (restrict_consultation, and Reports & Analytics with its exports).
 # The Barangay Official is not here, and neither is the Administrator, who has
 # their own copies of these screens under /admin.
 CLINICAL_FLOOR_ROLES = ("Health Staff", "Doctor")
@@ -486,6 +492,56 @@ def staff_edit_consultation(consultation_id):
 @role_required(*CLINICAL_FLOOR_ROLES)
 def staff_sms_notifications():
     return render_template('sms_notifications.html', **sms_notifications_context())
+
+
+# Screen 10, Reports & Analytics, and its two exports -- for THE DOCTOR ONLY.
+# Health Center Staff are refused all three, as they were before, so these carry
+# role_required("Doctor") rather than CLINICAL_FLOOR_ROLES, like
+# restrict_consultation above.
+#
+# Why the Doctor: the consultation counts and the top-diagnoses ranking are the
+# clinician's own material, and disease prevention is what the RHU named as its
+# main goal. It exposes nothing new -- the Barangay Official already reads these
+# figures, and a sealed diagnosis is left out of the ranking for every viewer
+# (models/consultations.py get_consultation_stats()); the Doctor reads sealed
+# text on the patient's own record, never here.
+#
+# The same three thin routes the Administrator and the Barangay Official each
+# have in their own blueprint, over the same reports_analytics_context() and the
+# same assembly in routes/report_export.py. So the Doctor is handed the same
+# figures, the same workbook and the same PDF -- no doctor-specific view. Here
+# rather than under /admin because every /admin/* guard names the Administrator
+# alone, and this blueprint is where the Doctor's URL space already is. Prefixed
+# staff_ like their neighbours, so User Management's derived screen list folds
+# them into "Reports & Analytics" (routes/user_views.py _screen_label()).
+@staff_bp.route('/reports_analytics')
+@login_required
+@role_required("Doctor")
+def staff_reports_analytics():
+    return render_template(
+        'reports_analytics.html',
+        **reports_analytics_context(args=request.args),
+    )
+
+
+@staff_bp.route('/reports_analytics/export.xlsx')
+@login_required
+@role_required("Doctor")
+def staff_export_reports_analytics_excel():
+    return excel_response(analytics_workbook(
+        reports_analytics_context(args=request.args),
+        produced_by=exported_by(),
+    ))
+
+
+@staff_bp.route('/reports_analytics/export.pdf')
+@login_required
+@role_required("Doctor")
+def staff_export_reports_analytics_pdf():
+    return pdf_response(analytics_pdf(
+        reports_analytics_context(args=request.args),
+        produced_by=exported_by(),
+    ))
 
 
 # Renamed from register_patient to staff_register_patient so the Administrator's

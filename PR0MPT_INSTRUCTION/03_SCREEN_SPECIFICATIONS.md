@@ -1029,11 +1029,12 @@ clinical authority is the RHU physician's, while the Administrator — Kagawad A
 barangay official and not a physician — administers the system. The decision record is in
 `01_PROJECT_BIBLE.md` and `09_IDS-BPHCSN_UI_Architecture_FROM-CLAUDE.md` §18.
 
-**Which screens the Doctor reaches.** Exactly Health Center Staff's: Login, the clinical dashboard
+**Which screens the Doctor reaches.** Health Center Staff's: Login, the clinical dashboard
 (Screen 14, titled "Doctor Dashboard" for this role), Patient Records, Register Patient, Patient
 Profile, Medicine Inventory, Add/Edit Medicine, Patient Queue, Record / Edit Consultation, SMS
-Notifications (view-only, as staff see it) and My Account. The Doctor is refused User Management,
-Audit Logs, Settings and Reports & Analytics.
+Notifications (view-only, as staff see it) and My Account — plus Reports & Analytics (Screen 10),
+with the same figures and the same Excel and PDF exports the Administrator and the Barangay Official
+get. The Doctor is refused User Management, Audit Logs and Settings.
 
 **What only the Doctor may do on those screens**, enforced on the server from the signed-in
 account's stored role, not by hiding a control:
@@ -1056,7 +1057,8 @@ treatment plan as changed and does not quote either value, because Audit Logs ar
 Administrator.
 
 **Screen 10 and 18.** A Restricted diagnosis is left out of the top-diagnoses ranking for every
-viewer, as before.
+viewer, as before — the Doctor included. The Doctor reads sealed text on the patient's own record
+(Screens 05 and 20), never in an aggregate or its exports.
 
 **History.** Diagnoses written, and seals set, under the Administrator account before 2026-09-25
 are unchanged and keep their attribution.

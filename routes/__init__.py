@@ -13,7 +13,8 @@ visible in its URL.
     admin_bp     /admin/*       11 Administrator screens
     staff_bp     /staff/*        8 clinical-floor screens, for Health Center
                                 Staff and the Doctor (routes/staff.py says why
-                                the Doctor shares them rather than having a copy)
+                                the Doctor shares them rather than having a copy),
+                                plus Reports & Analytics for the Doctor alone
     official_bp  /official/*     8 Barangay Official screens
 """
 from routes.admin import admin_bp

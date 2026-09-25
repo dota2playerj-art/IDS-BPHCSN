@@ -1,19 +1,21 @@
 """Shared context builder for Reports & Analytics (Screen 10).
 
-Screen 10 is rendered by two blueprints -- once for the Administrator and once
-for the Barangay Official -- from the same template with the same data. The
-queries live here so the two role variants cannot drift apart; the routes stay
-thin and each keeps its own role_required guard.
+Screen 10 is rendered by three blueprints -- once for the Administrator, once
+for the Barangay Official and once for the Doctor -- from the same template with
+the same data. The queries live here so the role variants cannot drift apart;
+the routes stay thin and each keeps its own role_required guard.
 
 This mirrors routes/patient_views.py, routes/inventory_views.py and
 routes/appointment_views.py exactly.
 
-Both roles receive an identical context. That is deliberate: the Barangay
+Every role receives an identical context. That is deliberate: the Barangay
 Official's access to this screen is read-only by virtue of there being nothing
 to write -- every route reaching it is GET, and no action on the page posts
 anywhere -- rather than by handing that role a reduced set of numbers. A
-statistics screen that showed the two roles different totals would be two
-reports wearing one name.
+statistics screen that showed two roles different totals would be two reports
+wearing one name. The Doctor is given no view of their own for the same reason:
+a sealed diagnosis is left out of the ranking for every viewer, the Doctor
+included, and is read on the patient's record rather than here.
 
 
 WHAT THIS SCREEN CANNOT REPORT

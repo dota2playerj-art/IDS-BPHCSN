@@ -110,9 +110,11 @@ Responsibilities
 - Declare a patient deceased, and reverse that status
 - Everything Health Center Staff do on the clinical floor: register patients, work the patient
   queue, record consultations, dispense medicines, update inventory, view SMS notifications
+- Read Reports & Analytics — the consultation counts and top-diagnoses ranking — with the same
+  figures and exports the Administrator and the Barangay Official see
 
-The Doctor has no User Management, Audit Logs, Settings or Reports & Analytics, and is blocked by
-maintenance mode like every role but the Administrator.
+The Doctor has no User Management, Audit Logs or Settings, and is blocked by maintenance mode like
+every role but the Administrator.
 
 ---
 
@@ -173,9 +175,15 @@ Consultation it now records intake exactly as Health Center Staff do. Under RA 1
 text and its attribution. A seal the Administrator set stays set and stays attributed to it. No
 audit entry was rewritten. The last-Administrator guard still protects the Administrator role.
 
-**Open question for the team.** The Doctor was deliberately not given Reports & Analytics. Whether
-the RHU physician should see the community-level consultation and diagnosis figures there is a
-decision for the team, not something this change assumed.
+**Reports & Analytics — decided afterwards (2026-09-25).** The Doctor was at first deliberately
+not given Reports & Analytics, and the question was left to the team. The team granted it. The
+consultation counts and the top-diagnoses ranking are the doctor's own clinical material, and they
+serve disease prevention, which the RHU named as its main goal. Granting it exposes nothing new:
+the Barangay Official already reads the same figures, and a sealed diagnosis is left out of the
+ranking for every viewer, the Doctor included — the Doctor reads sealed text on the patient's own
+record, never in an aggregate. The Doctor sees the same screen, the same figures and the same two
+exports as the other two roles; there is no doctor-specific view. User Management, Audit Logs and
+Settings stay with the Administrator.
 
 ---
 
@@ -325,14 +333,15 @@ Health Center Staff
 ├── Medicine Inventory
 └── Notifications
 
-Doctor (the Health Center Staff menu, served from the same screens)
+Doctor (the Health Center Staff menu, served from the same screens, plus Reports & Analytics)
 
 ├── Dashboard
 ├── Patient Records
 ├── Register Patient
 ├── Medicine Inventory
 ├── Patient Queue
-└── SMS Notifications
+├── SMS Notifications
+└── Reports & Analytics
 
 Barangay Official
 
@@ -507,3 +516,9 @@ Four roles. Added the Doctor role and moved clinical authority — diagnosis, tr
 sealing and reading Restricted consultations, declaring death — to it from the Administrator, who
 is a barangay Kagawad and not a physician. See "Decision Record — Clinical Authority Belongs to the
 Doctor".
+
+Version 2.2 (2026-09-25)
+
+The Doctor reads Reports & Analytics, with the same figures and exports as the Administrator and
+the Barangay Official. Sealed diagnoses stay out of the ranking for every viewer. See the Reports &
+Analytics paragraph at the end of the Decision Record.

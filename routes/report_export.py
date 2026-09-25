@@ -169,8 +169,9 @@ ALWAYS_UNTRACKED = ("generated_reports",)
 def _download(built, mimetype):
     """A (bytes, filename) pair as the download itself.
 
-    Every export route -- the Administrator's and the Barangay Official's views of
-    Screen 10, and Community Reports, each in both formats -- returns through here,
+    Every export route -- the Administrator's, the Barangay Official's and the
+    Doctor's views of Screen 10, and Community Reports, each in both formats --
+    returns through here,
     so the attachment header and the filename are decided once. A route that
     assembled its own response is how one of them would end up serving a file the
     browser offers to open as text.
@@ -528,7 +529,7 @@ def _ranked_block(title, entries, label_key, count_key, heads, note=None,
 # helpers exist so the two blocks below state that consistently.
 #
 # THEY ARE SHARED BECAUSE THE WORKBOOK AND THE PDF ARE THE SAME ASSEMBLY. Both
-# export routes for both roles -- four of them, plus Screen 18's three -- build
+# export routes for all three roles -- six of them, plus Screen 18's three -- build
 # from the identical context through the identical functions, which is what stops
 # an Administrator's workbook and a Barangay Official's PDF disagreeing about
 # what the barangay recorded. A sentence typed into one of the two ranking blocks

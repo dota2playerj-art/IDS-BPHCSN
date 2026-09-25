@@ -116,6 +116,14 @@ def inject_role_context():
                 # every other role gets no control rather than a URL it would
                 # bounce off.
                 "restrict_consultation_endpoint": "restrict_consultation",
+                # Reports & Analytics and its two exports, the same screen the
+                # Administrator and the Barangay Official read, through the
+                # Doctor's own three routes on /staff (routes/staff.py says why
+                # this role and not Health Center Staff). Named per role for the
+                # reason given on the Administrator's copies below.
+                "reports_analytics_endpoint": "staff_reports_analytics",
+                "reports_excel_endpoint": "staff_export_reports_analytics_excel",
+                "reports_pdf_endpoint": "staff_export_reports_analytics_pdf",
             })
     elif normalized_role == "admin":
         context = {
@@ -156,9 +164,9 @@ def inject_role_context():
             "reports_analytics_endpoint": "reports_analytics",
             # Export Excel and Export PDF on Screen 10. Named per role for the same
             # reason every endpoint above is: reports_analytics.html is one template
-            # rendered by two blueprints, and each role must be handed the download
-            # route its own guard admits. A shared literal would send one of the two
-            # roles to a URL it bounces straight off.
+            # rendered by three blueprints, and each role must be handed the download
+            # route its own guard admits. A shared literal would send two of the
+            # three roles to a URL they bounce straight off.
             "reports_excel_endpoint": "export_reports_analytics_excel",
             "reports_pdf_endpoint": "export_reports_analytics_pdf",
             # The Administrator's copies of the three shared screens' exports,

@@ -281,9 +281,13 @@
     <li><a href="{{ url_for(appointment_scheduling_endpoint) }}"{% if active_nav == 'appointment_scheduling' %} class="active"{% endif %}><span class="material-symbols-outlined">calendar_month</span>Patient Queue</a></li>
     <!-- See the note on the Barangay Official's copy of this item above. -->
     <li><a href="{{ url_for(sms_notifications_endpoint) }}"{% if active_nav == 'sms_notifications' %} class="active"{% endif %}><span class="material-symbols-outlined">campaign</span>SMS Notifications</a></li>
-{%- if current_role == 'admin' %}
+{%- if current_role in ('admin', 'doctor') %}
     <!-- Community Announcements was retired here too; see the note on the
-         Barangay Official's menu above. -->
+         Barangay Official's menu above.
+         Reports & Analytics: the Administrator and the Doctor, each through
+         their own route (reports_analytics_endpoint is named per role in
+         utils/context.py). Health Center Staff do not reach Screen 10, so the
+         item is not drawn for them. -->
     <li><a href="{{ url_for(reports_analytics_endpoint) }}"{% if active_nav == 'reports_analytics' %} class="active"{% endif %}><span class="material-symbols-outlined">monitoring</span>Reports &amp; Analytics</a></li>
 {%- endif %}
 {%- endif %}
