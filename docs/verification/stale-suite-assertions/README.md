@@ -256,6 +256,58 @@ crashes in its own setup, identically before and after this fix. It needs an
 appointment in `In Consultation`, and the current database has none. Its
 fallback `print` also fails when that appointment is missing. It passed 117 / 117
 on 2026-09-25, so the change is in the data. The application is not involved.
+*Repaired later the same day; see the next section.*
+
+## RBAC suite: made independent of the database (2026-09-26)
+
+The consultation RBAC and confidentiality suite (`2aec74c4_verify_rbac_ported.py`)
+had been crashing in setup and catching nothing. It now builds the state it
+needs in its throwaway copy, and it passes **117 / 117**. The 117 check names
+and outcomes are identical to its last passing run on 2026-09-25. No check was
+changed. Only its fixtures and one print line were.
+
+**What it depended on, and what it does now.** Each change is marked
+`DB-INDEPENDENCE` in the suite.
+
+| It assumed | Now |
+| --- | --- |
+| Some appointment was already `In Consultation`. It cloned that row, made nothing when there was none, then crashed. | It creates its own walk-in, checked in today and `In Consultation`. The spare is created only when the capabilities section needs it, after the first has been used up, so the suite never holds two visits open at once (the application refuses to). |
+| Accounts 1, 2, 3 and 5 were the Administrator, Staff, Official and Doctor. | It looks each role up and creates the account in the copy if none is active. |
+| Some consultation already had a diagnosis and a plan. | If none does, it creates one. Its text is replaced by the sentinels either way. |
+| The queued patient could be anyone. | The patient must be Active and paediatric by the application's own `consultation_age_context()`. If none qualifies, it registers a child in the copy. |
+| `print(... dict(queued) if queued is None ...)` | `dict(None)` raised in exactly the case the line existed to report. It now prints "none". A fixture that cannot be built at all ends with `RESULT: setup failed … <what and why>`, not a traceback. |
+
+**One check was silently depending on the data.** "Staff Record Consultation
+still offers growth/vital measurements" looks for the weight and height boxes.
+The form renders those only for a child under 5, by design. On 2026-09-25 the
+queued patient happened to be an infant. When a variant copy put an adult in the
+queue, the check failed. That is the application being correct, not a defect,
+so the check was left alone and the fixture now always queues a child.
+
+**Runs, all on copies:**
+
+- **The live data:** 117 / 117, before and after the login-message change
+  (a47a53d).
+- **A variant with every fallback forced:** no consultation carries clinical
+  text, the only Doctor is deactivated, and another patient is already
+  `In Consultation` (the condition the old setup relied on). Result: 117 / 117.
+- **The same variant with no Active child:** 117 / 117. The suite registered
+  one.
+- **A copy with no patients at all:** setup stops with that reason and exit
+  code 2, and there is no crash.
+- **Mutation, to prove it now catches regressions.** `can_diagnose()` was
+  changed to also admit Health Center Staff. Result: **74 / 106**. The 32
+  failures are the confidentiality properties that broke: Staff forms offering
+  the diagnosis, forged diagnoses written, sealed records erased by a Staff
+  edit, and more. The total drops to 106 because some checks only run when an
+  earlier one passes.
+
+**No genuine finding.** On the current code every check passes. Two things were
+noticed and not changed. Several check labels still say "Administrator" where
+the ported suite now acts as the Doctor. "No /staff/ URL exists for restricting
+a consultation" actually asserts that no `/admin/` restrict URL exists, which
+is the true property since the route moved to `/staff/`. Both are wording in
+the suite, and both checks test the right thing.
 
 ## How to reproduce
 
@@ -263,7 +315,8 @@ The runner and the corrected suites are in the session scratchpad that did this
 work (`…/claude/C--IDS-BPHCSN/4f281146-…/scratchpad/`: `run_suites.py`,
 `suites/`, `doc_now/verify_doctor.py`). The copies updated for the fix, and
 the end-to-end probe `e2e_self_deactivation.py`, are in
-`…/claude/C--IDS-BPHCSN/b74e63e7-…/scratchpad/`. Each suite runs in a git worktree over a
+`…/claude/C--IDS-BPHCSN/b74e63e7-…/scratchpad/`. The repaired RBAC suite is in
+that folder's `t2/suites/`. Each suite runs in a git worktree over a
 fresh copy of a pristine database, and the live `app.db` is never opened for
 writing. Each correction is marked `STALE-FIX` in the suite with the commit that
 made the old assertion stale.

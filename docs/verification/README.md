@@ -78,6 +78,13 @@ be shown it. The ordinary failed sign-ins still get the identical generic
 sentence. Add User is 122 / 122, and every other suite and the route × role
 matrix are unchanged.
 
+The RBAC and confidentiality suite had been crashing in setup, because it
+cloned an `In Consultation` appointment the live data no longer had. It now
+creates every fixture it needs in its copy, and passes 117 / 117 with the same
+checks as its last passing run. A deliberate regression (Health Center Staff
+allowed to diagnose) makes it fail 32 checks, so it is catching regressions
+again.
+
 Details, the commit behind each stale assertion, the two ways that were
 considered, and how the fix was verified are in
 `stale-suite-assertions/README.md`.
