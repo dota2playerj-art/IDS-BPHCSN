@@ -10,17 +10,17 @@ Status: Screens 01–15 approved. Screens 16–20 specified from the built syste
 
 This document defines every screen of the IDS-BPHCSN system.
 
-The system has 21 screens.
+The system has 22 screens.
 
-Screens 01 to 15 are the original approved specifications and are unchanged below. Screens 16 to 20 were built after this document was first written and are specified here for the first time. Screen 21, My Account, was built on 4 September 2026 and is specified at the end.
+Screens 01 to 15 are the original approved specifications and are unchanged below. Screens 16 to 20 were built after this document was first written and are specified here for the first time. Screen 21, My Account, was built on 4 September 2026, and Screen 22, Service Schedule, on 26 September 2026; both are specified at the end.
 
-`templates/` holds 25 `.html` files. Twenty-one of them are the 21 screens, one file each. The other four are not screens, and are not screens for two different reasons:
+`templates/` holds 26 `.html` files. Twenty-two of them are the 22 screens, one file each. The other four are not screens, and are not screens for two different reasons:
 
 - **`base.html`** is the shared layout — sidebar, header, content region — that every screen renders inside.
 - **`_print.html`** and **`_chart_table.html`** are partials, included by the screens that print and the screens that render a chart's underlying figures as a table.
 - **`maintenance.html`** is a *response page*, not a screen. It has no route, no sidebar entry and no URL of its own: `utils/security.py::_maintenance_response()` renders it with a 503 status **instead of** whatever screen the request asked for, while maintenance mode is on. Nothing navigates to it, so it is closer to an error page than to a screen, and counting it as one would imply somewhere to click that does not exist.
 
-Why My Account **is** counted as a screen when `maintenance.html` is not: it has its own route (`/account`), its own guard, its own context and a form that writes. It is entered deliberately, from the profile chip in the header rather than from a sidebar — which makes it unusual among the 21, but no more so than Patient Profile, Add/Edit Medicine and Record Consultation, which are also reachable only from another screen.
+Why My Account **is** counted as a screen when `maintenance.html` is not: it has its own route (`/account`), its own guard, its own context and a form that writes. It is entered deliberately, from the profile chip in the header rather than from a sidebar — which makes it unusual among the 22, but no more so than Patient Profile, Add/Edit Medicine and Record Consultation, which are also reachable only from another screen.
 
 Record Consultation and Edit Consultation are two modes of one template, `record_consultation.html`, rendered by one shared context builder, and are specified together as Screen 20.
 
@@ -393,6 +393,8 @@ The URL, the endpoint and the template file keep their old names.
 
 Components
 
+Services Today (a strip under the title, read from Screen 22 — added 2026-09-26)
+
 Calendar (a record of each day's visits — it is not booked against)
 
 Today's Queue
@@ -419,6 +421,11 @@ Removed with advance booking: the Upcoming Appointments panel, the Upcoming
 Reminders strip, and the Schedule / Reschedule / Cancel buttons and their three
 dialogs, along with the Date, Time and Assigned Staff fields they collected. See
 `utils/unavailable.py` `advance_booking`, which the screen itself quotes.
+
+Services Today lists what the Service Schedule (Screen 22) says runs on the queue's own date, with
+each service's note. With nothing entered it says the schedule has not been filled in, and with
+nothing on today it says so; it never draws a blank. It restricts nothing: check-in, the queue order
+and the consultation actions ignore it.
 
 ---
 
@@ -1021,6 +1028,78 @@ Both outcomes are audited. A successful change writes "Changed own account passw
 
 ---
 
+# SCREEN 22
+
+## Service Schedule
+
+Purpose
+
+Say which services the health center runs on which days, so the people at the desk and in the
+barangay know what is on. Built on 26 September 2026 as the successor to advance booking: the
+facility decides the days, and patients walk in.
+
+Authorized Users
+
+- Administrator — reads, adds, edits and deletes
+- Doctor — reads
+- Health Center Staff — reads
+- Barangay Official — reads
+
+Navigation
+
+A sidebar item for all four roles: beside the Patient Queue for the Administrator, the Doctor and
+Health Center Staff, and after Health Programs for the Barangay Official. The Patient Queue's
+Services Today strip links to it.
+
+Sections
+
+Running today
+
+The week (Monday to Sunday, each service under every day it runs)
+
+All entries (each once, with its note, and the next two dates for an entry tied to weeks of the
+month)
+
+Add / Edit / Delete panel (Administrator only)
+
+Fields
+
+Service — typed; names already on the schedule are suggested
+
+Days it runs — Monday to Sunday, at least one
+
+Weeks of the month — 1st to 4th, optional; blank means every week
+
+Note — optional; anything that decides whether the service actually runs
+
+Actions
+
+Add to schedule, Save changes, Delete entry (Administrator only)
+
+Validation
+
+A service is required, 80 characters at most. At least one day. Weeks are 1st to 4th only, and
+ticking all four is refused with a message to leave them blank, since four is not "every week" in a
+month with a 5th occurrence. A note of 300 characters at most. An exact duplicate of an existing
+entry is refused. A refused submit re-renders the screen at 200 with the panel holding exactly what
+was typed and each message beside its field, the project's form-redisplay standard.
+
+Backend Notes
+
+Storage is the `service_schedule` table, which **ships empty**: the health center's days have not
+been confirmed, so none were entered, and the screen says so rather than drawing seven blank days.
+A day pattern is two columns: ISO weekday numbers, and optionally which occurrences in the month.
+"Every weekday", "every Monday and Thursday" and "every 2nd and 4th Wednesday" are each one row.
+See `09_IDS-BPHCSN_UI_Architecture_FROM-CLAUDE.md` §19.
+
+The three reading routes (`/admin`, `/staff`, `/official`) share one context builder in
+`routes/schedule_views.py`. The three writing routes exist under `/admin` only, guarded to the
+Administrator, so a forged form from any other role has nowhere to go. Every add, edit and delete
+is audited under the Service Schedule module. The schedule is information only: it restricts no
+check-in or consultation and is not connected to SMS.
+
+---
+
 # Clinical Authority and the Doctor Role (added 2026-09-25)
 
 The system has **four** roles: Administrator, Doctor, Health Center Staff, Barangay Official. The
@@ -1171,7 +1250,7 @@ a reconciliation section that under-reports the system is as misleading as one t
 it. Screens 01 to 20 above are left exactly as approved; this section records only where the built
 system differs from them.
 
-The system has **21 screens**. `templates/` holds 25 `.html` files, of which four are not screens:
+The system has **22 screens**. `templates/` holds 26 `.html` files, of which four are not screens:
 `base.html` (the shared layout), the `_print.html` and `_chart_table.html` partials, and
 `maintenance.html` — a response page rendered with a 503 in place of the screen that was asked for,
 with no route and nothing navigating to it. See the note under "Purpose" at the top of this

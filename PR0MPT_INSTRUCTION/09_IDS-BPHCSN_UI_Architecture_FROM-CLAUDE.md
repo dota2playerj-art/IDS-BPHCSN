@@ -28,9 +28,9 @@ All future UI generation and frontend development must follow this document unle
 
 ## 1. Complete Screen Inventory
 
-**The system has 21 screens.** Screens 1–15 were the original inventory; screens 16–20 were built afterwards and are added here in Version 2.0; screen 21, My Account, was built on 2026-09-04 and added here on 2026-09-05.
+**The system has 22 screens.** Screens 1–15 were the original inventory; screens 16–20 were built afterwards and are added here in Version 2.0; screen 21, My Account, was built on 2026-09-04 and added here on 2026-09-05; screen 22, Service Schedule, was built on 2026-09-26 (§19).
 
-`templates/` holds 25 `.html` files, of which four are not screens. `base.html` is the shared layout — sidebar, header, content region. `_print.html` and `_chart_table.html` are partials included by the screens that print and the screens that render a chart's underlying figures as a table. And `maintenance.html` is a **response page rather than a screen**: it has no route and no sidebar entry, and `utils/security.py::_maintenance_response()` renders it with a 503 *in place of* whatever screen the request asked for while maintenance mode is on. Nothing navigates to it, so counting it as a screen would imply somewhere to click that does not exist. The other 21 files are the 21 screens below, one file each.
+`templates/` holds 26 `.html` files, of which four are not screens. `base.html` is the shared layout — sidebar, header, content region. `_print.html` and `_chart_table.html` are partials included by the screens that print and the screens that render a chart's underlying figures as a table. And `maintenance.html` is a **response page rather than a screen**: it has no route and no sidebar entry, and `utils/security.py::_maintenance_response()` renders it with a 503 *in place of* whatever screen the request asked for while maintenance mode is on. Nothing navigates to it, so counting it as a screen would imply somewhere to click that does not exist. The other 22 files are the 22 screens below, one file each.
 
 The **Primary Role(s)** column is not a description kept in step by hand. It is the set of roles each view's own `role_required()` guard admits, read off `utils/security.py` and confirmed against the live `url_map` by `routes/user_views.py::accessible_screens()` — the same function that prints the permission list on Screen 11. If this column and the code ever disagree, the code is right and this table is stale.
 
@@ -57,6 +57,7 @@ The **Primary Role(s)** column is not a description kept in step by hand. It is 
 | 19 | Notifications | `notifications.html` | Barangay Official | Notification centre. Presentation only — there is no notifications table. |
 | 20 | Record / Edit Consultation | `record_consultation.html` | Administrator, Doctor, Health Center Staff (diagnosis and treatment plan: Doctor only — §18) | Write up the clinical record of a visit, and edit one already recorded. Two modes of one template and one context builder. See §10. |
 | 21 | My Account | `my_account.html` | All four roles (`login_required`) | The signed-in person's own details, and a self-service password change requiring the current password. The only screen guarded by `login_required` rather than `role_required`, because what it reaches is one row — the caller's own — rather than a role's worth of screens. Entered from the header profile chip; it has no sidebar entry. |
+| 22 | Service Schedule | `service_schedule.html` | All four roles; Administrator only to add, edit or delete | Which services the health center runs on which days, one entry per service, with an optional note. Ships empty: the health center's days have not been confirmed, and nothing is seeded. Today's services also head the Patient Queue. Information only — it restricts no check-in or consultation. See §19. |
 
 **One screen is not backed by data: 19, Notifications.** It is rendered as `render_template('notifications.html')` with no context, because there is no `notifications` table. Nothing on it should be quoted as a system output; recorded activity lives on Screen 12.
 
@@ -101,6 +102,7 @@ MAIN MENU
 ├── Register Patient
 ├── Medicine Inventory   [low-stock count badge, omitted when zero]
 ├── Patient Queue
+├── Service Schedule
 ├── SMS Notifications
 └── Reports & Analytics
 
@@ -111,7 +113,7 @@ ADMINISTRATION
 ```
 
 - **Navigation hierarchy:** Two sidebar groups — "Main Menu" (operational) and "Administration" (governance). This is the only role for which the Administration group is rendered.
-- **Accessible screens (15 of 21):** Login, Administrator Dashboard, Patient Records, Register Patient, Patient Profile, Medicine Inventory, Add/Edit Medicine, Patient Queue, Record / Edit Consultation, SMS Notifications, Reports & Analytics, User Management, Audit Logs, Settings, My Account.
+- **Accessible screens (16 of 22):** Login, Administrator Dashboard, Patient Records, Register Patient, Patient Profile, Medicine Inventory, Add/Edit Medicine, Patient Queue, Service Schedule (the only role that can change it), Record / Edit Consultation, SMS Notifications, Reports & Analytics, User Management, Audit Logs, Settings, My Account.
 - **Restricted screens:** The two other dashboards, and the four Barangay Official screens — Health Programs, Vaccination Campaigns, Community Reports, Notifications. **The Administrator does not have access to every screen.** The earlier claim in this document that the role reached "all 15 screens" was never true of the built system: the community-facing screens are guarded to the Barangay Official alone.
 
 ### Health Center Staff
@@ -125,11 +127,12 @@ MAIN MENU
 ├── Register Patient
 ├── Medicine Inventory   [low-stock count badge, omitted when zero]
 ├── Patient Queue
+├── Service Schedule     (read-only)
 └── SMS Notifications
 ```
 
 - **Navigation hierarchy:** Single group, operational only — no "Administration" section is rendered for this role.
-- **Accessible screens (11 of 21):** Login, Health Center Staff Dashboard, Patient Records, Register Patient, Patient Profile, Medicine Inventory, Add/Edit Medicine, Patient Queue, Record / Edit Consultation, SMS Notifications, My Account.
+- **Accessible screens (12 of 22):** Login, Health Center Staff Dashboard, Patient Records, Register Patient, Patient Profile, Medicine Inventory, Add/Edit Medicine, Patient Queue, Service Schedule (read-only), Record / Edit Consultation, SMS Notifications, My Account.
 - **Restricted screens:** Reports & Analytics, User Management, Audit Logs, Settings, and all four Barangay Official screens.
 - **Resolved:** an earlier note here hedged that staff might get SMS "send/view only, not necessarily full broadcast history depending on future rule confirmation". The rule is settled in code — Health Center Staff render the same SMS screen as the Administrator, including the full broadcast history, and **do not send**: there is no `/staff/sms_notifications/send` route, so the compose control is absent rather than hidden. (This line previously said staff "may send", which the code has never allowed.) `routes/staff.py` and `routes/admin.py` build it from one shared context builder.
 - **No diagnosis.** On Record Consultation this role records the intake; the diagnosis and treatment plan are the Doctor's. It may move a patient between Active and Inactive but not to or from Deceased. See §18.
@@ -145,12 +148,13 @@ MAIN MENU
 ├── Register Patient
 ├── Medicine Inventory   [low-stock count badge, omitted when zero]
 ├── Patient Queue
+├── Service Schedule     (read-only, as Health Center Staff see it)
 ├── SMS Notifications    (view-only, as Health Center Staff see it)
 └── Reports & Analytics  (the same screen and figures the Administrator sees)
 ```
 
 - **Navigation hierarchy:** Single group, operational only. No "Administration" section.
-- **Accessible screens (12 of 21):** Health Center Staff's list above, plus Reports & Analytics. The Doctor is added to every `/staff/*` guard rather than given a copy of those routes, and reaches Reports & Analytics through three `/staff/reports_analytics` routes guarded to the Doctor alone (§18); `accessible_screens("Doctor")` returns Health Center Staff's list plus Reports & Analytics.
+- **Accessible screens (13 of 22):** Health Center Staff's list above, plus Reports & Analytics. The Doctor is added to every `/staff/*` guard rather than given a copy of those routes, and reaches Reports & Analytics through three `/staff/reports_analytics` routes guarded to the Doctor alone (§18); `accessible_screens("Doctor")` returns Health Center Staff's list plus Reports & Analytics.
 - **Restricted screens:** User Management, Audit Logs, Settings, the other two dashboards, and all four Barangay Official screens. Maintenance mode blocks this role.
 - **What only this role may do** — diagnose, write the treatment plan, seal and unseal a consultation, read a sealed one, declare or reverse Deceased — is §18.
 
@@ -163,6 +167,7 @@ MAIN MENU
 ├── Dashboard
 ├── SMS Notifications
 ├── Health Programs
+├── Service Schedule     (read-only)
 ├── Vaccination Campaigns
 ├── Community Reports
 ├── Reports & Analytics
@@ -170,9 +175,9 @@ MAIN MENU
 ```
 
 - **Navigation hierarchy:** Single group, community-facing. No Administration section. No badges on any item — see §1.1.
-- **Accessible screens (9 of 21):** Login, Barangay Official Dashboard, SMS Notifications, Health Programs, Vaccination Campaigns, Community Reports, Reports & Analytics, Notifications, My Account.
+- **Accessible screens (10 of 22):** Login, Barangay Official Dashboard, SMS Notifications, Health Programs, Service Schedule (read-only), Vaccination Campaigns, Community Reports, Reports & Analytics, Notifications, My Account.
 - **Restricted screens:** Patient Records, Patient Profile, Register Patient, Record / Edit Consultation, Medicine Inventory, Add/Edit Medicine, Patient Queue, User Management, Audit Logs, Settings, and the other two dashboards.
-- **The Barangay Official reaches no clinical screen.** This is the system's central access rule, and it holds against the enforced guards independently of this document: `accessible_screens("Barangay Official")` walks the live `url_map` and returns exactly the seven guarded screens above — no patient record, no patient profile, no consultation, no inventory.
+- **The Barangay Official reaches no clinical screen.** This is the system's central access rule, and it holds against the enforced guards independently of this document: `accessible_screens("Barangay Official")` walks the live `url_map` and returns exactly the eight guarded screens above — no patient record, no patient profile, no consultation, no inventory. The Service Schedule is among them and is not a clinical screen: it says which services run on which days and holds nothing about any patient.
 - The "Announcements" item that this section previously listed does not exist. See §1.1.
 
 ---
@@ -565,11 +570,11 @@ absence and not an unfinished feature. **A reader who used something last week a
 this week cannot tell "removed on purpose" from "broken this morning" unless the screen says
 which.**
 
-What is *not* promised is a replacement. A real facility does publish a shape to its week — one day
-for immunisation, another for prenatal — and a fixed service-day schedule is the honest successor.
-Which days carry which services has not been confirmed with Barangay Poblacion Health Center, so
-nothing here names any: inventing a plausible timetable would be the same mistake advance booking
-was, in a smaller font.
+A real facility does publish a shape to its week — one day for immunisation, another for prenatal —
+and a fixed service-day schedule was named here as the honest successor. **It is built (§19), and it
+ships empty.** Which days carry which services has not been confirmed with Barangay Poblacion Health
+Center, so neither the code nor this document names any: inventing a plausible timetable would be the
+same mistake advance booking was, in a smaller font.
 
 ### The dashboards offer a way back into a consultation, not a second way to start one
 
@@ -1041,6 +1046,69 @@ named as its main goal, and granting it exposes nothing new: the Barangay Offici
 the same figures, and the ranking excludes sealed diagnoses for every viewer, the Doctor included.
 The Doctor reads sealed text on the patient's own record, never in an aggregate. There is no
 doctor-specific view. User Management, Audit Logs and Settings stay with the Administrator.
+
+
+## 19. Design Decision — The Service Schedule Ships Empty, and Restricts Nothing
+
+**Read this before seeding a service day, or before making the queue act on the schedule.**
+
+### What it is
+
+Screen 22 records which services the health center runs on which days: one entry per service, the
+days it runs, and an optional note. It replaces nothing on the Patient Queue. It adds a *Services
+today* strip at the top of it, which is the schedule's daily use: the desk sees what is running
+before the first patient arrives. All four roles read it. Only the Administrator adds, edits or
+deletes, through three POST routes that exist under `/admin` and nowhere else.
+
+### Why it is empty
+
+When it was built, Barangay Poblacion Health Center had not been interviewed. Two facts were
+confirmed from the RHU interview: family planning runs daily at the barangay health center, and
+vaccination there is scheduled on a day that is not known, because immunisation rotates between
+barangays. The RHU's own days (prenatal on Tuesday, immunisation on Wednesday) describe the RHU
+building, not this facility. So no row is seeded, not even the two half-facts, and there is no
+default schedule in the code. Every screen that reads the schedule says in words when it is empty.
+§17 records what happened the last time an unconfirmed placeholder was allowed to look like a fact.
+
+### How a day pattern is stored
+
+Two columns and no "pattern type" column. `weekdays` holds ISO weekday numbers (`1,4` is Monday and
+Thursday). `weeks_of_month` is empty for every week, or holds which occurrences in the month (`2,4`
+is the 2nd and 4th). Every pattern the interviews described is one row:
+
+| Described as | `weekdays` | `weeks_of_month` | Shown as |
+|---|---|---|---|
+| daily, Monday to Friday | `1,2,3,4,5` | — | Every weekday, Monday to Friday |
+| every Monday and Thursday | `1,4` | — | Every Monday and Thursday |
+| every 2nd and 4th Wednesday | `3` | `2,4` | 2nd and 4th Wednesday of the month |
+
+The pattern is what the two columns say, so it cannot disagree with them the way a stored "type"
+could. The Nth occurrence of a weekday is `(day - 1) // 7 + 1`, written once in
+`models/service_schedule.py::week_of_month()`. Weeks run 1st to 4th only: every month has four of
+each weekday and only some have a fifth, and no interview described a "5th" or a "last" weekday.
+
+### Why the service name is typed
+
+There was no service vocabulary to reuse. The queue's *Reason for visit* and Record Consultation's
+chief complaint are free text. Every queue row's `appointment_type` is the one constant "Walk-in
+Consultation". The only controlled list, `APPOINTMENT_TYPES`, went with advance booking, and it held
+services nobody had confirmed. So the form suggests only names already on the schedule, and a name
+retyped in different capitals is stored in the spelling already there.
+
+### Why it restricts nothing
+
+A walk-in with a fever is seen on prenatal day. That is the RHU's own account of how these
+facilities work. The Patient Queue reads the schedule in one function, `_services_today()`, and only
+renders the result. Check-in, the queue order, Start Consultation and Record Consultation are
+decided exactly as before. The schedule is also not connected to SMS. A later change that wants
+either must be decided as a new rule, not slipped in as a use of this data.
+
+### Audit
+
+Three phrases under a *Service Schedule* module: added, edited (field by field, before → after) and
+deleted (everything the entry said, since the audit entry is then the only copy). An edit saved
+unchanged writes nothing. The module is left out of "Record Updates" on the argument that leaves
+Settings out: it is the facility's configuration, not a clinical or stock record.
 
 ---
 

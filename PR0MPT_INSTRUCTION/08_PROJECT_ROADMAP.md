@@ -249,7 +249,7 @@ Tasks
 
 ☑ Build Sidebar — role-scoped, built from `utils/context.py`, with a live low-stock badge
 
-☑ Build Header — shared `base.html` layout across all 21 screens
+☑ Build Header — shared `base.html` layout across all 22 screens
 
 ☑ Build Dashboard — three role dashboards built; Administrator and Staff are partially wired
   (see Phase 4), Barangay Official is still presentation-only
@@ -299,9 +299,15 @@ Tasks
   cancel, reschedule and no-show closure" until **2026-09-05**. All of that was built and all
   of it worked; it was removed anyway, on the adviser's point that a government barangay health
   center does not let a patient pick their own hour weeks ahead. Screen 08 is now the Patient
-  Queue. A fixed schedule of service days is the honest successor and is not yet built — the
-  days and services have to be confirmed with the health center first. See
-  `utils/unavailable.py` `advance_booking`, which Screen 08 quotes on itself.
+  Queue. See `utils/unavailable.py` `advance_booking`, which Screen 08 quotes on itself.
+
+☑ Service schedule — which services run on which days (every weekday, specific weekdays, or
+  the Nth weekday of the month), with a note per service. All four roles read it; only the
+  Administrator changes it, and every change is audited. Today's services head the Patient
+  Queue. Built on **2026-09-26** as the successor to advance booking, and **shipped empty**:
+  the health center's days are not yet confirmed, so none were entered. Filling it in is a
+  data task for the Administrator once they are. Informational only — it restricts no check-in
+  or consultation and is not connected to SMS. See 09_UI_Architecture §19.
 
 ☑ Consultations and Immunization — clinical record with validated vitals, paediatric growth
   measurements, and DOH EPI dose recording. Editing a saved consultation writes a field-by-field
@@ -566,7 +572,7 @@ Complete UI Design
 
 Status
 
-Completed — 21 screens
+Completed — 22 screens (Service Schedule, the 22nd, added 2026-09-26)
 
 ---
 
@@ -887,23 +893,26 @@ Reports & Analytics about the same barangay.
   patient, appointment and stock row the demo runs on. The mitigation is a manual dated copy taken
   outside the application.
 
-## Documentation debt — closed 21 August 2026, re-counted 5 September 2026
+## Documentation debt — closed 21 August 2026, re-counted 5 and 26 September 2026
 
 This subsection previously recorded that `03_SCREEN_SPECIFICATIONS.md` described 15 screens while
 the system had 21, and that `09_IDS-BPHCSN_UI_Architecture_FROM-CLAUDE.md` §1 also listed 15. Both
-were brought current on 21 August 2026, and both were re-counted on 5 September 2026 after
-My Account and the maintenance response page were added:
+were brought current on 21 August 2026, re-counted on 5 September 2026 after My Account and the
+maintenance response page were added, and re-counted again on 26 September 2026 when the Service
+Schedule was built:
 
-- The system has **21 screens**. `templates/` holds 25 `.html` files; four are not screens —
+- The system has **22 screens**. `templates/` holds 26 `.html` files; four are not screens —
   `base.html` (the shared layout), the `_print.html` and `_chart_table.html` partials, and
   `maintenance.html`, which is a **response page rather than a screen**: it has no route and
   nothing navigates to it, because `utils/security.py` renders it with a 503 in place of the
   screen that was asked for.
 - **My Account is counted as a screen** — it has its own route, guard, context and a form that
   writes, and is entered from the header profile chip. It is Screen 21.
-- `03_SCREEN_SPECIFICATIONS.md` documents Screens 01–21 and carries a
+- **The Service Schedule is Screen 22**, read by all four roles and changed only by the
+  Administrator. See `09_IDS-BPHCSN_UI_Architecture_FROM-CLAUDE.md` §19.
+- `03_SCREEN_SPECIFICATIONS.md` documents Screens 01–22 and carries a
   "Reconciliation With The Built System" section, updated in the same pass as this one.
-- `09_IDS-BPHCSN_UI_Architecture_FROM-CLAUDE.md` §1 lists the same 21.
+- `09_IDS-BPHCSN_UI_Architecture_FROM-CLAUDE.md` §1 lists the same 22.
 
 ## What this section used to claim, and why it was wrong
 
