@@ -184,9 +184,21 @@ def current_role():
 # Administrator who deactivates their OWN account is told so on the login form
 # after being signed out. end_session_after_self_deactivation() below says why
 # that is not an oracle -- nobody can be shown it without having done it.
+#
+# THE QUERY STRING CARRIES A KEY, NOT THE SENTENCE.
+# The redirect used to put the sentence itself on the URL, and login.html printed
+# whatever ?error= held -- so /login?error=<anything> showed <anything> on a page
+# headed with the health center's name. It now carries INVALID_CREDENTIALS_KEY,
+# and routes/auth.py looks the sentence up in a table of its own. Nothing typed
+# into the address bar can reach the page; a key the table does not hold shows
+# nothing at all.
+INVALID_CREDENTIALS_MESSAGE = "Invalid security credentials."
+INVALID_CREDENTIALS_KEY = "credentials"
+
+
 def refuse_credentials():
-    flash("Invalid security credentials.")
-    return redirect(url_for("auth.login", error="Invalid security credentials."))
+    flash(INVALID_CREDENTIALS_MESSAGE)
+    return redirect(url_for("auth.login", error=INVALID_CREDENTIALS_KEY))
 
 
 def _log_revoked_session(user, ip_address):

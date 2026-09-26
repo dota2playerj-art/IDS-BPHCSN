@@ -25,6 +25,24 @@ So the evidence lives on the machine that produced it. What is committed is this
 file, naming what was captured and how to produce it again, so the absence is
 stated rather than left for someone to trip over.
 
+## login-message-lookup/
+
+Before this change, the login form printed whatever arrived in `?error=`, so
+anyone could craft a link that put their own words on a page headed with the
+health center's name. The two refusals that use the query string now send a
+key (`credentials`, `maintenance`), and the form shows only the sentence it
+looks up for that key. An unknown key shows nothing.
+
+No message changed wording. The four ordinary failed-sign-in pages and the
+maintenance refusal page are byte-identical to before. Ten crafted values,
+among them HTML, a script tag and a 5,000-character string, now show nothing.
+The self-deactivation notice still works end to end.
+
+Three other screens print query values back to signed-in users: Reports'
+range errors, Register Patient's check-in reason, and its address prefill.
+These are reported, not changed. Details are in
+`login-message-lookup/README.md`.
+
 ## service-schedule/
 
 Verification of the Service Schedule (Screen 22). It ships empty: the live

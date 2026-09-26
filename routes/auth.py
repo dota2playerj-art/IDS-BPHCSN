@@ -134,7 +134,13 @@ from models.settings import maintenance_mode
 from models.users import get_user_by_username
 from routes.account_views import my_account_context, process_password_change
 from utils.roles import normalize_role
-from utils.security import get_current_user, login_required, refuse_credentials
+from utils.security import (
+    INVALID_CREDENTIALS_KEY,
+    INVALID_CREDENTIALS_MESSAGE,
+    get_current_user,
+    login_required,
+    refuse_credentials,
+)
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -283,19 +289,41 @@ def _log_refused_sign_in(user, ip_address):
 _refuse = refuse_credentials
 
 # The maintenance window's own refusal at the login form. Built the same shape
-# _refuse is -- flash, then redirect to the form with the message on the query
-# string -- so it renders in the same alert box login.html already draws and no
+# _refuse is -- flash, then redirect to the form with a key on the query string
+# -- so it renders in the same alert box login.html already draws and no
 # template change is needed to show it.
 MAINTENANCE_SIGN_IN_MESSAGE = (
     "The system is temporarily in maintenance mode and is open to "
     "Administrators only. Your username and password are correct. Please try "
     "again shortly."
 )
+MAINTENANCE_SIGN_IN_KEY = "maintenance"
 
 
 def _refuse_maintenance():
     flash(MAINTENANCE_SIGN_IN_MESSAGE)
-    return redirect(url_for("auth.login", error=MAINTENANCE_SIGN_IN_MESSAGE))
+    return redirect(url_for("auth.login", error=MAINTENANCE_SIGN_IN_KEY))
+
+
+# EVERY SENTENCE THE LOGIN FORM WILL SHOW FROM ITS QUERY STRING, AND NO OTHER.
+# login() looks ?error= up here and hands the template the sentence it finds --
+# never the value that arrived. It used to hand over the value, so
+# /login?error=<anything> printed <anything> under the health center's name: a
+# link anyone could craft to put their own words on this page. A key missing
+# from this table shows no message at all -- not a fallback sentence, and not
+# the text supplied.
+#
+# Both sentences are safe for anyone to summon by typing the key, because both
+# were already the answer any visitor could get by submitting the form: neither
+# names an account or says anything about one. A new entry must meet the same
+# test. The self-deactivation notice is deliberately NOT here -- it travels
+# only as a flash in the signed session cookie of the browser that earned it
+# (utils/security.py end_session_after_self_deactivation()), and a key for it
+# would let anybody display it.
+LOGIN_FORM_MESSAGES = {
+    INVALID_CREDENTIALS_KEY: INVALID_CREDENTIALS_MESSAGE,
+    MAINTENANCE_SIGN_IN_KEY: MAINTENANCE_SIGN_IN_MESSAGE,
+}
 
 
 @auth_bp.route("/")
@@ -307,7 +335,7 @@ def index():
 
 @auth_bp.route("/login", methods=["GET", "POST"])
 def login():
-    error = request.args.get("error")
+    error = LOGIN_FORM_MESSAGES.get(request.args.get("error", ""))
 
     if request.method == "POST":
         username = request.form.get("username", "").strip()

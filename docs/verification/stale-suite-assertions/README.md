@@ -212,7 +212,9 @@ deactivation. That cookie is signed with the application's key and, by then,
 carries no identity. The notice names no account. It was deliberately kept off
 the query string: `login.html` prints whatever `?error=` says, so anyone could
 put a sentence there. That is a separate, older property of the login page. It
-is noted here and was not changed by this fix.
+is noted here and was not changed by this fix. *It was fixed later the same day:
+the form now shows only sentences it looks up by key. See
+`../login-message-lookup/README.md`.*
 
 **The two checks** keep their labels and now assert the corrected behaviour, word
 for word: the login form shows the notice and does not say "Invalid security
