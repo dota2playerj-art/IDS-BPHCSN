@@ -8,8 +8,8 @@ suites. This pass took each failing check in turn and asked one question: is the
 - **Stale assertion.** The application is right. The test quotes wording, a
   persona, a date or a count that was later changed on purpose. The test was
   updated to check the same property against what the application now says.
-- **Real defect.** The test is right. It is reported below and **not fixed**, so
-  the team can decide what to do.
+- **Real defect.** The test is right. It was reported below and left for the
+  team to decide. **It was fixed on 2026-09-26**; see the end of that section.
 
 No check was deleted or loosened to make it pass. Where the new wording made a
 check pass without testing anything (one did), it was corrected until it tests
@@ -27,7 +27,7 @@ changed in them and why.
 | Dispensing (e04a0beb, Doctor as clinician) | 111 / 128 | **128 / 128** |
 | Account management, Edit User / Reset Password (7b0d7b4d) | 81 / 82 | **82 / 82** |
 | My Account (39d11d59) | 335 passed, 3 failed | **344 / 344** |
-| Add User / Deactivate / Reactivate (033c26b6) | 108 passed, 11 failed | 117 passed, **2 failed: the real defect below** |
+| Add User / Deactivate / Reactivate (033c26b6) | 108 passed, 11 failed | 117 passed, 2 failed: the real defect below. **122 / 122** once it was fixed (2026-09-26) |
 
 Every other suite matches its baseline check for check: RBAC and restricted
 diagnosis 117/117, Reports and the seal 61/61, EPI 15/15, staff capabilities
@@ -124,7 +124,7 @@ the Administrator as the clinician. The Doctor-role work ported all three to the
 Doctor, and the ported copies replace them. The originals are kept, but no
 longer run.
 
-## Real defect: 2 checks, reported, not fixed
+## Real defect: 2 checks, reported, then fixed (2026-09-26)
 
 **An Administrator who deactivates their own account is never told they did so.
 They are sent to the login page with "Invalid security credentials."**
@@ -163,11 +163,105 @@ from. Two ways to close it:
 
 Until the team decides, the two checks stay as they are and keep failing.
 
+### Fixed (2026-09-26): the first way
+
+The first way was chosen. The second would have deleted the message and kept a
+login page that says a credentials check failed when no credentials were
+checked. The project's standard is to say what actually happened, so the second
+way was not an option.
+
+**The cause, confirmed in the code, has one more layer than stated above.** The
+flash was discarded by `session.clear()` in `_end_revoked_session()`, as
+described. But even a surviving flash would not have been shown: `login.html`
+prints the `?error=` value *instead of* any flashed messages, and the guard's
+redirect carries `error=Invalid security credentials.` So there were two
+separate reasons the message could never be shown.
+
+**What changed:**
+
+- `process_account_status()` now returns `(message, deactivated_self)`.
+  `deactivated_self` is true only when the acting Administrator's own
+  deactivation succeeded. The clause that could never be shown ("…you will be
+  signed out on your next action…") is gone.
+- `set_user_status()` then calls
+  `utils/security.py end_session_after_self_deactivation()`. It writes the
+  audit entry, clears the session **in that same request** and flashes the
+  notice into the now-empty session. It then redirects to `/login` with **no**
+  `?error=`. The login form shows:
+  "You deactivated your own account, so you have been signed out. You cannot
+  sign back in until another Administrator reactivates it. Nothing was deleted —
+  reactivating it restores the same password."
+  Every clause is true when the notice is shown. There is always another
+  Administrator, because the last one cannot be deactivated, and reactivation
+  restores the stored hash.
+- The session is cleared *sooner* than before (in the deactivating request, not
+  on the next one). Any other session the account has open is still ended on
+  its next click by the guard, with the generic refusal. That path is unchanged.
+- The audit trail keeps two entries, as before. The deactivation entry now adds
+  "and the session they did it from was ended in the same request". The
+  session-ended entry is still `Ended session on deactivated account`, but it is
+  worded for this case. The old wording would have been false here twice: "on
+  its next guarded request" and "told only that the credentials were invalid".
+- The confirmation dialog on User Management used to warn about being signed out
+  "on your next action". It now says "as soon as you confirm", which is when it
+  now happens.
+
+**Why it is not an oracle.** The notice cannot be produced from the login form.
+It exists only as a flash in the session cookie of the browser that sent the
+deactivation. That cookie is signed with the application's key and, by then,
+carries no identity. The notice names no account. It was deliberately kept off
+the query string: `login.html` prints whatever `?error=` says, so anyone could
+put a sentence there. That is a separate, older property of the login page. It
+is noted here and was not changed by this fix.
+
+**The two checks** keep their labels and now assert the corrected behaviour, word
+for word: the login form shows the notice and does not say "Invalid security
+credentials." Three checks were added beside them, for the redirect carrying no
+`?error=`, no identity left in the session, and the notice appearing once only.
+Each is marked `DEFECT-FIX` in the suite.
+
+**How it was verified.** Worktrees at 7d12fe1 (before) and with the fix (after),
+each over a fresh copy of the live database. The live `app.db` had the same
+SHA-256 before and after.
+
+- Add User 117 passed, 2 failed → **122 / 122**.
+- Account management 82 / 82, My Account 344 / 344, Doctor-role 129 / 129,
+  Reports 61 / 61, dispensing 128 / 128, EPI 15 / 15, staff capabilities 27 / 27.
+  Each matches the before run check for check. The password-change audit check
+  and the four dose-given-elsewhere runs gave identical output.
+- Route × role matrix (four roles plus anonymous, 490 cells): identical before and
+  after, no 5xx.
+- End-to-end over real HTTP (werkzeug on a socket, a cookie-jar client, redirects
+  inspected by hand): 40 / 40 after the fix. Before it, the self-deactivation
+  redirected to User Management, and that page answered
+  `302 /login?error=Invalid+security+credentials.`
+  - The last Administrator still cannot deactivate themselves: refused, still
+    active, still signed in, no audit row.
+  - The three ordinary failed sign-ins (wrong password, unknown username,
+    deactivated account, the last tried with both the correct and a wrong
+    password) each give `302 /login?error=Invalid+security+credentials.`. Each
+    lands on a login page that is byte-identical across all four cases, and
+    byte-identical to the one before the fix.
+  - The notice could not be produced by an anonymous visitor. The probes were
+    guessed query strings, an anonymous POST to the status route, and a session
+    cookie forged with the wrong key. As a control, the same cookie signed with
+    the real key does show the notice, so the forgery test is live. It also
+    could not be produced by Health Center Staff aiming the status route at
+    itself: the role guard turns them away.
+
+**Noticed, not changed.** The RBAC suite (`2aec74c4_verify_rbac_ported.py`)
+crashes in its own setup, identically before and after this fix. It needs an
+appointment in `In Consultation`, and the current database has none. Its
+fallback `print` also fails when that appointment is missing. It passed 117 / 117
+on 2026-09-25, so the change is in the data. The application is not involved.
+
 ## How to reproduce
 
 The runner and the corrected suites are in the session scratchpad that did this
 work (`…/claude/C--IDS-BPHCSN/4f281146-…/scratchpad/`: `run_suites.py`,
-`suites/`, `doc_now/verify_doctor.py`). Each suite runs in a git worktree over a
+`suites/`, `doc_now/verify_doctor.py`). The copies updated for the fix, and
+the end-to-end probe `e2e_self_deactivation.py`, are in
+`…/claude/C--IDS-BPHCSN/b74e63e7-…/scratchpad/`. Each suite runs in a git worktree over a
 fresh copy of a pristine database, and the live `app.db` is never opened for
 writing. Each correction is marked `STALE-FIX` in the suite with the commit that
 made the old assertion stale.

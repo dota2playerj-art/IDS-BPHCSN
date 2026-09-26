@@ -50,14 +50,19 @@ refusal in ef47b94, a reworded password rule, and counts and dates written in as
 literals. Each was corrected to check the same property, and one check that had
 been passing vacuously was repaired.
 
-**2 checks are a real defect, reported and not fixed.** An Administrator who
-deactivates their own account is sent to the login page with "Invalid security
-credentials." The message written for that moment is never shown. It has failed
-since the commit that introduced it. Severity is low: the deactivation itself is
-correct. It is left for the team to decide.
+**2 checks were a real defect, fixed on 2026-09-26.** An Administrator who
+deactivated their own account was sent to the login page with "Invalid security
+credentials." The message written for that moment was never shown. It had
+failed since the commit that introduced it. The route now signs them out in the
+same request and the login form says they deactivated their own account. The
+notice travels only in that browser's signed session cookie, so nobody else can
+be shown it. The ordinary failed sign-ins still get the identical generic
+sentence. Add User is 122 / 122, and every other suite and the route × role
+matrix are unchanged.
 
-Details, the commit behind each stale assertion, and the two ways to close the
-defect are in `stale-suite-assertions/README.md`.
+Details, the commit behind each stale assertion, the two ways that were
+considered, and how the fix was verified are in
+`stale-suite-assertions/README.md`.
 
 ## dose-given-elsewhere/
 
