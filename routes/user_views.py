@@ -550,6 +550,27 @@ DEACTIVATE = "deactivate"
 REACTIVATE = "reactivate"
 STATUS_ACTIONS = (DEACTIVATE, REACTIVATE)
 
+# What the login form says to an Administrator who has just deactivated their
+# own account. It is the one sentence in the application that says an account is
+# deactivated to someone who is no longer signed in, and it is safe for exactly
+# one reason: nobody can see it without having done it. It is not a response the
+# login form can give. It travels only as a flash in the signed session cookie of
+# the browser that sent the deactivation, set by the route after it clears that
+# session (utils/security.py end_session_after_self_deactivation), and never on
+# the query string, where anyone could type it into the address bar. It names no
+# account, so even on a shared screen it says nothing a visitor could not
+# already see.
+#
+# Every clause is true at the moment it is shown. "Another Administrator" is
+# guaranteed: deactivate_user() refuses the last one, so this can only be
+# reached while a second active Administrator exists. "The same password" is
+# what reactivate_user() restores, because deactivation never touches the hash.
+SELF_DEACTIVATION_NOTICE = (
+    "You deactivated your own account, so you have been signed out. You cannot "
+    "sign back in until another Administrator reactivates it. Nothing was "
+    "deleted — reactivating it restores the same password."
+)
+
 # The fields Add User submits, read into one dict the model validates and the
 # template re-renders. The password pair is deliberately absent from this list --
 # see _extract_add_user_form().
@@ -660,7 +681,14 @@ def process_create_user(form_data, actor_id, ip_address=None):
 
 
 def process_account_status(form_data, actor_id, ip_address=None):
-    """Deactivate or reactivate one account. Returns the message to flash.
+    """Deactivate or reactivate one account. Returns (message, deactivated_self).
+
+    `deactivated_self` is True in one case only: the acting Administrator has
+    just deactivated their own account, and the write succeeded. The message is
+    then SELF_DEACTIVATION_NOTICE, which is meant for the login form, and the
+    caller must end the session it is running in rather than flash it over User
+    Management -- a page the person can no longer open. Every other outcome,
+    refusals included, is False with a sentence for User Management.
 
     Everything is re-checked here because a POST can be made without ever loading
     the page: the requested action is validated against STATUS_ACTIONS, the id is
@@ -671,16 +699,16 @@ def process_account_status(form_data, actor_id, ip_address=None):
     """
     action = (form_data.get("action") or "").strip()
     if action not in STATUS_ACTIONS:
-        return "Choose whether to deactivate or reactivate the account."
+        return "Choose whether to deactivate or reactivate the account.", False
 
     raw_id = (form_data.get("user_id") or "").strip()
     if not raw_id.isdigit():
-        return "Select an account to change."
+        return "Select an account to change.", False
 
     user_id = int(raw_id)
     user = get_user_by_id(user_id)
     if user is None:
-        return "That account could not be found."
+        return "That account could not be found.", False
 
     # Captured before the write, so the sentence describes the account as it was
     # named at the moment it was changed.
@@ -703,11 +731,12 @@ def process_account_status(form_data, actor_id, ip_address=None):
                     "one, or undo the change — the system could only be recovered "
                     "by editing the database file by hand. Create or reactivate "
                     "another Administrator first, and this account can then be "
-                    "deactivated."
+                    "deactivated.",
+                    False,
                 )
             if refusal == ALREADY_IN_THAT_STATE:
-                return f'No change. {user["full_name"]}’s account is already deactivated.'
-            return "That account could not be found."
+                return f'No change. {user["full_name"]}’s account is already deactivated.', False
+            return "That account could not be found.", False
 
         log_action(
             actor_id,
@@ -715,7 +744,11 @@ def process_account_status(form_data, actor_id, ip_address=None):
             module=MODULE_USERS,
             details=(
                 f"Account {phrase} deactivated by {_actor_phrase(actor)}"
-                + ("; the administrator deactivated their own account" if acting_on_self else "")
+                + (
+                    "; the administrator deactivated their own account, and the "
+                    "session they did it from was ended in the same request"
+                    if acting_on_self else ""
+                )
                 + "; the account is refused at the login form from now on even "
                 "when the password presented is correct, and a session it already "
                 "had open is ended on its next guarded request rather than being "
@@ -728,24 +761,28 @@ def process_account_status(form_data, actor_id, ip_address=None):
             ip_address=ip_address,
         )
 
-        message = (
+        # Their own account: the sentence below would be flashed over User
+        # Management, which this person can no longer open. It used to be, with a
+        # clause saying they would be signed out "on your next action" -- and the
+        # redirect was that action, so the guard cleared the session, the flash
+        # went with it, and the login form said "Invalid security credentials."
+        # instead. The caller now ends the session itself and shows this notice.
+        if acting_on_self:
+            return SELF_DEACTIVATION_NOTICE, True
+
+        return (
             f'{user["full_name"]}’s account is deactivated. They are refused at '
             "the login form from now on, even with the correct password, and any "
             "session they already had open ends on their next click. Nothing was "
-            "deleted — reactivating the account restores the same password."
+            "deleted — reactivating the account restores the same password.",
+            False,
         )
-        if acting_on_self:
-            message += (
-                " You deactivated your own account, so you will be signed out on "
-                "your next action and will not be able to sign back in."
-            )
-        return message
 
     changed, refusal = reactivate_user(user_id)
     if not changed:
         if refusal == ALREADY_IN_THAT_STATE:
-            return f'No change. {user["full_name"]}’s account is already active.'
-        return "That account could not be found."
+            return f'No change. {user["full_name"]}’s account is already active.', False
+        return "That account could not be found.", False
 
     log_action(
         actor_id,
@@ -766,7 +803,8 @@ def process_account_status(form_data, actor_id, ip_address=None):
         f'{user["full_name"]}’s account is active again. They can sign in with '
         "the same password they had before it was deactivated — no new password "
         "was set. If they have forgotten it, it still cannot be looked up, but "
-        "Reset Password on this screen sets them a new one."
+        "Reset Password on this screen sets them a new one.",
+        False,
     )
 
 

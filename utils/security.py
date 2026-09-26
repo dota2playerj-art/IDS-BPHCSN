@@ -179,6 +179,11 @@ def current_role():
 # cookie, and it would be the only place in the application where the deactivated
 # state is stated out loud. The distinction is recorded in the audit trail, where
 # only a signed-in Admin can read it.
+#
+# One sentence does say it, to one person, and it is not a refusal: an
+# Administrator who deactivates their OWN account is told so on the login form
+# after being signed out. end_session_after_self_deactivation() below says why
+# that is not an oracle -- nobody can be shown it without having done it.
 def refuse_credentials():
     flash("Invalid security credentials.")
     return redirect(url_for("auth.login", error="Invalid security credentials."))
@@ -241,6 +246,72 @@ def _end_revoked_session(user):
     _log_revoked_session(user, request.remote_addr if has_request_context() else None)
     session.clear()
     return refuse_credentials()
+
+
+def _log_self_ended_session(user, ip_address):
+    """Record that a session was ended because its holder deactivated themselves.
+
+    The same action as _log_revoked_session(), because it is the same event --
+    a session ended on a deactivated account -- and a reviewer filtering for it
+    must find both. The sentence is different because two of that one's clauses
+    would be false here: this session was not ended "on its next guarded
+    request" but in the request that deactivated it, and the person was not told
+    "only that the credentials were invalid".
+    """
+    if user is None:
+        return None
+
+    return log_action(
+        user_id=user["id"],
+        action=ACTION_SESSION_REVOKED,
+        module=MODULE_AUTH,
+        details=(
+            f'Session ended for account "{user["username"]}" '
+            f'({user["full_name"]}, {user["role"]}), from '
+            f'{ip_address or "an address the request did not carry"}; the '
+            "account holder deactivated their own account from User Management, "
+            "so the session they did it from was ended in that same request. They "
+            "were told on the login form that they had deactivated their own "
+            "account and been signed out. That notice is carried only in this "
+            "browser's signed session and is never shown in answer to a sign-in "
+            "attempt. Signing in again will be refused while the account stays "
+            "deactivated"
+        ),
+        ip_address=ip_address,
+    )
+
+
+def end_session_after_self_deactivation(notice):
+    """Sign out an Administrator who has just deactivated their own account.
+
+    THE ONE PLACE A SIGNED-OUT PERSON IS TOLD AN ACCOUNT IS DEACTIVATED, AND WHY
+    THAT DOES NOT BREAK THE RULE ABOVE.
+    refuse_credentials() is vague because the people who meet it have not proved
+    who they are: a visitor at the login form, or a request carrying a session
+    the account behind it no longer backs. The holder who switched their own
+    account off has proved it -- the deactivation arrived in their live,
+    Administrator session, through role_required("Admin") -- and the only thing
+    the notice tells them is what they just did. It is not a response the login
+    form can give to anyone:
+
+    * it is flashed into the session cookie AFTER the session is cleared, so the
+      cookie carries the notice and no identity, and it is signed with the
+      application's secret key, so it cannot be written by anybody else;
+    * the redirect carries no ?error=, because login.html prints that parameter
+      as given and anyone could type it into the address bar;
+    * it names no account.
+
+    The session is cleared here, in the request that did the deactivation,
+    rather than left for the guard to find on the next one. That is sooner than
+    before, not later; and the guard still ends every other session this account
+    has open, on each one's next click, with the generic refusal.
+    """
+    _log_self_ended_session(
+        get_current_user(), request.remote_addr if has_request_context() else None
+    )
+    session.clear()
+    flash(notice)
+    return redirect(url_for("auth.login"))
 
 
 def _maintenance_response(user):

@@ -90,7 +90,9 @@ from routes.user_views import (
     user_management_context,
 )
 from routes.vaccination_correction_views import process_vaccination_correction
-from utils.security import login_required, role_required
+from utils.security import (
+    end_session_after_self_deactivation, login_required, role_required,
+)
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -729,10 +731,20 @@ def set_user_status():
     last-administrator refusal and the two "nothing to do" answers are all
     sentences about an account rather than corrections to something typed, so
     there is no form state to preserve and nothing to reopen a dialog on.
+
+    Except one: an Administrator who has just deactivated their own account is
+    signed out here, in this request, and sent to the login form with a notice
+    saying they did it. Redirecting them to User Management instead -- as this
+    route once did -- meant the guard found the account deactivated on that GET,
+    cleared the session and the flash with it, and told them "Invalid security
+    credentials."
     """
-    flash(process_account_status(
+    message, deactivated_self = process_account_status(
         request.form, session.get("user_id"), request.remote_addr
-    ))
+    )
+    if deactivated_self:
+        return end_session_after_self_deactivation(message)
+    flash(message)
     return redirect(url_for("admin.user_management"))
 
 

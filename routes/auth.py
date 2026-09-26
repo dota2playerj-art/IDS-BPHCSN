@@ -274,6 +274,12 @@ def _log_refused_sign_in(user, ip_address):
 # a list of guessed usernames into real-and-disabled, real-and-live, and
 # fictional, without ever knowing a password. The distinction is recorded in the
 # audit trail, where only a signed-in Admin can read it.
+#
+# The one person it would be helpful to is now told, and not by this form: an
+# Administrator who deactivates their own account is signed out by the route that
+# did it, and sees a notice saying so here on the next page. It arrives as a
+# flash in their own signed session cookie, never as a response to anything
+# posted to this form -- utils/security.py end_session_after_self_deactivation().
 _refuse = refuse_credentials
 
 # The maintenance window's own refusal at the login form. Built the same shape
