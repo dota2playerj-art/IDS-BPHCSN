@@ -25,6 +25,18 @@ So the evidence lives on the machine that produced it. What is committed is this
 file, naming what was captured and how to produce it again, so the absence is
 stated rather than left for someone to trip over.
 
+## service-schedule/
+
+Verification of the Service Schedule (Screen 22). It ships empty: the live
+database gained one table with zero rows, and nothing else changed. A "2nd and
+4th Wednesday" entry was read off the Patient Queue on 52 controlled
+Wednesdays. It was listed on every 2nd and 4th Wednesday, and on no 1st, 3rd or
+5th. Forged add, edit and delete POSTs from the Doctor, Health Center Staff and
+the Barangay Official were all refused, and nothing was written. A fever walk-in
+was checked in and seen on another service's day. The route × role matrix grew
+by the six new routes only, and no suite check went from pass to fail. There was
+no real-browser pass. Details are in `service-schedule/README.md`.
+
 ## stale-suite-assertions/
 
 A pass through the verification suites that were failing before the Doctor-role
