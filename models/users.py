@@ -426,12 +426,11 @@ FULL_NAME_MAX_LENGTH = 100
 # project does not have and has not invented one to look like it has. What is
 # here is the shape of the check, working, with its scope stated.
 #
-# THE THREE ORIGINAL SEEDED ACCOUNTS WOULD FAIL THIS RULE, AND THEY ARE NOT
-# RE-CHECKED. "(retired demo password)" is nine characters. That is a true and slightly awkward fact, and
-# it is left true rather than papered over: this rule governs passwords set from
-# now on, seed_demo_users() is unchanged, and nothing re-validates a stored hash
-# because a hash cannot be re-validated -- the password is not recoverable from
-# it, which is the entire reason it is stored that way.
+# THE OLD FIXED DEMO PASSWORDS WOULD FAIL THIS RULE. They are gone from the code:
+# seed_demo_users() now makes random passwords that pass it. An existing database
+# may still hold them, and a hash cannot be re-checked against a rule, so
+# migrate_add_must_change_password.py finds those accounts and makes each person
+# set a new password that does pass.
 PASSWORD_MIN_LENGTH = 12
 PASSWORD_MIN_CHARACTER_KINDS = 3
 
@@ -1147,12 +1146,12 @@ def update_user(user_id, values):
         return dict(user), dict(after), None
 
 
-def set_user_password(user_id, password, must_change):
+def set_user_password(user_id, password, must_change=True):
     """Replace one account's stored password. Returns (changed, refusal).
 
-    `must_change` is required, so every caller says what happens next:
-    True when an Administrator sets it (the person must set their own at the
-    next sign-in), False when the person sets their own.
+    `must_change` says what happens next. The default, True, is for an
+    Administrator's reset: the person must set their own at the next sign-in.
+    The self-service change passes False, which clears the requirement.
 
     Assumes validate_password_reset_form() has already passed, the same contract
     create_user() has with validate_new_user_form().

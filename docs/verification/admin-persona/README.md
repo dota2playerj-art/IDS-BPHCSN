@@ -117,8 +117,8 @@ before and after.
 
 1. `python migrate_correct_admin_persona.py` — on a database already corrected
    it prints `already ... nothing to do` and writes nothing.
-2. `python app.py`, sign in as `admin` / `(retired demo password)` — the credentials are
-   unchanged by any of this.
+2. `python app.py`, and sign in as `admin` with that computer's password — the
+   credentials are unchanged by any of this.
 3. The header chip, the sidebar card, **User Management's roster**, Audit Logs
    and My Account must all show `AA`, `Kagawad Antonio Acido`, and the system
    role `Admin` / `Administrator`. The chip's subtitle, and only it, reads
