@@ -22,6 +22,16 @@ reached at any point.
 Demo logins are seeded on first run — `admin` / `(retired demo password)`,
 `staff` / `(retired demo password)`, `official` / `(retired demo password)`.
 
+## Running the tests
+
+```
+python tests/run_all.py
+```
+
+Each suite runs on its own fresh test database in the system temp folder, and
+never on `app.db`. The runner prints one line per suite and a total, and exits
+with 0 only when every check passes. See `PROJECT_STATUS.md` for current results.
+
 ## The database
 
 `app.db` is **not** in version control. It is generated, and everything needed to
