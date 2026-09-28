@@ -139,6 +139,19 @@ ANALYTICS_REPORT_TYPES = {
 }
 
 
+# Every message a report screen can show about its link. Fixed sentences only:
+# nothing typed into the address bar is ever printed back.
+RANGE_MESSAGES = {
+    "bad_type": "The report type in the link is not one this screen offers, "
+                "so the full report is shown instead.",
+    "bad_from": "The start date in the link is not a date this screen can read.",
+    "bad_to": "The end date in the link is not a date this screen can read.",
+    "need_both": "A report needs both a start and an end date.",
+    "start_after_end": "The start date is after the end date, so the range "
+                       "covers no days.",
+}
+
+
 def parse_report_range(args, types=None, default_type="all", months=TREND_MONTHS):
     """Turn a report screen's query string into a window, a type, and any errors.
 
@@ -160,12 +173,11 @@ def parse_report_range(args, types=None, default_type="all", months=TREND_MONTHS
     types = types or ANALYTICS_REPORT_TYPES
     errors = []
 
+    # Every message comes from RANGE_MESSAGES. A value from the URL is never
+    # printed back: the screen and its exports carry the health center's name.
     requested_type = (args.get("type") or "").strip() or default_type
     if requested_type not in types:
-        errors.append(
-            f'"{requested_type}" is not a report type this screen offers, so the '
-            f'full report is shown instead.'
-        )
+        errors.append(RANGE_MESSAGES["bad_type"])
         requested_type = default_type
 
     raw_from = (args.get("from") or "").strip()
@@ -176,17 +188,15 @@ def parse_report_range(args, types=None, default_type="all", months=TREND_MONTHS
         start = _parse_iso(raw_from)
         end = _parse_iso(raw_to)
         if raw_from and start is None:
-            errors.append(f'"{raw_from}" is not a date this screen can read.')
+            errors.append(RANGE_MESSAGES["bad_from"])
         if raw_to and end is None:
-            errors.append(f'"{raw_to}" is not a date this screen can read.')
+            errors.append(RANGE_MESSAGES["bad_to"])
         if start and not end:
-            errors.append("A report needs both a start and an end date.")
+            errors.append(RANGE_MESSAGES["need_both"])
         if end and not start:
-            errors.append("A report needs both a start and an end date.")
+            errors.append(RANGE_MESSAGES["need_both"])
         if start and end and start > end:
-            errors.append(
-                "The start date is after the end date, so the range covers no days."
-            )
+            errors.append(RANGE_MESSAGES["start_after_end"])
         if start and end and start <= end:
             span = (end.year - start.year) * 12 + (end.month - start.month) + 1
             if span > MAX_REPORT_MONTHS:

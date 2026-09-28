@@ -123,6 +123,35 @@ def check_in_reason(source):
     return (source.get(CHECK_IN_REASON_FIELD) or "").strip()[:CHECK_IN_REASON_MAX]
 
 
+# THE REASON NEVER TRAVELS IN THE URL. The Check In dialog POSTs it to Register
+# Patient with this marker. The route keeps it in the signed session and
+# redirects to ?check_in=1, and the form reads it back only from the session.
+# So a link typed by anyone cannot put words on this page: a check_in_reason in
+# the query string is ignored.
+CHECK_IN_HANDOFF_FIELD = "check_in_start"
+_CHECK_IN_SESSION_KEY = "check_in_reason"
+
+
+def check_in_handoff_requested(form_data):
+    """True when this POST is the Check In dialog handing a reason over."""
+    return (form_data.get(CHECK_IN_HANDOFF_FIELD) or "").strip() == "1"
+
+
+def store_check_in_reason(form_data):
+    """Keep the dialog's reason in the session until the patient is saved."""
+    session[_CHECK_IN_SESSION_KEY] = check_in_reason(form_data)
+
+
+def stored_check_in_reason():
+    """The reason the dialog handed over, or "" if there is none."""
+    return (session.get(_CHECK_IN_SESSION_KEY) or "")[:CHECK_IN_REASON_MAX]
+
+
+def clear_check_in_reason():
+    """Forget the handed-over reason once the new patient is checked in."""
+    session.pop(_CHECK_IN_SESSION_KEY, None)
+
+
 # Save & Register Another. The submit button carries this name/value pair, the
 # shape this project already uses wherever one form has more than one action --
 # Patient Records' status buttons and the Patient Queue's row buttons both
@@ -159,33 +188,36 @@ def save_and_register_another_requested(form_data):
 ADDRESS_PREFILL_FIELDS = ("address", "municipality", "province", "zip_code")
 
 
-def address_prefill_args(form_data):
-    """The just-used address rendered as the query string the fresh form opens with.
+# THE URL CARRIES A PATIENT ID, NOT AN ADDRESS. It used to carry the address text
+# itself, so a link could put any words in the form's boxes. Now it carries the
+# id of the patient just saved, and the fresh form reads the address from that
+# stored record. An id that names no patient fills nothing. Opening Register
+# Patient from the sidebar still gives an empty form.
+PREFILL_FROM_FIELD = "prefill_from"
 
-    Carried in the URL rather than the session because the redirect is the only
-    thing between the two, and a query string is visible: the operator can see
-    what was kept, and clearing it is a matter of opening Register Patient from
-    the sidebar instead.
-    """
-    args = {}
-    for field in ADDRESS_PREFILL_FIELDS:
-        value = (form_data.get(field) or "").strip()
-        if value:
-            args[field] = value
-    return args
+
+def address_prefill_args(saved_patient_id):
+    """The query string the fresh form opens with: the id of the patient just saved."""
+    return {PREFILL_FROM_FIELD: saved_patient_id}
 
 
 def address_prefill_form(args):
-    """A form dict holding only the carried address, for the fresh form's GET.
+    """A form dict holding only the address of the patient named in the URL.
 
-    Every other key is absent, and the template reads an absent key exactly as it
-    reads a blank one -- so name, birth date, sex, civil status, blood type,
-    conditions, allergies and the emergency contact all render as they do on a
-    form opened with nothing at all.
+    Read from the stored record, never from the URL. Every other key is absent,
+    and the template reads an absent key exactly as it reads a blank one -- so
+    name, birth date, sex, civil status, blood type, conditions, allergies and
+    the emergency contact all render as they do on a form opened with nothing.
     """
+    raw = (args.get(PREFILL_FROM_FIELD) or "").strip()
+    if not raw.isdigit():
+        return None
+    source = get_patient_by_id(int(raw))
+    if source is None:
+        return None
     values = {}
     for field in ADDRESS_PREFILL_FIELDS:
-        value = (args.get(field) or "").strip()
+        value = str(source.get(field) or "").strip()
         if value:
             values[field] = value
     return values or None

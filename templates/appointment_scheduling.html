@@ -915,11 +915,12 @@
             </div>
 
             <div id="checkInNewPane" class="d-none">
-              <!-- GET, because this navigates to the registration form rather
-                   than saving anything. Nothing is created until that form is
-                   submitted and passes its own validation. -->
-              <form id="checkInNewForm" method="get" action="{{ url_for(register_patient_endpoint) }}">
-                <input type="hidden" name="check_in" value="1">
+              <!-- POST, so the reason never travels in the URL. The server keeps
+                   it in the session and opens the registration form. Nothing is
+                   created until that form is submitted and passes its own
+                   validation. -->
+              <form id="checkInNewForm" method="post" action="{{ url_for(register_patient_endpoint) }}">
+                <input type="hidden" name="check_in_start" value="1">
                 <div class="mode-hint">
                   Opens the Register Patient form. Saving it registers the patient
                   <em>and</em> places them in today's queue in one step.

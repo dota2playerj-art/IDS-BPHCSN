@@ -71,13 +71,17 @@ from routes.roster_export import (
     pdf_response,
 )
 from routes.patient_views import (
+    check_in_handoff_requested,
     check_in_reason,
+    clear_check_in_reason,
     check_in_requested,
     patient_profile_context,
     patient_records_context,
     patient_selection_context,
     process_archive_patients,
     address_prefill_args,
+    store_check_in_reason,
+    stored_check_in_reason,
     address_prefill_form,
     process_register_patient,
     register_patient_context,
@@ -561,6 +565,12 @@ def staff_register_patient(patient_id=None):
             flash("That patient record could not be found.")
             return redirect(url_for("staff.staff_patient_records"))
 
+    # The Check In dialog hands its reason over by POST, never in the URL. It is
+    # kept in the session and the form opens with ?check_in=1 only.
+    if request.method == "POST" and patient is None and check_in_handoff_requested(request.form):
+        store_check_in_reason(request.form)
+        return redirect(url_for("staff.staff_register_patient", check_in=1))
+
     if request.method == "POST":
         saved_id, context = process_register_patient(request.form, patient=patient)
         if saved_id:
@@ -576,6 +586,7 @@ def staff_register_patient(patient_id=None):
                         session.get("user_id"),
                     )
                 )
+                clear_check_in_reason()
                 return redirect(url_for("staff.staff_appointment_scheduling"))
             # Save & Register Another. The record is saved -- the branch above
             # only runs on a row id returned by the very same
@@ -583,12 +594,12 @@ def staff_register_patient(patient_id=None):
             # left is where to put the operator. At a community health drive the
             # answer is a fresh form, because the next person is already waiting.
             #
-            # The address rides along on the query string and nothing else does.
-            # Everyone registered in one sitting is from the same purok, so that
-            # is the retyping worth removing; a name, a birth date or a blood
-            # type carried into the next registration would be a wrong value
-            # sitting in a field that looks filled in, which is the one failure
-            # this must not have.
+            # The address is kept and nothing else is. Everyone registered in
+            # one sitting is from the same purok, so that is the retyping worth
+            # removing; a name, a birth date or a blood type carried into the
+            # next registration would be a wrong value sitting in a field that
+            # looks filled in. The URL carries the saved patient's id, and the
+            # fresh form reads the address from that stored record.
             if patient is None and save_and_register_another_requested(request.form):
                 name = registered_patient_name(request.form)
                 flash(
@@ -596,7 +607,7 @@ def staff_register_patient(patient_id=None):
                     "the next patient, with the address kept."
                 )
                 return redirect(url_for(
-                    "staff.staff_register_patient", **address_prefill_args(request.form)
+                    "staff.staff_register_patient", **address_prefill_args(saved_id)
                 ))
             flash("Patient details updated." if patient else "Patient registered successfully.")
             return redirect(url_for("staff.staff_patient_profile", patient_id=saved_id))
@@ -611,7 +622,8 @@ def staff_register_patient(patient_id=None):
             # nothing else, so every other field renders exactly as blank.
             form=address_prefill_form(request.args) if patient is None else None,
             check_in=check_in_requested(request.args),
-            check_in_reason_text=check_in_reason(request.args),
+            # From the session only, never from the URL.
+            check_in_reason_text=stored_check_in_reason(),
         ),
     )
 
