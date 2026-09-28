@@ -330,6 +330,23 @@ def open_session(sess):
     sess["last_active"] = moment
 
 
+def clear_password_change(username):
+    """Clear must_change_password for an account a suite just created or reset.
+
+    A new or reset account must set its own password before it can use any
+    other screen. tests/verify_security_basics.py tests that rule. The other
+    suites clear the flag, as if the person had already set their own
+    password, so they can keep testing what they were written for.
+    """
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        conn.execute("UPDATE users SET must_change_password = 0 WHERE username = ?",
+                     (username,))
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def work_path(name):
     """A path for a scratch file inside this suite's temporary folder."""
     return guard_path(os.path.join(TEST_DIR, name))

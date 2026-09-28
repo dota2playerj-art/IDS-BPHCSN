@@ -673,6 +673,7 @@
                   <div class="field-error">{{ add_errors.password }}</div>
 {%- else %}
                   <div class="form-text-hint">{{ password_rule }}</div>
+                  <div class="form-text-hint"><strong>The user must change this password the first time they sign in.</strong></div>
 {%- endif %}
                 </div>
                 <div class="col-md-6">
@@ -1013,6 +1014,7 @@
                   <div class="field-error">{{ rerr.password }}</div>
 {%- else %}
                   <div class="form-text-hint">{{ password_rule }}</div>
+                  <div class="form-text-hint"><strong>The user must change this password the first time they sign in.</strong></div>
 {%- endif %}
                 </div>
                 <div class="col-md-6">

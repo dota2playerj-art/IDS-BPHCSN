@@ -77,7 +77,12 @@ import sys
 from werkzeug.security import generate_password_hash
 
 import config
-from models.users import DEMO_USERS, DOCTOR_ROLE, check_password_strength
+from models.users import (
+    DEMO_USERS,
+    DOCTOR_ROLE,
+    generate_initial_password,
+    print_first_passwords,
+)
 
 OLD_CHECK = "CHECK (role IN ('Admin', 'Health Center Staff', 'Barangay Official'))"
 NEW_CHECK = (
@@ -91,7 +96,9 @@ USER_COLUMNS = (
     "is_active", "created_at",
 )
 
-DOCTOR_ACCOUNT = next(entry for entry in DEMO_USERS if entry[3] == DOCTOR_ROLE)
+# (username, full name, role). DEMO_USERS holds no password: one is made at
+# random when the account is created, and printed once.
+DOCTOR_ACCOUNT = next(entry for entry in DEMO_USERS if entry[2] == DOCTOR_ROLE)
 
 
 def users_sql(conn):
@@ -187,7 +194,7 @@ def add_demo_doctor(conn):
     username is held by an account of another role -- that is somebody's real
     account and this script has no business deciding what it should be.
     """
-    username, password, full_name, role = DOCTOR_ACCOUNT
+    username, full_name, role = DOCTOR_ACCOUNT
     existing = conn.execute(
         "SELECT id, role FROM users WHERE LOWER(username) = LOWER(?)", (username,)
     ).fetchone()
@@ -200,23 +207,31 @@ def add_demo_doctor(conn):
             )
         return "present"
 
-    problem = check_password_strength(password, username, full_name)
-    if problem:
-        raise SystemExit(
-            f"The demo Doctor password in models/users.py fails the password "
-            f"rule, so the account was not created: {problem}"
-        )
+    # A random first password that passes the password rule, the same way
+    # seed_demo_users() makes one. It is printed once below and kept nowhere.
+    password = generate_initial_password(username, full_name)
 
     # generate_password_hash() with no arguments, exactly as seed_demo_users()
     # and create_user() call it, so this credential is verified by the same
-    # code path as every other one in the table.
+    # code path as every other one in the table. If the must_change_password
+    # column already exists, the account is marked so the person must set their
+    # own password; if not, migrate_add_must_change_password.py adds it later.
+    columns = [row[1] for row in conn.execute("PRAGMA table_info(users)")]
     conn.execute("BEGIN")
-    conn.execute(
-        "INSERT INTO users (username, password_hash, full_name, role) "
-        "VALUES (?, ?, ?, ?)",
-        (username, generate_password_hash(password), full_name, role),
-    )
+    if "must_change_password" in columns:
+        conn.execute(
+            "INSERT INTO users (username, password_hash, full_name, role, "
+            "must_change_password) VALUES (?, ?, ?, ?, 1)",
+            (username, generate_password_hash(password), full_name, role),
+        )
+    else:
+        conn.execute(
+            "INSERT INTO users (username, password_hash, full_name, role) "
+            "VALUES (?, ?, ?, ?)",
+            (username, generate_password_hash(password), full_name, role),
+        )
     conn.execute("COMMIT")
+    print_first_passwords([(username, password)])
     return "created"
 
 
@@ -282,7 +297,7 @@ def main():
         problems.append(f"{len(added)} accounts added, expected {expected_added}")
     for account in added:
         if (account["username"], account["full_name"], account["role"]) != (
-            DOCTOR_ACCOUNT[0], DOCTOR_ACCOUNT[2], DOCTOR_ACCOUNT[3]
+            DOCTOR_ACCOUNT[0], DOCTOR_ACCOUNT[1], DOCTOR_ACCOUNT[2]
         ) or account["is_active"] != 1:
             problems.append(f"added account is not the demo Doctor: {account}")
 

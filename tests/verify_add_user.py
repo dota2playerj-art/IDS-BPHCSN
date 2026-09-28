@@ -255,6 +255,10 @@ with app.test_client() as admin:
 # ---------------------------------------------------------------------------
 # 4. The new account signs in and has exactly its role's access
 # ---------------------------------------------------------------------------
+# SETUP (Task 2): a new account must set its own password first. That rule is
+# tested in verify_security_basics.py; here it is cleared so this section keeps
+# testing the account's access.
+_support.clear_password_change("mdelacruz")
 with app.test_client() as staffer:
     r = sign_in(staffer, "mdelacruz", NEW_PW)
     check("the new account signs in",
@@ -471,6 +475,9 @@ with app.test_client() as admin:
     conn.close()
     check("the second Administrator is stored with the Admin role",
           admin2 and admin2["role"] == "Admin")
+    # SETUP (Task 2): see section 4. Cleared so rbautista can act as an
+    # Administrator in section 9 below.
+    _support.clear_password_change("rbautista")
 
     r = admin.get("/admin/user_management")
     check("with two Administrators, neither shows the last-Administrator notice",

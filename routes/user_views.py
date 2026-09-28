@@ -674,7 +674,8 @@ def process_create_user(form_data, actor_id, ip_address=None):
 
     return new_id, None, (
         f'Account "{created["username"]}" created for {created["full_name"]} as '
-        f'{created["role"]}. They can sign in now with the password you set. '
+        f'{created["role"]}. They can sign in now with the password you set, '
+        "and must change it the first time they sign in. "
         "That password is not stored anywhere it can be read back — tell them "
         "what it is; nobody, including you, can look it up later."
     )
@@ -1075,7 +1076,8 @@ def process_reset_password(form_data, actor_id, ip_address=None):
             reset_state=_reset_state(user_id, errors)
         ), None
 
-    changed, refusal = set_user_password(user_id, values["password"])
+    # must_change=True: the person must set their own at the next sign-in.
+    changed, refusal = set_user_password(user_id, values["password"], must_change=True)
     if not changed:
         return None, None, "That account could not be found."
 
@@ -1112,7 +1114,8 @@ def process_reset_password(form_data, actor_id, ip_address=None):
     message = (
         f'{user["full_name"]}’s password has been reset. They sign in with the '
         f'new password from now on — the old one stopped working the moment you '
-        "saved this. That password is not stored anywhere it can be read back — "
+        "saved this. They must change it the first time they sign in. "
+        "That password is not stored anywhere it can be read back — "
         "tell them what it is; nobody, including you, can look it up later."
     )
     if acting_on_self:

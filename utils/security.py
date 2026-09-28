@@ -111,7 +111,7 @@ from models.audit import (
     log_action,
 )
 from models.settings import maintenance_mode
-from models.users import get_user_by_id
+from models.users import get_user_by_id, needs_password_change
 from utils.dates import CLINIC_TIMEZONE
 from utils.roles import normalize_role
 
@@ -292,6 +292,27 @@ def _session_limit_passed():
     if moment - last_active >= config.IDLE_TIMEOUT.total_seconds():
         return ACTION_SESSION_IDLE_TIMEOUT
     return None
+
+
+# While an account must set its own password (users.must_change_password), these
+# are the only guarded endpoints it may reach: My Account, its password form,
+# and the keep-alive. Logout is not guarded, so it always works.
+PASSWORD_CHANGE_ENDPOINTS = frozenset({
+    "auth.my_account",
+    "auth.change_own_password",
+    "auth.keep_alive",
+})
+
+
+def _to_password_change():
+    """Send the person to set their own password, or tell the page's script."""
+    target = url_for("auth.my_account")
+    if _wants_json():
+        response = jsonify({"signed_in": True, "must_change_password": True,
+                            "url": target})
+        response.status_code = 403
+        return response
+    return redirect(target)
 
 
 def _clock_time(seconds):
@@ -553,6 +574,13 @@ def _signed_in_account():
     # the page header, so by the time a guarded view runs this is a dict lookup.
     if maintenance_mode() and normalize_role(user["role"]) != "admin":
         return None, _maintenance_response(user)
+
+    # A PASSWORD SOMEONE ELSE SET MUST BE REPLACED FIRST. An Administrator set it,
+    # or it was printed at install, so other people may know it. Until the
+    # person sets their own, every other screen sends them back to My Account.
+    # Asked here, so every guarded route is covered, including one added later.
+    if needs_password_change(user) and request.endpoint not in PASSWORD_CHANGE_ENDPOINTS:
+        return None, _to_password_change()
 
     return user, None
 

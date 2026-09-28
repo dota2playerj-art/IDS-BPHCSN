@@ -590,6 +590,10 @@ check("admin Edit User changes the role",
       q1("SELECT role FROM users WHERE id=?", (new_doc["id"],))[0] == "Health Center Staff")
 admin.post("/admin/user_management/reset_password", data={"user_id": new_doc["id"],
            "password": "Evening-rounds-88", "confirm_password": "Evening-rounds-88"})
+# SETUP (Task 2): a reset password must be changed at the next sign-in. That
+# rule is tested in verify_security_basics.py; cleared here so this check keeps
+# testing that the reset password itself signs in.
+_support.clear_password_change("drsecond")
 t = app.test_client()
 rr = t.post("/login", data={"username": "drsecond", "password": "Evening-rounds-88"})
 check("admin Reset Password works (new password signs in)", rr.status_code == 302

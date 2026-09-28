@@ -70,6 +70,15 @@
     <div class="page-title">My Account</div>
     <div class="page-desc">Your own account, and the one thing on it you can change yourself. Everything here is about the account you are signed in as — it cannot show or alter anybody else's.</div>
 
+{%- if must_change %}
+    {#- Shown while users.must_change_password is set. utils/security.py keeps
+        the person on this screen until they set their own password below. #}
+    <div class="alert-ids alert-warning-ids" id="mustChangeNotice" style="margin-top:14px;">
+      <span class="material-symbols-outlined">password</span>
+      <div>{{ must_change_notice }}</div>
+    </div>
+{%- endif %}
+
     <div style="height:16px;"></div>
 
     <!-- ACCOUNT DETAILS -->

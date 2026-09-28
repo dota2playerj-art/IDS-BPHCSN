@@ -307,6 +307,10 @@ cdb = sqlite3.connect(DB)
 newid = cdb.execute("SELECT id FROM users WHERE username='regtest1'").fetchone()
 cdb.close()
 check("Add User still creates an account", newid is not None)
+# SETUP (Task 2): a new account must set its own password first. That rule is
+# tested in verify_security_basics.py; cleared here so regtest1 can act as an
+# Administrator in step 18.
+_support.clear_password_change("regtest1")
 if newid:
     newid = newid[0]
     r = c.post("/admin/user_management/status",

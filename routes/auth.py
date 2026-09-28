@@ -131,7 +131,7 @@ from models.audit import (
     log_action,
 )
 from models.settings import maintenance_mode
-from models.users import get_user_by_username
+from models.users import get_user_by_id, get_user_by_username, needs_password_change
 from routes.account_views import my_account_context, process_password_change
 from utils.roles import normalize_role
 from utils.security import (
@@ -352,14 +352,11 @@ def login():
 
         user = get_user_by_username(username)
 
+        # Only a stored hash is ever compared. An account with no hash cannot
+        # sign in.
         password_verified = False
-        if user is not None:
-            user_dict = dict(user)
-            password_hash = user_dict.get("password_hash")
-            if password_hash:
-                password_verified = check_password_hash(password_hash, password)
-            elif user_dict.get("password"):
-                password_verified = user_dict["password"] == password
+        if user is not None and user["password_hash"]:
+            password_verified = check_password_hash(user["password_hash"], password)
 
         # Read once, before any branch, so entries written by different outcomes
         # cannot end up describing the address differently.
@@ -441,22 +438,30 @@ def login():
             normalized_role = normalize_role(user["role"])
             if normalized_role == "admin":
                 session["role"] = "Admin"
-                return redirect(url_for("admin.admin_dashboard"))
+                destination = url_for("admin.admin_dashboard")
             elif normalized_role == "health staff":
                 session["role"] = "Health Staff"
-                return redirect(url_for("staff.staff_dashboard"))
+                destination = url_for("staff.staff_dashboard")
             elif normalized_role == "doctor":
                 # The Doctor works the clinical floor's screens, so lands on
                 # its dashboard. routes/staff.py says why the two roles share
                 # one blueprint.
                 session["role"] = "Doctor"
-                return redirect(url_for("staff.staff_dashboard"))
+                destination = url_for("staff.staff_dashboard")
             elif normalized_role == "barangay official":
                 session["role"] = "Barangay Official"
-                return redirect(url_for("official.official_dashboard"))
+                destination = url_for("official.official_dashboard")
             else:
                 session["role"] = user["role"]
-                return redirect(url_for("auth.dashboard"))
+                destination = url_for("auth.dashboard")
+
+            # A password someone else set must be replaced before anything
+            # else. utils/security.py enforces it on every request; this only
+            # saves one redirect. Read with SELECT *, so a database without the
+            # column (not yet migrated) still signs in.
+            if needs_password_change(get_user_by_id(user["id"])):
+                destination = url_for("auth.my_account")
+            return redirect(destination)
 
         # Everything below this point is a refusal: either the username matched
         # no account, or it matched an active one and the password did not.

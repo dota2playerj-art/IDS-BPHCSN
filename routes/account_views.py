@@ -72,6 +72,7 @@ from models.audit import (
 from models.users import (
     PASSWORD_RULE_TEXT,
     ROLE_LABELS,
+    needs_password_change,
     set_user_password,
     validate_password_change_form,
     verify_user_password,
@@ -101,6 +102,17 @@ _NO_ADDRESS = "an address the request did not carry"
 WRONG_CURRENT_PASSWORD = (
     "That is not the password this account signs in with. Type your current "
     "password, not the new one you want."
+)
+
+
+# Shown on My Account while the account must set its own password
+# (users.must_change_password). utils/security.py keeps the person on this
+# screen until they do.
+MUST_CHANGE_NOTICE = "Please set your own password before you continue."
+# The one extra rule during that change: the password an Administrator set, or
+# the first-time password, must not simply be typed again.
+MUST_DIFFER_FROM_CURRENT = (
+    "Choose a new password. It must be different from the one you have now."
 )
 
 
@@ -147,6 +159,9 @@ def my_account_context(change_errors=None):
         # one of those screens is refused on this one.
         "password_rule": PASSWORD_RULE_TEXT,
         "change_errors": change_errors or {},
+        # True while this person must set their own password first.
+        "must_change": needs_password_change(user),
+        "must_change_notice": MUST_CHANGE_NOTICE,
     }
 
 
@@ -266,6 +281,16 @@ def process_password_change(form_data, ip_address=None):
                 ip_address=ip_address,
             )
 
+    # A FORCED CHANGE MUST ACTUALLY CHANGE THE PASSWORD. The current password was
+    # set by an Administrator or printed at install, so other people may know
+    # it. Re-saving it would clear the requirement and fix nothing. Only asked
+    # when both boxes hold something, so an empty box keeps its own message.
+    forced = needs_password_change(user)
+    if (forced and values["new_password"]
+            and values["new_password"] == values["current_password"]
+            and "new_password" not in errors):
+        errors["new_password"] = MUST_DIFFER_FROM_CURRENT
+
     if errors:
         return False, my_account_context(change_errors=errors), None
 
@@ -279,7 +304,11 @@ def process_password_change(form_data, ip_address=None):
     # one in use would be.
     unchanged_value = values["new_password"] == values["current_password"]
 
-    changed, _refusal = set_user_password(user["id"], values["new_password"])
+    # must_change=False: the person set their own, so any requirement to change
+    # it is met and cleared here.
+    changed, _refusal = set_user_password(
+        user["id"], values["new_password"], must_change=False
+    )
     if not changed:
         return False, None, "Your account could not be read. Sign in again."
 
@@ -312,6 +341,11 @@ def process_password_change(form_data, ip_address=None):
                 if unchanged_value else
                 "; the previous password stopped working the moment this was "
                 "saved and the account signs in with the new one from now on"
+            )
+            + (
+                "; this account had to set its own password before it could use "
+                "any other screen, and that requirement is now met and cleared"
+                if forced else ""
             )
             + "; the new value met the same strength rule a new account's "
             "password must meet and is stored only as a salted hash -- neither "

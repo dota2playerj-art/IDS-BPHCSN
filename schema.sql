@@ -4,6 +4,12 @@ PRAGMA foreign_keys = ON;
 -- RHU's field data separated system administration (the Administrator, a
 -- barangay Kagawad) from clinical authority (the RHU physician). A database
 -- built from this file already has it; an older one gets it from that script.
+--
+-- must_change_password: 1 means the person must set their own password before
+-- they can use any other screen. It is set when an account is created, when an
+-- Administrator resets its password, and when the first accounts are seeded. It
+-- is cleared when the person changes their own password. Last in the table, as
+-- migrate_add_must_change_password.py adds it to an existing database.
 CREATE TABLE users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT NOT NULL UNIQUE,
@@ -13,7 +19,8 @@ CREATE TABLE users (
     email TEXT,
     phone TEXT,
     is_active INTEGER NOT NULL DEFAULT 1,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    must_change_password INTEGER NOT NULL DEFAULT 0
 );
 
 -- medical_conditions and allergies hold a JSON array of strings, e.g.

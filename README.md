@@ -12,15 +12,21 @@ and Barangay Official.
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
+python setup_env.py
 python app.py
 ```
+
+`python setup_env.py` is a one-time step on each computer. It creates `.env`
+with a new secret key. The app will not start without it. Never commit `.env`.
 
 The app serves on <http://127.0.0.1:5001>. It runs entirely offline: Bootstrap,
 Chart.js and the Inter/Material fonts are vendored under `static/`, so no CDN is
 reached at any point.
 
-Demo logins are seeded on first run — `admin` / `(retired demo password)`,
-`staff` / `(retired demo password)`, `official` / `(retired demo password)`.
+On a new install, the first run creates four accounts (`admin`, `staff`,
+`official`, `doctor`) with random passwords. It shows them once, in the
+terminal. Write them down then; they are not shown again. Each person must set
+their own password the first time they sign in.
 
 ## Running the tests
 

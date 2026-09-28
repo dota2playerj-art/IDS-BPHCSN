@@ -130,28 +130,95 @@ from database.connection import db_connection
 # and seed_demo_users() still runs only into an empty table, so nothing here
 # touches an account an administrator created.
 #
-# The first three accounts' passwords would not pass the strength rule further
-# down this file, and they are not re-checked against it. That is stated in full
-# beside the rule. The Doctor account's does pass it: it was written after the
-# rule existed, and migrate_add_doctor_role.py refuses to create it otherwise.
+# NO PASSWORD IS WRITTEN HERE. There used to be one per account, which meant
+# everyone with the code knew them. Now seed_demo_users() makes a random
+# password for each account, prints it once, and marks the account so the
+# person must set their own at first sign-in.
 DEMO_USERS = [
-    ("admin", "(retired demo password)", "Kagawad Antonio Acido", "Admin"),
-    ("staff", "(retired demo password)", "Health Center Staff", "Health Center Staff"),
-    ("official", "(retired demo password)", "Barangay Official", "Barangay Official"),
-    ("doctor", "(retired demo password)", "RHU Physician (demo)", "Doctor"),
+    # username, full name, role
+    ("admin", "Kagawad Antonio Acido", "Admin"),
+    ("staff", "Health Center Staff", "Health Center Staff"),
+    ("official", "Barangay Official", "Barangay Official"),
+    ("doctor", "RHU Physician (demo)", "Doctor"),
 ]
+
+# Letters and digits that are easy to read aloud and to type: no 0/O, 1/l/I.
+_EASY_LETTERS = "abcdefghjkmnpqrstuvwxyz"
+_EASY_DIGITS = "23456789"
+
+
+def generate_initial_password(username="", full_name=""):
+    """A random first password that passes check_password_strength().
+
+    Three short groups joined by "-", for example "kqz4-Wmtp-7hre". It is
+    only used until the person sets their own, so it is made easy to type.
+    """
+    import secrets
+
+    while True:
+        groups = []
+        for _ in range(3):
+            chars = [secrets.choice(_EASY_LETTERS) for _ in range(4)]
+            chars[secrets.randbelow(4)] = secrets.choice(_EASY_DIGITS)
+            groups.append("".join(chars))
+        # One capital letter somewhere, so four kinds of character appear.
+        index = secrets.randbelow(3)
+        groups[index] = groups[index].capitalize() if groups[index][0].isalpha() \
+            else groups[index][0] + groups[index][1:].capitalize()
+        password = "-".join(groups)
+        if check_password_strength(password, username, full_name) is None:
+            return password
 
 
 def seed_demo_users():
+    """Create the first accounts in an empty database, each with a random password.
+
+    Each password is printed ONCE, in a block on the terminal, and is not kept
+    anywhere else: not in a file, not in the database (only its hash), and not
+    in the audit trail. Each account must change it at first sign-in.
+
+    Returns [(username, password), ...] so a caller or a test can use them.
+    Returns [] when the table already has accounts, and prints nothing.
+    """
+    created = []
     with db_connection() as conn:
         user_count = conn.execute("SELECT COUNT(*) AS count FROM users").fetchone()["count"]
         if user_count == 0:
-            for username, password, full_name, role in DEMO_USERS:
+            for username, full_name, role in DEMO_USERS:
+                password = generate_initial_password(username, full_name)
                 conn.execute(
-                    "INSERT INTO users (username, password_hash, full_name, role) VALUES (?, ?, ?, ?)",
+                    "INSERT INTO users (username, password_hash, full_name, role, "
+                    "must_change_password) VALUES (?, ?, ?, ?, 1)",
                     (username, generate_password_hash(password), full_name, role),
                 )
+                created.append((username, password))
             conn.commit()
+    if created:
+        print_first_passwords(created)
+    return created
+
+
+def print_first_passwords(accounts):
+    """Print first-time passwords once, in a clear block, to the terminal."""
+    line = "=" * 64
+    print(f"\n{line}\nFIRST-TIME PASSWORDS FOR THIS NEW INSTALL\n{line}")
+    for username, password in accounts:
+        print(f"  {username:<12} {password}")
+    print("Write these down now. They will not be shown again.")
+    print("Each user must change it at first sign-in.")
+    print(f"{line}\n", flush=True)
+
+
+def needs_password_change(user):
+    """Whether this account must set its own password before anything else.
+
+    Accepts a users row or dict. A database that has not had
+    migrate_add_must_change_password.py run yet has no such column: False.
+    """
+    if user is None:
+        return False
+    keys = user.keys()
+    return "must_change_password" in keys and bool(user["must_change_password"])
 
 
 # Whose names may appear in "Assign to" on a booking. The Barangay Official is
@@ -726,8 +793,9 @@ def create_user(values):
     with db_connection() as conn:
         cursor = conn.execute(
             """
-        INSERT INTO users (username, password_hash, full_name, role)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO users (username, password_hash, full_name, role,
+                           must_change_password)
+        VALUES (?, ?, ?, ?, 1)
         """,
             (
                 (values.get("username") or "").strip(),
@@ -1079,8 +1147,12 @@ def update_user(user_id, values):
         return dict(user), dict(after), None
 
 
-def set_user_password(user_id, password):
+def set_user_password(user_id, password, must_change):
     """Replace one account's stored password. Returns (changed, refusal).
+
+    `must_change` is required, so every caller says what happens next:
+    True when an Administrator sets it (the person must set their own at the
+    next sign-in), False when the person sets their own.
 
     Assumes validate_password_reset_form() has already passed, the same contract
     create_user() has with validate_new_user_form().
@@ -1114,8 +1186,8 @@ def set_user_password(user_id, password):
             return False, ACCOUNT_NOT_FOUND
 
         conn.execute(
-            "UPDATE users SET password_hash = ? WHERE id = ?",
-            (generate_password_hash(password), user_id),
+            "UPDATE users SET password_hash = ?, must_change_password = ? WHERE id = ?",
+            (generate_password_hash(password), 1 if must_change else 0, user_id),
         )
         conn.commit()
         return True, None
