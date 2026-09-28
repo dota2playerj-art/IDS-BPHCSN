@@ -397,6 +397,19 @@ The system shall implement:
 - Input validation
 - Secure database access
 
+How these are done now (2026-09-29):
+
+- The secret key that signs sign-in cookies is read from a .env file on each computer
+  (`python setup_env.py` creates it). The app will not start without a proper key.
+  Debug mode is off unless IDS_DEBUG=1.
+- A person is signed out after 30 minutes without activity, and 12 hours after they sign
+  in. The page warns 2 minutes before the idle limit.
+- No password is written in the code. A new install makes random first-time passwords and
+  shows them once in the terminal.
+- A new account, a password reset by the Administrator, and a first-time password must all
+  be replaced by the person at their first sign-in, before any other screen opens.
+- No screen prints text taken from the address bar.
+
 ---
 
 # Sample Development Workflow
@@ -522,3 +535,10 @@ Version 2.2 (2026-09-25)
 The Doctor reads Reports & Analytics, with the same figures and exports as the Administrator and
 the Barangay Official. Sealed diagnoses stay out of the ranking for every viewer. See the Reports &
 Analytics paragraph at the end of the Decision Record.
+
+Version 2.3 (2026-09-29)
+
+Security basics. The secret key comes from .env, and debug mode is off by default. Sessions end
+after 30 minutes without activity or 12 hours after sign-in. No password is written in the code:
+first-time passwords are random and shown once, and every new or reset password must be changed
+at first sign-in. See "Security Principles".

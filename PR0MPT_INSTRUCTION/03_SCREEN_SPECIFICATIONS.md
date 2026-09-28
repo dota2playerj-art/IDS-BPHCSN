@@ -74,13 +74,21 @@ Authenticate user.
 
 Redirect based on role.
 
+If the account must set its own password (new account, password reset by an Administrator, or a first-time password from a new install), go to My Account first (Screen 21). No other screen opens until it is done.
+
+Session limits (added 2026-09-29): a person is signed out after 30 minutes without activity, and 12 hours after they sign in. Two minutes before the idle limit, the page asks "Are you still there?". The server enforces both limits and records each sign-out in the audit trail.
+
+Messages
+
+The login form shows only known messages: invalid credentials, maintenance mode, signed out after 30 minutes without activity, and signed out after 12 hours. The link carries a short key, never the sentence. An unknown key shows nothing.
+
 Validation
 
 Required fields.
 
 Invalid credentials.
 
-Locked session after multiple failed attempts.
+There is no account lockout. A refused sign-in is recorded in the audit trail.
 
 Navigation
 
@@ -545,6 +553,10 @@ Enable
 
 Delete
 
+Passwords set here (added 2026-09-29)
+
+Add User and Reset Password both say: "The user must change this password the first time they sign in." The account is marked, and the person must set their own password on My Account before they can open any other screen.
+
 Roles
 
 Administrator
@@ -624,6 +636,10 @@ Reset
 Backup Database
 
 Restore Database
+
+Security pane (updated 2026-09-29)
+
+It holds no controls. It states the rule in one read-only line: "Users are signed out after 30 minutes without activity, and 12 hours after they sign in." It also lists what is enforced and the sign-in counts. The old disabled controls (session timeout box, login attempt limit, two-factor switch, auto logout switch) were removed. Two-factor sign-in and lockout are not part of this system.
 
 ---
 
@@ -1011,6 +1027,8 @@ Validation
 The current password must be supplied and must match. This is the whole difference between this screen and the Administrator's reset on Screen 11: a reset exists precisely *because* the old password is unavailable, and a change exists precisely because it is available and is the only thing proving the person at the keyboard is the account holder rather than whoever found the machine still signed in.
 
 The new password is checked against the same password policy Screen 11 applies — length, character kinds, and refusal of anything containing the username or the person's own name.
+
+When the account must set its own password (added 2026-09-29), the screen says "Please set your own password before you continue." Every other screen sends the person back here until they do. Logout still works. The new password must also differ from the current one. A successful change clears the requirement, and the audit entry says so.
 
 A refused submit re-renders this screen at 200 with the error beside the box it belongs to, the project's form-redisplay standard. Nothing typed is written back into the page: all three boxes hold a password, and re-rendering one into the markup would put it somewhere it should not be.
 
