@@ -22,6 +22,7 @@ import _support  # noqa: E402  (first: builds the test database, points the app 
 
 import config  # noqa: E402
 from app import app  # noqa: E402
+from models.consultations import RESTRICTED_PLACEHOLDER  # noqa: E402
 
 _support.attach(app)
 
@@ -261,8 +262,12 @@ def main():
     check("the visit appears in the profile",
           "Fever and body aches since yesterday" in body)
     check("the dispensing appears in the profile", item["name"] in body)
+    # FIXED 2026-09-28 (L13): this compared against "Restricted — Administrator
+    # access only", text the app stopped showing when the Doctor role arrived
+    # (849a586), so it passed whatever the page said. It now uses the text the
+    # app really shows on a sealed record.
     check("no restriction notice on an unsealed record",
-          "Restricted — Administrator access only" not in body)
+          RESTRICTED_PLACEHOLDER not in body)
 
     print("\n" + "=" * 72)
     failures = [name for name, ok, _ in results if not ok]
