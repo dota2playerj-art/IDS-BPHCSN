@@ -119,6 +119,7 @@ def client_for(account):
     if account is not None:
         with client.session_transaction() as s:
             s["user_id"] = account["id"]
+            _support.open_session(s)
     return client
 
 

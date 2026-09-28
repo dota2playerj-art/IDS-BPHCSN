@@ -66,6 +66,7 @@ def client_as(user_id):
     c = app.test_client()
     with c.session_transaction() as sess:
         sess["user_id"] = user_id
+        _support.open_session(sess)
     return c
 
 

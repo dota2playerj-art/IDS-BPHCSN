@@ -11,12 +11,16 @@ said closing it "would mean a lookup on every guarded request rather than a
 change to this file". This is that change, and the lookup turned out to be one
 the request was already making twice.
 
-A guarded request now asks four questions, in this order:
+A guarded request now asks five questions, in this order:
 
     1. is there a session at all           session["user_id"]
     2. does the account still exist        get_current_user()
     3. is the account still active         user["is_active"]
-    4. is the system open to this role     maintenance_mode()
+    4. is the session within its limits    config.IDLE_TIMEOUT, ABSOLUTE_TIMEOUT
+    5. is the system open to this role     maintenance_mode()
+
+(Question 4 was added later. The notes below that speak of "question 4" mean
+maintenance mode, now question 5.)
 
 Failing 2 or 3 clears the session and returns the same refusal the login form
 gives, so the next request arrives as an anonymous one and the holder has to
@@ -87,16 +91,28 @@ logged-out-looking page instead of a redirect; and routes/report_export.py stamp
 actually produced the file. This function stays a plain lookup. Deciding what a
 deactivated account may do belongs to the guards below, where it can be seen.
 """
+import time
+from datetime import datetime
 from functools import wraps
 
 from flask import (
-    flash, g, has_request_context, redirect, render_template, request, session,
-    url_for,
+    flash, g, has_request_context, jsonify, redirect, render_template, request,
+    session, url_for,
 )
 
-from models.audit import ACTION_SESSION_REVOKED, MODULE_AUTH, log_action
+import config
+from models.audit import (
+    ABSOLUTE_TIMEOUT_HOURS,
+    ACTION_SESSION_ABSOLUTE_TIMEOUT,
+    ACTION_SESSION_IDLE_TIMEOUT,
+    ACTION_SESSION_REVOKED,
+    IDLE_TIMEOUT_MINUTES,
+    MODULE_AUTH,
+    log_action,
+)
 from models.settings import maintenance_mode
 from models.users import get_user_by_id
+from utils.dates import CLINIC_TIMEZONE
 from utils.roles import normalize_role
 
 # Sentinel for "this request has not looked the account up yet", kept distinct
@@ -198,7 +214,118 @@ INVALID_CREDENTIALS_KEY = "credentials"
 
 def refuse_credentials():
     flash(INVALID_CREDENTIALS_MESSAGE)
-    return redirect(url_for("auth.login", error=INVALID_CREDENTIALS_KEY))
+    return _to_login(INVALID_CREDENTIALS_KEY)
+
+
+# ---------------------------------------------------------------------------
+# Session limits: signed out after IDLE_TIMEOUT without activity, and
+# ABSOLUTE_TIMEOUT after sign-in whatever happens (config.py). Enforced here on
+# every guarded request. static/js/session.js only warns and keeps alive.
+# ---------------------------------------------------------------------------
+# Keys for the login form's message table (routes/auth.py LOGIN_FORM_MESSAGES).
+# The URL carries only the key, never the sentence.
+SESSION_IDLE_KEY = "idle"
+SESSION_EXPIRED_KEY = "expired"
+SESSION_IDLE_MESSAGE = (
+    f"You were signed out after {IDLE_TIMEOUT_MINUTES} minutes without activity. "
+    "Please sign in again."
+)
+SESSION_EXPIRED_MESSAGE = (
+    f"You were signed out because {ABSOLUTE_TIMEOUT_HOURS} hours have passed "
+    "since you signed in. Please sign in again."
+)
+# Shown on Settings, Security.
+SESSION_RULE_TEXT = (
+    f"Users are signed out after {IDLE_TIMEOUT_MINUTES} minutes without activity, "
+    f"and {ABSOLUTE_TIMEOUT_HOURS} hours after they sign in."
+)
+# The header static/js/session.js sends. A refused request that carries it gets
+# a 401 with JSON rather than the login page's HTML.
+FETCH_HEADER = "X-Requested-With"
+FETCH_HEADER_VALUE = "fetch"
+# Sent by session.js when it only asks whether the session is still open.
+# Such a request does not count as activity.
+PROBE_HEADER = "X-Session-Probe"
+
+
+def now_ts():
+    """Seconds since the epoch. One function, so the tests can move the clock."""
+    return time.time()
+
+
+def start_session_clock():
+    """Record the sign-in time and the last activity. Called once, at sign-in."""
+    moment = int(now_ts())
+    session["signed_in_at"] = moment
+    session["last_active"] = moment
+
+
+def _wants_json():
+    return (has_request_context()
+            and request.headers.get(FETCH_HEADER) == FETCH_HEADER_VALUE)
+
+
+def _to_login(message_key=None):
+    """Send the person to the login form, or tell the page's script to do it."""
+    target = (url_for("auth.login", error=message_key) if message_key
+              else url_for("auth.login"))
+    if _wants_json():
+        response = jsonify({"signed_in": False, "login_url": target})
+        response.status_code = 401
+        return response
+    return redirect(target)
+
+
+def _session_limit_passed():
+    """ACTION_SESSION_IDLE_TIMEOUT or ..._ABSOLUTE_TIMEOUT if a limit has passed.
+
+    A session with no recorded times started before these limits existed. Its
+    age cannot be proved, so it is treated as past the 12-hour limit.
+    """
+    signed_in_at = session.get("signed_in_at")
+    last_active = session.get("last_active")
+    if not isinstance(signed_in_at, int) or not isinstance(last_active, int):
+        return ACTION_SESSION_ABSOLUTE_TIMEOUT
+    moment = now_ts()
+    if moment - signed_in_at >= config.ABSOLUTE_TIMEOUT.total_seconds():
+        return ACTION_SESSION_ABSOLUTE_TIMEOUT
+    if moment - last_active >= config.IDLE_TIMEOUT.total_seconds():
+        return ACTION_SESSION_IDLE_TIMEOUT
+    return None
+
+
+def _clock_time(seconds):
+    """A stored epoch second as clinic time, for an audit entry."""
+    if not isinstance(seconds, int):
+        return "an unrecorded time"
+    return datetime.fromtimestamp(seconds, CLINIC_TIMEZONE).strftime("%Y-%m-%d %H:%M")
+
+
+def _end_timed_out_session(user, action):
+    """Write the audit entry, clear the session, and send the person to sign in."""
+    ip_address = request.remote_addr if has_request_context() else None
+    if action == ACTION_SESSION_IDLE_TIMEOUT:
+        reason = (f"there was no activity for {IDLE_TIMEOUT_MINUTES} minutes; "
+                  f"last activity at {_clock_time(session.get('last_active'))}")
+        key = SESSION_IDLE_KEY
+    else:
+        reason = (f"{ABSOLUTE_TIMEOUT_HOURS} hours had passed since sign-in; "
+                  f"signed in at {_clock_time(session.get('signed_in_at'))}")
+        key = SESSION_EXPIRED_KEY
+    log_action(
+        user_id=user["id"],
+        action=action,
+        module=MODULE_AUTH,
+        details=(
+            f'Session ended for account "{user["username"]}" '
+            f'({user["full_name"]}, {user["role"]}), from '
+            f'{ip_address or "an address the request did not carry"}; {reason}; '
+            "the person must sign in again"
+        ),
+        ip_address=ip_address,
+    )
+    session.clear()
+    return _to_login(key)
 
 
 def _log_revoked_session(user, ip_address):
@@ -350,6 +477,8 @@ def _maintenance_response(user):
     this system knows when an administrator will switch it back, and a guessed
     number would be the sort of invented figure this project keeps deleting.
     """
+    if _wants_json():
+        return jsonify({"signed_in": True, "maintenance": True}), 503
     return render_template(
         "maintenance.html",
         blocked_name=(user["full_name"] if user is not None else ""),
@@ -366,7 +495,7 @@ def _signed_in_account():
     a valid session -- which they would, the first time one of them was edited.
     """
     if not session.get("user_id"):
-        return None, redirect(url_for("auth.login"))
+        return None, _to_login()
 
     user = get_current_user()
 
@@ -384,6 +513,15 @@ def _signed_in_account():
     # column, at the other end of the session's life.
     if not bool(user["is_active"]):
         return None, _end_revoked_session(user)
+
+    # SESSION LIMITS. Asked after the deactivation check, so a revoked account
+    # is still reported as revoked. A request that passes counts as activity,
+    # except a probe from static/js/session.js, which only asks.
+    limit = _session_limit_passed()
+    if limit:
+        return None, _end_timed_out_session(user, limit)
+    if not request.headers.get(PROBE_HEADER):
+        session["last_active"] = int(now_ts())
 
     # MAINTENANCE MODE, ASKED ONCE HERE AND THEREFORE ASKED ON EVERY GUARDED
     # ROUTE IN THE APPLICATION.

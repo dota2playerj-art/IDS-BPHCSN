@@ -95,6 +95,7 @@ from models.settings import (
 from models.users import get_all_users, get_user_by_id, password_policy
 from routes.report_export import _download
 from utils.dates import display_timestamp, now
+from utils.security import SESSION_RULE_TEXT
 from utils.workbook import safe_filename
 
 
@@ -306,6 +307,8 @@ def settings_context(general_form=None, general_errors=None, active_tab=None):
             "saved_by": saved_by,
         },
         "security": {
+            # The session limits, in the words the server enforces them by.
+            "session_rule": SESSION_RULE_TEXT,
             "sign_ins": stats["logins"],
             "sign_ins_today": stats["logins_today"],
             "refused": stats["refused_logins"],

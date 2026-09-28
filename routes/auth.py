@@ -137,9 +137,14 @@ from utils.roles import normalize_role
 from utils.security import (
     INVALID_CREDENTIALS_KEY,
     INVALID_CREDENTIALS_MESSAGE,
+    SESSION_EXPIRED_KEY,
+    SESSION_EXPIRED_MESSAGE,
+    SESSION_IDLE_KEY,
+    SESSION_IDLE_MESSAGE,
     get_current_user,
     login_required,
     refuse_credentials,
+    start_session_clock,
 )
 
 auth_bp = Blueprint("auth", __name__)
@@ -323,6 +328,10 @@ def _refuse_maintenance():
 LOGIN_FORM_MESSAGES = {
     INVALID_CREDENTIALS_KEY: INVALID_CREDENTIALS_MESSAGE,
     MAINTENANCE_SIGN_IN_KEY: MAINTENANCE_SIGN_IN_MESSAGE,
+    # The two session limits (utils/security.py). Safe for anyone to summon:
+    # they name no account and state a rule that is the same for everyone.
+    SESSION_IDLE_KEY: SESSION_IDLE_MESSAGE,
+    SESSION_EXPIRED_KEY: SESSION_EXPIRED_MESSAGE,
 }
 
 
@@ -421,6 +430,8 @@ def login():
             session["username"] = user["username"]
             session["full_name"] = user["full_name"]
             session["role"] = user["role"]
+            # The start of both session limits. See utils/security.py.
+            start_session_clock()
 
             # Written once here rather than in each of the dispatch
             # branches below: the entry records that this account was admitted,
@@ -506,6 +517,18 @@ def change_own_password():
         flash(message)
         return redirect(url_for("auth.my_account"))
     return render_template("my_account.html", **context)
+
+
+# KEEP-ALIVE. static/js/session.js calls this while the person is active, at
+# most once every config.KEEPALIVE_INTERVAL. The guard does the work: a request
+# that passes it counts as activity. It never changes the sign-in time, so it
+# cannot stretch the 12-hour limit. When the session has ended, the guard
+# answers with a 401 and JSON (the script sends X-Requested-With: fetch), and
+# the script goes to the login page.
+@auth_bp.route("/session/keep-alive", methods=["POST"])
+@login_required
+def keep_alive():
+    return "", 204
 
 
 @auth_bp.route("/dashboard")

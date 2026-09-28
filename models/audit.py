@@ -25,6 +25,7 @@ written here are already in the shape that screen reads:
     details      the expansion, as above
     ip_address   where the request came from
 """
+import config
 from database.connection import db_connection
 from utils.dates import day_start_utc, today
 
@@ -208,6 +209,16 @@ ACTION_LOGIN_BLOCKED = "Blocked sign-in to deactivated account"
 # "who is still trying to use the account I switched off" would read the second
 # as the first and conclude the credential is still in circulation.
 ACTION_SESSION_REVOKED = "Ended session on deactivated account"
+
+# A session the server ended because a session limit in config.py passed.
+# Written by utils/security.py. Two phrases, so the trail says which limit it was.
+# The numbers come from config.py, so the phrase matches the rule in force.
+IDLE_TIMEOUT_MINUTES = int(config.IDLE_TIMEOUT.total_seconds() // 60)
+ABSOLUTE_TIMEOUT_HOURS = int(config.ABSOLUTE_TIMEOUT.total_seconds() // 3600)
+ACTION_SESSION_IDLE_TIMEOUT = (
+    f"Signed out after {IDLE_TIMEOUT_MINUTES} minutes without activity"
+)
+ACTION_SESSION_ABSOLUTE_TIMEOUT = f"Signed out after {ABSOLUTE_TIMEOUT_HOURS} hours"
 
 # The three account-management phrases, written from routes/user_views.py when an
 # Administrator creates an account or changes whether it may sign in.

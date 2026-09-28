@@ -232,7 +232,17 @@
   }
 {% block styles %}{% endblock %}</style>
 </head>
+{#- The session timings for static/js/session.js, from config.py. Only on a
+    signed-in page: the script does nothing without them. #}
+{%- if current_role %}
+<body data-session-idle-ms="{{ (config.IDLE_TIMEOUT.total_seconds() * 1000) | int }}"
+      data-session-warn-ms="{{ (config.IDLE_WARNING.total_seconds() * 1000) | int }}"
+      data-session-ping-ms="{{ (config.KEEPALIVE_INTERVAL.total_seconds() * 1000) | int }}"
+      data-session-keepalive-url="{{ url_for('auth.keep_alive') }}"
+      data-session-login-url="{{ url_for('auth.login') }}">
+{%- else %}
 <body>
+{%- endif %}
 
 <!-- SIDEBAR -->
 <aside class="sidebar">
@@ -501,5 +511,24 @@
       </div>
     </div>
   </div>
+{%- if current_role %}
+  {#- Shown by static/js/session.js shortly before the idle limit. #}
+  <div class="modal fade" id="sessionIdleModal" tabindex="-1" aria-labelledby="sessionIdleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content" style="border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.12);">
+        <div class="modal-header">
+          <h5 class="modal-title" id="sessionIdleModalLabel">Are you still there?</h5>
+        </div>
+        <div class="modal-body">
+          You will be signed out in {{ (config.IDLE_WARNING.total_seconds() // 60) | int }} minutes because there was no activity.
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-primary" id="sessionStayButton" data-bs-dismiss="modal">Stay signed in</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="{{ url_for('static', filename='js/session.js') }}"></script>
+{%- endif %}
 </body>
 </html>

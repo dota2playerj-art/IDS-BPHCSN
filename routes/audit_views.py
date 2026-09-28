@@ -72,6 +72,8 @@ from models.audit import (
     ACTION_LOGIN_SUCCESS,
     ACTION_MAINTENANCE_DISABLED,
     ACTION_MAINTENANCE_ENABLED,
+    ACTION_SESSION_ABSOLUTE_TIMEOUT,
+    ACTION_SESSION_IDLE_TIMEOUT,
     ACTION_SESSION_REVOKED,
     ACTION_SETTINGS_UPDATED,
     ACTION_PASSWORD_RESET,
@@ -242,6 +244,10 @@ _ICONS = {
     # fixed subset and a ligature it does not carry renders as its own literal
     # name, which is the failure mode medicine_inventory.html documents.
     ACTION_SESSION_REVOKED: "link_off",
+    # Sessions the server ended because a session limit passed. Both glyphs are
+    # already drawn elsewhere in this project, so the font subset carries them.
+    ACTION_SESSION_IDLE_TIMEOUT: "hourglass_top",
+    ACTION_SESSION_ABSOLUTE_TIMEOUT: "lock_clock",
     # A refused own-password change. It needs a glyph of its own for the reason
     # the three above do: it is a refusal, and the successful self-change beside
     # it in the trail carries no entry in this map at all, so without one an

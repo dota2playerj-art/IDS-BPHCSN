@@ -54,6 +54,7 @@ def main():
     client = app.test_client()
     with client.session_transaction() as sess:
         sess["user_id"] = STAFF_ID
+        _support.open_session(sess)
         sess["role"] = STAFF_ROLE
 
     conn = db()

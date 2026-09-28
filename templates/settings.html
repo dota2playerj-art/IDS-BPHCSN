@@ -613,62 +613,22 @@
             <!-- SECURITY SETTINGS -->
             <div class="tab-pane fade{% if active_pane == 'pane-security' %} show active{% endif %}" id="pane-security">
               <div class="section-title">Security Settings</div>
-              <div class="section-sub">Session, access, and authentication controls</div>
+              <div class="section-sub">What this system enforces and records about signing in</div>
 
-{#- THE DISABLED CONTROLS IN THIS PANE, INSIDE THEIR OWN FIELDSET. The block of
-    live sign-in figures below is deliberately OUTSIDE it -- it contains no
-    control, only counts, and a fieldset over it would be disabling nothing while
-    implying the numbers were inert.
-
-    "MINIMUM PASSWORD LENGTH: 8" IS GONE FROM HERE, AND IT HAD TO GO RATHER THAN
-    BE CORRECTED. It was wrong twice: the real minimum is 12, and this pane was
-    never where the rule lives -- Password Policy is. Leaving a corrected "12" in
-    a dead box here would put the same number in two panes, which is how one of
-    them comes to be updated and the other not; and this project has just spent
-    the Password Policy pane making sure that number can only be read from the
-    validator. A second copy in a disabled input a tab away would defeat exactly
-    that. The rule is stated once, on the pane named after it. #}
-              <fieldset class="unavailable-form" disabled title="{{ unavailable.settings }}">
-              <div class="row g-3 mb-3">
-                <div class="col-md-4">
-                  <label class="field-label">Session Timeout (minutes)</label>
-                  <input type="number" class="form-control" value="30">
-                </div>
-                {#- THE HINT UNDER THIS FIELD USED TO PROMISE A LOCKOUT.
-                    It read "Account locks after this many failed attempts",
-                    which was false in both halves: nothing counted the attempts
-                    and nothing locked an account. Half of it is now true --
-                    routes/auth.py records every refused sign-in, and the block
-                    below counts them -- which makes the other half more
-                    dangerous rather than less, because a promise sitting beside
-                    a live number reads as the thing that produced it. So the
-                    hint says what actually happens. #}
-                <div class="col-md-4">
-                  <label class="field-label">Login Attempt Limit</label>
-                  <input type="number" class="form-control" value="5">
-                  <div class="form-text-hint">Not enforced. No account is ever locked out.</div>
-                </div>
-              </div>
-
-              <div class="subsection-divider"></div>
-              <div class="toggle-row">
-                <div><div class="toggle-row-label">Two-Factor Authentication</div><div class="toggle-row-desc">Require a one-time code sent via SMS when logging in &mdash; not implemented; sign-in is username and password only</div></div>
-                <label class="switch"><input type="checkbox"><span class="slider"></span></label>
-              </div>
-              <div class="toggle-row">
-                <div><div class="toggle-row-label">Auto Logout on Inactivity</div><div class="toggle-row-desc">Automatically sign users out after the session timeout period &mdash; not implemented; a session ends when the browser is closed or Logout is used</div></div>
-                <label class="switch"><input type="checkbox" checked><span class="slider"></span></label>
-              </div>
-              </fieldset>
-
-{#- THE ONE THING THIS PANE DOES ENFORCE, SAID WHERE THE DEAD CONTROLS ARE.
-    Every switch above is off in fact whatever it shows, and a reader who has
-    just been told that three times could reasonably conclude the system enforces
-    nothing about access. It enforces the two things below, and both are real
-    guards with code behind them -- so they are stated here rather than left for
-    somebody to discover, and stated as facts rather than as controls. #}
-              <div class="subsection-divider"></div>
+{#- NO CONTROLS IN THIS PANE. It used to hold four disabled controls: Session
+    Timeout, Login Attempt Limit, Two-Factor Authentication and Auto Logout.
+    None did anything. The session limits are now real and are stated below
+    as facts, read from utils/security.py SESSION_RULE_TEXT, which is built
+    from config.py. Two-factor sign-in and a lockout policy are not part of
+    this system, so their controls are gone. #}
               <div class="subsection-title"><span class="material-symbols-outlined" style="color:var(--teal-dark); font-size:18px;">verified_user</span>What is actually enforced</div>
+              <div class="fact-row">
+                <div>
+                  <div class="fact-label">Sessions end on their own</div>
+                  <div class="fact-desc">{{ security.session_rule }}</div>
+                </div>
+                <div class="fact-value" style="color:#15803D;">Enforced</div>
+              </div>
               <div class="fact-row">
                 <div>
                   <div class="fact-label">Every screen checks the role that opens it</div>

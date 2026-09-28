@@ -317,6 +317,19 @@ def _cleanup():
 atexit.register(_cleanup)
 
 
+def open_session(sess):
+    """Give a session a suite builds by hand the two times a real sign-in records.
+
+    The server treats a session without them as past the 12-hour limit
+    (utils/security.py). A real sign-in sets them in routes/auth.py.
+    """
+    import time
+
+    moment = int(time.time())
+    sess["signed_in_at"] = moment
+    sess["last_active"] = moment
+
+
 def work_path(name):
     """A path for a scratch file inside this suite's temporary folder."""
     return guard_path(os.path.join(TEST_DIR, name))

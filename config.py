@@ -9,6 +9,7 @@ project folder is read at import. Run ``python setup_env.py`` once to create it.
 A value already set in the environment wins over the .env file.
 """
 import os
+from datetime import timedelta
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -29,6 +30,17 @@ DEBUG = os.environ.get("IDS_DEBUG", "").strip() == "1"
 
 DATABASE = os.path.join(BASE_DIR, "app.db")
 SCHEMA = os.path.join(BASE_DIR, "schema.sql")
+
+# Session limits. The server enforces them on every request (utils/security.py).
+# The computers are shared, so a session must not stay open for the next person.
+# Signed out after this long with no activity.
+IDLE_TIMEOUT = timedelta(minutes=30)
+# Signed out this long after signing in, whatever happens.
+ABSOLUTE_TIMEOUT = timedelta(hours=12)
+# The browser shows "Are you still there?" this long before the idle limit.
+IDLE_WARNING = timedelta(minutes=2)
+# The browser sends at most one keep-alive in this time while the user is active.
+KEEPALIVE_INTERVAL = timedelta(minutes=5)
 
 
 def secret_key_problem(value):
