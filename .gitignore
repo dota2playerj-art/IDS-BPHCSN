@@ -62,6 +62,8 @@ docs/verification/**/*.webp
 *.env
 # Other environment files, such as .env.local.
 .env.*
+# The template with names only and no values is tracked on purpose.
+!.env.example
 
 # --- More guards for patient data (added 2026-09-28) ------------------------
 # Any SQLite database file, anywhere in the project. Only schema.sql is tracked.

@@ -44,6 +44,12 @@ def no_store(response):
 
 
 def create_app():
+    # Refuse to start without a proper secret key. The key signs every session
+    # cookie, so a missing or public key would let anyone sign in as anyone.
+    problem = config.secret_key_problem(config.SECRET_KEY)
+    if problem:
+        raise SystemExit("IDS-BPHCSN cannot start. " + problem)
+
     app = Flask(__name__)
     app.config.from_object(config)
 

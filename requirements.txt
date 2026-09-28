@@ -27,3 +27,7 @@ openpyxl==3.1.5
 # runs offline", not openpyxl's stronger "pure Python all the way down". See
 # utils/document.py.
 fpdf2==2.8.4
+# Reads SECRET_KEY and IDS_DEBUG from a .env file in the project folder, so the
+# secret key is never written in the code. Run python setup_env.py once to
+# create that file. Pure Python, no other packages needed.
+python-dotenv==1.2.3

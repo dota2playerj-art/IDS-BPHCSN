@@ -19,6 +19,7 @@ run on its own makes its own folder and deletes it at exit.
 """
 import atexit
 import os
+import secrets
 import shutil
 import sqlite3
 import sys
@@ -27,6 +28,11 @@ from datetime import date, timedelta
 from pathlib import Path
 
 from werkzeug.security import generate_password_hash
+
+# The tests make their own secret key, so they never need a .env file. Set
+# before config is imported. A .env file never overrides a value already set.
+os.environ["SECRET_KEY"] = secrets.token_hex(32)
+os.environ["IDS_DEBUG"] = "0"
 
 REPO = Path(__file__).resolve().parent.parent
 LIVE_DB = REPO / "app.db"

@@ -3,12 +3,38 @@
 Kept as a plain module so it can be consumed two ways: Flask picks up the
 upper-case names via ``app.config.from_object(config)``, and standalone scripts
 (``populate_records.py``) import the paths directly without booting the app.
+
+Secrets come from the environment, never from this file. A .env file in the
+project folder is read at import. Run ``python setup_env.py`` once to create it.
+A value already set in the environment wins over the .env file.
 """
 import os
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent
+from dotenv import load_dotenv
 
-SECRET_KEY = os.environ.get("SECRET_KEY", "ids-bphcsn-dev-secret")
+BASE_DIR = Path(__file__).resolve().parent
+load_dotenv(BASE_DIR / ".env")
+
+# Checked by secret_key_problem() when the app starts. There is no fallback:
+# a key written in the code is a key everyone with the code knows.
+SECRET_KEY = os.environ.get("SECRET_KEY", "")
+SECRET_KEY_MIN_LENGTH = 32
+# The value this file used to fall back to. It is public, so it is refused.
+_OLD_FALLBACK_KEY = "ids-bphcsn-dev-secret"
+
 DATABASE = os.path.join(BASE_DIR, "app.db")
 SCHEMA = os.path.join(BASE_DIR, "schema.sql")
+
+
+def secret_key_problem(value):
+    """A short message saying what is wrong with a SECRET_KEY, or None if it is fine."""
+    fix = "Run: python setup_env.py   (it creates a .env file with a new key)"
+    if not value:
+        return "SECRET_KEY is not set. " + fix
+    if value == _OLD_FALLBACK_KEY:
+        return "SECRET_KEY is the old public default. " + fix
+    if len(value) < SECRET_KEY_MIN_LENGTH:
+        return (f"SECRET_KEY is too short. It needs at least "
+                f"{SECRET_KEY_MIN_LENGTH} characters. " + fix)
+    return None
