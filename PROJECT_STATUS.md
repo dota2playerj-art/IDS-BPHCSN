@@ -1,7 +1,7 @@
 # IDS-BPHCSN — Project Status
 
 Last updated: 2026-09-28
-Updated by: Task 1 — repository safety
+Updated by: Task 1b — fresh install and connection fixes
 
 Sections 1–7 started as a read-only status audit. The Task Log below says what each task after it changed. The live `app.db` has only ever been opened read-only by these tasks.
 
@@ -15,6 +15,7 @@ Newest first.
 
 | Date | Task | Result |
 |---|---|---|
+| 2026-09-28 | Task 1b — fresh install and connection fixes | H5, M16 and L13 done. `schema.sql` now matches the live database (see "Schema drift"). Every app connection goes through `db_connection()`. New suite `verify_database_integrity.py`. Tests: 1249/1249, 12 of 12 suites. |
 | 2026-09-28 | Task 1 — repository safety | Tests now live in `tests/` and run with one command on a fresh test database. 5 stale worktrees removed. 54 backup copies moved out of the project. `.gitignore` tightened. The test run found a real defect (H5) and patient names in git (H6). |
 | 2026-09-28 | Status audit | Wrote this file. Read-only. |
 
@@ -34,28 +35,41 @@ python tests/run_all.py rbac       only the suites whose names contain "rbac"
 - The live `app.db` is never used. A guard stops the whole run if any database path is inside the project folder. The runner also checks that `app.db` has the same size, time and checksum after the run.
 - Test accounts use test-only passwords (`tests/_support.py`), not the demo passwords.
 - All test data is made up. The old suites used a real staff member's name for account 4; the tests now use `bhwtest` / "Test Health Worker".
-- "All passing" looks like: one `ok` line per suite, then `TOTAL: 1231/1231 checks passed in 11/11 suites` and `All checks passed.` Exit code 0.
-- **Today it is 906/921, with 6 of 11 suites passing.** All failures come from one real defect, H5. With only H5 worked around in a throwaway copy, every check passed: 1231/1231.
+- "All passing" looks like: one `ok` line per suite, then `TOTAL: 1249/1249 checks passed in 12/12 suites` and `All checks passed.` Exit code 0.
+- **Today (after Task 1b): 1249/1249, all 12 suites pass.** Before Task 1b it was 906/921; every failure came from H5.
 
-| Suite | Checks | Result on 2026-09-28 |
+| Suite | Checks | Result after Task 1b |
 |---|---|---|
-| verify_epi.py | 15 | Crashed after 6 passed, 2 failed (H5) |
-| verify_staff_capabilities.py | 27 | Crashed after 0 passed, 2 failed (H5) |
+| verify_epi.py | 15 | 15/15 |
+| verify_staff_capabilities.py | 27 | 27/27 |
 | verify_add_user.py | 122 | 122/122 |
 | verify_my_account.py | 344 | 344/344 |
 | verify_password_change_audit.py | 50 | 50/50 |
 | verify_edit_user_reset_password.py | 82 | 82/82 |
-| verify_rbac.py | 117 | 90/105 (H5; 12 checks did not run) |
+| verify_rbac.py | 117 | 117/117 |
 | verify_reports.py | 61 | 61/61 |
-| verify_dispensing.py | 128 | Crashed after 51 passed, 8 failed (H5) |
-| verify_doctor.py | 128 | Crashed after 28 passed, 3 failed (H5) |
+| verify_dispensing.py | 128 | 128/128 |
+| verify_doctor.py | 128 | 128/128 |
 | verify_service_schedule.py | 157 | 157/157 |
+| verify_database_integrity.py (new) | 18 | 18/18 |
 
 Not brought in: the four `d4d04b0e_*` scripts (they print values but have no pass/fail checks; they were only compared between two code trees), the three retired originals that `*_ported.py` replaced, the mutation worktrees, and one Doctor-suite check that ran old code from a worktree (L13).
 
 ### Where backups live
 
 Copies of `app.db` go in the folder **`IDS-BPHCSN-backups`**, next to the project folder (same parent folder). Never in the project folder. They hold patient records. `.gitignore` also ignores any backup copy by name, as a second guard.
+
+### Schema drift (Task 1b)
+
+A fresh install (`schema.sql`, then the seed) was compared with the live `app.db` (read-only): tables, columns, types, NOT NULL, defaults, keys, foreign keys, CHECKs, indexes and triggers. Five differences were found.
+
+| Difference | Resolved how |
+|---|---|
+| `consultations.updated_at`: NOT NULL with a default (fresh) vs nullable, no default (live) | `schema.sql` now matches live. Made by `migrate_add_consultation_columns.py`. This was H5. |
+| `consultations.restricted_by` foreign key: ON DELETE RESTRICT (fresh) vs no ON DELETE (live) | `schema.sql` now matches live. The migration left it out on purpose (`migrate_add_consultation_restriction.py:63-67`), and nothing deletes accounts. |
+| Column order in `consultations`, `inventory_items`, `patients` | Left as is. Live order comes from `ALTER TABLE ADD COLUMN`. No code reads columns by position: every INSERT names its columns, and audit text follows label order (`models/audit.py:839-866`). |
+
+Everything else matches. `tests/verify_database_integrity.py` checks the consultations table of a fresh install against a stored structure, so it cannot drift back.
 
 ### Git snapshot
 
@@ -249,7 +263,7 @@ None found. Every route carries a guard. The only unguarded routes are `/`, `/lo
 |---|---|
 | Schema | `schema.sql:12` (role CHECK), `schema.sql:3` comment |
 | Migration | `migrate_add_doctor_role.py` (rebuilds `users` with the new CHECK, adds the `doctor` account) |
-| Seed | `models/users.py:141` `("doctor", "(retired demo password)", "RHU Physician (demo)", "Doctor")` |
+| Seed | The demo `doctor` account: see `models/users.py:141` |
 | Role list | `models/users.py:162` `CLINICAL_ROLES`, `:298` `ROLE_CHOICES`, `:313` `DOCTOR_ROLE` |
 | Single rule | `utils/roles.py:44-49` `CLINICAL_AUTHORITY_ROLE = "doctor"`, `holds_clinical_authority()` |
 | Permissions | `models/consultations.py:161, 177, 198`; `models/patients.py:157`; `models/dispensing.py:746` |
@@ -276,7 +290,7 @@ None found. Every route carries a guard. The only unguarded routes are `/`, `/lo
 ## 5. Issues Found
 
 Severity: High = breaks a feature, or is a security or legal risk. Medium = wrong behavior or confusing. Low = cleanup.
-Count: **6 High, 16 Medium, 13 Low.** Done: M11, M15, L9 (Task 1). Added in Task 1: H5, H6, M16, L13.
+Count: **6 High, 16 Medium, 14 Low.** Done: M11, M15, L9 (Task 1); H5, M16, L13 (Task 1b). Added in Task 1: H5, H6, M16, L13. Added in Task 1b: L14.
 
 | # | Severity | File:line | Problem | Suggested direction |
 |---|---|---|---|---|
@@ -284,7 +298,7 @@ Count: **6 High, 16 Medium, 13 Low.** Done: M11, M15, L9 (Task 1). Added in Task
 | H2 | High | `config.py:12` | `SECRET_KEY` falls back to the hardcoded `"ids-bphcsn-dev-secret"`, and there is no `.env`. Anyone with the code can forge a session cookie for any user id, including the Administrator. | Require `SECRET_KEY` from the environment; refuse to start without it. |
 | H3 | High | `routes/audit_views.py:58`; `routes/patient_views.py:406-420` | Patient register/edit/status changes (including **declaring a death**), inventory changes, dispensing, queue actions and new consultations write no audit entry. | Add `log_action()` to these write paths, death declaration first. |
 | H4 | High | `routes/admin.py:930`; `models/consultations.py:388-392` | The Administrator (not a physician) can read sealed diagnoses through the backup download and through audit entries written before sealing. This is an RA 11166 risk. There are 0 sealed records today, so it is a risk path, not a current leak. | Team decides the policy: e.g. redact sealed fields in audit view on read, and limit or encrypt what the backup holds. |
-| H5 | High | `schema.sql:114` (consultations `updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP`); `models/consultations.py:999-1005` | On a database built from `schema.sql` (any fresh install or new clone), recording a consultation fails with HTTP 500: the insert writes `updated_at = NULL` into a NOT NULL column. The live `app.db` works only because a migration added this column as nullable. Found by the test run in Task 1. | Make `schema.sql` and the insert agree (e.g. the column nullable, as in the live DB, or insert a real timestamp). Team decides. |
+| H5 | High | `schema.sql:114` (consultations `updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP`); `models/consultations.py:999-1005` | On a database built from `schema.sql` (any fresh install or new clone), recording a consultation fails with HTTP 500: the insert writes `updated_at = NULL` into a NOT NULL column. The live `app.db` works only because a migration added this column as nullable. Found by the test run in Task 1. **Done (Task 1b):** `schema.sql` now declares `updated_at TEXT` (nullable, no default), as the live DB does, so the app behaves the same on both. | — |
 | H6 | High | 12 tracked files, e.g. `docs/verification/retire-advance-booking/README.md`, `migrate_clear_seeded_remarks.py`, `AUDIT_REPORT_2026-08-06_v2.md`, comments in `models/audit.py` and `routes/user_views.py`; 10 commits; 3 commit messages | 16 of the 29 patient full names in the live `app.db`, and 6 patient contact numbers, appear in tracked files and in git history. They are not from the demo seed script. Whether they are real people: Not verified. A push would publish them. | Before the first push: confirm whether they are real. If real, replace them in the files and decide on rewriting history. |
 | M1 | Medium | `app.py:67` | `debug=True` whenever the app starts with `python app.py` (the README's run command). The Werkzeug debugger allows code execution if reached. Default bind is 127.0.0.1, so the risk is lower. | Read debug from an env variable; default off. |
 | M2 | Medium | (none found: no `csrf` anywhere) | POST forms have no CSRF token. Logout is a GET (`routes/auth.py:458`). | Add a CSRF token (e.g. Flask-WTF `CSRFProtect`). |
@@ -301,7 +315,7 @@ Count: **6 High, 16 Medium, 13 Low.** Done: M11, M15, L9 (Task 1). Added in Task
 | M13 | Medium | live DB; `populate_records.py:251-274` | 28 of 29 demo consultations have diagnoses by non-Doctor accounts, and the seed script still writes diagnoses. This contradicts the new rule during a demo. | Decide whether to clear or reattribute the demo diagnoses. |
 | M14 | Medium | `routes/official.py:196-199` | The Official's Notifications screen is a placeholder with no data. | Remove it from the menu, or build it. |
 | M15 | Medium | project root (`app.db.*BACKUP*`, 54 files, 26,525,696 bytes) | **Done (Task 1).** All 54 moved to `IDS-BPHCSN-backups` next to the project folder. Count, bytes and every file's checksum match. | — |
-| M16 | Medium | `database/connection.py:27`; `models/consultations.py:1007-1011` | A write that fails leaves its SQLite connection open. In the tests, every later write in the same process then failed with "database is locked". Seen after H5. Effect on the running server: Not verified. | Close connections on error (`try`/`finally` or `with`). |
+| M16 | Medium | `database/connection.py:27`; `models/consultations.py:1007-1011` | A write that fails leaves its SQLite connection open. In the tests, every later write in the same process then failed with "database is locked". Seen after H5. Effect on the running server: Not verified. **Done (Task 1b):** new `db_connection()` in `database/connection.py` closes every connection and rolls back a failed write. All 97 app call sites use it (14 files). | — |
 | L1 | Low | `routes/auth.py:352-353` | Legacy branch compares a plain-text `password` column. The column no longer exists, so this is dead code. | Delete the branch. |
 | L2 | Low | `routes/consultation_views.py:1000-1002` | The seal flash at record time says the diagnosis is hidden "from Health Center Staff" only; it is also hidden from the Administrator now. | Add "and the Administrator". |
 | L3 | Low | `templates/appointment_scheduling.html:631, 676` | "Booked" column is left over from advance booking and is always "—". | Remove the column. |
@@ -314,7 +328,8 @@ Count: **6 High, 16 Medium, 13 Low.** Done: M11, M15, L9 (Task 1). Added in Task
 | L10 | Low | e.g. `utils/security.py:1-89`, `routes/auth.py:1-120` | Very long code comments. Hard for the team to maintain and explain at the defense. | Trim to short summaries; keep the reasoning in docs. |
 | L11 | Low | `models/immunizations.py:116-140` | EPI has one IPV dose (14 weeks). Whether a second DOH IPV dose applies: Not verified. | Confirm with the RHU nurse. |
 | L12 | Low | `PR0MPT_INSTRUCTION/08_PROJECT_ROADMAP.md:75` | Says "89 guarded endpoints for all three roles". Code has 91 guarded view functions and four roles. | Update with the other doc fixes (§6). |
-| L13 | Low | `tests/verify_doctor.py` (section H); `tests/verify_staff_capabilities.py` | Two test gaps. (1) One Doctor-suite check ran the old code from a worktree; it is not run now, and the row it made is written directly. (2) The staff suite checks that "Restricted — Administrator access only" is absent; that text no longer exists, so the check always passes. | Team decides whether to replace either check. |
+| L13 | Low | `tests/verify_doctor.py` (section H); `tests/verify_staff_capabilities.py` | Two test gaps. (1) One Doctor-suite check ran the old code from a worktree; it is not run now, and the row it made is written directly. (2) The staff suite checks that "Restricted — Administrator access only" is absent; that text no longer exists, so the check always passes. **Done (Task 1b):** (2) now uses the app's real placeholder text, and fails on a sealed record. (1) is not replaced: it tested old code that no longer exists. What it protected (an old Administrator seal stays sealed) is still checked in section S, and section F checks that the Administrator cannot seal now. | — |
+| L14 | Low | `migrate_add_consultation_columns.py:47-52` | Its note says the `updated_at` difference between a migrated and a fresh database is "deliberate" and "the only one". After Task 1b there is no such difference. This task may not edit migrations. | Update the note when migrations are next touched. |
 
 Checked and **not** found: `TODO`/`FIXME`/`XXX` markers; `href="#"` or "coming soon" stubs; broken `url_for()` targets (123 literal calls and 73 context endpoint names all resolve); missing static files; "Agusan del Sur" as a live value (it appears only in notes about the correction, in code comments and docs 06/09, and not at all in the live DB); passwords sent by email or SMS; offline mode, national database integration, or non-plain-text SMS.
 
