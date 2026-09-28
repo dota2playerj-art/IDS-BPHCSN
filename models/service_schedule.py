@@ -59,7 +59,7 @@ The Nth occurrence of a weekday in a month is (day - 1) // 7 + 1: days 1-7 hold
 the 1st of every weekday, 8-14 the 2nd, and so on. That is the whole of the
 calendar arithmetic here, and week_of_month() is the only place it is written.
 """
-from database.connection import get_db
+from database.connection import db_connection
 from utils.dates import today
 
 # ---------------------------------------------------------------------------
@@ -193,20 +193,18 @@ def _decorate(row):
 
 def get_entries():
     """Every entry, alphabetically by service, then oldest first."""
-    conn = get_db()
-    rows = conn.execute(
-        "SELECT * FROM service_schedule ORDER BY service COLLATE NOCASE, id"
-    ).fetchall()
-    conn.close()
+    with db_connection() as conn:
+        rows = conn.execute(
+            "SELECT * FROM service_schedule ORDER BY service COLLATE NOCASE, id"
+        ).fetchall()
     return [_decorate(row) for row in rows]
 
 
 def get_entry(entry_id):
-    conn = get_db()
-    row = conn.execute(
-        "SELECT * FROM service_schedule WHERE id = ?", (entry_id,)
-    ).fetchone()
-    conn.close()
+    with db_connection() as conn:
+        row = conn.execute(
+            "SELECT * FROM service_schedule WHERE id = ?", (entry_id,)
+        ).fetchone()
     return _decorate(row) if row else None
 
 
@@ -450,19 +448,18 @@ def create_entry(values, actor_id, entries=None):
     """Insert one validated entry. Returns the stored row, decorated."""
     entries = get_entries() if entries is None else entries
     stored = _stored(values, entries)
-    conn = get_db()
-    cursor = conn.execute(
-        """
+    with db_connection() as conn:
+        cursor = conn.execute(
+            """
         INSERT INTO service_schedule
             (service, weekdays, weeks_of_month, note, created_by)
         VALUES (?, ?, ?, ?, ?)
         """,
-        (stored["service"], stored["weekdays"], stored["weeks_of_month"],
-         stored["note"], actor_id),
-    )
-    conn.commit()
-    new_id = cursor.lastrowid
-    conn.close()
+            (stored["service"], stored["weekdays"], stored["weeks_of_month"],
+             stored["note"], actor_id),
+        )
+        conn.commit()
+        new_id = cursor.lastrowid
     return get_entry(new_id)
 
 
@@ -475,20 +472,19 @@ def update_entry(entry_id, values, actor_id, entries=None):
     """
     entries = get_entries() if entries is None else entries
     stored = _stored(values, entries, editing_id=entry_id)
-    conn = get_db()
-    cursor = conn.execute(
-        """
+    with db_connection() as conn:
+        cursor = conn.execute(
+            """
         UPDATE service_schedule
            SET service = ?, weekdays = ?, weeks_of_month = ?, note = ?,
                updated_by = ?, updated_at = CURRENT_TIMESTAMP
          WHERE id = ?
         """,
-        (stored["service"], stored["weekdays"], stored["weeks_of_month"],
-         stored["note"], actor_id, entry_id),
-    )
-    conn.commit()
-    changed = cursor.rowcount
-    conn.close()
+            (stored["service"], stored["weekdays"], stored["weeks_of_month"],
+             stored["note"], actor_id, entry_id),
+        )
+        conn.commit()
+        changed = cursor.rowcount
     return get_entry(entry_id) if changed else None
 
 
@@ -519,9 +515,8 @@ def delete_entry(entry_id):
     entry = get_entry(entry_id)
     if entry is None:
         return None
-    conn = get_db()
-    cursor = conn.execute("DELETE FROM service_schedule WHERE id = ?", (entry_id,))
-    conn.commit()
-    removed = cursor.rowcount
-    conn.close()
+    with db_connection() as conn:
+        cursor = conn.execute("DELETE FROM service_schedule WHERE id = ?", (entry_id,))
+        conn.commit()
+        removed = cursor.rowcount
     return entry if removed else None

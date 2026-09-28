@@ -41,7 +41,7 @@ receive one. 'Sent' means the gateway accepted the message, which is genuinely
 all a POST to the messages endpoint tells you. A delivery percentage would have
 to be made up, so none is stored or shown.
 """
-from database.connection import get_db
+from database.connection import db_connection
 from models.consultations import PEDIATRIC_AGE_YEARS
 from models.patients import SENIOR_AGE, calculate_age
 from utils.dates import (
@@ -157,9 +157,9 @@ def _patient_contacts(min_age=None, max_age=None):
     `max_age` is exclusive: max_age=5 is "under five", matching how
     PEDIATRIC_AGE_YEARS is read everywhere else in the project.
     """
-    conn = get_db()
-    rows = conn.execute(
-        """
+    with db_connection() as conn:
+        rows = conn.execute(
+            """
         SELECT id, first_name, middle_name, last_name, birth_date, contact_number
         FROM patients
         WHERE status = 'Active'
@@ -167,8 +167,7 @@ def _patient_contacts(min_age=None, max_age=None):
           AND TRIM(contact_number) != ''
         ORDER BY last_name COLLATE NOCASE, first_name COLLATE NOCASE
         """
-    ).fetchall()
-    conn.close()
+        ).fetchall()
 
     contacts = []
     for row in rows:
@@ -203,16 +202,15 @@ def _personnel_contacts():
     currently resolves to nobody and the compose dialog says so. That is the
     honest reading of the column rather than a reason to invent numbers for it.
     """
-    conn = get_db()
-    rows = conn.execute(
-        """
+    with db_connection() as conn:
+        rows = conn.execute(
+            """
         SELECT id, full_name, role, phone
         FROM users
         WHERE is_active = 1 AND phone IS NOT NULL AND TRIM(phone) != ''
         ORDER BY full_name COLLATE NOCASE
         """
-    ).fetchall()
-    conn.close()
+        ).fetchall()
 
     return [
         {
@@ -346,15 +344,14 @@ def generate_next_reference(conn=None):
     so a deleted broadcast cannot cause a UNIQUE collision -- the same reasoning
     as generate_next_patient_id().
     """
-    owns_connection = conn is None
-    conn = conn or get_db()
+    if conn is None:
+        with db_connection() as own:
+            return generate_next_reference(own)
     year = today().year
     rows = conn.execute(
         "SELECT reference FROM sms_broadcasts WHERE reference LIKE ?",
         (f"SMS-{year}-%",),
     ).fetchall()
-    if owns_connection:
-        conn.close()
 
     highest = 0
     for row in rows:
@@ -410,43 +407,42 @@ def send_broadcast(message, audience, category, sent_by):
     else:
         status = STATUS_PARTIAL
 
-    conn = get_db()
-    reference = generate_next_reference(conn)
-    cursor = conn.execute(
-        """
+    with db_connection() as conn:
+        reference = generate_next_reference(conn)
+        cursor = conn.execute(
+            """
         INSERT INTO sms_broadcasts
             (reference, message, category, audience, audience_label,
              recipient_count, sent_count, failed_count, segments, encoding,
              status, delivery_mode, sent_by)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (
-            reference, message, category or None, audience,
-            AUDIENCES[audience]["label"], len(recipients), sent_count,
-            failed_count, metrics["segments"], metrics["encoding"], status,
-            delivery_mode, sent_by,
-        ),
-    )
-    broadcast_id = cursor.lastrowid
+            (
+                reference, message, category or None, audience,
+                AUDIENCES[audience]["label"], len(recipients), sent_count,
+                failed_count, metrics["segments"], metrics["encoding"], status,
+                delivery_mode, sent_by,
+            ),
+        )
+        broadcast_id = cursor.lastrowid
 
-    for recipient, outcome in results:
-        conn.execute(
-            """
+        for recipient, outcome in results:
+            conn.execute(
+                """
             INSERT INTO sms_broadcast_recipients
                 (broadcast_id, patient_id, user_id, recipient_name, mobile_number,
                  status, gateway_response)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (
-                broadcast_id, recipient["patient_id"], recipient["user_id"],
-                recipient["name"], recipient["mobile"],
-                "Sent" if outcome["status"] == "sent" else "Failed",
-                outcome.get("response") or outcome.get("error"),
-            ),
-        )
+                (
+                    broadcast_id, recipient["patient_id"], recipient["user_id"],
+                    recipient["name"], recipient["mobile"],
+                    "Sent" if outcome["status"] == "sent" else "Failed",
+                    outcome.get("response") or outcome.get("error"),
+                ),
+            )
 
-    conn.commit()
-    conn.close()
+        conn.commit()
 
     broadcast = get_broadcast_by_id(broadcast_id)
     broadcast["merged_duplicates"] = merged
@@ -479,36 +475,33 @@ _HISTORY_SELECT = """
 
 def get_broadcast_history(limit=50):
     """Past broadcasts, newest first, with the sender's name resolved."""
-    conn = get_db()
-    rows = conn.execute(
-        _HISTORY_SELECT + " ORDER BY b.sent_at DESC, b.id DESC LIMIT ?", (limit,)
-    ).fetchall()
-    conn.close()
+    with db_connection() as conn:
+        rows = conn.execute(
+            _HISTORY_SELECT + " ORDER BY b.sent_at DESC, b.id DESC LIMIT ?", (limit,)
+        ).fetchall()
     return [_to_broadcast(row) for row in rows]
 
 
 def get_broadcast_by_id(broadcast_id):
-    conn = get_db()
-    row = conn.execute(
-        _HISTORY_SELECT + " WHERE b.id = ?", (broadcast_id,)
-    ).fetchone()
-    conn.close()
+    with db_connection() as conn:
+        row = conn.execute(
+            _HISTORY_SELECT + " WHERE b.id = ?", (broadcast_id,)
+        ).fetchone()
     return _to_broadcast(row) if row else None
 
 
 def get_broadcast_recipients(broadcast_id, limit=None):
     """Who one broadcast went to, and what the gateway said about each."""
-    conn = get_db()
-    rows = conn.execute(
-        """
+    with db_connection() as conn:
+        rows = conn.execute(
+            """
         SELECT * FROM sms_broadcast_recipients
         WHERE broadcast_id = ?
         ORDER BY recipient_name COLLATE NOCASE, id
         """
-        + (" LIMIT ?" if limit else ""),
-        (broadcast_id, limit) if limit else (broadcast_id,),
-    ).fetchall()
-    conn.close()
+            + (" LIMIT ?" if limit else ""),
+            (broadcast_id, limit) if limit else (broadcast_id,),
+        ).fetchall()
     return [dict(row) for row in rows]
 
 

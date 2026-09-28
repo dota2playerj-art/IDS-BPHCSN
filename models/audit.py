@@ -25,7 +25,7 @@ written here are already in the shape that screen reads:
     details      the expansion, as above
     ip_address   where the request came from
 """
-from database.connection import get_db
+from database.connection import db_connection
 from utils.dates import day_start_utc, today
 
 # The module pills the Audit Logs screen already renders. Named constants rather
@@ -575,17 +575,16 @@ def log_action(user_id, action, module=None, details=None, ip_address=None):
     if not user_id:
         return None
 
-    conn = get_db()
-    cursor = conn.execute(
-        """
+    with db_connection() as conn:
+        cursor = conn.execute(
+            """
         INSERT INTO audit_logs (user_id, action, module, details, ip_address)
         VALUES (?, ?, ?, ?, ?)
         """,
-        (user_id, action, module, details, ip_address),
-    )
-    conn.commit()
-    entry_id = cursor.lastrowid
-    conn.close()
+            (user_id, action, module, details, ip_address),
+        )
+        conn.commit()
+        entry_id = cursor.lastrowid
     return entry_id
 
 
@@ -606,9 +605,9 @@ def get_audit_logs(module=None, limit=100):
         cap = "LIMIT ?"
         parameters = parameters + [limit]
 
-    conn = get_db()
-    rows = conn.execute(
-        f"""
+    with db_connection() as conn:
+        rows = conn.execute(
+            f"""
         SELECT a.id, a.action, a.module, a.details, a.ip_address, a.created_at,
                u.full_name AS user_name, u.role AS user_role
         FROM audit_logs a
@@ -617,9 +616,8 @@ def get_audit_logs(module=None, limit=100):
         ORDER BY a.created_at DESC, a.id DESC
         {cap}
         """,
-        parameters,
-    ).fetchall()
-    conn.close()
+            parameters,
+        ).fetchall()
     return [dict(row) for row in rows]
 
 
@@ -636,9 +634,9 @@ def get_latest_entry(module, action):
     taken. models/backup.py writes no file and keeps no history of its own, by
     design, so the trail is not one source among several here -- it is the source.
     """
-    conn = get_db()
-    row = conn.execute(
-        """
+    with db_connection() as conn:
+        row = conn.execute(
+            """
         SELECT a.id, a.action, a.module, a.details, a.ip_address, a.created_at,
                u.full_name AS user_name, u.role AS user_role
           FROM audit_logs a
@@ -647,9 +645,8 @@ def get_latest_entry(module, action):
       ORDER BY a.created_at DESC, a.id DESC
          LIMIT 1
         """,
-        (module, action),
-    ).fetchone()
-    conn.close()
+            (module, action),
+        ).fetchone()
     return dict(row) if row is not None else None
 
 
@@ -659,11 +656,10 @@ def count_audit_logs(module=None):
     clause = "WHERE module = ?" if module else ""
     parameters = [module] if module else []
 
-    conn = get_db()
-    total = conn.execute(
-        f"SELECT COUNT(*) FROM audit_logs {clause}", parameters
-    ).fetchone()[0]
-    conn.close()
+    with db_connection() as conn:
+        total = conn.execute(
+            f"SELECT COUNT(*) FROM audit_logs {clause}", parameters
+        ).fetchone()[0]
     return total
 
 
@@ -713,71 +709,70 @@ def get_audit_stats():
     """
     start_of_today = day_start_utc(today())
 
-    conn = get_db()
-    total = conn.execute("SELECT COUNT(*) FROM audit_logs").fetchone()[0]
-    today_count = conn.execute(
-        "SELECT COUNT(*) FROM audit_logs WHERE created_at >= ?", (start_of_today,)
-    ).fetchone()[0]
-    by_module = conn.execute(
-        """
+    with db_connection() as conn:
+        total = conn.execute("SELECT COUNT(*) FROM audit_logs").fetchone()[0]
+        today_count = conn.execute(
+            "SELECT COUNT(*) FROM audit_logs WHERE created_at >= ?", (start_of_today,)
+        ).fetchone()[0]
+        by_module = conn.execute(
+            """
         SELECT module, COUNT(*) AS entries
           FROM audit_logs
          WHERE module IS NOT NULL
       GROUP BY module
       ORDER BY entries DESC, module
         """
-    ).fetchall()
-    # "Record Updates" on the screen means a change to a clinical or stock
-    # record, as opposed to a message sent out or an access event -- so it is
-    # every module except the ones NON_RECORD_MODULES names, rather than a second
-    # list that could drift from MODULE_* above. This was "except SMS" until
-    # authentication started writing; leaving it that way would have quietly
-    # counted every sign-in as an edit to somebody's record.
-    #
-    # The action exclusion beside it is the same rule one level finer, for the
-    # two confidentiality entries that change nothing -- see NON_RECORD_ACTIONS.
-    # Their module is not excluded, because its other two entries do move a
-    # column on a consultation.
-    exclusions = ", ".join("?" for _ in NON_RECORD_MODULES)
-    action_exclusions = ", ".join("?" for _ in NON_RECORD_ACTIONS)
-    record_updates = conn.execute(
-        f"""
+        ).fetchall()
+        # "Record Updates" on the screen means a change to a clinical or stock
+        # record, as opposed to a message sent out or an access event -- so it is
+        # every module except the ones NON_RECORD_MODULES names, rather than a second
+        # list that could drift from MODULE_* above. This was "except SMS" until
+        # authentication started writing; leaving it that way would have quietly
+        # counted every sign-in as an edit to somebody's record.
+        #
+        # The action exclusion beside it is the same rule one level finer, for the
+        # two confidentiality entries that change nothing -- see NON_RECORD_ACTIONS.
+        # Their module is not excluded, because its other two entries do move a
+        # column on a consultation.
+        exclusions = ", ".join("?" for _ in NON_RECORD_MODULES)
+        action_exclusions = ", ".join("?" for _ in NON_RECORD_ACTIONS)
+        record_updates = conn.execute(
+            f"""
         SELECT COUNT(*) FROM audit_logs
          WHERE module IS NOT NULL AND module NOT IN ({exclusions})
            AND action NOT IN ({action_exclusions})
         """,
-        NON_RECORD_MODULES + NON_RECORD_ACTIONS,
-    ).fetchone()[0]
-    actors = conn.execute(
-        "SELECT COUNT(DISTINCT user_id) FROM audit_logs"
-    ).fetchone()[0]
-
-    # The two authentication figures, each selected on its own action so a
-    # successful sign-in can never be counted as a refused one or the reverse.
-    def _auth_count(action, since=None):
-        clause = " AND created_at >= ?" if since else ""
-        parameters = [MODULE_AUTH, action] + ([since] if since else [])
-        return conn.execute(
-            f"SELECT COUNT(*) FROM audit_logs WHERE module = ? AND action = ?{clause}",
-            parameters,
+            NON_RECORD_MODULES + NON_RECORD_ACTIONS,
+        ).fetchone()[0]
+        actors = conn.execute(
+            "SELECT COUNT(DISTINCT user_id) FROM audit_logs"
         ).fetchone()[0]
 
-    logins = _auth_count(ACTION_LOGIN_SUCCESS)
-    logins_today = _auth_count(ACTION_LOGIN_SUCCESS, start_of_today)
-    failed_logins = _auth_count(ACTION_LOGIN_FAILED)
-    failed_logins_today = _auth_count(ACTION_LOGIN_FAILED, start_of_today)
-    blocked_logins = _auth_count(ACTION_LOGIN_BLOCKED)
-    blocked_logins_today = _auth_count(ACTION_LOGIN_BLOCKED, start_of_today)
-    refused_logins = sum(_auth_count(a) for a in REFUSAL_ACTIONS)
-    refused_logins_today = sum(_auth_count(a, start_of_today) for a in REFUSAL_ACTIONS)
-    # How many distinct accounts have ever signed in -- not how many exist. An
-    # account that has never signed in is absent from audit_logs entirely, which
-    # is exactly what makes this figure worth reporting beside the total.
-    login_accounts = conn.execute(
-        "SELECT COUNT(DISTINCT user_id) FROM audit_logs WHERE module = ? AND action = ?",
-        (MODULE_AUTH, ACTION_LOGIN_SUCCESS),
-    ).fetchone()[0]
-    conn.close()
+        # The two authentication figures, each selected on its own action so a
+        # successful sign-in can never be counted as a refused one or the reverse.
+        def _auth_count(action, since=None):
+            clause = " AND created_at >= ?" if since else ""
+            parameters = [MODULE_AUTH, action] + ([since] if since else [])
+            return conn.execute(
+                f"SELECT COUNT(*) FROM audit_logs WHERE module = ? AND action = ?{clause}",
+                parameters,
+            ).fetchone()[0]
+
+        logins = _auth_count(ACTION_LOGIN_SUCCESS)
+        logins_today = _auth_count(ACTION_LOGIN_SUCCESS, start_of_today)
+        failed_logins = _auth_count(ACTION_LOGIN_FAILED)
+        failed_logins_today = _auth_count(ACTION_LOGIN_FAILED, start_of_today)
+        blocked_logins = _auth_count(ACTION_LOGIN_BLOCKED)
+        blocked_logins_today = _auth_count(ACTION_LOGIN_BLOCKED, start_of_today)
+        refused_logins = sum(_auth_count(a) for a in REFUSAL_ACTIONS)
+        refused_logins_today = sum(_auth_count(a, start_of_today) for a in REFUSAL_ACTIONS)
+        # How many distinct accounts have ever signed in -- not how many exist. An
+        # account that has never signed in is absent from audit_logs entirely, which
+        # is exactly what makes this figure worth reporting beside the total.
+        login_accounts = conn.execute(
+            "SELECT COUNT(DISTINCT user_id) FROM audit_logs WHERE module = ? AND action = ?",
+            (MODULE_AUTH, ACTION_LOGIN_SUCCESS),
+        ).fetchone()[0]
 
     return {
         "total": total,
@@ -822,17 +817,16 @@ def get_last_logins():
     by CURRENT_TIMESTAMP in a fixed-width, zero-padded UTC format, so it sorts
     lexicographically in the same order it sorts chronologically.
     """
-    conn = get_db()
-    rows = conn.execute(
-        """
+    with db_connection() as conn:
+        rows = conn.execute(
+            """
         SELECT user_id, MAX(created_at) AS last_login
           FROM audit_logs
          WHERE module = ? AND action = ?
       GROUP BY user_id
         """,
-        (MODULE_AUTH, ACTION_LOGIN_SUCCESS),
-    ).fetchall()
-    conn.close()
+            (MODULE_AUTH, ACTION_LOGIN_SUCCESS),
+        ).fetchall()
     return {row["user_id"]: row["last_login"] for row in rows}
 
 

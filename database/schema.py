@@ -1,7 +1,7 @@
 """Schema creation and first-run bootstrap."""
 import os
 
-from database.connection import _database_path, _schema_path, get_db
+from database.connection import _database_path, _schema_path, db_connection
 
 
 def init_db():
@@ -11,11 +11,10 @@ def init_db():
     first. Behaviour is unchanged from the original single-file app.py.
     """
     if not os.path.exists(_database_path()):
-        conn = get_db()
-        with open(_schema_path(), "r", encoding="utf-8") as handle:
-            conn.executescript(handle.read())
-        conn.commit()
-        conn.close()
+        with db_connection() as conn:
+            with open(_schema_path(), "r", encoding="utf-8") as handle:
+                conn.executescript(handle.read())
+            conn.commit()
         # Imported here rather than at module scope: models.users reads from this
         # package, so a top-level import would tie the two together at import time
         # purely for one bootstrap call.

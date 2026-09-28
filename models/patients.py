@@ -9,7 +9,7 @@ import calendar
 import json
 from datetime import date, datetime
 
-from database.connection import get_db
+from database.connection import db_connection
 from utils.dates import (
     day_start_utc,
     days_ago,
@@ -186,11 +186,10 @@ def get_patient_statuses(patient_ids):
         return {}
 
     placeholders = ", ".join("?" for _ in ids)
-    conn = get_db()
-    rows = conn.execute(
-        f"SELECT id, status FROM patients WHERE id IN ({placeholders})", ids
-    ).fetchall()
-    conn.close()
+    with db_connection() as conn:
+        rows = conn.execute(
+            f"SELECT id, status FROM patients WHERE id IN ({placeholders})", ids
+        ).fetchall()
     return {row["id"]: row["status"] for row in rows}
 
 
@@ -359,26 +358,24 @@ _LAST_VISIT = (
 
 def get_all_patients():
     """Every patient, ordered by surname then given name."""
-    conn = get_db()
-    rows = conn.execute(
-        f"""
+    with db_connection() as conn:
+        rows = conn.execute(
+            f"""
         SELECT p.*, {_LAST_VISIT}
         FROM patients p
         ORDER BY p.last_name COLLATE NOCASE, p.first_name COLLATE NOCASE
         """
-    ).fetchall()
-    conn.close()
+        ).fetchall()
     return [_to_patient(row) for row in rows]
 
 
 def get_patient_by_id(patient_id):
     """One patient by primary key, or None if no such row exists."""
-    conn = get_db()
-    row = conn.execute(
-        f"SELECT p.*, {_LAST_VISIT} FROM patients p WHERE p.id = ?",
-        (patient_id,),
-    ).fetchone()
-    conn.close()
+    with db_connection() as conn:
+        row = conn.execute(
+            f"SELECT p.*, {_LAST_VISIT} FROM patients p WHERE p.id = ?",
+            (patient_id,),
+        ).fetchone()
     return _to_patient(row) if row else None
 
 
@@ -393,37 +390,36 @@ def get_patient_stats():
     expressed the same way -- previously SQLite's own date('now') supplied the
     boundary, which pinned these counts to UTC midnight rather than Manila's.
     """
-    conn = get_db()
+    with db_connection() as conn:
 
-    total = conn.execute("SELECT COUNT(*) FROM patients").fetchone()[0]
+        total = conn.execute("SELECT COUNT(*) FROM patients").fetchone()[0]
 
-    month_start, next_month_start = month_bounds()
-    new_this_month = conn.execute(
-        "SELECT COUNT(*) FROM patients WHERE created_at >= ? AND created_at < ?",
-        (day_start_utc(month_start), day_start_utc(next_month_start)),
-    ).fetchone()[0]
+        month_start, next_month_start = month_bounds()
+        new_this_month = conn.execute(
+            "SELECT COUNT(*) FROM patients WHERE created_at >= ? AND created_at < ?",
+            (day_start_utc(month_start), day_start_utc(next_month_start)),
+        ).fetchone()[0]
 
-    # Registered since midnight, clinic time. The Staff dashboard's "New Patient
-    # Registrations / Today" card reads this; same boundary treatment as the
-    # month window above, so the two cannot disagree about which day a record
-    # written late in the evening belongs to.
-    new_today = conn.execute(
-        "SELECT COUNT(*) FROM patients WHERE created_at >= ?",
-        (day_start_utc(today()),),
-    ).fetchone()[0]
+        # Registered since midnight, clinic time. The Staff dashboard's "New Patient
+        # Registrations / Today" card reads this; same boundary treatment as the
+        # month window above, so the two cannot disagree about which day a record
+        # written late in the evening belongs to.
+        new_today = conn.execute(
+            "SELECT COUNT(*) FROM patients WHERE created_at >= ?",
+            (day_start_utc(today()),),
+        ).fetchone()[0]
 
-    new_last_30 = conn.execute(
-        "SELECT COUNT(*) FROM patients WHERE created_at >= ?",
-        (day_start_utc(days_ago(30)),),
-    ).fetchone()[0]
+        new_last_30 = conn.execute(
+            "SELECT COUNT(*) FROM patients WHERE created_at >= ?",
+            (day_start_utc(days_ago(30)),),
+        ).fetchone()[0]
 
-    previous_30 = conn.execute(
-        "SELECT COUNT(*) FROM patients WHERE created_at >= ? AND created_at < ?",
-        (day_start_utc(days_ago(60)), day_start_utc(days_ago(30))),
-    ).fetchone()[0]
+        previous_30 = conn.execute(
+            "SELECT COUNT(*) FROM patients WHERE created_at >= ? AND created_at < ?",
+            (day_start_utc(days_ago(60)), day_start_utc(days_ago(30))),
+        ).fetchone()[0]
 
-    birth_dates = [row[0] for row in conn.execute("SELECT birth_date FROM patients")]
-    conn.close()
+        birth_dates = [row[0] for row in conn.execute("SELECT birth_date FROM patients")]
 
     senior_count = sum(
         1
@@ -613,19 +609,18 @@ def get_registration_trend(months=6, end=None, start=None):
     # note in get_consultation_stats(). The clamp is a no-op on the default
     # window, whose bounds are month boundaries already.
     lo_text, hi_text = range_bounds_utc(window)
-    conn = get_db()
-    trend = []
-    for month_start, next_start, label in window["months"]:
-        bar_lo = max(day_start_utc(month_start), lo_text)
-        bar_hi = min(day_start_utc(next_start), hi_text)
-        count = conn.execute(
-            "SELECT COUNT(*) FROM patients WHERE created_at >= ? AND created_at < ?",
-            (bar_lo, bar_hi),
-        ).fetchone()[0] if bar_lo < bar_hi else 0
-        trend.append(
-            {"month": month_start.strftime("%Y-%m"), "label": label, "count": count}
-        )
-    conn.close()
+    with db_connection() as conn:
+        trend = []
+        for month_start, next_start, label in window["months"]:
+            bar_lo = max(day_start_utc(month_start), lo_text)
+            bar_hi = min(day_start_utc(next_start), hi_text)
+            count = conn.execute(
+                "SELECT COUNT(*) FROM patients WHERE created_at >= ? AND created_at < ?",
+                (bar_lo, bar_hi),
+            ).fetchone()[0] if bar_lo < bar_hi else 0
+            trend.append(
+                {"month": month_start.strftime("%Y-%m"), "label": label, "count": count}
+            )
     return trend
 
 
@@ -638,12 +633,11 @@ def count_registered_in(window):
     though the operator had asked for them.
     """
     lo, hi = range_bounds_utc(window)
-    conn = get_db()
-    count = conn.execute(
-        "SELECT COUNT(*) FROM patients WHERE created_at >= ? AND created_at < ?",
-        (lo, hi),
-    ).fetchone()[0]
-    conn.close()
+    with db_connection() as conn:
+        count = conn.execute(
+            "SELECT COUNT(*) FROM patients WHERE created_at >= ? AND created_at < ?",
+            (lo, hi),
+        ).fetchone()[0]
     return count
 
 
@@ -774,9 +768,9 @@ def find_possible_duplicates(first_name, last_name, birth_date):
     Used for a non-blocking warning: two residents genuinely can share a name and
     birthday, so this informs the operator rather than refusing the record.
     """
-    conn = get_db()
-    rows = conn.execute(
-        """
+    with db_connection() as conn:
+        rows = conn.execute(
+            """
         SELECT id, patient_id, first_name, last_name, birth_date
         FROM patients
         WHERE LOWER(TRIM(first_name)) = LOWER(TRIM(?))
@@ -784,9 +778,8 @@ def find_possible_duplicates(first_name, last_name, birth_date):
           AND birth_date = ?
         ORDER BY patient_id
         """,
-        (first_name or "", last_name or "", birth_date or ""),
-    ).fetchall()
-    conn.close()
+            (first_name or "", last_name or "", birth_date or ""),
+        ).fetchall()
     return [dict(row) for row in rows]
 
 
@@ -824,14 +817,13 @@ def update_patient(patient_id, values):
     assignments = ", ".join(f"{field} = ?" for field in PATIENT_FIELDS)
     parameters = [record[field] for field in PATIENT_FIELDS] + [patient_id]
 
-    conn = get_db()
-    cursor = conn.execute(
-        f"UPDATE patients SET {assignments}, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-        parameters,
-    )
-    conn.commit()
-    affected = cursor.rowcount
-    conn.close()
+    with db_connection() as conn:
+        cursor = conn.execute(
+            f"UPDATE patients SET {assignments}, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            parameters,
+        )
+        conn.commit()
+        affected = cursor.rowcount
     return affected
 
 
@@ -862,18 +854,17 @@ def set_patient_status(patient_ids, status):
         return 0
 
     placeholders = ", ".join("?" for _ in ids)
-    conn = get_db()
-    cursor = conn.execute(
-        f"""
+    with db_connection() as conn:
+        cursor = conn.execute(
+            f"""
         UPDATE patients
            SET status = ?, updated_at = CURRENT_TIMESTAMP
          WHERE id IN ({placeholders}) AND status != ?
         """,
-        [status] + ids + [status],
-    )
-    conn.commit()
-    affected = cursor.rowcount
-    conn.close()
+            [status] + ids + [status],
+        )
+        conn.commit()
+        affected = cursor.rowcount
     return affected
 
 
@@ -889,14 +880,13 @@ def create_patient(values):
     placeholders = ", ".join("?" for _ in columns)
     parameters = [generate_next_patient_id()] + [record[f] for f in PATIENT_FIELDS] + ["Active"]
 
-    conn = get_db()
-    cursor = conn.execute(
-        f"INSERT INTO patients ({', '.join(columns)}) VALUES ({placeholders})",
-        parameters,
-    )
-    conn.commit()
-    new_id = cursor.lastrowid
-    conn.close()
+    with db_connection() as conn:
+        cursor = conn.execute(
+            f"INSERT INTO patients ({', '.join(columns)}) VALUES ({placeholders})",
+            parameters,
+        )
+        conn.commit()
+        new_id = cursor.lastrowid
     return new_id
 
 
@@ -907,11 +897,10 @@ def generate_next_patient_id():
     gap left by an earlier record cannot cause a UNIQUE collision. Zero-padded
     to three digits; a series past PAT-999 simply grows wider.
     """
-    conn = get_db()
-    rows = conn.execute(
-        "SELECT patient_id FROM patients WHERE patient_id LIKE 'PAT-%'"
-    ).fetchall()
-    conn.close()
+    with db_connection() as conn:
+        rows = conn.execute(
+            "SELECT patient_id FROM patients WHERE patient_id LIKE 'PAT-%'"
+        ).fetchall()
 
     highest = 0
     for row in rows:

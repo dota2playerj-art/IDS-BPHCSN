@@ -26,7 +26,7 @@ That rule is held in two places, and both are needed:
 import calendar as _calendar
 from datetime import date, datetime
 
-from database.connection import get_db
+from database.connection import db_connection
 from utils.dates import now, recent_months, resolve_range, today
 
 # Statuses that still represent a commitment the patient is expected to keep.
@@ -166,9 +166,9 @@ def _clock(value):
 
 def get_appointments_for_patient(patient_id):
     """Appointment History tab on Screen 04, most recent first."""
-    conn = get_db()
-    rows = conn.execute(
-        """
+    with db_connection() as conn:
+        rows = conn.execute(
+            """
         SELECT a.id, a.appointment_date, a.appointment_time, a.appointment_type,
                a.status, a.notes, u.full_name AS assigned_staff
         FROM appointments a
@@ -176,9 +176,8 @@ def get_appointments_for_patient(patient_id):
         WHERE a.patient_id = ?
         ORDER BY a.appointment_date DESC, a.appointment_time DESC
         """,
-        (patient_id,),
-    ).fetchall()
-    conn.close()
+            (patient_id,),
+        ).fetchall()
     return [_to_appointment(row) for row in rows]
 
 
@@ -292,12 +291,11 @@ def get_todays_appointments(on_date=None, active=None):
     table and the cards above it are answering from one reading.
     """
     day = (on_date or today()).isoformat()
-    conn = get_db()
-    rows = conn.execute(
-        _QUEUE_SELECT + " WHERE date(a.appointment_date) = ?",
-        (day,),
-    ).fetchall()
-    conn.close()
+    with db_connection() as conn:
+        rows = conn.execute(
+            _QUEUE_SELECT + " WHERE date(a.appointment_date) = ?",
+            (day,),
+        ).fetchall()
 
     entries = [_to_queue_entry(row) for row in rows]
     entries.sort(
@@ -430,9 +428,8 @@ def get_appointment_by_id(appointment_id):
     relative to a whole day's queue. Use get_queue_entry() when the answer
     depends on who else is in the room.
     """
-    conn = get_db()
-    row = conn.execute(_QUEUE_SELECT + " WHERE a.id = ?", (appointment_id,)).fetchone()
-    conn.close()
+    with db_connection() as conn:
+        row = conn.execute(_QUEUE_SELECT + " WHERE a.id = ?", (appointment_id,)).fetchone()
     return _to_queue_entry(row) if row else None
 
 
@@ -444,11 +441,10 @@ def count_active_consultations():
     be trusted as the check on that invariant rather than reporting only what the
     queue screen happens to render.
     """
-    conn = get_db()
-    count = conn.execute(
-        "SELECT COUNT(*) FROM appointments WHERE status = ?", (IN_CONSULTATION,)
-    ).fetchone()[0]
-    conn.close()
+    with db_connection() as conn:
+        count = conn.execute(
+            "SELECT COUNT(*) FROM appointments WHERE status = ?", (IN_CONSULTATION,)
+        ).fetchone()[0]
     return count
 
 
@@ -465,13 +461,12 @@ def get_active_consultation():
     (which is exactly what migrate_enforce_single_consultation.py repairs) this
     names the most recently started one rather than an arbitrary row.
     """
-    conn = get_db()
-    row = conn.execute(
-        _QUEUE_SELECT
-        + " WHERE a.status = ? ORDER BY a.checked_in_at DESC, a.id DESC LIMIT 1",
-        (IN_CONSULTATION,),
-    ).fetchone()
-    conn.close()
+    with db_connection() as conn:
+        row = conn.execute(
+            _QUEUE_SELECT
+            + " WHERE a.status = ? ORDER BY a.checked_in_at DESC, a.id DESC LIMIT 1",
+            (IN_CONSULTATION,),
+        ).fetchone()
     return _to_queue_entry(row) if row else None
 
 
@@ -485,9 +480,9 @@ def find_todays_appointment(patient_id, on_date=None):
     """
     day = (on_date or today()).isoformat()
     placeholders = ", ".join("?" for _ in CHECK_IN_FROM_STATUSES)
-    conn = get_db()
-    row = conn.execute(
-        f"""
+    with db_connection() as conn:
+        row = conn.execute(
+            f"""
         SELECT * FROM appointments
         WHERE patient_id = ?
           AND date(appointment_date) = ?
@@ -495,9 +490,8 @@ def find_todays_appointment(patient_id, on_date=None):
         ORDER BY appointment_time IS NULL, appointment_time, id
         LIMIT 1
         """,
-        (patient_id, day, *CHECK_IN_FROM_STATUSES),
-    ).fetchone()
-    conn.close()
+            (patient_id, day, *CHECK_IN_FROM_STATUSES),
+        ).fetchone()
     return dict(row) if row else None
 
 
@@ -505,9 +499,9 @@ def find_active_queue_entry(patient_id, on_date=None):
     """This patient's row for today that is already in the queue, or None."""
     day = (on_date or today()).isoformat()
     placeholders = ", ".join("?" for _ in QUEUE_STATUSES)
-    conn = get_db()
-    row = conn.execute(
-        f"""
+    with db_connection() as conn:
+        row = conn.execute(
+            f"""
         SELECT * FROM appointments
         WHERE patient_id = ?
           AND date(appointment_date) = ?
@@ -515,9 +509,8 @@ def find_active_queue_entry(patient_id, on_date=None):
         ORDER BY id
         LIMIT 1
         """,
-        (patient_id, day, *QUEUE_STATUSES),
-    ).fetchone()
-    conn.close()
+            (patient_id, day, *QUEUE_STATUSES),
+        ).fetchone()
     return dict(row) if row else None
 
 
@@ -553,10 +546,10 @@ def check_in_patient(patient_id, reason, user_id, on_date=None):
         return existing["id"], "already"
 
     booked = find_todays_appointment(patient_id, on_date=on_date)
-    conn = get_db()
-    if booked:
-        conn.execute(
-            """
+    with db_connection() as conn:
+        if booked:
+            conn.execute(
+                """
             UPDATE appointments
                SET status = ?,
                    checked_in_at = ?,
@@ -570,37 +563,36 @@ def check_in_patient(patient_id, reason, user_id, on_date=None):
                    updated_at = CURRENT_TIMESTAMP
              WHERE id = ?
             """,
-            (WAITING, stamp, reason, reason, reason, booked["id"]),
-        )
-        conn.commit()
-        appointment_id = booked["id"]
-        outcome = "updated"
-    else:
-        cursor = conn.execute(
-            """
+                (WAITING, stamp, reason, reason, reason, booked["id"]),
+            )
+            conn.commit()
+            appointment_id = booked["id"]
+            outcome = "updated"
+        else:
+            cursor = conn.execute(
+                """
             INSERT INTO appointments
                 (patient_id, scheduled_by, appointment_type, appointment_date,
                  appointment_time, status, notes, is_walkin, checked_in_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
             """,
-            (
-                patient_id,
-                user_id,
-                WALK_IN_TYPE,
-                day,
-                # A walk-in has no booked slot; the arrival time is the only time
-                # that means anything, and it is kept in checked_in_at.
-                None,
-                WAITING,
-                reason,
-                stamp,
-            ),
-        )
-        conn.commit()
-        appointment_id = cursor.lastrowid
-        outcome = "created"
+                (
+                    patient_id,
+                    user_id,
+                    WALK_IN_TYPE,
+                    day,
+                    # A walk-in has no booked slot; the arrival time is the only time
+                    # that means anything, and it is kept in checked_in_at.
+                    None,
+                    WAITING,
+                    reason,
+                    stamp,
+                ),
+            )
+            conn.commit()
+            appointment_id = cursor.lastrowid
+            outcome = "created"
 
-    conn.close()
     return appointment_id, outcome
 
 
@@ -631,9 +623,9 @@ def start_consultation(appointment_id):
     waiting patient can be brought in, so a Completed visit cannot be quietly
     reopened and lose the record of it having ended.
     """
-    conn = get_db()
-    cursor = conn.execute(
-        """
+    with db_connection() as conn:
+        cursor = conn.execute(
+            """
         UPDATE appointments
            SET status = ?, updated_at = CURRENT_TIMESTAMP
          WHERE id = ?
@@ -642,19 +634,17 @@ def start_consultation(appointment_id):
                  SELECT 1 FROM appointments busy WHERE busy.status = ?
                )
         """,
-        (IN_CONSULTATION, appointment_id, WAITING, IN_CONSULTATION),
-    )
-    conn.commit()
+            (IN_CONSULTATION, appointment_id, WAITING, IN_CONSULTATION),
+        )
+        conn.commit()
 
-    if cursor.rowcount == 1:
-        conn.close()
-        return "started"
+        if cursor.rowcount == 1:
+            return "started"
 
-    # Nothing was written, so say which of the WHERE's conditions refused.
-    row = conn.execute(
-        "SELECT status FROM appointments WHERE id = ?", (appointment_id,)
-    ).fetchone()
-    conn.close()
+        # Nothing was written, so say which of the WHERE's conditions refused.
+        row = conn.execute(
+            "SELECT status FROM appointments WHERE id = ?", (appointment_id,)
+        ).fetchone()
 
     if row is None:
         return "missing"
@@ -684,25 +674,23 @@ def complete_consultation(appointment_id):
     visit actually in progress may be completed, so a stale page cannot close a
     patient who never went in.
     """
-    conn = get_db()
-    cursor = conn.execute(
-        """
+    with db_connection() as conn:
+        cursor = conn.execute(
+            """
         UPDATE appointments
            SET status = ?, updated_at = CURRENT_TIMESTAMP
          WHERE id = ? AND status = ?
         """,
-        (COMPLETED, appointment_id, IN_CONSULTATION),
-    )
-    conn.commit()
+            (COMPLETED, appointment_id, IN_CONSULTATION),
+        )
+        conn.commit()
 
-    if cursor.rowcount == 1:
-        conn.close()
-        return "completed"
+        if cursor.rowcount == 1:
+            return "completed"
 
-    row = conn.execute(
-        "SELECT status FROM appointments WHERE id = ?", (appointment_id,)
-    ).fetchone()
-    conn.close()
+        row = conn.execute(
+            "SELECT status FROM appointments WHERE id = ?", (appointment_id,)
+        ).fetchone()
 
     if row is None:
         return "missing"
@@ -741,17 +729,16 @@ def get_appointment_day_summary(start_date, end_date):
     buckets match the legend the calendar already prints: still to happen,
     finished, and called off.
     """
-    conn = get_db()
-    rows = conn.execute(
-        """
+    with db_connection() as conn:
+        rows = conn.execute(
+            """
         SELECT date(appointment_date) AS day, status, COUNT(*) AS count
         FROM appointments
         WHERE date(appointment_date) BETWEEN ? AND ?
         GROUP BY day, status
         """,
-        (start_date.isoformat(), end_date.isoformat()),
-    ).fetchall()
-    conn.close()
+            (start_date.isoformat(), end_date.isoformat()),
+        ).fetchall()
 
     summary = {}
     for row in rows:
@@ -853,29 +840,28 @@ def get_appointment_report(months=6, on_date=None, start=None, end=None):
     year = reference.strftime("%Y")
     lo, hi = window["start"].isoformat(), window["end"].isoformat()
 
-    conn = get_db()
-    rows = conn.execute(
-        """
+    with db_connection() as conn:
+        rows = conn.execute(
+            """
         SELECT substr(appointment_date, 1, 7) AS month, status, is_walkin,
                appointment_type, COUNT(*) AS count
         FROM appointments
         GROUP BY month, status, is_walkin, appointment_type
         """
-    ).fetchall()
-    # The window's own rows, by day rather than by month: a range starting on the
-    # 12th must not be handed the whole of that month. appointment_date is stored
-    # as clinic-local date text, so it compares directly.
-    scoped = conn.execute(
-        """
+        ).fetchall()
+        # The window's own rows, by day rather than by month: a range starting on the
+        # 12th must not be handed the whole of that month. appointment_date is stored
+        # as clinic-local date text, so it compares directly.
+        scoped = conn.execute(
+            """
         SELECT substr(appointment_date, 1, 7) AS month, status, is_walkin,
                appointment_type, COUNT(*) AS count
         FROM appointments
         WHERE substr(appointment_date, 1, 10) BETWEEN ? AND ?
         GROUP BY month, status, is_walkin, appointment_type
         """,
-        (lo, hi),
-    ).fetchall()
-    conn.close()
+            (lo, hi),
+        ).fetchall()
 
     by_month = {}
     ytd = {outcome: 0 for outcome in OUTCOMES}
@@ -1075,16 +1061,15 @@ def set_appointment_status(appointment_id, status):
             f"{APPOINTMENT_STATUSES}."
         )
 
-    conn = get_db()
-    cursor = conn.execute(
-        """
+    with db_connection() as conn:
+        cursor = conn.execute(
+            """
         UPDATE appointments
            SET status = ?, updated_at = CURRENT_TIMESTAMP
          WHERE id = ? AND status != ?
         """,
-        (status, appointment_id, status),
-    )
-    conn.commit()
-    affected = cursor.rowcount
-    conn.close()
+            (status, appointment_id, status),
+        )
+        conn.commit()
+        affected = cursor.rowcount
     return affected

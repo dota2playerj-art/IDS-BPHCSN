@@ -109,7 +109,7 @@ and the retirement test is its RETIRED_STATUS. A second opinion about whether a
 medicine is expired is exactly the drift models/inventory.py's own header warns
 against.
 """
-from database.connection import get_db
+from database.connection import db_connection
 from models.consultations import RESTRICTED_PLACEHOLDER, can_view_restricted
 from models.inventory import (
     ITEM_CATEGORIES,
@@ -474,62 +474,61 @@ def check_dispensing(entries, consultation_id=None):
         return {}
 
     errors = {}
-    conn = get_db()
+    with db_connection() as conn:
 
-    existing = {}
-    if consultation_id:
-        existing = {
-            row["inventory_item_id"]: row
-            for row in conn.execute(
-                "SELECT inventory_item_id, medicine_name, unit, quantity_dispensed "
+        existing = {}
+        if consultation_id:
+            existing = {
+                row["inventory_item_id"]: row
+                for row in conn.execute(
+                    "SELECT inventory_item_id, medicine_name, unit, quantity_dispensed "
                 "FROM medicine_dispensing WHERE consultation_id = ?",
-                (consultation_id,),
-            ).fetchall()
-        }
+                    (consultation_id,),
+                ).fetchall()
+            }
 
-    for entry in entries:
-        already = existing.get(entry["item_id"])
-        if already is not None:
-            errors[item_field(entry["index"])] = (
-                "{} is already recorded for this visit ({}). Correct that entry "
+        for entry in entries:
+            already = existing.get(entry["item_id"])
+            if already is not None:
+                errors[item_field(entry["index"])] = (
+                    "{} is already recorded for this visit ({}). Correct that entry "
                 "rather than dispensing it a second time.".format(
-                    already["medicine_name"],
-                    _plural(already["quantity_dispensed"], already["unit"]),
+                        already["medicine_name"],
+                        _plural(already["quantity_dispensed"], already["unit"]),
+                    )
                 )
-            )
-            continue
+                continue
 
-        row = conn.execute(
-            "SELECT id, name, unit, category, status, stock_quantity, "
+            row = conn.execute(
+                "SELECT id, name, unit, category, status, stock_quantity, "
             "       low_stock_threshold, expiry_date "
             "FROM inventory_items WHERE id = ?",
-            (entry["item_id"],),
-        ).fetchone()
+                (entry["item_id"],),
+            ).fetchone()
 
-        if row is None:
-            errors[item_field(entry["index"])] = (
-                "That item is no longer in the inventory. Pick one from the "
+            if row is None:
+                errors[item_field(entry["index"])] = (
+                    "That item is no longer in the inventory. Pick one from the "
                 "list."
-            )
-            continue
+                )
+                continue
 
-        # Unreachable for any row the Add Medicine form could have created, since
-        # every category it offers is dispensable. Kept as the guard for a row
-        # that arrived some other way, so a category this module has never heard
-        # of cannot be dispensed by default.
-        if row["category"] not in DISPENSABLE_CATEGORIES:
-            errors[item_field(entry["index"])] = (
-                "{} is filed under {}, which is not something this form can "
+            # Unreachable for any row the Add Medicine form could have created, since
+            # every category it offers is dispensable. Kept as the guard for a row
+            # that arrived some other way, so a category this module has never heard
+            # of cannot be dispensed by default.
+            if row["category"] not in DISPENSABLE_CATEGORIES:
+                errors[item_field(entry["index"])] = (
+                    "{} is filed under {}, which is not something this form can "
                 "dispense. Correct its item type on Medicine Inventory."
-                .format(row["name"], row["category"] or "no item type")
-            )
-            continue
+                    .format(row["name"], row["category"] or "no item type")
+                )
+                continue
 
-        refusal = _refusal(row, entry["quantity"])
-        if refusal:
-            errors[_blamed_field(entry["index"], row, entry["quantity"])] = refusal
+            refusal = _refusal(row, entry["quantity"])
+            if refusal:
+                errors[_blamed_field(entry["index"], row, entry["quantity"])] = refusal
 
-    conn.close()
     return errors
 
 
@@ -580,122 +579,120 @@ def record_dispensing(patient_id, entries, dispensed_by, date_dispensed,
     day = date_dispensed
     day = day.isoformat() if hasattr(day, "isoformat") else str(day)
 
-    conn = get_db()
-    # Must be set before the transaction opens; inside one it is a no-op. This is
-    # what makes the table's foreign keys real rather than decorative, so a row
-    # cannot name an inventory item or a user that is not there.
-    conn.execute("PRAGMA foreign_keys = ON")
+    with db_connection() as conn:
+        # Must be set before the transaction opens; inside one it is a no-op. This is
+        # what makes the table's foreign keys real rather than decorative, so a row
+        # cannot name an inventory item or a user that is not there.
+        conn.execute("PRAGMA foreign_keys = ON")
 
-    stored, errors = [], {}
-    try:
-        conn.execute("BEGIN IMMEDIATE")
+        stored, errors = [], {}
+        try:
+            conn.execute("BEGIN IMMEDIATE")
 
-        for entry in entries:
-            row = conn.execute(
-                "SELECT id, name, unit, category, status, stock_quantity, "
+            for entry in entries:
+                row = conn.execute(
+                    "SELECT id, name, unit, category, status, stock_quantity, "
                 "       low_stock_threshold, expiry_date "
                 "FROM inventory_items WHERE id = ?",
-                (entry["item_id"],),
-            ).fetchone()
-
-            if row is None or row["category"] not in DISPENSABLE_CATEGORIES:
-                errors[item_field(entry["index"])] = (
-                    "That item is no longer available to dispense. Pick one "
-                    "from the list."
-                )
-                raise _Refused
-
-            refusal = _refusal(row, entry["quantity"])
-            if refusal:
-                errors[_blamed_field(entry["index"], row, entry["quantity"])] = refusal
-                raise _Refused
-
-            # The same item, at the same visit, already on file. The table's
-            # UNIQUE (consultation_id, inventory_item_id) would refuse the insert
-            # below anyway -- that is the guarantee, and it is why the constraint
-            # exists -- but it would refuse it by raising, which reaches the
-            # operator as a failed request rather than as a sentence telling them
-            # what is already recorded. So the constraint is asked *first*, in the
-            # same transaction and under the same lock, and the refusal is worded.
-            #
-            # This is the check that makes a double-submitted form safe. The
-            # second POST finds the first one's row, refuses the whole
-            # submission, and rolls back -- so nothing is dispensed twice and no
-            # stock moves twice.
-            if consultation_id:
-                already = conn.execute(
-                    "SELECT medicine_name, unit, quantity_dispensed "
-                    "FROM medicine_dispensing "
-                    "WHERE consultation_id = ? AND inventory_item_id = ?",
-                    (consultation_id, entry["item_id"]),
+                    (entry["item_id"],),
                 ).fetchone()
-                if already is not None:
+
+                if row is None or row["category"] not in DISPENSABLE_CATEGORIES:
                     errors[item_field(entry["index"])] = (
-                        "{} is already recorded for this visit ({}). Correct that "
-                        "entry rather than dispensing it a second time.".format(
-                            already["medicine_name"],
-                            _plural(already["quantity_dispensed"], already["unit"]),
-                        )
+                        "That item is no longer available to dispense. Pick one "
+                    "from the list."
                     )
                     raise _Refused
 
-            cursor = conn.execute(
-                """
+                refusal = _refusal(row, entry["quantity"])
+                if refusal:
+                    errors[_blamed_field(entry["index"], row, entry["quantity"])] = refusal
+                    raise _Refused
+
+                # The same item, at the same visit, already on file. The table's
+                # UNIQUE (consultation_id, inventory_item_id) would refuse the insert
+                # below anyway -- that is the guarantee, and it is why the constraint
+                # exists -- but it would refuse it by raising, which reaches the
+                # operator as a failed request rather than as a sentence telling them
+                # what is already recorded. So the constraint is asked *first*, in the
+                # same transaction and under the same lock, and the refusal is worded.
+                #
+                # This is the check that makes a double-submitted form safe. The
+                # second POST finds the first one's row, refuses the whole
+                # submission, and rolls back -- so nothing is dispensed twice and no
+                # stock moves twice.
+                if consultation_id:
+                    already = conn.execute(
+                        "SELECT medicine_name, unit, quantity_dispensed "
+                    "FROM medicine_dispensing "
+                    "WHERE consultation_id = ? AND inventory_item_id = ?",
+                        (consultation_id, entry["item_id"]),
+                    ).fetchone()
+                    if already is not None:
+                        errors[item_field(entry["index"])] = (
+                            "{} is already recorded for this visit ({}). Correct that "
+                        "entry rather than dispensing it a second time.".format(
+                                already["medicine_name"],
+                                _plural(already["quantity_dispensed"], already["unit"]),
+                            )
+                        )
+                        raise _Refused
+
+                cursor = conn.execute(
+                    """
                 UPDATE inventory_items
                    SET stock_quantity = stock_quantity - ?,
                        updated_at = CURRENT_TIMESTAMP
                  WHERE id = ? AND stock_quantity >= ?
                 """,
-                (entry["quantity"], entry["item_id"], entry["quantity"]),
-            )
-            if cursor.rowcount != 1:
-                # Unreachable through the form -- _refusal() above has already
-                # compared the same two numbers on the same row inside the same
-                # lock. Kept because it is the refusal that does not depend on
-                # any of that being true.
-                errors[quantity_field(entry["index"])] = (
-                    "{}'s stock changed while this was being saved, so nothing "
-                    "was dispensed. Reload and try again.".format(row["name"])
+                    (entry["quantity"], entry["item_id"], entry["quantity"]),
                 )
-                raise _Refused
+                if cursor.rowcount != 1:
+                    # Unreachable through the form -- _refusal() above has already
+                    # compared the same two numbers on the same row inside the same
+                    # lock. Kept because it is the refusal that does not depend on
+                    # any of that being true.
+                    errors[quantity_field(entry["index"])] = (
+                        "{}'s stock changed while this was being saved, so nothing "
+                    "was dispensed. Reload and try again.".format(row["name"])
+                    )
+                    raise _Refused
 
-            conn.execute(
-                """
+                conn.execute(
+                    """
                 INSERT INTO medicine_dispensing
                     (patient_id, consultation_id, inventory_item_id,
                      medicine_name, unit, quantity_dispensed, date_dispensed,
                      dispensed_by)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (patient_id, consultation_id, entry["item_id"], row["name"],
-                 row["unit"], entry["quantity"], day, dispensed_by),
-            )
+                    (patient_id, consultation_id, entry["item_id"], row["name"],
+                     row["unit"], entry["quantity"], day, dispensed_by),
+                )
 
-            stored.append({
-                "index": entry["index"],
-                "item_id": entry["item_id"],
-                "medicine_name": row["name"],
-                "unit": row["unit"],
-                "quantity_dispensed": entry["quantity"],
-                # What the shelf holds now, read off the figure this statement
-                # just wrote rather than recomputed. The flash message says it
-                # back to the operator, which is the moment a stock level is
-                # worth anything.
-                "stock_after": (row["stock_quantity"] or 0) - entry["quantity"],
-                "low_stock_threshold": row["low_stock_threshold"] or 0,
-            })
+                stored.append({
+                    "index": entry["index"],
+                    "item_id": entry["item_id"],
+                    "medicine_name": row["name"],
+                    "unit": row["unit"],
+                    "quantity_dispensed": entry["quantity"],
+                    # What the shelf holds now, read off the figure this statement
+                    # just wrote rather than recomputed. The flash message says it
+                    # back to the operator, which is the moment a stock level is
+                    # worth anything.
+                    "stock_after": (row["stock_quantity"] or 0) - entry["quantity"],
+                    "low_stock_threshold": row["low_stock_threshold"] or 0,
+                })
 
-        conn.commit()
-    except _Refused:
-        conn.rollback()
-        stored = []
-    except Exception:
-        # Any other failure -- a constraint nobody anticipated, a disk error --
-        # must not leave a decrement without its record or the reverse.
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+            conn.commit()
+        except _Refused:
+            conn.rollback()
+            stored = []
+        except Exception:
+            # Any other failure -- a constraint nobody anticipated, a disk error --
+            # must not leave a decrement without its record or the reverse.
+            conn.rollback()
+            raise
 
     return stored, errors
 
@@ -778,13 +775,12 @@ def get_dispensing_for_patient(patient_id, viewer_role):
     dispensing itself is never withheld -- what was handed over is what a health
     worker needs in order to do their job, and none of it is sealed.
     """
-    conn = get_db()
-    rows = conn.execute(
-        _DISPENSING_SELECT
-        + " WHERE d.patient_id = ? ORDER BY d.date_dispensed DESC, d.id DESC",
-        (patient_id,),
-    ).fetchall()
-    conn.close()
+    with db_connection() as conn:
+        rows = conn.execute(
+            _DISPENSING_SELECT
+            + " WHERE d.patient_id = ? ORDER BY d.date_dispensed DESC, d.id DESC",
+            (patient_id,),
+        ).fetchall()
     return _to_records(rows, viewer_role)
 
 
@@ -799,12 +795,11 @@ def get_dispensing_for_consultation(consultation_id):
     """
     if not consultation_id:
         return []
-    conn = get_db()
-    rows = conn.execute(
-        _DISPENSING_SELECT + " WHERE d.consultation_id = ? ORDER BY d.id",
-        (consultation_id,),
-    ).fetchall()
-    conn.close()
+    with db_connection() as conn:
+        rows = conn.execute(
+            _DISPENSING_SELECT + " WHERE d.consultation_id = ? ORDER BY d.id",
+            (consultation_id,),
+        ).fetchall()
     return _to_records(rows)
 
 
@@ -827,13 +822,12 @@ def get_dispensing_by_consultation(consultation_ids):
     if not ids:
         return {}
     placeholders = ", ".join("?" for _ in ids)
-    conn = get_db()
-    rows = conn.execute(
-        _DISPENSING_SELECT
-        + " WHERE d.consultation_id IN ({}) ORDER BY d.id".format(placeholders),
-        ids,
-    ).fetchall()
-    conn.close()
+    with db_connection() as conn:
+        rows = conn.execute(
+            _DISPENSING_SELECT
+            + " WHERE d.consultation_id IN ({}) ORDER BY d.id".format(placeholders),
+            ids,
+        ).fetchall()
 
     grouped = {}
     for record in _to_records(rows):
@@ -878,25 +872,24 @@ def get_dispensing_stats(months=6, limit=TOP_MEDICINE_LIMIT, on_date=None,
     window = resolve_range(start=start, end=end, months=months, on_date=reference)
     lo, hi = window["start"].isoformat(), window["end"].isoformat()
 
-    conn = get_db()
-    totals = conn.execute(
-        "SELECT COUNT(*) AS events, COALESCE(SUM(quantity_dispensed), 0) AS units "
+    with db_connection() as conn:
+        totals = conn.execute(
+            "SELECT COUNT(*) AS events, COALESCE(SUM(quantity_dispensed), 0) AS units "
         "FROM medicine_dispensing"
-    ).fetchone()
-    patients_supplied = conn.execute(
-        "SELECT COUNT(DISTINCT patient_id) FROM medicine_dispensing"
-    ).fetchone()[0]
+        ).fetchone()
+        patients_supplied = conn.execute(
+            "SELECT COUNT(DISTINCT patient_id) FROM medicine_dispensing"
+        ).fetchone()[0]
 
-    scoped = conn.execute(
-        """
+        scoped = conn.execute(
+            """
         SELECT medicine_name, unit, quantity_dispensed, patient_id,
                inventory_item_id, substr(date_dispensed, 1, 7) AS month
         FROM medicine_dispensing
         WHERE substr(date_dispensed, 1, 10) BETWEEN ? AND ?
         """,
-        (lo, hi),
-    ).fetchall()
-    conn.close()
+            (lo, hi),
+        ).fetchall()
 
     units_by_month, events_by_month = {}, {}
     by_medicine = {}

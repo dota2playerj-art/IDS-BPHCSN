@@ -89,7 +89,7 @@ what is actually known, and never let a record claim more than that.
 """
 from datetime import datetime, timedelta
 
-from database.connection import get_db
+from database.connection import db_connection
 from models.consultations import PEDIATRIC_AGE_YEARS, as_date
 from models.patients import add_months, calculate_age
 from utils.dates import display_date, resolve_range, today
@@ -283,9 +283,9 @@ def _dose_status(given, due_date, reference):
 
 def get_immunizations_for_patient(patient_id):
     """Every dose recorded for one patient, oldest first."""
-    conn = get_db()
-    rows = conn.execute(
-        """
+    with db_connection() as conn:
+        rows = conn.execute(
+            """
         SELECT i.id, i.patient_id, i.consultation_id, i.vaccine_code, i.dose_number,
                i.source, i.date_administered, i.administered_by, i.notes, i.created_at,
                u.full_name AS administered_by_name
@@ -294,9 +294,8 @@ def get_immunizations_for_patient(patient_id):
         WHERE i.patient_id = ?
         ORDER BY i.date_administered, i.id
         """,
-        (patient_id,),
-    ).fetchall()
-    conn.close()
+            (patient_id,),
+        ).fetchall()
     return [dict(row) for row in rows]
 
 
@@ -304,18 +303,17 @@ def get_immunizations_for_consultation(consultation_id):
     """The doses given during one consultation, in schedule order."""
     if not consultation_id:
         return []
-    conn = get_db()
-    rows = conn.execute(
-        """
+    with db_connection() as conn:
+        rows = conn.execute(
+            """
         SELECT i.id, i.vaccine_code, i.dose_number, i.source, i.date_administered,
                i.notes, u.full_name AS administered_by_name
         FROM immunizations i
         JOIN users u ON u.id = i.administered_by
         WHERE i.consultation_id = ?
         """,
-        (consultation_id,),
-    ).fetchall()
-    conn.close()
+            (consultation_id,),
+        ).fetchall()
     given = [dict(row) for row in rows]
     order = {(row[0], row[3]): index for index, row in enumerate(EPI_SCHEDULE)}
     given.sort(key=lambda dose: order.get((dose["vaccine_code"], dose["dose_number"]), 99))
@@ -562,9 +560,9 @@ def _roster_statuses(on_date=None):
 
     reference = on_date or today()
 
-    conn = get_db()
-    rows = conn.execute(
-        """
+    with db_connection() as conn:
+        rows = conn.execute(
+            """
         SELECT i.id, i.patient_id, i.consultation_id, i.vaccine_code, i.dose_number,
                i.source, i.date_administered, i.administered_by, i.notes, i.created_at,
                u.full_name AS administered_by_name
@@ -572,8 +570,7 @@ def _roster_statuses(on_date=None):
         JOIN users u ON u.id = i.administered_by
         ORDER BY i.date_administered, i.id
         """
-    ).fetchall()
-    conn.close()
+        ).fetchall()
 
     by_patient = {}
     for row in rows:
@@ -671,42 +668,41 @@ def get_immunization_coverage(on_date=None, start=None, end=None, months=6):
     the DOH schedule does not have.
     """
     window = resolve_range(start=start, end=end, months=months, on_date=on_date)
-    conn = get_db()
-    enrolled = conn.execute(
-        "SELECT COUNT(DISTINCT patient_id) FROM immunizations"
-    ).fetchone()[0]
-    # Split by source, all time and in the window, because "doses given" and
-    # "doses this health center gave" stopped being the same number the day a
-    # dose could be recorded as given elsewhere. A single total would credit
-    # another hospital's work to this one on the Barangay Official's dashboard,
-    # which is the one screen in the project a figure leaves the building from.
-    #
-    # Both halves are returned rather than one being chosen here. Coverage is
-    # about the child and counts every dose; activity is about the health center
-    # and counts only its own -- and the screens that print each say which they
-    # mean.
-    by_source = {
-        row[0]: row[1]
-        for row in conn.execute(
-            "SELECT source, COUNT(*) FROM immunizations GROUP BY source"
-        )
-    }
-    doses_given = sum(by_source.values())
-    # A dose with no date is in no window. That is arithmetic rather than a
-    # decision -- substr(NULL) is NULL and NULL BETWEEN anything is not true --
-    # but it is also the right answer: a dose whose date nobody knows cannot
-    # honestly be counted into a particular month.
-    scoped = conn.execute(
-        """
+    with db_connection() as conn:
+        enrolled = conn.execute(
+            "SELECT COUNT(DISTINCT patient_id) FROM immunizations"
+        ).fetchone()[0]
+        # Split by source, all time and in the window, because "doses given" and
+        # "doses this health center gave" stopped being the same number the day a
+        # dose could be recorded as given elsewhere. A single total would credit
+        # another hospital's work to this one on the Barangay Official's dashboard,
+        # which is the one screen in the project a figure leaves the building from.
+        #
+        # Both halves are returned rather than one being chosen here. Coverage is
+        # about the child and counts every dose; activity is about the health center
+        # and counts only its own -- and the screens that print each say which they
+        # mean.
+        by_source = {
+            row[0]: row[1]
+            for row in conn.execute(
+                "SELECT source, COUNT(*) FROM immunizations GROUP BY source"
+            )
+        }
+        doses_given = sum(by_source.values())
+        # A dose with no date is in no window. That is arithmetic rather than a
+        # decision -- substr(NULL) is NULL and NULL BETWEEN anything is not true --
+        # but it is also the right answer: a dose whose date nobody knows cannot
+        # honestly be counted into a particular month.
+        scoped = conn.execute(
+            """
         SELECT COUNT(*) AS doses,
                COUNT(DISTINCT patient_id) AS children,
                SUM(CASE WHEN source = ? THEN 1 ELSE 0 END) AS reported
         FROM immunizations
         WHERE substr(date_administered, 1, 10) BETWEEN ? AND ?
         """,
-        (SOURCE_REPORTED, window["start"].isoformat(), window["end"].isoformat()),
-    ).fetchone()
-    conn.close()
+            (SOURCE_REPORTED, window["start"].isoformat(), window["end"].isoformat()),
+        ).fetchone()
 
     scoped_reported = scoped["reported"] or 0
     reported = by_source.get(SOURCE_REPORTED, 0)
@@ -846,9 +842,8 @@ def get_dose_coverage(on_date=None):
 
 
 def _patients_with_doses():
-    conn = get_db()
-    ids = {row[0] for row in conn.execute("SELECT DISTINCT patient_id FROM immunizations")}
-    conn.close()
+    with db_connection() as conn:
+        ids = {row[0] for row in conn.execute("SELECT DISTINCT patient_id FROM immunizations")}
     return ids
 
 
@@ -1076,22 +1071,21 @@ def record_immunizations(patient_id, dose_keys, administered_by, date_administer
     day = day.isoformat() if hasattr(day, "isoformat") else str(day)
 
     stored = []
-    conn = get_db()
-    for code, dose_number in dose_keys:
-        cursor = conn.execute(
-            """
+    with db_connection() as conn:
+        for code, dose_number in dose_keys:
+            cursor = conn.execute(
+                """
             INSERT OR IGNORE INTO immunizations
                 (patient_id, consultation_id, vaccine_code, dose_number,
                  source, date_administered, administered_by)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (patient_id, consultation_id, code, dose_number,
-             SOURCE_ADMINISTERED, day, administered_by),
-        )
-        if cursor.rowcount:
-            stored.append((code, dose_number))
-    conn.commit()
-    conn.close()
+                (patient_id, consultation_id, code, dose_number,
+                 SOURCE_ADMINISTERED, day, administered_by),
+            )
+            if cursor.rowcount:
+                stored.append((code, dose_number))
+        conn.commit()
     return stored
 
 
@@ -1131,25 +1125,24 @@ def record_reported_immunizations(patient_id, entries, recorded_by,
         return []
 
     stored = []
-    conn = get_db()
-    for entry in entries:
-        day = entry.get("date")
-        if day is not None and hasattr(day, "isoformat"):
-            day = day.isoformat()
-        cursor = conn.execute(
-            """
+    with db_connection() as conn:
+        for entry in entries:
+            day = entry.get("date")
+            if day is not None and hasattr(day, "isoformat"):
+                day = day.isoformat()
+            cursor = conn.execute(
+                """
             INSERT OR IGNORE INTO immunizations
                 (patient_id, consultation_id, vaccine_code, dose_number,
                  source, date_administered, administered_by)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (patient_id, consultation_id, entry["code"], entry["dose_number"],
-             SOURCE_REPORTED, day, recorded_by),
-        )
-        if cursor.rowcount:
-            stored.append((entry["code"], entry["dose_number"], day))
-    conn.commit()
-    conn.close()
+                (patient_id, consultation_id, entry["code"], entry["dose_number"],
+                 SOURCE_REPORTED, day, recorded_by),
+            )
+            if cursor.rowcount:
+                stored.append((entry["code"], entry["dose_number"], day))
+        conn.commit()
     return stored
 
 
@@ -1166,20 +1159,19 @@ def remove_immunizations(patient_id, dose_keys, consultation_id):
         return []
 
     removed = []
-    conn = get_db()
-    for code, dose_number in dose_keys:
-        cursor = conn.execute(
-            """
+    with db_connection() as conn:
+        for code, dose_number in dose_keys:
+            cursor = conn.execute(
+                """
             DELETE FROM immunizations
              WHERE patient_id = ? AND consultation_id = ?
                AND vaccine_code = ? AND dose_number = ?
             """,
-            (patient_id, consultation_id, code, dose_number),
-        )
-        if cursor.rowcount:
-            removed.append((code, dose_number))
-    conn.commit()
-    conn.close()
+                (patient_id, consultation_id, code, dose_number),
+            )
+            if cursor.rowcount:
+                removed.append((code, dose_number))
+        conn.commit()
     return removed
 
 
@@ -1194,9 +1186,9 @@ def get_immunization_by_id(record_id):
     same full_name builder every other screen uses, rather than by a second
     concatenation in SQL that could spell the same person differently.
     """
-    conn = get_db()
-    row = conn.execute(
-        """
+    with db_connection() as conn:
+        row = conn.execute(
+            """
         SELECT i.id, i.patient_id, i.consultation_id, i.vaccine_code, i.dose_number,
                i.source, i.date_administered, i.administered_by, i.notes, i.created_at,
                u.full_name AS administered_by_name
@@ -1204,9 +1196,8 @@ def get_immunization_by_id(record_id):
         JOIN users u ON u.id = i.administered_by
         WHERE i.id = ?
         """,
-        (record_id,),
-    ).fetchone()
-    conn.close()
+            (record_id,),
+        ).fetchone()
     # Annotated like every other dose this module hands out, so the correction
     # dialog reads `record["reported"]` rather than comparing the stored string
     # itself -- and so it knows whether this record may be left without a date.
@@ -1244,45 +1235,41 @@ def correct_immunization(record_id, vaccine_code, dose_number, date_administered
     if day is not None:
         day = day.isoformat() if hasattr(day, "isoformat") else str(day)
 
-    conn = get_db()
-    row = conn.execute(
-        "SELECT patient_id, source FROM immunizations WHERE id = ?", (record_id,)
-    ).fetchone()
-    if row is None:
-        conn.close()
-        return "missing"
+    with db_connection() as conn:
+        row = conn.execute(
+            "SELECT patient_id, source FROM immunizations WHERE id = ?", (record_id,)
+        ).fetchone()
+        if row is None:
+            return "missing"
 
-    # A correction may not turn a dose this health center administered into an
-    # undated one. The table's CHECK would refuse the UPDATE anyway and raise an
-    # IntegrityError up through the route; naming the outcome here is what lets
-    # the dialog say something a person can act on, exactly as "duplicate" does
-    # for the UNIQUE constraint below. The correction dialog does not offer a
-    # blank date on such a record, so this is the server's own refusal rather
-    # than the form's -- the distinction routes/consultation_views.py draws
-    # between a field a screen does not offer and a field the server refuses.
-    if day is None and row["source"] != SOURCE_REPORTED:
-        conn.close()
-        return "date_required"
+        # A correction may not turn a dose this health center administered into an
+        # undated one. The table's CHECK would refuse the UPDATE anyway and raise an
+        # IntegrityError up through the route; naming the outcome here is what lets
+        # the dialog say something a person can act on, exactly as "duplicate" does
+        # for the UNIQUE constraint below. The correction dialog does not offer a
+        # blank date on such a record, so this is the server's own refusal rather
+        # than the form's -- the distinction routes/consultation_views.py draws
+        # between a field a screen does not offer and a field the server refuses.
+        if day is None and row["source"] != SOURCE_REPORTED:
+            return "date_required"
 
-    clash = conn.execute(
-        """
+        clash = conn.execute(
+            """
         SELECT id FROM immunizations
          WHERE patient_id = ? AND vaccine_code = ? AND dose_number = ? AND id <> ?
         """,
-        (row["patient_id"], vaccine_code, dose_number, record_id),
-    ).fetchone()
-    if clash is not None:
-        conn.close()
-        return "duplicate"
+            (row["patient_id"], vaccine_code, dose_number, record_id),
+        ).fetchone()
+        if clash is not None:
+            return "duplicate"
 
-    conn.execute(
-        """
+        conn.execute(
+            """
         UPDATE immunizations
            SET vaccine_code = ?, dose_number = ?, date_administered = ?
          WHERE id = ?
         """,
-        (vaccine_code, dose_number, day, record_id),
-    )
-    conn.commit()
-    conn.close()
+            (vaccine_code, dose_number, day, record_id),
+        )
+        conn.commit()
     return "corrected"

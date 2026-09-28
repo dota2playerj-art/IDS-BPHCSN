@@ -107,7 +107,7 @@ import sqlite3
 
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from database.connection import get_db
+from database.connection import db_connection
 
 # The single source of truth for the SEEDED login accounts (audit item 21 --
 # seed_users.py was removed so these were the only credentials in the project).
@@ -143,16 +143,15 @@ DEMO_USERS = [
 
 
 def seed_demo_users():
-    conn = get_db()
-    user_count = conn.execute("SELECT COUNT(*) AS count FROM users").fetchone()["count"]
-    if user_count == 0:
-        for username, password, full_name, role in DEMO_USERS:
-            conn.execute(
-                "INSERT INTO users (username, password_hash, full_name, role) VALUES (?, ?, ?, ?)",
-                (username, generate_password_hash(password), full_name, role),
-            )
-        conn.commit()
-    conn.close()
+    with db_connection() as conn:
+        user_count = conn.execute("SELECT COUNT(*) AS count FROM users").fetchone()["count"]
+        if user_count == 0:
+            for username, password, full_name, role in DEMO_USERS:
+                conn.execute(
+                    "INSERT INTO users (username, password_hash, full_name, role) VALUES (?, ?, ?, ?)",
+                    (username, generate_password_hash(password), full_name, role),
+                )
+            conn.commit()
 
 
 # Whose names may appear in "Assign to" on a booking. The Barangay Official is
@@ -170,17 +169,16 @@ def get_clinical_staff():
     so a deactivated account stops being offered without a template edit.
     """
     placeholders = ", ".join("?" for _ in CLINICAL_ROLES)
-    conn = get_db()
-    rows = conn.execute(
-        f"""
+    with db_connection() as conn:
+        rows = conn.execute(
+            f"""
         SELECT id, full_name, role
         FROM users
         WHERE is_active = 1 AND role IN ({placeholders})
         ORDER BY full_name COLLATE NOCASE
         """,
-        CLINICAL_ROLES,
-    ).fetchall()
-    conn.close()
+            CLINICAL_ROLES,
+        ).fetchall()
     return [dict(row) for row in rows]
 
 
@@ -199,9 +197,9 @@ def get_all_users():
     the screen it is what keeps a newly added one from appearing at whatever
     position its row id happens to fall in.
     """
-    conn = get_db()
-    rows = conn.execute(
-        """
+    with db_connection() as conn:
+        rows = conn.execute(
+            """
         SELECT id, username, full_name, role, email, phone, is_active, created_at
         FROM users
         ORDER BY
@@ -214,15 +212,13 @@ def get_all_users():
             END,
             full_name COLLATE NOCASE
         """
-    ).fetchall()
-    conn.close()
+        ).fetchall()
     return [dict(row) for row in rows]
 
 
 def get_user_by_id(user_id):
-    conn = get_db()
-    user = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
-    conn.close()
+    with db_connection() as conn:
+        user = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
     return user
 
 
@@ -253,19 +249,17 @@ def get_user_by_username(username):
     the audit trail would then have had nothing to attribute the refusal to,
     which is exactly the entry an administrator most needs to see.
     """
-    conn = get_db()
-    user = None
-
-    try:
-        user = conn.execute(
-            "SELECT id, username, role, full_name, password_hash, is_active "
-            "FROM users WHERE username = ?",
-            (username,),
-        ).fetchone()
-    except sqlite3.OperationalError:
+    with db_connection() as conn:
         user = None
-    finally:
-        conn.close()
+
+        try:
+            user = conn.execute(
+                "SELECT id, username, role, full_name, password_hash, is_active "
+            "FROM users WHERE username = ?",
+                (username,),
+            ).fetchone()
+        except sqlite3.OperationalError:
+            user = None
 
     return user
 
@@ -626,12 +620,11 @@ def username_taken(username):
     account. So this is the check that runs, and the UNIQUE constraint stays as
     the backstop underneath it for the exact-match case.
     """
-    conn = get_db()
-    row = conn.execute(
-        "SELECT id FROM users WHERE LOWER(username) = LOWER(?)",
-        ((username or "").strip(),),
-    ).fetchone()
-    conn.close()
+    with db_connection() as conn:
+        row = conn.execute(
+            "SELECT id FROM users WHERE LOWER(username) = LOWER(?)",
+            ((username or "").strip(),),
+        ).fetchone()
     return row is not None
 
 
@@ -730,22 +723,21 @@ def create_user(values):
     Management's `contact` reason, which says contact details are never captured
     and remains true of accounts created here.
     """
-    conn = get_db()
-    cursor = conn.execute(
-        """
+    with db_connection() as conn:
+        cursor = conn.execute(
+            """
         INSERT INTO users (username, password_hash, full_name, role)
         VALUES (?, ?, ?, ?)
         """,
-        (
-            (values.get("username") or "").strip(),
-            generate_password_hash(values.get("password") or ""),
-            (values.get("full_name") or "").strip(),
-            (values.get("role") or "").strip(),
-        ),
-    )
-    conn.commit()
-    new_id = cursor.lastrowid
-    conn.close()
+            (
+                (values.get("username") or "").strip(),
+                generate_password_hash(values.get("password") or ""),
+                (values.get("full_name") or "").strip(),
+                (values.get("role") or "").strip(),
+            ),
+        )
+        conn.commit()
+        new_id = cursor.lastrowid
     return new_id
 
 
@@ -772,12 +764,11 @@ def count_active_admins():
     column is ADMIN_ROLE. Counting through the normaliser would be a loop over
     every row to answer what one COUNT already answers.
     """
-    conn = get_db()
-    total = conn.execute(
-        "SELECT COUNT(*) FROM users WHERE is_active = 1 AND role = ?",
-        (ADMIN_ROLE,),
-    ).fetchone()[0]
-    conn.close()
+    with db_connection() as conn:
+        total = conn.execute(
+            "SELECT COUNT(*) FROM users WHERE is_active = 1 AND role = ?",
+            (ADMIN_ROLE,),
+        ).fetchone()[0]
     return total
 
 
@@ -838,8 +829,7 @@ def deactivate_user(user_id):
     first to commit and then counts one, not two, and is refused. The guard holds
     under concurrency because the count it reads cannot change under it.
     """
-    conn = get_db()
-    try:
+    with db_connection() as conn:
         # Write lock first, then read. The order is the guarantee -- see above.
         conn.execute("BEGIN IMMEDIATE")
 
@@ -865,8 +855,6 @@ def deactivate_user(user_id):
         _set_active(conn, user_id, False)
         conn.commit()
         return True, None
-    finally:
-        conn.close()
 
 
 def reactivate_user(user_id):
@@ -884,8 +872,7 @@ def reactivate_user(user_id):
     because an administrator restoring an account needs to know they are handing
     back the old password rather than issuing a new one.
     """
-    conn = get_db()
-    try:
+    with db_connection() as conn:
         conn.execute("BEGIN IMMEDIATE")
         user = conn.execute(
             "SELECT id, is_active FROM users WHERE id = ?", (user_id,)
@@ -900,8 +887,6 @@ def reactivate_user(user_id):
         _set_active(conn, user_id, True)
         conn.commit()
         return True, None
-    finally:
-        conn.close()
 
 
 # ---------------------------------------------------------------------------
@@ -1056,8 +1041,7 @@ def update_user(user_id, values):
     full_name = (values.get("full_name") or "").strip()
     role = (values.get("role") or "").strip()
 
-    conn = get_db()
-    try:
+    with db_connection() as conn:
         # Write lock first, then read -- see above.
         conn.execute("BEGIN IMMEDIATE")
 
@@ -1093,8 +1077,6 @@ def update_user(user_id, values):
         ).fetchone()
         conn.commit()
         return dict(user), dict(after), None
-    finally:
-        conn.close()
 
 
 def set_user_password(user_id, password):
@@ -1122,8 +1104,7 @@ def set_user_password(user_id, password):
     strand is one whose new password is then forgotten before it is written down,
     and the answer to that is another reset.
     """
-    conn = get_db()
-    try:
+    with db_connection() as conn:
         conn.execute("BEGIN IMMEDIATE")
         user = conn.execute(
             "SELECT id FROM users WHERE id = ?", (user_id,)
@@ -1138,8 +1119,6 @@ def set_user_password(user_id, password):
         )
         conn.commit()
         return True, None
-    finally:
-        conn.close()
 
 
 # ---------------------------------------------------------------------------

@@ -66,7 +66,7 @@ fixed dose count. "Influenza" is one shot a year forever; a Td booster is not
 would force a health worker to invent one, and an invented number in a clinical
 record is worse than an absent one.
 """
-from database.connection import get_db
+from database.connection import db_connection
 
 # (key, name, protects_against) -- the vaccines the entry form offers as tick
 # boxes. `key` is what the form posts and is never stored; `name` is what is
@@ -311,9 +311,9 @@ def get_general_vaccinations_for_patient(patient_id):
     that runs in order from birth, while this is a plain history whose most
     useful line is the last thing the patient was given.
     """
-    conn = get_db()
-    rows = conn.execute(
-        """
+    with db_connection() as conn:
+        rows = conn.execute(
+            """
         SELECT g.id, g.patient_id, g.consultation_id, g.vaccine_name, g.dose_number,
                g.date_administered, g.administered_by, g.created_at,
                u.full_name AS administered_by_name
@@ -322,9 +322,8 @@ def get_general_vaccinations_for_patient(patient_id):
         WHERE g.patient_id = ?
         ORDER BY g.date_administered DESC, g.id DESC
         """,
-        (patient_id,),
-    ).fetchall()
-    conn.close()
+            (patient_id,),
+        ).fetchall()
     records = [dict(row) for row in rows]
     for record in records:
         record["label"] = vaccination_label(record["vaccine_name"], record["dose_number"])
@@ -335,9 +334,9 @@ def get_general_vaccinations_for_consultation(consultation_id):
     """The general vaccinations recorded during one visit, oldest row first."""
     if not consultation_id:
         return []
-    conn = get_db()
-    rows = conn.execute(
-        """
+    with db_connection() as conn:
+        rows = conn.execute(
+            """
         SELECT g.id, g.vaccine_name, g.dose_number, g.date_administered,
                u.full_name AS administered_by_name
         FROM general_vaccinations g
@@ -345,9 +344,8 @@ def get_general_vaccinations_for_consultation(consultation_id):
         WHERE g.consultation_id = ?
         ORDER BY g.id
         """,
-        (consultation_id,),
-    ).fetchall()
-    conn.close()
+            (consultation_id,),
+        ).fetchall()
     records = [dict(row) for row in rows]
     for record in records:
         record["label"] = vaccination_label(record["vaccine_name"], record["dose_number"])
@@ -375,22 +373,21 @@ def record_general_vaccinations(patient_id, entries, administered_by,
     day = day.isoformat() if hasattr(day, "isoformat") else str(day)
 
     stored = []
-    conn = get_db()
-    for entry in entries:
-        cursor = conn.execute(
-            """
+    with db_connection() as conn:
+        for entry in entries:
+            cursor = conn.execute(
+                """
             INSERT OR IGNORE INTO general_vaccinations
                 (patient_id, consultation_id, vaccine_name, dose_number,
                  date_administered, administered_by)
             VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (patient_id, consultation_id, entry["vaccine_name"],
-             entry["dose_number"], day, administered_by),
-        )
-        if cursor.rowcount:
-            stored.append(entry)
-    conn.commit()
-    conn.close()
+                (patient_id, consultation_id, entry["vaccine_name"],
+                 entry["dose_number"], day, administered_by),
+            )
+            if cursor.rowcount:
+                stored.append(entry)
+        conn.commit()
     return stored
 
 
@@ -402,9 +399,9 @@ def get_general_vaccination_by_id(record_id):
     models.patients.get_patient_by_id() so a corrected record is named by the
     same full_name builder every other screen uses.
     """
-    conn = get_db()
-    row = conn.execute(
-        """
+    with db_connection() as conn:
+        row = conn.execute(
+            """
         SELECT g.id, g.patient_id, g.consultation_id, g.vaccine_name, g.dose_number,
                g.date_administered, g.administered_by, g.created_at,
                u.full_name AS administered_by_name
@@ -412,9 +409,8 @@ def get_general_vaccination_by_id(record_id):
         JOIN users u ON u.id = g.administered_by
         WHERE g.id = ?
         """,
-        (record_id,),
-    ).fetchone()
-    conn.close()
+            (record_id,),
+        ).fetchone()
     return dict(row) if row else None
 
 
@@ -448,34 +444,31 @@ def correct_general_vaccination(record_id, vaccine_name, dose_number, date_admin
     day = date_administered
     day = day.isoformat() if hasattr(day, "isoformat") else str(day)
 
-    conn = get_db()
-    row = conn.execute(
-        "SELECT patient_id FROM general_vaccinations WHERE id = ?", (record_id,)
-    ).fetchone()
-    if row is None:
-        conn.close()
-        return "missing"
+    with db_connection() as conn:
+        row = conn.execute(
+            "SELECT patient_id FROM general_vaccinations WHERE id = ?", (record_id,)
+        ).fetchone()
+        if row is None:
+            return "missing"
 
-    clash = conn.execute(
-        """
+        clash = conn.execute(
+            """
         SELECT id FROM general_vaccinations
          WHERE patient_id = ? AND vaccine_name = ? AND date_administered = ?
            AND id <> ?
         """,
-        (row["patient_id"], vaccine_name, day, record_id),
-    ).fetchone()
-    if clash is not None:
-        conn.close()
-        return "duplicate"
+            (row["patient_id"], vaccine_name, day, record_id),
+        ).fetchone()
+        if clash is not None:
+            return "duplicate"
 
-    conn.execute(
-        """
+        conn.execute(
+            """
         UPDATE general_vaccinations
            SET vaccine_name = ?, dose_number = ?, date_administered = ?
          WHERE id = ?
         """,
-        (vaccine_name, dose_number, day, record_id),
-    )
-    conn.commit()
-    conn.close()
+            (vaccine_name, dose_number, day, record_id),
+        )
+        conn.commit()
     return "corrected"

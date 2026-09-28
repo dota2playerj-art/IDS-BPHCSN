@@ -75,7 +75,7 @@ import re
 
 from flask import g, has_request_context
 
-from database.connection import get_db
+from database.connection import db_connection
 
 # ---------------------------------------------------------------------------
 # THE KEYS, AND WHAT THE SYSTEM DOES WITHOUT THEM
@@ -209,14 +209,13 @@ def _read_stored():
     rather than being read into a dict the rest of the application would then be
     able to see.
     """
-    conn = get_db()
-    placeholders = ", ".join("?" for _ in STORED_KEYS)
-    rows = conn.execute(
-        f"SELECT setting_key, setting_value FROM settings "
+    with db_connection() as conn:
+        placeholders = ", ".join("?" for _ in STORED_KEYS)
+        rows = conn.execute(
+            f"SELECT setting_key, setting_value FROM settings "
         f"WHERE setting_key IN ({placeholders})",
-        STORED_KEYS,
-    ).fetchall()
-    conn.close()
+            STORED_KEYS,
+        ).fetchall()
 
     stored = {}
     for row in rows:
@@ -330,9 +329,9 @@ def set_maintenance_mode(enabled, actor_id):
     if get_settings()[KEY_MAINTENANCE] == desired:
         return False
 
-    conn = get_db()
-    conn.execute(
-        """
+    with db_connection() as conn:
+        conn.execute(
+            """
         INSERT INTO settings (setting_key, setting_value, updated_by, updated_at)
              VALUES (?, ?, ?, CURRENT_TIMESTAMP)
         ON CONFLICT(setting_key) DO UPDATE SET
@@ -340,10 +339,9 @@ def set_maintenance_mode(enabled, actor_id):
                 updated_by = excluded.updated_by,
                 updated_at = CURRENT_TIMESTAMP
         """,
-        (KEY_MAINTENANCE, desired, actor_id),
-    )
-    conn.commit()
-    conn.close()
+            (KEY_MAINTENANCE, desired, actor_id),
+        )
+        conn.commit()
 
     # The guard in utils/security.py reads this on the very next request, and
     # the redirect that follows this call IS the next request. Without this the
@@ -362,17 +360,16 @@ def maintenance_changed_at():
     attribute to a real account, and a switch whose history disagreed with its
     own row would be the more misleading of the two.
     """
-    conn = get_db()
-    row = conn.execute(
-        """
+    with db_connection() as conn:
+        row = conn.execute(
+            """
         SELECT s.updated_at, u.full_name
           FROM settings s
           LEFT JOIN users u ON u.id = s.updated_by
          WHERE s.setting_key = ?
         """,
-        (KEY_MAINTENANCE,),
-    ).fetchone()
-    conn.close()
+            (KEY_MAINTENANCE,),
+        ).fetchone()
     if row is None:
         return None, None
     return row["updated_at"], row["full_name"]
@@ -531,9 +528,9 @@ def save_general_settings(values, actor_id):
     """
     changed = _changes(values, get_settings())
 
-    conn = get_db()
-    conn.executemany(
-        """
+    with db_connection() as conn:
+        conn.executemany(
+            """
         INSERT INTO settings (setting_key, setting_value, updated_by, updated_at)
              VALUES (?, ?, ?, CURRENT_TIMESTAMP)
         ON CONFLICT(setting_key) DO UPDATE SET
@@ -541,13 +538,12 @@ def save_general_settings(values, actor_id):
                 updated_by = excluded.updated_by,
                 updated_at = CURRENT_TIMESTAMP
         """,
-        [
-            (key, (values.get(key) or "").strip(), actor_id)
-            for key in GENERAL_KEYS
-        ],
-    )
-    conn.commit()
-    conn.close()
+            [
+                (key, (values.get(key) or "").strip(), actor_id)
+                for key in GENERAL_KEYS
+            ],
+        )
+        conn.commit()
 
     # Anything reading settings later in THIS request -- the audit entry below,
     # the flash message, a re-render -- must see what was just written.
@@ -580,10 +576,10 @@ def last_updated():
     about the stored values -- if a row is ever changed by any route other than
     the one on Screen 13, this still reports it.
     """
-    conn = get_db()
-    placeholders = ", ".join("?" for _ in GENERAL_KEYS)
-    row = conn.execute(
-        f"""
+    with db_connection() as conn:
+        placeholders = ", ".join("?" for _ in GENERAL_KEYS)
+        row = conn.execute(
+            f"""
         SELECT s.updated_at, u.full_name
           FROM settings s
           LEFT JOIN users u ON u.id = s.updated_by
@@ -591,9 +587,8 @@ def last_updated():
       ORDER BY s.updated_at DESC, s.id DESC
          LIMIT 1
         """,
-        GENERAL_KEYS,
-    ).fetchone()
-    conn.close()
+            GENERAL_KEYS,
+        ).fetchone()
     if row is None:
         return None, None
     return row["updated_at"], row["full_name"]

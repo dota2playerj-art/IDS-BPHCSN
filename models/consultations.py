@@ -56,7 +56,7 @@ is who may write, seal and read from now on.
 """
 from datetime import datetime
 
-from database.connection import get_db
+from database.connection import db_connection
 from models.patients import calculate_age, format_age
 from utils.dates import recent_months, resolve_range, today
 from utils.roles import holds_clinical_authority
@@ -467,9 +467,9 @@ def get_consultation_report(limit=None):
     -- which is normal, the column is a date for anything entered on Screen 21 --
     come back newest-first rather than in whatever order SQLite happens to scan.
     """
-    conn = get_db()
-    rows = conn.execute(
-        f"""
+    with db_connection() as conn:
+        rows = conn.execute(
+            f"""
         SELECT c.id, c.consultation_date, c.chief_complaint, c.diagnosis,
                c.treatment_plan, c.created_at, c.appointment_id,
                p.id AS patient_row_id, p.patient_id, p.first_name, p.last_name,
@@ -480,9 +480,8 @@ def get_consultation_report(limit=None):
         ORDER BY c.consultation_date DESC, c.id DESC
         {"LIMIT ?" if limit else ""}
         """,
-        (limit,) if limit else (),
-    ).fetchall()
-    conn.close()
+            (limit,) if limit else (),
+        ).fetchall()
 
     return {
         "entries": [dict(row) for row in rows],
@@ -619,64 +618,63 @@ def get_consultation_stats(months=6, limit=TOP_DIAGNOSIS_LIMIT, on_date=None,
     current_month = reference.strftime("%Y-%m")
     lo, hi = window["start"].isoformat(), window["end"].isoformat()
 
-    conn = get_db()
-    total = conn.execute("SELECT COUNT(*) FROM consultations").fetchone()[0]
-    by_month = {
-        row["month"]: row["count"]
-        for row in conn.execute(
-            """
+    with db_connection() as conn:
+        total = conn.execute("SELECT COUNT(*) FROM consultations").fetchone()[0]
+        by_month = {
+            row["month"]: row["count"]
+            for row in conn.execute(
+                """
             SELECT substr(consultation_date, 1, 7) AS month, COUNT(*) AS count
             FROM consultations
             GROUP BY month
             """
-        ).fetchall()
-    }
-    patients_seen = conn.execute(
-        "SELECT COUNT(DISTINCT patient_id) FROM consultations"
-    ).fetchone()[0]
-    # A SEALED CONSULTATION'S DIAGNOSIS IS NOT RANKED HERE. See the block above
-    # _rank_free_text() for why an aggregate is not a safe place for one.
-    diagnoses = [
-        row[0] for row in conn.execute(
-            "SELECT diagnosis FROM consultations WHERE is_restricted = 0"
-        )
-    ]
-    withheld_total = conn.execute(
-        "SELECT COUNT(*) FROM consultations WHERE is_restricted = 1"
-    ).fetchone()[0]
-    # THE COMPLAINTS QUERY IS DELIBERATELY NOT FILTERED, and the asymmetry is the
-    # point rather than an oversight. The seal covers DOCTOR_ONLY_FIELDS and
-    # nothing else: chief_complaint is shown in full to Health Center Staff on a
-    # sealed record's own profile panel, so withholding it from a ranking nobody
-    # can attribute to a patient would protect nothing and would quietly
-    # understate what the barangay presented with.
-    complaints = [
-        row[0] for row in conn.execute("SELECT chief_complaint FROM consultations")
-    ]
+            ).fetchall()
+        }
+        patients_seen = conn.execute(
+            "SELECT COUNT(DISTINCT patient_id) FROM consultations"
+        ).fetchone()[0]
+        # A SEALED CONSULTATION'S DIAGNOSIS IS NOT RANKED HERE. See the block above
+        # _rank_free_text() for why an aggregate is not a safe place for one.
+        diagnoses = [
+            row[0] for row in conn.execute(
+                "SELECT diagnosis FROM consultations WHERE is_restricted = 0"
+            )
+        ]
+        withheld_total = conn.execute(
+            "SELECT COUNT(*) FROM consultations WHERE is_restricted = 1"
+        ).fetchone()[0]
+        # THE COMPLAINTS QUERY IS DELIBERATELY NOT FILTERED, and the asymmetry is the
+        # point rather than an oversight. The seal covers DOCTOR_ONLY_FIELDS and
+        # nothing else: chief_complaint is shown in full to Health Center Staff on a
+        # sealed record's own profile panel, so withholding it from a ranking nobody
+        # can attribute to a patient would protect nothing and would quietly
+        # understate what the barangay presented with.
+        complaints = [
+            row[0] for row in conn.execute("SELECT chief_complaint FROM consultations")
+        ]
 
-    # The window's own rows. consultation_date is stored as clinic-local date
-    # text (it is the day of the visit, not a UTC instant), so the range compares
-    # against its leading ten characters directly -- no timezone conversion, and
-    # a row carrying a time still lands on its own day.
-    #
-    # is_restricted comes along so the diagnosis ranking can drop the sealed rows
-    # WITHOUT the visit itself vanishing. The filter is applied where the ranking
-    # is built, a few lines below, and deliberately not in this WHERE clause: a
-    # sealed consultation still happened, was still attended, and still belongs
-    # in the total, in patients_seen and in the month it falls in. Filtering here
-    # would have made a sealed visit disappear from the barangay's activity
-    # figures altogether, which is a second, quieter falsehood -- and one that
-    # would have moved the trend line under a card that no longer matched it.
-    scoped = conn.execute(
-        """
+        # The window's own rows. consultation_date is stored as clinic-local date
+        # text (it is the day of the visit, not a UTC instant), so the range compares
+        # against its leading ten characters directly -- no timezone conversion, and
+        # a row carrying a time still lands on its own day.
+        #
+        # is_restricted comes along so the diagnosis ranking can drop the sealed rows
+        # WITHOUT the visit itself vanishing. The filter is applied where the ranking
+        # is built, a few lines below, and deliberately not in this WHERE clause: a
+        # sealed consultation still happened, was still attended, and still belongs
+        # in the total, in patients_seen and in the month it falls in. Filtering here
+        # would have made a sealed visit disappear from the barangay's activity
+        # figures altogether, which is a second, quieter falsehood -- and one that
+        # would have moved the trend line under a card that no longer matched it.
+        scoped = conn.execute(
+            """
         SELECT diagnosis, chief_complaint, patient_id, is_restricted,
                substr(consultation_date, 1, 7) AS month
         FROM consultations
         WHERE substr(consultation_date, 1, 10) BETWEEN ? AND ?
         """,
-        (lo, hi),
-    ).fetchall()
-    conn.close()
+            (lo, hi),
+        ).fetchall()
 
     # THE TREND IS CLIPPED TO THE RANGE, NOT TO WHOLE MONTHS.
     # A report for 1-10 August whose August bar showed the whole month would put
@@ -759,13 +757,12 @@ def get_consultations_for_patient(patient_id, viewer_role):
     """
     can_view = can_view_restricted(viewer_role)
 
-    conn = get_db()
-    rows = conn.execute(
-        _CONSULTATION_SELECT
-        + " WHERE c.patient_id = ? ORDER BY c.consultation_date DESC, c.id DESC",
-        (patient_id,),
-    ).fetchall()
-    conn.close()
+    with db_connection() as conn:
+        rows = conn.execute(
+            _CONSULTATION_SELECT
+            + " WHERE c.patient_id = ? ORDER BY c.consultation_date DESC, c.id DESC",
+            (patient_id,),
+        ).fetchall()
 
     consultations = []
     for row in rows:
@@ -788,11 +785,10 @@ def get_consultation_by_id(consultation_id):
     screen redact it themselves, at the point they know who is looking -- see
     routes/consultation_views.py consultation_form_context().
     """
-    conn = get_db()
-    row = conn.execute(
-        _CONSULTATION_SELECT + " WHERE c.id = ?", (consultation_id,)
-    ).fetchone()
-    conn.close()
+    with db_connection() as conn:
+        row = conn.execute(
+            _CONSULTATION_SELECT + " WHERE c.id = ?", (consultation_id,)
+        ).fetchone()
     if row is None:
         return None
     consultation = _to_consultation(row)
@@ -812,12 +808,11 @@ def get_consultation_for_appointment(appointment_id):
     """
     if not appointment_id:
         return None
-    conn = get_db()
-    row = conn.execute(
-        _CONSULTATION_SELECT + " WHERE c.appointment_id = ? ORDER BY c.id LIMIT 1",
-        (appointment_id,),
-    ).fetchone()
-    conn.close()
+    with db_connection() as conn:
+        row = conn.execute(
+            _CONSULTATION_SELECT + " WHERE c.appointment_id = ? ORDER BY c.id LIMIT 1",
+            (appointment_id,),
+        ).fetchone()
     return _to_consultation(row) if row else None
 
 
@@ -1004,18 +999,17 @@ def create_consultation(patient_id, recorded_by, values, age_context,
     # Equal to created_at on an unedited record, which is what was_edited reads.
     parameters += [None]
 
-    conn = get_db()
-    cursor = conn.execute(
-        f"INSERT INTO consultations ({', '.join(columns)}) VALUES ({placeholders})",
-        parameters,
-    )
-    conn.execute(
-        "UPDATE consultations SET updated_at = created_at WHERE id = ?",
-        (cursor.lastrowid,),
-    )
-    conn.commit()
-    new_id = cursor.lastrowid
-    conn.close()
+    with db_connection() as conn:
+        cursor = conn.execute(
+            f"INSERT INTO consultations ({', '.join(columns)}) VALUES ({placeholders})",
+            parameters,
+        )
+        conn.execute(
+            "UPDATE consultations SET updated_at = created_at WHERE id = ?",
+            (cursor.lastrowid,),
+        )
+        conn.commit()
+        new_id = cursor.lastrowid
     return new_id
 
 
@@ -1059,16 +1053,15 @@ def update_consultation(consultation_id, values, age_context):
     # and the record would go on claiming it had never been touched. The
     # fractional part makes "has this been edited?" exact rather than usually
     # right. display_date() still reads it: it falls back to the date prefix.
-    conn = get_db()
-    cursor = conn.execute(
-        f"UPDATE consultations SET {assignments}, "
+    with db_connection() as conn:
+        cursor = conn.execute(
+            f"UPDATE consultations SET {assignments}, "
         "updated_at = strftime('%Y-%m-%d %H:%M:%f', 'now') "
         f"WHERE id = ? AND NOT ({unchanged})",
-        parameters,
-    )
-    conn.commit()
-    affected = cursor.rowcount
-    conn.close()
+            parameters,
+        )
+        conn.commit()
+        affected = cursor.rowcount
     return affected
 
 
@@ -1102,47 +1095,44 @@ def set_consultation_restriction(consultation_id, restricted, user_id):
     """
     flag = 1 if restricted else 0
 
-    conn = get_db()
-    row = conn.execute(
-        "SELECT is_restricted FROM consultations WHERE id = ?", (consultation_id,)
-    ).fetchone()
-    if row is None:
-        conn.close()
-        return "missing"
+    with db_connection() as conn:
+        row = conn.execute(
+            "SELECT is_restricted FROM consultations WHERE id = ?", (consultation_id,)
+        ).fetchone()
+        if row is None:
+            return "missing"
 
-    if bool(row["is_restricted"]) == bool(flag):
-        conn.close()
-        return "unchanged"
+        if bool(row["is_restricted"]) == bool(flag):
+            return "unchanged"
 
-    conn.execute(
-        """
+        conn.execute(
+            """
         UPDATE consultations
            SET is_restricted = ?,
                restricted_by = ?,
                restricted_at = ?
          WHERE id = ?
         """,
-        (
-            flag,
-            user_id if flag else None,
-            # NULL here for both directions. Lifting a seal wants NULL and keeps
-            # it; setting one has its stamp written by the statement below, from
-            # SQLite's own clock rather than from Python's -- created_at and
-            # updated_at on this table both come from that clock, and a third
-            # date taken from a different one would disagree with them by
-            # however far the application's idea of now has drifted.
-            None,
-            consultation_id,
-        ),
-    )
-    # Same shape and same precision as the stamp update_consultation() writes, so
-    # the dates on a record read alike and sort together.
-    if flag:
-        conn.execute(
-            "UPDATE consultations "
-            "SET restricted_at = strftime('%Y-%m-%d %H:%M:%f', 'now') WHERE id = ?",
-            (consultation_id,),
+            (
+                flag,
+                user_id if flag else None,
+                # NULL here for both directions. Lifting a seal wants NULL and keeps
+                # it; setting one has its stamp written by the statement below, from
+                # SQLite's own clock rather than from Python's -- created_at and
+                # updated_at on this table both come from that clock, and a third
+                # date taken from a different one would disagree with them by
+                # however far the application's idea of now has drifted.
+                None,
+                consultation_id,
+            ),
         )
-    conn.commit()
-    conn.close()
+        # Same shape and same precision as the stamp update_consultation() writes, so
+        # the dates on a record read alike and sort together.
+        if flag:
+            conn.execute(
+                "UPDATE consultations "
+            "SET restricted_at = strftime('%Y-%m-%d %H:%M:%f', 'now') WHERE id = ?",
+                (consultation_id,),
+            )
+        conn.commit()
     return "restricted" if flag else "lifted"

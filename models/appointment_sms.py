@@ -64,7 +64,7 @@ project's rule (utils/unavailable.py) is that a control either works or is
 visibly not a control at all. Here there is genuinely nothing to click, so
 nothing clickable is drawn.
 """
-from database.connection import get_db
+from database.connection import db_connection
 from utils.dates import display_timestamp
 from utils.sms import LIVE, SIMULATED
 
@@ -146,19 +146,17 @@ _HISTORY_SELECT = """
 
 
 def get_appointment_sms_by_id(message_id):
-    conn = get_db()
-    row = conn.execute(_HISTORY_SELECT + " WHERE m.id = ?", (message_id,)).fetchone()
-    conn.close()
+    with db_connection() as conn:
+        row = conn.execute(_HISTORY_SELECT + " WHERE m.id = ?", (message_id,)).fetchone()
     return _to_message(row) if row else None
 
 
 def get_appointment_sms_history(limit=25):
     """Individual confirmations, newest first, with the sender's name resolved."""
-    conn = get_db()
-    rows = conn.execute(
-        _HISTORY_SELECT + " ORDER BY m.sent_at DESC, m.id DESC LIMIT ?", (limit,)
-    ).fetchall()
-    conn.close()
+    with db_connection() as conn:
+        rows = conn.execute(
+            _HISTORY_SELECT + " ORDER BY m.sent_at DESC, m.id DESC LIMIT ?", (limit,)
+        ).fetchall()
     return [_to_message(row) for row in rows]
 
 

@@ -8,7 +8,7 @@ into a dict and the derived keys are added alongside.
 """
 from datetime import datetime
 
-from database.connection import get_db
+from database.connection import db_connection
 from utils.dates import today
 
 # The vocabularies the Add/Edit Medicine form offers. The template renders its
@@ -386,21 +386,19 @@ def _threshold_pct(stock_quantity, low_stock_threshold):
 
 def get_all_inventory_items():
     """Every inventory item, ordered by name."""
-    conn = get_db()
-    rows = conn.execute(
-        "SELECT * FROM inventory_items ORDER BY name COLLATE NOCASE"
-    ).fetchall()
-    conn.close()
+    with db_connection() as conn:
+        rows = conn.execute(
+            "SELECT * FROM inventory_items ORDER BY name COLLATE NOCASE"
+        ).fetchall()
     return [_to_item(row) for row in rows]
 
 
 def get_inventory_item_by_id(item_id):
     """One inventory item by primary key, or None if no such row exists."""
-    conn = get_db()
-    row = conn.execute(
-        "SELECT * FROM inventory_items WHERE id = ?", (item_id,)
-    ).fetchone()
-    conn.close()
+    with db_connection() as conn:
+        row = conn.execute(
+            "SELECT * FROM inventory_items WHERE id = ?", (item_id,)
+        ).fetchone()
     return _to_item(row) if row else None
 
 
@@ -757,14 +755,13 @@ def create_inventory_item(values):
     placeholders = ", ".join("?" for _ in columns)
     parameters = [generate_next_item_code()] + [record[f] for f in INVENTORY_FIELDS]
 
-    conn = get_db()
-    cursor = conn.execute(
-        f"INSERT INTO inventory_items ({', '.join(columns)}) VALUES ({placeholders})",
-        parameters,
-    )
-    conn.commit()
-    new_id = cursor.lastrowid
-    conn.close()
+    with db_connection() as conn:
+        cursor = conn.execute(
+            f"INSERT INTO inventory_items ({', '.join(columns)}) VALUES ({placeholders})",
+            parameters,
+        )
+        conn.commit()
+        new_id = cursor.lastrowid
     return new_id
 
 
@@ -785,34 +782,32 @@ def update_inventory_item(item_id, values):
     """
     record = _build_record(values)
 
-    conn = get_db()
-    before = conn.execute(
-        "SELECT * FROM inventory_items WHERE id = ?", (item_id,)
-    ).fetchone()
-    if before is None:
-        conn.close()
-        return []
+    with db_connection() as conn:
+        before = conn.execute(
+            "SELECT * FROM inventory_items WHERE id = ?", (item_id,)
+        ).fetchone()
+        if before is None:
+            return []
 
-    changes = [
-        {
-            "field": field,
-            "label": FIELD_LABELS.get(field, field),
-            "old": before[field],
-            "new": record[field],
-        }
-        for field in INVENTORY_FIELDS
-        if before[field] != record[field]
-    ]
+        changes = [
+            {
+                "field": field,
+                "label": FIELD_LABELS.get(field, field),
+                "old": before[field],
+                "new": record[field],
+            }
+            for field in INVENTORY_FIELDS
+            if before[field] != record[field]
+        ]
 
-    assignments = ", ".join(f"{field} = ?" for field in INVENTORY_FIELDS)
-    parameters = [record[field] for field in INVENTORY_FIELDS] + [item_id]
-    conn.execute(
-        f"UPDATE inventory_items SET {assignments}, updated_at = CURRENT_TIMESTAMP "
+        assignments = ", ".join(f"{field} = ?" for field in INVENTORY_FIELDS)
+        parameters = [record[field] for field in INVENTORY_FIELDS] + [item_id]
+        conn.execute(
+            f"UPDATE inventory_items SET {assignments}, updated_at = CURRENT_TIMESTAMP "
         "WHERE id = ?",
-        parameters,
-    )
-    conn.commit()
-    conn.close()
+            parameters,
+        )
+        conn.commit()
     return changes
 
 
@@ -841,18 +836,17 @@ def set_item_status(item_id, status):
             f"{status!r} is not an item status; expected one of {ITEM_STATUSES}."
         )
 
-    conn = get_db()
-    cursor = conn.execute(
-        """
+    with db_connection() as conn:
+        cursor = conn.execute(
+            """
         UPDATE inventory_items
            SET status = ?, updated_at = CURRENT_TIMESTAMP
          WHERE id = ? AND status != ?
         """,
-        (status, int(item_id), status),
-    )
-    conn.commit()
-    affected = cursor.rowcount
-    conn.close()
+            (status, int(item_id), status),
+        )
+        conn.commit()
+        affected = cursor.rowcount
     return affected
 
 
@@ -868,11 +862,10 @@ def generate_next_item_code():
     is UNIQUE across the whole table and the screen these codes appear on is
     Medicine Inventory.
     """
-    conn = get_db()
-    rows = conn.execute(
-        "SELECT item_code FROM inventory_items WHERE item_code LIKE 'MED-%'"
-    ).fetchall()
-    conn.close()
+    with db_connection() as conn:
+        rows = conn.execute(
+            "SELECT item_code FROM inventory_items WHERE item_code LIKE 'MED-%'"
+        ).fetchall()
 
     highest = 0
     for row in rows:
