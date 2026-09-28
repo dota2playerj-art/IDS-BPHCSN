@@ -60,6 +60,34 @@ docs/verification/**/*.webp
 # A real key belongs in a .env that never leaves the machine.
 .env
 *.env
+# Other environment files, such as .env.local.
+.env.*
+
+# --- More guards for patient data (added 2026-09-28) ------------------------
+# Any SQLite database file, anywhere in the project. Only schema.sql is tracked.
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+# Any copy of a database file (app.db.PRETASK_BACKUP_..., test.db.old, ...).
+*.db.*
+# Backup copies by name, and a backups folder.
+# Not "*BACKUP*": git here ignores case, so that would also hide
+# models/backup.py and any new source file with "backup" in its name.
+*_BACKUP_*
+backups/
+# Source files are never backups, whatever their name.
+!*.py
+!*.html
+!*.sql
+!*.md
+# Other common names for a virtual environment folder.
+venv/
+env/
+# The tests do not write into the project. Each suite uses its own folder in
+# the system temp folder (see tests/_support.py), so no tests/ rule is needed.
 
 # --- Tooling and scratch work -----------------------------------------------
 .claude/
