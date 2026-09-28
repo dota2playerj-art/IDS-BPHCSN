@@ -111,10 +111,17 @@ CREATE TABLE consultations (
     restricted_by INTEGER,
     restricted_at TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- Nullable, with no default, as in the migrated database
+    -- (migrate_add_consultation_columns.py). create_consultation() inserts NULL
+    -- and then sets it to created_at in the same transaction. Equal to created_at
+    -- means "never edited". A NOT NULL here made every new consultation fail on
+    -- a fresh install.
+    updated_at TEXT,
     FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
     FOREIGN KEY (recorded_by) REFERENCES users(id) ON DELETE RESTRICT,
-    FOREIGN KEY (restricted_by) REFERENCES users(id) ON DELETE RESTRICT,
+    -- No ON DELETE clause, as in the migrated database
+    -- (migrate_add_consultation_restriction.py). Nothing deletes an account.
+    FOREIGN KEY (restricted_by) REFERENCES users(id),
     FOREIGN KEY (appointment_id) REFERENCES appointments(id) ON DELETE SET NULL
 );
 
