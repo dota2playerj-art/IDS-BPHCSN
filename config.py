@@ -23,6 +23,10 @@ SECRET_KEY_MIN_LENGTH = 32
 # The value this file used to fall back to. It is public, so it is refused.
 _OLD_FALLBACK_KEY = "ids-bphcsn-dev-secret"
 
+# Debug mode shows code, and lets code run from the browser, when an error
+# happens. It is on only when IDS_DEBUG is exactly 1. Anything else is off.
+DEBUG = os.environ.get("IDS_DEBUG", "").strip() == "1"
+
 DATABASE = os.path.join(BASE_DIR, "app.db")
 SCHEMA = os.path.join(BASE_DIR, "schema.sql")
 

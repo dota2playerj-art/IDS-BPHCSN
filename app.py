@@ -70,4 +70,6 @@ app = create_app()
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5001)
+    # Debug is off unless IDS_DEBUG=1 (see config.py). The app listens on this
+    # computer only.
+    app.run(host="127.0.0.1", port=5001, debug=config.DEBUG)
