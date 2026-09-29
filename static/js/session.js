@@ -10,6 +10,8 @@
  * - At the idle limit it asks the server with a probe, which does not count as
  *   activity. The server ends the session and answers 401 with the login page
  *   address, and the script goes there.
+ * - Every request carries the form token (static/js/csrf.js). If the server
+ *   refuses the token (400), the script also goes to the login page.
  * - Nothing here touches the sign-in time, so the 12-hour limit cannot be
  *   stretched from the browser.
  *
@@ -59,6 +61,8 @@
     sending = true;
     var headers = { 'X-Requested-With': 'fetch' };
     if (probe) { headers['X-Session-Probe'] = '1'; }
+    // The form token (static/js/csrf.js). Without it the server refuses the request.
+    if (window.withCsrfToken) { window.withCsrfToken(headers); }
     fetch(keepAliveUrl, { method: 'POST', headers: headers, credentials: 'same-origin' })
       .then(function (response) {
         if (response.status === 204) {
@@ -66,7 +70,10 @@
           hideWarning();
           return null;
         }
-        if (response.status === 401) {
+        // 401: the session ended. 400: the token was refused, which means the
+        // session this page belonged to is gone (for example, signed out in
+        // another tab). Either way, go to the login page.
+        if (response.status === 401 || response.status === 400) {
           return response.json().then(function (data) {
             goToLogin(data && data.login_url);
           }, function () { goToLogin(); });
