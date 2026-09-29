@@ -101,7 +101,15 @@ from flask import (
 )
 
 import config
-from models.audit import ACTION_SESSION_REVOKED, MODULE_AUTH, log_action
+from models.audit import (
+    ABSOLUTE_TIMEOUT_HOURS,
+    ACTION_SESSION_ABSOLUTE_TIMEOUT,
+    ACTION_SESSION_IDLE_TIMEOUT,
+    ACTION_SESSION_REVOKED,
+    IDLE_TIMEOUT_MINUTES,
+    MODULE_AUTH,
+    log_action,
+)
 from models.settings import maintenance_mode
 from models.users import get_user_by_id, needs_password_change
 from utils.dates import CLINIC_TIMEZONE
@@ -214,16 +222,6 @@ def refuse_credentials():
 # ABSOLUTE_TIMEOUT after sign-in whatever happens (config.py). Enforced here on
 # every guarded request. static/js/session.js only warns and keeps alive.
 # ---------------------------------------------------------------------------
-# The two audit phrases for a session the server ended. Two phrases, so the
-# trail says which limit it was. The numbers come from config.py, so the phrase
-# matches the rule in force. routes/audit_views.py gives each its own icon.
-IDLE_TIMEOUT_MINUTES = int(config.IDLE_TIMEOUT.total_seconds() // 60)
-ABSOLUTE_TIMEOUT_HOURS = int(config.ABSOLUTE_TIMEOUT.total_seconds() // 3600)
-ACTION_SESSION_IDLE_TIMEOUT = (
-    f"Signed out after {IDLE_TIMEOUT_MINUTES} minutes without activity"
-)
-ACTION_SESSION_ABSOLUTE_TIMEOUT = f"Signed out after {ABSOLUTE_TIMEOUT_HOURS} hours"
-
 # Keys for the login form's message table (routes/auth.py LOGIN_FORM_MESSAGES).
 # The URL carries only the key, never the sentence.
 SESSION_IDLE_KEY = "idle"

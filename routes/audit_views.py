@@ -72,6 +72,8 @@ from models.audit import (
     ACTION_LOGIN_SUCCESS,
     ACTION_MAINTENANCE_DISABLED,
     ACTION_MAINTENANCE_ENABLED,
+    ACTION_SESSION_ABSOLUTE_TIMEOUT,
+    ACTION_SESSION_IDLE_TIMEOUT,
     ACTION_SESSION_REVOKED,
     ACTION_SETTINGS_UPDATED,
     ACTION_PASSWORD_RESET,
@@ -100,7 +102,6 @@ from models.audit import (
 )
 from utils.dates import to_clinic_time
 from utils.names import initials
-from utils.security import ACTION_SESSION_ABSOLUTE_TIMEOUT, ACTION_SESSION_IDLE_TIMEOUT
 
 # How many entries one page of the trail shows. The screen has no paging
 # controls behind it yet, so this doubles as the honest ceiling the footer

@@ -1075,7 +1075,8 @@ def process_reset_password(form_data, actor_id, ip_address=None):
             reset_state=_reset_state(user_id, errors)
         ), None
 
-    changed, refusal = set_user_password(user_id, values["password"])
+    # must_change=True: the person must set their own at the next sign-in.
+    changed, refusal = set_user_password(user_id, values["password"], must_change=True)
     if not changed:
         return None, None, "That account could not be found."
 

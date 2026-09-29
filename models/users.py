@@ -1146,12 +1146,12 @@ def update_user(user_id, values):
         return dict(user), dict(after), None
 
 
-def set_user_password(user_id, password, must_change=True):
+def set_user_password(user_id, password, must_change):
     """Replace one account's stored password. Returns (changed, refusal).
 
-    `must_change` says what happens next. The default, True, is for an
-    Administrator's reset: the person must set their own at the next sign-in.
-    The self-service change passes False, which clears the requirement.
+    `must_change` is required, so every caller says what happens next:
+    True when an Administrator sets it (the person must set their own at the
+    next sign-in), False when the person sets their own.
 
     Assumes validate_password_reset_form() has already passed, the same contract
     create_user() has with validate_new_user_form().
