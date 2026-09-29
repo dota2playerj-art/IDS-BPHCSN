@@ -1,0 +1,62 @@
+{#- Shown when a form or request is refused because it did not carry a valid
+    form token (utils/csrf.py refuse_request()). The usual cause is an old page
+    whose session has ended, for example after signing out in another tab.
+    Nothing the form asked for was done.
+
+    A standalone page like login.html and maintenance.html: the only useful
+    next step is to sign in again, so there is no menu to wander into. #}
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IDS-BPHCSN | Your session expired</title>
+<link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/fonts.css') }}" rel="stylesheet">
+<style>
+  :root{
+    --teal:#169B92;
+    --teal-dark:#0F6E56;
+    --teal-light:#E1F5EE;
+    --bg:#F5F7FA;
+    --text-dark:#1F2937;
+    --text-muted:#6B7280;
+  }
+  *{font-family:'Inter',Arial,sans-serif;}
+  body{
+    margin:0; min-height:100vh; background:var(--bg); color:var(--text-dark);
+    display:flex; align-items:center; justify-content:center; padding:24px;
+  }
+  .expired-card{
+    background:#fff; border-radius:18px; box-shadow:0 2px 14px rgba(0,0,0,0.07);
+    max-width:480px; width:100%; padding:40px 40px 32px; text-align:center;
+  }
+  .expired-mark{
+    width:64px; height:64px; border-radius:50%; background:var(--teal-light);
+    display:flex; align-items:center; justify-content:center; margin:0 auto 20px;
+  }
+  .expired-mark .material-symbols-outlined{font-size:30px; color:var(--teal-dark);}
+  .expired-brand{
+    font-size:12px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase;
+    color:var(--teal-dark); margin-bottom:6px;
+  }
+  .expired-title{font-size:23px; font-weight:700; margin-bottom:12px;}
+  .expired-lead{font-size:14.5px; color:var(--text-muted); line-height:1.65; margin-bottom:24px;}
+  .btn-teal{
+    background:var(--teal); color:#fff; border:none; border-radius:10px;
+    padding:11px 20px; font-size:14px; font-weight:600; text-decoration:none;
+    display:inline-flex; align-items:center; gap:7px;
+  }
+  .btn-teal:hover{background:var(--teal-dark); color:#fff;}
+</style>
+</head>
+<body>
+  <div class="expired-card">
+    <div class="expired-mark"><span class="material-symbols-outlined">lock_clock</span></div>
+    <div class="expired-brand">{{ health_center.name }}</div>
+    <h1 class="expired-title">Your session expired</h1>
+    <p class="expired-lead">Please sign in again and repeat what you were doing.</p>
+    <a class="btn-teal" href="{{ login_url }}"><span class="material-symbols-outlined" style="font-size:18px;">login</span>Sign in</a>
+  </div>
+</body>
+</html>

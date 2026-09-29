@@ -220,6 +220,11 @@ ACTION_SESSION_IDLE_TIMEOUT = (
 )
 ACTION_SESSION_ABSOLUTE_TIMEOUT = f"Signed out after {ABSOLUTE_TIMEOUT_HOURS} hours"
 
+# A form or script request refused because it did not carry the token from a
+# page this app served: an old page after the session ended, or a request made
+# by another website (CSRF). Written by utils/csrf.py. Nothing was changed.
+ACTION_REQUEST_REFUSED = "Refused a request from an expired or outside page"
+
 # The three account-management phrases, written from routes/user_views.py when an
 # Administrator creates an account or changes whether it may sign in.
 #

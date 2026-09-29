@@ -72,6 +72,7 @@ from models.audit import (
     ACTION_LOGIN_SUCCESS,
     ACTION_MAINTENANCE_DISABLED,
     ACTION_MAINTENANCE_ENABLED,
+    ACTION_REQUEST_REFUSED,
     ACTION_SESSION_ABSOLUTE_TIMEOUT,
     ACTION_SESSION_IDLE_TIMEOUT,
     ACTION_SESSION_REVOKED,
@@ -248,6 +249,9 @@ _ICONS = {
     # already drawn elsewhere in this project, so the font subset carries them.
     ACTION_SESSION_IDLE_TIMEOUT: "hourglass_top",
     ACTION_SESSION_ABSOLUTE_TIMEOUT: "lock_clock",
+    # A request refused for a missing or wrong form token (utils/csrf.py).
+    # `gpp_maybe` is drawn on this screen's own stat cards, so the font has it.
+    ACTION_REQUEST_REFUSED: "gpp_maybe",
     # A refused own-password change. It needs a glyph of its own for the reason
     # the three above do: it is a refusal, and the successful self-change beside
     # it in the trail carries no entry in this map at all, so without one an
