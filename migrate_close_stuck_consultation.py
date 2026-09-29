@@ -78,7 +78,7 @@ NOTE = (
 AUDIT_ACTION = "Closed a consultation left open"
 AUDIT_MODULE = "Appointment Scheduling"
 AUDIT_DETAILS = (
-    "Appointment APT-00067 (Remedios Lagunzad Manalastas, PAT-026, walk-in on "
+    "Appointment APT-00067 (PAT-026, walk-in on "
     "2026-08-28) was moved from 'In Consultation' to 'Completed'. It was "
     "checked in at 23:36:30 and started at 23:36:36 on 2026-08-28 and was "
     "never completed, so it still held the clinician a day later and refused "
