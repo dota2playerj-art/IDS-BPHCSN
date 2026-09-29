@@ -510,7 +510,11 @@
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-          <a href="{{ url_for('logout') }}" class="btn btn-danger">Logout</a>
+          {#- A POST form, not a link: a link would let any page sign a person out. #}
+          <form method="post" action="{{ url_for('logout') }}">
+            {{ csrf_field() }}
+            <button type="submit" class="btn btn-danger">Logout</button>
+          </form>
         </div>
       </div>
     </div>

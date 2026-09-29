@@ -86,6 +86,7 @@
     background:transparent; color:var(--text-dark); border:1px solid var(--border-color);
     border-radius:10px; padding:11px 20px; font-size:14px; font-weight:500;
     text-decoration:none; display:inline-flex; align-items:center; gap:7px;
+    cursor:pointer;
   }
   .btn-ghost:hover{background:var(--bg); color:var(--text-dark);}
   .maint-foot{font-size:11.5px; color:var(--text-muted); margin-top:24px;}
@@ -123,8 +124,12 @@
 {#- Kept available on purpose. Signing out is one of the few things a blocked
     person may legitimately want to do -- a shared desk at a health center is
     the ordinary case -- and /logout carries no guard, so it works while the
-    system is closed. #}
-      <a class="btn-ghost" href="{{ url_for('auth.logout') }}"><span class="material-symbols-outlined" style="font-size:18px;">logout</span>Sign out</a>
+    system is closed. A POST form, styled as the link it replaced: a link would
+    let any page sign a person out. #}
+      <form method="post" action="{{ url_for('auth.logout') }}" class="m-0">
+        {{ csrf_field() }}
+        <button type="submit" class="btn-ghost"><span class="material-symbols-outlined" style="font-size:18px;">logout</span>Sign out</button>
+      </form>
     </div>
 
     <div class="maint-foot">IDS-BPHCSN &middot; If this lasts longer than you expect, ask an Administrator.</div>

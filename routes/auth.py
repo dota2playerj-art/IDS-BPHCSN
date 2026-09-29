@@ -471,7 +471,11 @@ def login():
     return render_template("login.html", error=error)
 
 
-@auth_bp.route("/logout")
+# POST only, with the form token like every other POST (utils/csrf.py). As a GET,
+# any page or image link could sign a person out. A GET now gets 405 and the
+# session stays open. No guard, so signing out works during maintenance and while
+# a password change is required.
+@auth_bp.route("/logout", methods=["POST"])
 def logout():
     session.clear()
     return redirect(url_for("auth.login"))
