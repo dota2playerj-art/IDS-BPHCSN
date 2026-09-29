@@ -24,6 +24,11 @@ changes nothing.
 If git or the history cannot be read, it stops and changes nothing. Then
 --flag-all marks every account instead, so everyone sets a new password once.
 
+The H6 privacy cleanup (2026-09-29) took the old passwords out of git history.
+Every old version now reads "(retired demo password)" instead, and step 1
+skips that text. So on any copy of the repository made after the cleanup, step
+1 finds nothing and the script stops: run it with --flag-all.
+
 Afterwards it checks that only the new column moved: the same accounts, the
 same values in every other column, and the same number of rows in every table.
 """
@@ -43,6 +48,8 @@ BACKUP_DIR = PROJECT.parent / "IDS-BPHCSN-backups"
 TASK = "must-change-password"
 COLUMN = "must_change_password"
 COLUMN_SQL = f"ALTER TABLE users ADD COLUMN {COLUMN} INTEGER NOT NULL DEFAULT 0"
+# What the history rewrite put where each old password was. Not a password.
+RETIRED = "(retired demo password)"
 
 
 def old_demo_passwords(repo=PROJECT):
@@ -78,7 +85,8 @@ def old_demo_passwords(repo=PROJECT):
                 # Old shape: (username, password, full name, role).
                 if (isinstance(entry, ast.Tuple) and len(entry.elts) == 4
                         and all(isinstance(e, ast.Constant) and isinstance(e.value, str)
-                                for e in entry.elts)):
+                                for e in entry.elts)
+                        and entry.elts[1].value != RETIRED):
                     found.add(entry.elts[1].value)
     if not found:
         raise RuntimeError("no old demo password was found in git history")

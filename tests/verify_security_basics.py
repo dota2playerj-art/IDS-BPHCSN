@@ -8,7 +8,9 @@ import contextlib
 import io
 import os
 import re
+import shutil
 import sqlite3
+import stat
 import subprocess
 import sys
 
@@ -336,12 +338,28 @@ check("each printed password passes the password rule",
 check("two new installs get different passwords",
       all(installs[0][1][u] != installs[1][1][u] for u in printed0))
 check("the seed writes nothing to the audit trail", audit0 == 0)
-old = old_demo_passwords()
-check("no seeded account accepts any old demo password",
-      not any(check_password_hash(h, p) for _, h, _ in rows0 for p in old))
-source = open(os.path.join(REPO, "models", "users.py"), encoding="utf-8").read()
-check("models/users.py contains none of the old demo passwords",
-      not any(p in source for p in old))
+# The H6 cleanup took the old passwords out of this repository's history, so
+# the reader is tested on a small history made here: one version of
+# models/users.py with a password, then one with the text the rewrite left.
+hist = _support.work_path("old_history")
+os.makedirs(os.path.join(hist, "models"))
+GIT = ["git", "-c", "user.name=Test", "-c", "user.email=test@example.invalid"]
+subprocess.run(GIT + ["init", "-q", hist], check=True)
+for held in ("Lumang-Demo-Pass-31", "(retired demo password)"):
+    with open(os.path.join(hist, "models", "users.py"), "w", encoding="utf-8") as fh:
+        fh.write(f'DEMO_USERS = [("staff", "{held}", "Test Staff", "Health Center Staff")]\n')
+    subprocess.run(GIT + ["-C", hist, "add", "-A"], check=True)
+    subprocess.run(GIT + ["-C", hist, "commit", "-q", "-m", "x"], check=True)
+check("the reader finds a password DEMO_USERS held in history, and skips the retired text",
+      old_demo_passwords(hist) == {"Lumang-Demo-Pass-31"})
+# git makes its object files read-only, which would stop the suite's own cleanup.
+shutil.rmtree(hist, onexc=lambda func, path, exc: (os.chmod(path, stat.S_IWRITE), func(path)))
+try:
+    old_demo_passwords()
+    history_clean = False
+except RuntimeError as exc:
+    history_clean = "no old demo password" in str(exc)
+check("this repository's history holds no old demo password any more", history_clean)
 
 # ===========================================================================
 section("5. THE MUST-CHANGE MIGRATION")
@@ -377,8 +395,19 @@ flags = dict(conn.execute("SELECT username, must_change_password FROM users"))
 conn.close()
 check("after both runs, only the old-password account is flagged",
       flags == {"onold": 1, "onown": 0}, flags)
-check("the migration file holds no old demo password",
-      not any(p in open(migration.__file__, encoding="utf-8").read() for p in old))
+stop_db = _support.work_path("stop_migration.db")
+conn = sqlite3.connect(stop_db)
+conn.executescript(open(os.path.join(REPO, "schema.sql"), encoding="utf-8").read())
+conn.execute("ALTER TABLE users DROP COLUMN must_change_password")
+conn.commit()
+conn.close()
+before = open(stop_db, "rb").read()
+buf = io.StringIO()
+with contextlib.redirect_stdout(buf):
+    code = migration.main([stop_db])
+check("with no old password in history, the migration stops, changes nothing and names --flag-all",
+      code == 1 and open(stop_db, "rb").read() == before and "--flag-all" in buf.getvalue(),
+      buf.getvalue())
 
 # ===========================================================================
 section("6. NO TEXT FROM THE URL ON SCREEN (L8)")
