@@ -41,6 +41,10 @@ ABSOLUTE_TIMEOUT = timedelta(hours=12)
 IDLE_WARNING = timedelta(minutes=2)
 # The browser sends at most one keep-alive in this time while the user is active.
 KEEPALIVE_INTERVAL = timedelta(minutes=5)
+# How long the form token (CSRF, utils/csrf.py) on a page stays valid. As long
+# as the longest session, so a token never runs out while its session is open.
+# The session limits above still end the session itself.
+WTF_CSRF_TIME_LIMIT = int(ABSOLUTE_TIMEOUT.total_seconds())
 
 
 def secret_key_problem(value):

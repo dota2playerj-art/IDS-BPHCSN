@@ -8,7 +8,7 @@ Keep responsibilities separated." Responsibilities now live in:
     models/      data access, one module per entity
     routes/      HTTP endpoints, one blueprint per role surface
     utils/       cross-cutting helpers (RBAC, role/phone formatting, SMS,
-                 template context, endpoint aliasing)
+                 template context, endpoint aliasing, form tokens)
 
 This module creates the app, wires those pieces together, and nothing else.
 """
@@ -18,6 +18,7 @@ import config
 from database import init_db
 from routes import register_blueprints
 from utils.context import inject_role_context
+from utils.csrf import init_csrf
 from utils.dates import register_date_filters
 from utils.endpoints import register_flat_endpoint_aliases
 
@@ -61,6 +62,9 @@ def create_app():
     app.context_processor(inject_role_context)
     register_date_filters(app)
     app.before_request(ensure_db_ready)
+    # Every POST must carry the form token (utils/csrf.py). Registered after
+    # ensure_db_ready, so the database exists before the check runs.
+    init_csrf(app)
     app.after_request(no_store)
 
     return app

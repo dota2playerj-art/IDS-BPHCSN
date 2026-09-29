@@ -31,3 +31,7 @@ fpdf2==2.8.4
 # secret key is never written in the code. Run python setup_env.py once to
 # create that file. Pure Python, no other packages needed.
 python-dotenv==1.2.3
+# Checks that every form and script request comes from a page this app served,
+# so another website cannot make a signed-in browser send one (CSRF). See
+# utils/csrf.py. Pure Python; it brings WTForms, also pure Python.
+Flask-WTF==1.3.0
