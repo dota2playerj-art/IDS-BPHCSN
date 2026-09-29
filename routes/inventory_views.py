@@ -26,6 +26,9 @@ from models.inventory import (
     update_inventory_item,
     validate_inventory_form,
 )
+from routes.audit_entries import (
+    inventory_added, inventory_edited, inventory_status_changed,
+)
 
 # Handed to the template so every <select> and radio is rendered from the same
 # tuples the validator checks against.
@@ -162,7 +165,7 @@ def _save_message(name, changes):
     return f"{name} updated — " + ", ".join(parts) + "."
 
 
-def process_add_edit_medicine(form_data, item=None):
+def process_add_edit_medicine(form_data, item=None, user_id=None, ip_address=None):
     """Validate, then insert a new inventory item or update an existing one.
 
     `item` set means edit mode. Validation is identical either way -- the same
@@ -184,13 +187,16 @@ def process_add_edit_medicine(form_data, item=None):
     name = values.get("name") or (item["name"] if item else "Medicine")
 
     if item is not None:
-        changes = update_inventory_item(item["id"], values)
+        changes = update_inventory_item(
+            item["id"], values, audit=inventory_edited(item["id"], user_id, ip_address)
+        )
         return item["id"], None, _save_message(name, changes)
 
-    return create_inventory_item(values), None, f"{name} added to inventory."
+    new_id = create_inventory_item(values, audit=inventory_added(user_id, ip_address))
+    return new_id, None, f"{name} added to inventory."
 
 
-def process_archive_medicine(form_data):
+def process_archive_medicine(form_data, user_id=None, ip_address=None):
     """Apply Screen 06's status action. Returns the message to flash.
 
     The row-level Archive icon posts one item_id and the status it wants, and
@@ -238,7 +244,8 @@ def process_archive_medicine(form_data):
             f"{item['name']} cannot be moved from {current_status} to {status}."
         )
 
-    if not set_item_status(item["id"], status):
+    audit = inventory_status_changed(item["id"], current_status, status, user_id, ip_address)
+    if not set_item_status(item["id"], status, audit=audit):
         return f"No change. {item['name']} is already marked {status}."
 
     # Retiring is not reactivation, so the two do not share a sentence. The

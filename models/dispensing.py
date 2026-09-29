@@ -537,7 +537,7 @@ class _Refused(Exception):
 
 
 def record_dispensing(patient_id, entries, dispensed_by, date_dispensed,
-                      consultation_id=None):
+                      consultation_id=None, audit=None):
     """Write what was given or used at one visit and take it off the shelf.
 
     Returns (stored, errors). `stored` is the rows actually written, each with
@@ -572,6 +572,9 @@ def record_dispensing(patient_id, entries, dispensed_by, date_dispensed,
     with no Python involved at all. If it ever fires, something upstream is
     wrong; it rolls back rather than writing a record whose stock movement did
     not happen.
+
+    `audit(conn, stored)` is called inside that transaction, before the commit,
+    so a refused or failed submission leaves no audit entry either.
     """
     if not entries:
         return [], {}
@@ -684,6 +687,9 @@ def record_dispensing(patient_id, entries, dispensed_by, date_dispensed,
                     "low_stock_threshold": row["low_stock_threshold"] or 0,
                 })
 
+            # The audit entry is part of the same all-or-nothing transaction.
+            if audit and stored:
+                audit(conn, stored)
             conn.commit()
         except _Refused:
             conn.rollback()

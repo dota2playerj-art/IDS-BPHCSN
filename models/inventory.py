@@ -744,10 +744,11 @@ def _build_record(values):
     return record
 
 
-def create_inventory_item(values):
+def create_inventory_item(values, audit=None):
     """Insert an inventory item and return its new primary key.
 
     created_at and updated_at are left to their DEFAULT CURRENT_TIMESTAMP.
+    `audit(conn, new_id)` is called before the commit.
     """
     record = _build_record(values)
 
@@ -760,12 +761,14 @@ def create_inventory_item(values):
             f"INSERT INTO inventory_items ({', '.join(columns)}) VALUES ({placeholders})",
             parameters,
         )
-        conn.commit()
         new_id = cursor.lastrowid
+        if audit:
+            audit(conn, new_id)
+        conn.commit()
     return new_id
 
 
-def update_inventory_item(item_id, values):
+def update_inventory_item(item_id, values, audit=None):
     """Overwrite one item's form-collected fields.
 
     Deliberately leaves item_code and created_at alone -- the identifier and the
@@ -779,6 +782,8 @@ def update_inventory_item(item_id, values):
     differs, so it looks indistinguishable from a save that was silently dropped.
     The caller uses this to say which is which instead of flashing an
     unconditional "updated".
+
+    `audit(conn, changes)` is called before the commit when something changed.
     """
     record = _build_record(values)
 
@@ -807,11 +812,13 @@ def update_inventory_item(item_id, values):
         "WHERE id = ?",
             parameters,
         )
+        if audit and changes:
+            audit(conn, changes)
         conn.commit()
     return changes
 
 
-def set_item_status(item_id, status):
+def set_item_status(item_id, status, audit=None):
     """Move one item between Active and Inactive. Returns rows changed.
 
     This is the whole of the Archive action on Screen 06, and it is deliberately
@@ -830,6 +837,8 @@ def set_item_status(item_id, status):
     SQLite's rowcount reports rows matched, not rows changed, so without it
     re-retiring an already-Inactive item would claim an update that did not
     happen and would bump updated_at for a write that changed nothing.
+
+    `audit(conn)` is called before the commit when the status actually changed.
     """
     if status not in ITEM_STATUSES:
         raise ValueError(
@@ -845,8 +854,10 @@ def set_item_status(item_id, status):
         """,
             (status, int(item_id), status),
         )
-        conn.commit()
         affected = cursor.rowcount
+        if audit and affected:
+            audit(conn)
+        conn.commit()
     return affected
 
 

@@ -353,7 +353,7 @@ def get_general_vaccinations_for_consultation(consultation_id):
 
 
 def record_general_vaccinations(patient_id, entries, administered_by,
-                                date_administered, consultation_id=None):
+                                date_administered, consultation_id=None, audit=None):
     """Write the general vaccinations given at one visit. Returns what was stored.
 
     INSERT OR IGNORE against UNIQUE (patient_id, vaccine_name, date_administered):
@@ -365,6 +365,7 @@ def record_general_vaccinations(patient_id, entries, administered_by,
 
     Returns the entries actually stored, so a caller names what it wrote rather
     than what it asked for.
+    `audit(conn, stored)` is called before the commit when something was stored.
     """
     if not entries:
         return []
@@ -387,6 +388,8 @@ def record_general_vaccinations(patient_id, entries, administered_by,
             )
             if cursor.rowcount:
                 stored.append(entry)
+        if audit and stored:
+            audit(conn, stored)
         conn.commit()
     return stored
 

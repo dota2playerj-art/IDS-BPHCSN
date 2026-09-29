@@ -77,9 +77,9 @@ UNTRACKED = {
         "follow-up -- are the real ones."
     ),
     "staff_activity": (
-        "Per-staff activity is not recorded for most actions. Consultations "
-        "store who wrote them, but registrations, check-ins and stock edits do "
-        "not, so a weekly total for one worker cannot be assembled."
+        "Per-staff totals are not shown here. Audit Logs records who registered, "
+        "checked in, recorded, dispensed or changed stock, but this dashboard "
+        "does not add them up per person."
     ),
     # THERE IS NO "consultation_status" ENTRY ANY MORE, AND THAT IS THE POINT.
     # It said a consultation has no status of its own and pointed at the visit

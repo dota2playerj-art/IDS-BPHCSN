@@ -208,7 +208,7 @@ def staff_export_patient_selection_pdf():
 @login_required
 @role_required(*CLINICAL_FLOOR_ROLES)
 def staff_archive_patients():
-    flash(process_archive_patients(request.form))
+    flash(process_archive_patients(request.form, session.get("user_id"), request.remote_addr))
     return redirect(url_for("staff.staff_patient_records"))
 
 
@@ -329,7 +329,7 @@ def staff_export_medicine_inventory_pdf():
 @login_required
 @role_required(*CLINICAL_FLOOR_ROLES)
 def staff_archive_medicine():
-    flash(process_archive_medicine(request.form))
+    flash(process_archive_medicine(request.form, session.get("user_id"), request.remote_addr))
     return redirect(url_for("staff.staff_medicine_inventory"))
 
 
@@ -350,7 +350,10 @@ def staff_add_edit_medicine(medicine_id=None):
             return redirect(url_for("staff.staff_medicine_inventory"))
 
     if request.method == "POST":
-        saved_id, context, message = process_add_edit_medicine(request.form, item=item)
+        saved_id, context, message = process_add_edit_medicine(
+            request.form, item=item, user_id=session.get("user_id"),
+            ip_address=request.remote_addr,
+        )
         if saved_id:
             # The message names the fields that actually changed, so a save that
             # wrote back the stored values says so instead of claiming success.
@@ -405,7 +408,7 @@ def staff_export_appointment_scheduling_pdf():
 @login_required
 @role_required(*CLINICAL_FLOOR_ROLES)
 def staff_check_in_patient():
-    flash(process_check_in(request.form, session.get("user_id")))
+    flash(process_check_in(request.form, session.get("user_id"), request.remote_addr))
     return redirect(url_for("staff.staff_appointment_scheduling"))
 
 
@@ -413,7 +416,7 @@ def staff_check_in_patient():
 @login_required
 @role_required(*CLINICAL_FLOOR_ROLES)
 def staff_start_consultation():
-    flash(process_start_consultation(request.form))
+    flash(process_start_consultation(request.form, session.get("user_id"), request.remote_addr))
     return redirect(url_for("staff.staff_appointment_scheduling"))
 
 
@@ -424,7 +427,7 @@ def staff_start_consultation():
 @login_required
 @role_required(*CLINICAL_FLOOR_ROLES)
 def staff_complete_consultation():
-    flash(process_complete_consultation(request.form))
+    flash(process_complete_consultation(request.form, session.get("user_id"), request.remote_addr))
     return redirect(url_for("staff.staff_appointment_scheduling"))
 
 
@@ -572,7 +575,10 @@ def staff_register_patient(patient_id=None):
         return redirect(url_for("staff.staff_register_patient", check_in=1))
 
     if request.method == "POST":
-        saved_id, context = process_register_patient(request.form, patient=patient)
+        saved_id, context = process_register_patient(
+            request.form, patient=patient, user_id=session.get("user_id"),
+            ip_address=request.remote_addr,
+        )
         if saved_id:
             # Opened from the Check In dialog's "New Patient (first visit)" path:
             # the record now exists, so put that same person into today's queue
@@ -584,6 +590,7 @@ def staff_register_patient(patient_id=None):
                         saved_id,
                         check_in_reason(request.form),
                         session.get("user_id"),
+                        request.remote_addr,
                     )
                 )
                 clear_check_in_reason()

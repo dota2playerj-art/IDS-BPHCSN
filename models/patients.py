@@ -806,28 +806,39 @@ def _build_record(values):
     return record
 
 
-def update_patient(patient_id, values):
+def update_patient(patient_id, values, audit=None):
     """Overwrite one patient's form-collected fields. Returns rows affected.
 
     Deliberately leaves patient_id, created_at and status alone: the identifier
     and the registration date are historical fact, and the lifecycle status is
     changed through the separate deactivate/deceased flow, not by editing.
+
+    `audit(conn, changed_fields)` is called before the commit when at least one
+    field changed, so the audit entry commits with the edit.
     """
     record = _build_record(values)
     assignments = ", ".join(f"{field} = ?" for field in PATIENT_FIELDS)
     parameters = [record[field] for field in PATIENT_FIELDS] + [patient_id]
 
     with db_connection() as conn:
+        before = conn.execute(
+            "SELECT * FROM patients WHERE id = ?", (patient_id,)
+        ).fetchone()
         cursor = conn.execute(
             f"UPDATE patients SET {assignments}, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
             parameters,
         )
-        conn.commit()
         affected = cursor.rowcount
+        if audit and before is not None:
+            changed = [field for field in PATIENT_FIELDS
+                       if (before[field] or None) != (record[field] or None)]
+            if changed:
+                audit(conn, changed)
+        conn.commit()
     return affected
 
 
-def set_patient_status(patient_ids, status):
+def set_patient_status(patient_ids, status, audit=None):
     """Move one or more patients to a lifecycle status. Returns rows changed.
 
     This is the whole of the Archive action on Screen 03. Records are never
@@ -843,6 +854,9 @@ def set_patient_status(patient_ids, status):
     matched, not rows changed, so without it re-archiving an already-Inactive
     patient would claim an update that did not happen -- and would bump
     updated_at for a write that changed nothing.
+
+    `audit(conn, [(patient_id, old_status), ...])` is called before the commit
+    with the rows that actually changed.
     """
     if status not in PATIENT_STATUSES:
         raise ValueError(
@@ -855,6 +869,12 @@ def set_patient_status(patient_ids, status):
 
     placeholders = ", ".join("?" for _ in ids)
     with db_connection() as conn:
+        # Which rows will change, and from what, read inside the same
+        # transaction so the audit entries name exactly the rows updated.
+        moving = conn.execute(
+            f"SELECT id, status FROM patients WHERE id IN ({placeholders}) AND status != ?",
+            ids + [status],
+        ).fetchall()
         cursor = conn.execute(
             f"""
         UPDATE patients
@@ -863,16 +883,20 @@ def set_patient_status(patient_ids, status):
         """,
             [status] + ids + [status],
         )
-        conn.commit()
         affected = cursor.rowcount
+        if audit and moving:
+            audit(conn, [(row["id"], row["status"]) for row in moving])
+        conn.commit()
     return affected
 
 
-def create_patient(values):
+def create_patient(values, audit=None):
     """Insert a patient and return its new primary key.
 
     created_at is left to the column's DEFAULT CURRENT_TIMESTAMP, and status is
     set explicitly to 'Active' -- new records always start active.
+
+    `audit(conn, new_id)` is called before the commit.
     """
     record = _build_record(values)
 
@@ -885,8 +909,10 @@ def create_patient(values):
             f"INSERT INTO patients ({', '.join(columns)}) VALUES ({placeholders})",
             parameters,
         )
-        conn.commit()
         new_id = cursor.lastrowid
+        if audit:
+            audit(conn, new_id)
+        conn.commit()
     return new_id
 
 

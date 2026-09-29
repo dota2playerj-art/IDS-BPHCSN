@@ -504,6 +504,39 @@ ACTION_SCHEDULE_ENTRY_ADDED = "Added service schedule entry"
 ACTION_SCHEDULE_ENTRY_EDITED = "Edited service schedule entry"
 ACTION_SCHEDULE_ENTRY_DELETED = "Deleted service schedule entry"
 
+# Task 4 (H3): the health-record writes that used to leave no trace. Each is
+# written by routes/audit_entries.py, in the same transaction as the change.
+# Short, one-line details. Never diagnosis or treatment text, never a password,
+# never a contact number. Patients are named as "Name (PAT-001)", like the
+# entries above.
+#
+# Patient Records. A death declaration and its reversal have their own phrases:
+# they are the most serious changes to a patient record.
+ACTION_PATIENT_REGISTERED = "Registered patient"
+ACTION_PATIENT_UPDATED = "Updated patient record"
+ACTION_PATIENT_STATUS_CHANGED = "Changed patient status"
+ACTION_PATIENT_DECLARED_DECEASED = "Declared patient deceased"
+ACTION_PATIENT_DEATH_REVERSED = "Reversed death declaration"
+# Consultation Records. A new consultation. Edits keep ACTION_CONSULTATION_UPDATED.
+ACTION_CONSULTATION_RECORDED = "Recorded consultation"
+# Immunization Records, written when a new consultation records doses. The
+# three kinds stay apart, as the two correction phrases above do.
+ACTION_EPI_DOSES_RECORDED = "Recorded EPI immunisation doses"
+ACTION_REPORTED_DOSES_RECORDED = "Recorded doses given elsewhere"
+ACTION_OTHER_VACCINATIONS_RECORDED = "Recorded other vaccinations"
+# Medicine Inventory. Dispensing moves stock, so it is filed here. An edit that
+# moved the stock figure is "Adjusted stock quantity", the more serious fact.
+ACTION_MEDICINE_DISPENSED = "Dispensed medicine"
+ACTION_INVENTORY_ADDED = "Added inventory item"
+ACTION_INVENTORY_EDITED = "Edited inventory item"
+ACTION_STOCK_ADJUSTED = "Adjusted stock quantity"
+ACTION_INVENTORY_ARCHIVED = "Archived inventory item"
+ACTION_INVENTORY_RESTORED = "Returned inventory item to service"
+# Appointment Scheduling (the Patient Queue).
+ACTION_PATIENT_CHECKED_IN = "Checked patient in"
+ACTION_CONSULTATION_STARTED = "Started consultation"
+ACTION_CONSULTATION_COMPLETED = "Completed consultation"
+
 # Every action that means somebody was turned away at the login form. Grouped so
 # the Security Events figure counts refusals rather than one particular kind of
 # refusal -- adding a fourth outcome later must not silently shrink that number.
@@ -579,7 +612,8 @@ NON_RECORD_MODULES = (
 NON_RECORD_ACTIONS = (ACTION_RESTRICTED_WITHHELD, ACTION_DIAGNOSIS_REFUSED)
 
 
-def log_action(user_id, action, module=None, details=None, ip_address=None):
+def log_action(user_id, action, module=None, details=None, ip_address=None,
+               conn=None):
     """Append one entry. Returns its id, or None if it could not be attributed.
 
     A missing user_id means no entry rather than a fabricated one: user_id is NOT
@@ -587,19 +621,26 @@ def log_action(user_id, action, module=None, details=None, ip_address=None):
     who acted is worse than none -- it would read as though the change had no
     author. The caller's own write is not rolled back for it; losing a log line
     must never cost the clinical record it describes.
+
+    `conn`: write the entry on the caller's connection and do not commit. The
+    entry then commits with the change it describes, or rolls back with it, so a
+    change never lacks its entry and a failed change never has one. The model
+    write functions take an `audit` callback for this (see routes/audit_entries.py).
     """
     if not user_id:
         return None
 
-    with db_connection() as conn:
-        cursor = conn.execute(
-            """
+    sql = """
         INSERT INTO audit_logs (user_id, action, module, details, ip_address)
         VALUES (?, ?, ?, ?, ?)
-        """,
-            (user_id, action, module, details, ip_address),
-        )
-        conn.commit()
+        """
+    parameters = (user_id, action, module, details, ip_address)
+    if conn is not None:
+        return conn.execute(sql, parameters).lastrowid
+
+    with db_connection() as own:
+        cursor = own.execute(sql, parameters)
+        own.commit()
         entry_id = cursor.lastrowid
     return entry_id
 

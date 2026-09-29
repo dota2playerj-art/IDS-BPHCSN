@@ -144,6 +144,14 @@ from models.immunizations import (
     reported_date_field,
 )
 from models.patients import get_patient_by_id
+from routes.audit_entries import (
+    consultation_completed,
+    consultation_recorded,
+    epi_doses_recorded,
+    medicine_dispensed,
+    other_vaccinations_recorded,
+    reported_doses_recorded,
+)
 from utils.dates import display_date, today
 from utils.security import current_role
 
@@ -903,12 +911,17 @@ def process_record_consultation(appointment_id, form_data, user_id,
             "Nothing has been saved yet."
         )
 
+    # Each write below carries its own audit entry, committed with it (H3).
+    # None of these entries contains what the consultation says.
     consultation_id = create_consultation(
         patient_id=patient["id"],
         recorded_by=user_id,
         values=values,
         age_context=age_context,
         appointment_id=appointment["id"],
+        audit=consultation_recorded(
+            patient["id"], context["visit_date"], user_id, ip_address
+        ),
     )
 
     # Written after the record exists, because the refusal entry names the
@@ -941,6 +954,7 @@ def process_record_consultation(appointment_id, form_data, user_id,
         administered_by=user_id,
         date_administered=context["visit_date"],
         consultation_id=consultation_id,
+        audit=epi_doses_recorded(patient["id"], consultation_id, user_id, ip_address),
     )
 
     # The doses the parent reported at this visit as already given elsewhere.
@@ -955,6 +969,7 @@ def process_record_consultation(appointment_id, form_data, user_id,
         entries=reported_entries,
         recorded_by=user_id,
         consultation_id=consultation_id,
+        audit=reported_doses_recorded(patient["id"], consultation_id, user_id, ip_address),
     )
 
     # Same visit date, same author, same consultation anchor -- a separate table,
@@ -966,6 +981,9 @@ def process_record_consultation(appointment_id, form_data, user_id,
         administered_by=user_id,
         date_administered=context["visit_date"],
         consultation_id=consultation_id,
+        audit=other_vaccinations_recorded(
+            patient["id"], consultation_id, user_id, ip_address
+        ),
     )
 
     # Same visit date, same author, same consultation anchor as the two
@@ -980,13 +998,17 @@ def process_record_consultation(appointment_id, form_data, user_id,
         dispensed_by=user_id,
         date_dispensed=context["visit_date"],
         consultation_id=consultation_id,
+        audit=medicine_dispensed(patient["id"], consultation_id, user_id, ip_address),
     )
 
     # Reuses the queue's own transition rather than writing 'Completed' here, so
     # the one-patient-at-a-time invariant and the "only the visit in progress may
     # be completed" guard both still apply -- and completing frees the clinician
     # for whoever is next exactly as it does from the queue screen.
-    outcome = complete_consultation(appointment["id"])
+    outcome = complete_consultation(
+        appointment["id"],
+        audit=consultation_completed(appointment["id"], user_id, ip_address),
+    )
 
     message = (
         f"Consultation recorded for {patient['full_name']} "
@@ -1450,6 +1472,9 @@ def process_edit_consultation(consultation_id, form_data, user_id, ip_address=No
         dispensed_by=user_id,
         date_dispensed=before["consultation_date"],
         consultation_id=consultation_id,
+        # Its own entry, as on a new consultation. The edit entry below also
+        # lists what was dispensed.
+        audit=medicine_dispensed(patient["id"], consultation_id, user_id, ip_address),
     )
 
     after = get_consultation_by_id(consultation_id)

@@ -470,9 +470,10 @@ UNAVAILABLE = {
     # inventory_items had carried a status flag since the first schema and the
     # Add / Edit Medicine form had offered Active / Inactive on it all along. It
     # also held medicines to a bar it claimed patients cleared -- "its own
-    # confirmation and audit entry" -- when no audit entry is written for a
-    # patient archive either, and it warned of losing "batch and expiry history"
-    # that retiring could not touch and that no table holds.
+    # confirmation and audit entry" -- when, at the time, no audit entry was
+    # written for a patient archive either (one is since Task 4), and it warned
+    # of losing "batch and expiry history" that retiring could not touch and
+    # that no table holds.
     #
     # The rewrite fixed all of that and narrowed the claim to what was genuinely
     # missing: not the status, which existed and was read everywhere, but the

@@ -284,18 +284,14 @@ UNTRACKED = {
         "note are the only programme memberships the data can actually "
         "establish."
     ),
-    # The last sentence has been corrected twice, and both times for the same
-    # reason: it enumerates what audit_logs holds, so every new writer makes it
-    # stale. It first read "records consultation edits only", which stopped being
-    # true when SMS broadcast logging landed; it then read "records two things",
-    # which stopped being true when routes/auth.py started recording sign-ins.
-    # A list is the honest shape here -- the point of the sentence is that this
-    # screen's subject is not on it -- so it is kept, and kept current.
+    # The last sentence went stale three times because it listed every kind of
+    # entry (M6). It now names what the trail covers in general terms, and says
+    # plainly that report exports are not part of it.
     "generated_reports": (
         "Report exports are not recorded. Nothing is written down when a report "
         "is printed or exported, so there is no history of generated reports to "
-        "list. Audit Logs records three things, and none of them is this one: "
-        "consultation edits, SMS broadcasts, and sign-ins."
+        "list. Audit Logs records changes to patient, clinical, stock and account "
+        "records, sign-ins, settings and SMS broadcasts, but not report exports."
     ),
 }
 

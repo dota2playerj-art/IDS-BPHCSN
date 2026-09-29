@@ -56,6 +56,8 @@ from models.patients import (
     update_patient,
     validate_patient_form,
 )
+from routes.audit_entries import (patient_registered, patient_status_changed,
+                                  patient_updated)
 from routes.consultation_views import (
     RESTRICT_ACTION_FIELD,
     RESTRICT_CONSULTATION_FIELD,
@@ -383,7 +385,7 @@ def patient_selection_context(form_data):
     }
 
 
-def process_archive_patients(form_data):
+def process_archive_patients(form_data, user_id=None, ip_address=None):
     """Apply Screen 03's status action. Returns the message to flash.
 
     Both entry points post the same form to the same endpoint: the row-level
@@ -444,7 +446,11 @@ def process_archive_patients(form_data):
             "clinical decision. Nothing was changed."
         )
 
-    changed = set_patient_status(ids, status)
+    # One audit entry per patient changed, in the same transaction (H3). A death
+    # declaration and its reversal have their own phrases.
+    changed = set_patient_status(
+        ids, status, audit=patient_status_changed(status, user_id, ip_address)
+    )
     noun = "record" if changed == 1 else "records"
     # Reactivation is not archiving, so it does not claim to be. The retention
     # note only belongs on the two statuses that retire a record.
@@ -879,7 +885,7 @@ def _extract_form(form_data):
     return values
 
 
-def process_register_patient(form_data, patient=None):
+def process_register_patient(form_data, patient=None, user_id=None, ip_address=None):
     """Validate, then insert a new patient or update an existing one.
 
     `patient` set means edit mode. Validation is identical either way -- the
@@ -918,7 +924,8 @@ def process_register_patient(form_data, patient=None):
         )
 
     if patient is not None:
-        update_patient(patient["id"], values)
+        update_patient(patient["id"], values,
+                       audit=patient_updated(patient["id"], user_id, ip_address))
         return patient["id"], None
 
     duplicates = find_possible_duplicates(
@@ -930,4 +937,4 @@ def process_register_patient(form_data, patient=None):
             check_in=check_in, check_in_reason_text=reason,
         )
 
-    return create_patient(values), None
+    return create_patient(values, audit=patient_registered(user_id, ip_address)), None

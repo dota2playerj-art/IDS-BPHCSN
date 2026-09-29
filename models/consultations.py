@@ -976,17 +976,16 @@ def store_values(values, age_context):
 
 
 def create_consultation(patient_id, recorded_by, values, age_context,
-                        appointment_id=None, consultation_date=None):
+                        appointment_id=None, consultation_date=None, audit=None):
     """Insert a consultation and return its new primary key.
 
     consultation_date is the clinic-local calendar date, matching the format the
     five seeded rows already use, so the history table sorts and prints one way.
     created_at keeps the precise instant, from the column's own default.
 
-    Deliberately writes no audit entry. The first save is the record coming into
-    existence, not a change to it -- created_at and recorded_by already say who
-    wrote it and when, and logging it as an edit would bury the entries that
-    matter under one for every consultation ever taken.
+    `audit(conn, new_id)` is called before the commit, so "Recorded
+    consultation" commits with the record (Task 4, H3). The entry names the
+    consultation and the patient only, never what the consultation says.
     """
     record = store_values(values, age_context)
     day = as_date(consultation_date).isoformat()
@@ -1008,8 +1007,10 @@ def create_consultation(patient_id, recorded_by, values, age_context,
             "UPDATE consultations SET updated_at = created_at WHERE id = ?",
             (cursor.lastrowid,),
         )
-        conn.commit()
         new_id = cursor.lastrowid
+        if audit:
+            audit(conn, new_id)
+        conn.commit()
     return new_id
 
 

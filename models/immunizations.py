@@ -1048,7 +1048,7 @@ def parse_reported_doses(form_data, patient, visit_date=None, given_today=()):
 
 
 def record_immunizations(patient_id, dose_keys, administered_by, date_administered,
-                         consultation_id=None):
+                         consultation_id=None, audit=None):
     """Write the doses THIS HEALTH CENTER gave at one visit. Returns the pairs stored.
 
     INSERT OR IGNORE against the table's UNIQUE (patient_id, vaccine_code,
@@ -1063,6 +1063,7 @@ def record_immunizations(patient_id, dose_keys, administered_by, date_administer
     this function writes is a positive claim that a health worker here
     administered the dose, and a claim that large should be made in the INSERT
     where it can be read.
+    `audit(conn, stored)` is called before the commit when something was stored.
     """
     if not dose_keys:
         return []
@@ -1085,12 +1086,14 @@ def record_immunizations(patient_id, dose_keys, administered_by, date_administer
             )
             if cursor.rowcount:
                 stored.append((code, dose_number))
+        if audit and stored:
+            audit(conn, stored)
         conn.commit()
     return stored
 
 
 def record_reported_immunizations(patient_id, entries, recorded_by,
-                                  consultation_id=None):
+                                  consultation_id=None, audit=None):
     """Write doses reported at one visit as already given elsewhere.
 
     `entries` is [{'code', 'dose_number', 'date'}], where `date` is an ISO string
@@ -1120,6 +1123,7 @@ def record_reported_immunizations(patient_id, entries, recorded_by,
     seventeen rows of history to fix a word. What matters is that no screen
     prints it as "administered by" for a reported dose -- SOURCE_LABELS is what
     keeps that true, and the Patient Profile prints "Recorded by" instead.
+    `audit(conn, stored)` is called before the commit when something was stored.
     """
     if not entries or not consultation_id:
         return []
@@ -1142,6 +1146,8 @@ def record_reported_immunizations(patient_id, entries, recorded_by,
             )
             if cursor.rowcount:
                 stored.append((entry["code"], entry["dose_number"], day))
+        if audit and stored:
+            audit(conn, stored)
         conn.commit()
     return stored
 

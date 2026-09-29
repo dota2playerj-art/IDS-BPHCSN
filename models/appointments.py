@@ -514,7 +514,7 @@ def find_active_queue_entry(patient_id, on_date=None):
     return dict(row) if row else None
 
 
-def check_in_patient(patient_id, reason, user_id, on_date=None):
+def check_in_patient(patient_id, reason, user_id, on_date=None, audit=None):
     """Put a patient in today's queue. Returns (appointment_id, outcome).
 
     outcome is one of:
@@ -536,6 +536,9 @@ def check_in_patient(patient_id, reason, user_id, on_date=None):
     is shown as ready without ever being written as Waiting-and-then-something-
     else, and cannot be left stranded on a stale ready flag if someone else is
     brought in first. See READY_LABEL.
+
+    `audit(conn, appointment_id, outcome)` is called before the commit when a
+    row was created or updated. "already" writes nothing, so no entry.
     """
     day = (on_date or today()).isoformat()
     stamp = now().strftime("%Y-%m-%d %H:%M:%S")
@@ -565,9 +568,11 @@ def check_in_patient(patient_id, reason, user_id, on_date=None):
             """,
                 (WAITING, stamp, reason, reason, reason, booked["id"]),
             )
-            conn.commit()
             appointment_id = booked["id"]
             outcome = "updated"
+            if audit:
+                audit(conn, appointment_id, outcome)
+            conn.commit()
         else:
             cursor = conn.execute(
                 """
@@ -589,14 +594,16 @@ def check_in_patient(patient_id, reason, user_id, on_date=None):
                     stamp,
                 ),
             )
-            conn.commit()
             appointment_id = cursor.lastrowid
             outcome = "created"
+            if audit:
+                audit(conn, appointment_id, outcome)
+            conn.commit()
 
     return appointment_id, outcome
 
 
-def start_consultation(appointment_id):
+def start_consultation(appointment_id, audit=None):
     """Bring one Waiting patient in. Returns the outcome:
 
         "started"      they are now In Consultation
@@ -622,6 +629,8 @@ def start_consultation(appointment_id):
     `AND status = ?` in the same WHERE keeps the other half of the rule: only a
     waiting patient can be brought in, so a Completed visit cannot be quietly
     reopened and lose the record of it having ended.
+
+    `audit(conn)` is called before the commit, only when the patient started.
     """
     with db_connection() as conn:
         cursor = conn.execute(
@@ -636,6 +645,9 @@ def start_consultation(appointment_id):
         """,
             (IN_CONSULTATION, appointment_id, WAITING, IN_CONSULTATION),
         )
+        # The audit entry commits with the move, and only when the move happened.
+        if cursor.rowcount == 1 and audit:
+            audit(conn)
         conn.commit()
 
         if cursor.rowcount == 1:
@@ -657,7 +669,7 @@ def start_consultation(appointment_id):
     return "busy"
 
 
-def complete_consultation(appointment_id):
+def complete_consultation(appointment_id, audit=None):
     """Close the consultation in progress. Returns the outcome:
 
         "completed"           the visit is now Completed
@@ -673,6 +685,8 @@ def complete_consultation(appointment_id):
     Guarded in the WHERE for the same reason as start_consultation(): only the
     visit actually in progress may be completed, so a stale page cannot close a
     patient who never went in.
+
+    `audit(conn)` is called before the commit, only when the visit completed.
     """
     with db_connection() as conn:
         cursor = conn.execute(
@@ -683,6 +697,9 @@ def complete_consultation(appointment_id):
         """,
             (COMPLETED, appointment_id, IN_CONSULTATION),
         )
+        # The audit entry commits with the move, and only when the move happened.
+        if cursor.rowcount == 1 and audit:
+            audit(conn)
         conn.commit()
 
         if cursor.rowcount == 1:

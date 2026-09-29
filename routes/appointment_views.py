@@ -23,6 +23,9 @@ from models.appointments import (
 from models.immunizations import get_immunization_alert, get_immunization_status
 from models.patients import get_all_patients, get_patient_by_id
 from models.service_schedule import get_entries as get_schedule_entries, services_on
+from routes.audit_entries import (
+    consultation_completed, consultation_started, patient_checked_in,
+)
 from utils.dates import today
 
 # Only a living, active record may be checked in. An Inactive or Deceased patient
@@ -144,7 +147,7 @@ def _services_today(reference):
     }
 
 
-def process_check_in(form_data, user_id):
+def process_check_in(form_data, user_id, ip_address=None):
     """Apply the Check In Patient action. Returns the message to flash.
 
     Validated here rather than trusted from the page: the dialog only lists
@@ -175,7 +178,9 @@ def process_check_in(form_data, user_id):
     if not reason:
         return "Enter a reason for the visit before checking the patient in."
 
-    appointment_id, outcome = check_in_patient(patient_id, reason, user_id)
+    appointment_id, outcome = check_in_patient(
+        patient_id, reason, user_id, audit=patient_checked_in(user_id, ip_address)
+    )
     return _check_in_message(patient["full_name"], appointment_id, outcome, patient)
 
 
@@ -269,7 +274,7 @@ def _check_in_message(full_name, appointment_id, outcome, patient=None):
     return f"{full_name} checked in as a walk-in{at}. {placement}" + note
 
 
-def process_new_patient_check_in(patient_id, reason, user_id):
+def process_new_patient_check_in(patient_id, reason, user_id, ip_address=None):
     """Queue a patient who was registered from the Check In dialog.
 
     The second half of the "New Patient (first visit)" path: Register Patient has
@@ -284,7 +289,9 @@ def process_new_patient_check_in(patient_id, reason, user_id):
     if patient is None:
         return "That patient record could not be found, so nobody was checked in."
 
-    appointment_id, outcome = check_in_patient(patient_id, reason, user_id)
+    appointment_id, outcome = check_in_patient(
+        patient_id, reason, user_id, audit=patient_checked_in(user_id, ip_address)
+    )
     return (
         f"{patient['full_name']} registered as patient {patient['patient_id']}. "
         + _check_in_message(patient["full_name"], appointment_id, outcome, patient)
@@ -308,7 +315,7 @@ def process_new_patient_check_in(patient_id, reason, user_id):
 # ---------------------------------------------------------------------------
 
 
-def process_start_consultation(form_data):
+def process_start_consultation(form_data, user_id=None, ip_address=None):
     """Move one Waiting patient to In Consultation. Returns the message to flash.
 
     The decision itself belongs to start_consultation(), which settles it inside
@@ -326,7 +333,9 @@ def process_start_consultation(form_data):
         return "That queue entry could not be found."
 
     name = queue_display_name(appointment)
-    outcome = start_consultation(appointment_id)
+    outcome = start_consultation(
+        appointment_id, audit=consultation_started(appointment_id, user_id, ip_address)
+    )
 
     if outcome == "started":
         return f"{name} is now In Consultation."
@@ -351,7 +360,7 @@ def process_start_consultation(form_data):
     )
 
 
-def process_complete_consultation(form_data):
+def process_complete_consultation(form_data, user_id=None, ip_address=None):
     """Close the consultation in progress. Returns the message to flash.
 
     Completing is what frees the clinician, so the message says who that makes
@@ -368,7 +377,9 @@ def process_complete_consultation(form_data):
         return "That queue entry could not be found."
 
     name = queue_display_name(appointment)
-    outcome = complete_consultation(appointment_id)
+    outcome = complete_consultation(
+        appointment_id, audit=consultation_completed(appointment_id, user_id, ip_address)
+    )
 
     if outcome == "already":
         return f"{name}'s consultation is already marked completed."

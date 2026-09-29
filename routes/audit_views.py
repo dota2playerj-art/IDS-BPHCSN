@@ -6,11 +6,13 @@ and the shape of the screen is one readable thing in one place.
 
 WHAT THIS SCREEN CAN AND CANNOT SHOW
 ------------------------------------
-audit_logs has four writers today: the consultation edit path in
-routes/consultation_views.py, the broadcast send path in
-routes/broadcast_views.py, the login route in routes/auth.py, and the
-vaccination correction path in routes/vaccination_correction_views.py.
-Everything they write is shown here in full.
+Every path that changes a record or an account writes to audit_logs, and
+everything written is shown here in full. Since Task 4 (H3) that includes
+patient registration, edits and status changes (a death declaration and its
+reversal have their own phrases), new consultations, doses recorded at a visit,
+dispensing, inventory changes and the Patient Queue. Those entries are written
+by routes/audit_entries.py, in the same transaction as the change.
+tests/verify_audit_coverage.py fails if a write path has no audit entry.
 
 THE FOURTH WRITER IS THE FIRST THAT IS NOT AN EDIT, A MESSAGE OR AN ACCESS
 --------------------------------------------------------------------------
@@ -55,9 +57,8 @@ are what UNTRACKED["login_scope"] below says, and the Security Events card
 carries it as its own tooltip -- a real figure with its boundary stated beside
 it, rather than a figure left to be read as more than it is.
 
-No patient, inventory or appointment write calls log_action() yet, and the User /
-Activity Type / Status filters the screen was drawn with still have nothing
-behind them.
+The User / Activity Type / Status filters the screen was drawn with still have
+nothing behind them.
 
 That is the rule Screen 03's Prenatal card set and Screen 10 follows: a figure
 with no source reports its own absence, because an invented one gets believed --
@@ -65,6 +66,21 @@ and its corollary, which this screen is now the clearest example of, that a
 reason is deleted the moment the gap it describes is closed.
 """
 from models.audit import (
+    ACTION_CONSULTATION_COMPLETED,
+    ACTION_CONSULTATION_RECORDED,
+    ACTION_CONSULTATION_STARTED,
+    ACTION_INVENTORY_ADDED,
+    ACTION_INVENTORY_ARCHIVED,
+    ACTION_INVENTORY_EDITED,
+    ACTION_INVENTORY_RESTORED,
+    ACTION_MEDICINE_DISPENSED,
+    ACTION_PATIENT_CHECKED_IN,
+    ACTION_PATIENT_DEATH_REVERSED,
+    ACTION_PATIENT_DECLARED_DECEASED,
+    ACTION_PATIENT_REGISTERED,
+    ACTION_PATIENT_STATUS_CHANGED,
+    ACTION_PATIENT_UPDATED,
+    ACTION_STOCK_ADJUSTED,
     ACTION_LOGIN_BLOCKED,
     ACTION_LOGIN_FAILED,
     ACTION_PASSWORD_CHANGE_FAILED_SELF,
@@ -389,6 +405,24 @@ _ICONS = {
     ACTION_SCHEDULE_ENTRY_ADDED: "event_available",
     ACTION_SCHEDULE_ENTRY_EDITED: "date_range",
     ACTION_SCHEDULE_ENTRY_DELETED: "event_busy",
+    # Task 4 (H3): the health-record entries. Every glyph is already drawn in
+    # this project's templates, so the fixed font subset carries it. A death
+    # declaration gets a warning glyph: it is the entry a reviewer looks for.
+    ACTION_PATIENT_REGISTERED: "badge",
+    ACTION_PATIENT_UPDATED: "contacts",
+    ACTION_PATIENT_STATUS_CHANGED: "person",
+    ACTION_PATIENT_DECLARED_DECEASED: "warning",
+    ACTION_PATIENT_DEATH_REVERSED: "restore",
+    ACTION_CONSULTATION_RECORDED: "clinical_notes",
+    ACTION_MEDICINE_DISPENSED: "pill",
+    ACTION_INVENTORY_ADDED: "add",
+    ACTION_INVENTORY_EDITED: "edit_note",
+    ACTION_STOCK_ADJUSTED: "fact_check",
+    ACTION_INVENTORY_ARCHIVED: "archive",
+    ACTION_INVENTORY_RESTORED: "restart_alt",
+    ACTION_PATIENT_CHECKED_IN: "event_upcoming",
+    ACTION_CONSULTATION_STARTED: "play_arrow",
+    ACTION_CONSULTATION_COMPLETED: "task_alt",
 }
 _MODULE_ICONS = {
     MODULE_SMS: "campaign",
