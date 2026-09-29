@@ -46,6 +46,7 @@ SUITES = [
     ("verify_service_schedule.py", "verify_service_schedule.py"),
     ("verify_database_integrity.py", "(new in Task 1b)"),
     ("verify_security_basics.py", "(new in Task 2)"),
+    ("verify_csrf.py", "(new in Task 3)"),
 ]
 
 # The suites were written at different times and end with different summary

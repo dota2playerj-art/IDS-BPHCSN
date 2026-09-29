@@ -317,6 +317,58 @@ def _cleanup():
 atexit.register(_cleanup)
 
 
+# ---------------------------------------------------------------------------
+# The form token (CSRF). Every POST must carry the token from a page the app
+# served (utils/csrf.py). A browser takes it from the page. The suites post
+# without rendering the page first, so their clients add a real token to every
+# POST that does not carry one: made by Flask-WTF's own generate_csrf(), for the
+# client's own session. The app still checks every request. tests/verify_csrf.py
+# uses a plain FlaskClient to test the refusals.
+# ---------------------------------------------------------------------------
+from flask import Flask  # noqa: E402
+from flask.testing import FlaskClient  # noqa: E402
+from werkzeug.datastructures import Headers  # noqa: E402
+
+CSRF_FIELD = "csrf_token"
+CSRF_HEADER = "X-CSRFToken"
+TOKEN_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+
+def csrf_token_for(client):
+    """A valid form token for this client's session, as a page would carry it."""
+    from flask.ctx import RequestContext
+    from flask_wtf.csrf import generate_csrf
+    from werkzeug.test import EnvironBuilder
+
+    with client.session_transaction() as sess:
+        # A request context holding this client's session, so the token is
+        # stored in, and tied to, that session. Saved when the block ends.
+        ctx = RequestContext(client.application, EnvironBuilder().get_environ(),
+                             session=sess)
+        ctx.push()
+        try:
+            return generate_csrf()
+        finally:
+            ctx.pop()
+
+
+class TokenClient(FlaskClient):
+    """A test client that sends the form token with every POST, like a page does."""
+
+    def open(self, *args, **kwargs):
+        method = str(kwargs.get("method", "GET")).upper()
+        data = kwargs.get("data")
+        headers = Headers(kwargs.get("headers") or {})
+        carries = CSRF_HEADER in headers or (hasattr(data, "keys") and CSRF_FIELD in data)
+        if method in TOKEN_METHODS and not carries:
+            headers[CSRF_HEADER] = csrf_token_for(self)
+            kwargs["headers"] = headers
+        return super().open(*args, **kwargs)
+
+
+Flask.test_client_class = TokenClient
+
+
 def open_session(sess):
     """Give a session a suite builds by hand the two times a real sign-in records.
 

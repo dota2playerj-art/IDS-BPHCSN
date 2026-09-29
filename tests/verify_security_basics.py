@@ -288,7 +288,7 @@ check("an Administrator's reset sets the flag again",
 r = u2.get("/staff/dashboard")
 check("an open session is sent to My Account at its next click",
       location(r).endswith("/account"), location(r))
-r = u2.get("/logout")
+r = u2.post("/logout")
 check("logout still works while flagged", r.status_code == 302 and "/login" in location(r))
 with u2.session_transaction() as s:
     check("and it ends the session", "user_id" not in s)
