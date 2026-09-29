@@ -145,6 +145,7 @@
 {%- endif %}
 
     <form method="post" novalidate>
+      {{ csrf_field() }}
 {%- if acknowledge_duplicate %}
       <input type="hidden" name="confirm_duplicate" value="yes">
 {%- endif %}

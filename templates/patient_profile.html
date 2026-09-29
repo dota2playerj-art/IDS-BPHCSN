@@ -1463,6 +1463,7 @@
 {%- set submitted_key = cform.get(correction.vaccine_field) if cstate else '' %}
 {%- set selected_key = submitted_key if submitted_key in epi_keys else (cstate.current.vaccine_key if cstate else '') %}
           <form method="post" action="{{ url_for(correct_vaccination_endpoint, patient_id=patient.id) }}" novalidate>
+            {{ csrf_field() }}
             <input type="hidden" name="{{ correction.kind_field }}" id="correctKind" value="{{ cstate.kind if cstate else '' }}">
             <input type="hidden" name="{{ correction.record_field }}" id="correctRecordId" value="{{ cstate.record_id if cstate else '' }}">
             <div class="modal-header">
@@ -1613,6 +1614,7 @@
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content" style="border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.12);">
           <form method="post" action="{{ url_for(restrict_consultation_endpoint, patient_id=patient.id) }}" novalidate>
+            {{ csrf_field() }}
             <input type="hidden" name="{{ restrict_consultation_field }}" id="restrictConsultationId" value="">
 {#- The direction is posted explicitly rather than inferred from the record's
     current state on the server. Two people working the same profile could

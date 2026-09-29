@@ -268,6 +268,7 @@
           </div>
           <div class="form-text-hint mb-3">The audit trail keeps a record of what the entry said, so the deletion can be traced. The entry itself cannot be restored. Add it again if you need it back.</div>
           <form method="post" action="{{ url_for(delete_schedule_entry_endpoint, entry_id=target.id) }}" class="d-flex gap-2">
+            {{ csrf_field() }}
             <button type="submit" class="btn-danger-solid">Delete entry</button>
             <a class="btn-outline-teal" href="{{ url_for(service_schedule_endpoint) }}">Cancel</a>
           </form>
@@ -276,10 +277,12 @@
           <div class="panel-title">Edit entry</div>
           <div class="panel-sub">{{ target.service }} &middot; {{ target.days_text }}</div>
           <form method="post" action="{{ url_for(edit_schedule_entry_endpoint, entry_id=target.id) }}" novalidate class="mt-3">
+            {{ csrf_field() }}
 {%- else %}
           <div class="panel-title">Add a service</div>
           <div class="panel-sub">One service and the days it runs</div>
           <form method="post" action="{{ url_for(add_schedule_entry_endpoint) }}" novalidate class="mt-3">
+            {{ csrf_field() }}
 {%- endif %}
 {%- if errors %}
             <div class="alert-ids alert-danger-ids" role="alert">

@@ -360,6 +360,7 @@
         {% endif %}
 
         <form method="POST" action="/login" novalidate>
+          {{ csrf_field() }}
           <div class="field-group">
             <label class="field-label" for="username">Username</label>
             <div class="field-input-wrap">

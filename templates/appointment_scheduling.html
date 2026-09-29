@@ -744,8 +744,8 @@
            table, which is inside a horizontal scroll container; the forms live
            out here and the buttons reach them by id, the same arrangement
            Patient Records uses for its archive dialog. -->
-      <form id="startConsultationForm" method="post" action="{{ url_for(start_consultation_endpoint) }}"></form>
-      <form id="completeConsultationForm" method="post" action="{{ url_for(complete_consultation_endpoint) }}"></form>
+      <form id="startConsultationForm" method="post" action="{{ url_for(start_consultation_endpoint) }}">{{ csrf_field() }}</form>
+      <form id="completeConsultationForm" method="post" action="{{ url_for(complete_consultation_endpoint) }}">{{ csrf_field() }}</form>
 
       <!-- EMPTY STATE — shown when nobody is booked or checked in for today, and
            reused by the live search below when it filters everything out. -->
@@ -872,6 +872,7 @@
                  Consultation buttons reach their form above. -->
             <div id="checkInExistingPane">
               <form id="checkInExistingForm" method="post" action="{{ url_for(check_in_patient_endpoint) }}">
+                {{ csrf_field() }}
                 <div class="mode-hint">
                   Records their arrival and puts them in today's queue, in the order
                   they got here.
@@ -920,6 +921,7 @@
                    created until that form is submitted and passes its own
                    validation. -->
               <form id="checkInNewForm" method="post" action="{{ url_for(register_patient_endpoint) }}">
+                {{ csrf_field() }}
                 <input type="hidden" name="check_in_start" value="1">
                 <div class="mode-hint">
                   Opens the Register Patient form. Saving it registers the patient

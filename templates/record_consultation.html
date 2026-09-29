@@ -318,6 +318,7 @@
 {%- endif %}
 
     <form method="post" novalidate>
+      {{ csrf_field() }}
 
       <!-- PRESENTING COMPLAINT -->
       <div class="panel-card">

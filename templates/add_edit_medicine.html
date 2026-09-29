@@ -121,6 +121,7 @@
 {%- endif %}
 
     <form method="post" novalidate>
+      {{ csrf_field() }}
 
       <!-- MEDICINE INFORMATION -->
       <div class="panel-card">

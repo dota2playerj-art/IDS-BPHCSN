@@ -267,6 +267,7 @@
       Storing it would not have created one; enforcing days is a real change to
       booking validation and not a settings field. #}
               <form method="post" action="{{ url_for('admin.save_general_settings') }}" novalidate>
+                {{ csrf_field() }}
 
 {#- The whole-form banner, in the same place and the same words as User
     Management's: the field messages say what to fix, this says what did not
@@ -995,6 +996,7 @@
 {%- endif %}
 
               <form method="post" action="{{ url_for('admin.set_maintenance_mode') }}" style="margin-top:16px;">
+                {{ csrf_field() }}
 {%- if maintenance.on %}
                 <button type="submit" name="action" value="disable" class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">lock_open</span>Turn off maintenance mode</button>
 {%- else %}

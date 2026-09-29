@@ -589,6 +589,7 @@
           </div>
           <div class="modal-body">
             <form id="composeForm" method="post" action="{{ url_for(send_broadcast_endpoint) }}" novalidate>
+              {{ csrf_field() }}
 
               <label class="field-label" for="composeMessage">Message<span class="req">*</span></label>
               <textarea class="form-control{% if errors.message %} is-invalid{% endif %}" id="composeMessage"

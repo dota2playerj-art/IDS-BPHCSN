@@ -576,6 +576,7 @@
          only because the choice has to be made in the browser; the server
          re-derives it from the database before writing anything. -->
     <form id="archiveMedicineForm" method="post" action="{{ url_for(archive_medicine_endpoint) }}">
+      {{ csrf_field() }}
       <input type="hidden" name="item_id" id="archiveItemId" value="">
     </form>
 

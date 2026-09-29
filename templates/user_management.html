@@ -592,6 +592,7 @@
             </p>
 
             <form id="addUserForm" method="POST" action="{{ url_for('add_user') }}" novalidate>
+              {{ csrf_field() }}
               <div class="row g-3">
                 <div class="col-md-6">
                   <label class="field-label" for="addFullName">Full Name<span class="req">*</span></label>
@@ -746,6 +747,7 @@
           <div class="modal-footer">
             <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
             <form method="POST" action="{{ url_for('set_user_status') }}" style="display:inline;">
+              {{ csrf_field() }}
               <input type="hidden" name="user_id" value="{{ user.id }}">
               <button type="submit" name="action" value="{{ deactivate_action }}" class="btn-danger-ids">
                 <span class="material-symbols-outlined" style="font-size:18px;">person_off</span>Deactivate Account
@@ -778,6 +780,7 @@
           <div class="modal-footer">
             <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
             <form method="POST" action="{{ url_for('set_user_status') }}" style="display:inline;">
+              {{ csrf_field() }}
               <input type="hidden" name="user_id" value="{{ user.id }}">
               <button type="submit" name="action" value="{{ reactivate_action }}" class="btn-primary-teal">
                 <span class="material-symbols-outlined" style="font-size:18px;">how_to_reg</span>Reactivate Account
@@ -873,6 +876,7 @@
             </p>
 
             <form id="editUserForm{{ user.id }}" method="POST" action="{{ url_for('edit_user') }}" novalidate>
+              {{ csrf_field() }}
               <input type="hidden" name="user_id" value="{{ user.id }}">
               <div class="row g-3">
                 <div class="col-md-6">
@@ -984,6 +988,7 @@
             </p>
 
             <form id="resetPasswordForm{{ user.id }}" method="POST" action="{{ url_for('reset_user_password') }}" novalidate>
+              {{ csrf_field() }}
               <input type="hidden" name="user_id" value="{{ user.id }}">
               <div class="row g-3">
                 <div class="col-12">

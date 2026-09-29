@@ -384,6 +384,7 @@
            form to the same endpoint. There is no Delete button by design: patient
            records are soft-retired through Archive and never removed. -->
       <form id="archiveForm" method="post" action="{{ url_for(archive_patients_endpoint) }}">
+        {{ csrf_field() }}
       <input type="hidden" name="single_patient_id" id="singlePatientId" value="">
 
       <!-- BULK ACTION BAR -->
