@@ -207,7 +207,7 @@ with app.test_request_context():
     doc_screens = accessible_screens("Doctor")
     staff_screens = accessible_screens("Health Center Staff")
 print("  doctor screens:", doc_screens)
-# UPDATED FOR 445554e (2026-09-25): the team granted the Doctor Reports &
+# UPDATED FOR 8818686 (2026-09-25): the team granted the Doctor Reports &
 # Analytics, so the Doctor's list is now Health Center Staff's plus exactly the
 # three labels that screen carries for the Administrator and the Barangay
 # Official (the page and its two exports) -- and nothing else.

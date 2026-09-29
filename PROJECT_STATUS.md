@@ -83,7 +83,7 @@ This table is the state found by the audit, before Task 1.
 | Working tree | Clean. No modified, staged or untracked files. |
 | Stashes | None. |
 | Total commits | 102. |
-| Last commit | `fe33e45`, 2026-09-26 12:28 (+08:00). |
+| Last commit | `b95dae6`, 2026-09-26 12:28 (+08:00). |
 | Ignored but present | `app.db` (modified **2026-09-28 18:52**, after the last commit), 54 `app.db.*BACKUP*` copies in the root (moved out in Task 1), `.claude/`, `.vscode/`, and screenshots in `docs/verification/vaccination-correction/`. |
 | Extra worktrees | 5 detached worktrees registered in `.git/worktrees/` (`wt_after`, `wt_base`, `wt_mut1`, `wt_mut2`, `wt_predoctor`). They sit in an earlier session's temp folder. `wt_mut1` changes `models/service_schedule.py:114` and `wt_mut2` changes `routes/admin.py:962`, both marked `# MUTANT`. These are deliberate mutation tests from the Service Schedule verification, not unfinished work. (Removed in Task 1.) |
 
@@ -91,26 +91,26 @@ This table is the state found by the audit, before Task 1.
 
 | Hash | Date | Message |
 |---|---|---|
-| fe33e45 | 2026-09-26 | Record the RBAC suite repair: it builds its own fixtures and runs again |
-| a47a53d | 2026-09-26 | Show only known messages on the login form, never the text in the URL |
-| ffec974 | 2026-09-26 | Record that the self-deactivation message defect is fixed, and how it was verified |
-| 23c099a | 2026-09-26 | Tell an Administrator who deactivates their own account that they did |
-| 7d12fe1 | 2026-09-26 | Record how the Service Schedule was verified, and what was not |
-| 7cb17e5 | 2026-09-26 | Say in the documents that there are 22 screens, and what the 22nd is |
-| af97f43 | 2026-09-26 | Say at the top of the Patient Queue which services run today |
-| a940314 | 2026-09-26 | Give every role a Service Schedule screen, and only the Administrator a pen |
-| 90c21b3 | 2026-09-26 | Add a place to record which services run on which days, and leave it empty |
-| 2bc02fd | 2026-09-25 | Sort the old suite failures into stale tests and one real defect |
-| 445554e | 2026-09-25 | Let the Doctor read Reports & Analytics, with the same figures as everyone else |
-| fe6aaee | 2026-09-25 | Say in the documents that there are four roles, and that the Administrator is not the doctor |
-| 849a586 | 2026-09-25 | Let only the doctor diagnose, seal, read what is sealed, and declare a death |
-| 0f33500 | 2026-09-24 | Add a Doctor role, and an account to hold it until the RHU names one |
-| 822b723 | 2026-09-06 | Let a dose given at another facility be recorded as one, instead of claimed |
-| e1d64b5 | 2026-09-05 | Record the browser pass, and finish the sentences the last four commits missed |
-| d03fc0c | 2026-09-05 | Take the sheet of future visits out of a file that can no longer hold one |
-| 164fb63 | 2026-09-05 | Call the screen what it now is, and say on it what it no longer does |
-| 2d34eef | 2026-09-05 | Take the booking surfaces off the screens that offered them |
-| 64c1764 | 2026-09-05 | Take away every way to record a visit for a day that has not come |
+| b95dae6 | 2026-09-26 | Record the RBAC suite repair: it builds its own fixtures and runs again |
+| be20dfc | 2026-09-26 | Show only known messages on the login form, never the text in the URL |
+| 355c2ed | 2026-09-26 | Record that the self-deactivation message defect is fixed, and how it was verified |
+| b9f2185 | 2026-09-26 | Tell an Administrator who deactivates their own account that they did |
+| fe2cfb9 | 2026-09-26 | Record how the Service Schedule was verified, and what was not |
+| 5645021 | 2026-09-26 | Say in the documents that there are 22 screens, and what the 22nd is |
+| 9d13b7f | 2026-09-26 | Say at the top of the Patient Queue which services run today |
+| f87282d | 2026-09-26 | Give every role a Service Schedule screen, and only the Administrator a pen |
+| 085d14d | 2026-09-26 | Add a place to record which services run on which days, and leave it empty |
+| 33c3831 | 2026-09-25 | Sort the old suite failures into stale tests and one real defect |
+| 8818686 | 2026-09-25 | Let the Doctor read Reports & Analytics, with the same figures as everyone else |
+| b9c05b4 | 2026-09-25 | Say in the documents that there are four roles, and that the Administrator is not the doctor |
+| 113d6b7 | 2026-09-25 | Let only the doctor diagnose, seal, read what is sealed, and declare a death |
+| 262465a | 2026-09-24 | Add a Doctor role, and an account to hold it until the RHU names one |
+| 50990b7 | 2026-09-06 | Let a dose given at another facility be recorded as one, instead of claimed |
+| cb0bae2 | 2026-09-05 | Record the browser pass, and finish the sentences the last four commits missed |
+| d10ac7b | 2026-09-05 | Take the sheet of future visits out of a file that can no longer hold one |
+| b66263a | 2026-09-05 | Call the screen what it now is, and say on it what it no longer does |
+| e493402 | 2026-09-05 | Take the booking surfaces off the screens that offered them |
+| cd211fc | 2026-09-05 | Take away every way to record a visit for a day that has not come |
 
 ### What happened after the last commit
 
@@ -128,18 +128,18 @@ The `app.db` modification time (18:52:51) matches audit row 1280. There was no n
 ### Best judgment of the in-progress task
 
 1. **The last coding task is finished and committed.** Sep 24–26 added the Doctor role, moved clinical authority to it, added the Service Schedule, and fixed two defects (self-deactivation message, login `?error=` echo). Each has a verification note under `docs/verification/`.
-2. **The task in progress is operational: setting up the real Doctor account.** Commit `0f33500` says "The team renames it through Edit User", and on 2026-09-28 the team did. The rename is done. The password was **not** changed. The account still signs in with the password written in `models/users.py:141` (checked read-only against the stored hash). The brief role switch on `official` looks like someone trying the Doctor screens before renaming the real account.
+2. **The task in progress is operational: setting up the real Doctor account.** Commit `262465a` says "The team renames it through Edit User", and on 2026-09-28 the team did. The rename is done. The password was **not** changed. The account still signs in with the password written in `models/users.py:141` (checked read-only against the stored hash). The brief role switch on `official` looks like someone trying the Doctor screens before renaming the real account.
 3. **Open items left by the last session:**
-   - The Service Schedule table is empty (0 rows) on purpose until the health center is interviewed (`90c21b3`; `models/service_schedule.py:23`).
-   - Three screens still print query-string text: Reports range errors, and Register Patient's check-in reason and address prefill. These were recorded, not fixed, in `docs/verification/login-message-lookup/README.md` (commit `a47a53d`).
+   - The Service Schedule table is empty (0 rows) on purpose until the health center is interviewed (`085d14d`; `models/service_schedule.py:23`).
+   - Three screens still print query-string text: Reports range errors, and Register Patient's check-in reason and address prefill. These were recorded, not fixed, in `docs/verification/login-message-lookup/README.md` (commit `be20dfc`).
 
 Completeness of the in-progress task: about half done. Name set; password, contact details and a decision on the demo account are still open.
 
 ### Tests
 
-**Update (Task 1):** the suites are now in `tests/`. See "How to run the tests" above. The last recorded Add User result was 122/122 (the suite gained 3 checks with the fix in `23c099a`), not 119/119.
+**Update (Task 1):** the suites are now in `tests/`. See "How to run the tests" above. The last recorded Add User result was 122/122 (the suite gained 3 checks with the fix in `b9f2185`), not 119/119.
 
-At audit time: not run. There was no test suite in the repository. The suites (RBAC, Doctor role, reports, dispensing, EPI and others) live in an earlier session's Windows temp folder (`...\AppData\Local\Temp\claude\C--IDS-BPHCSN\15a6f5db-...\scratchpad\suites\`). The runner there says it works on database copies (`run_suites.py`, header), but it runs in the detached worktrees and was not inspected in full. Following rule 2, it was skipped. The last recorded results are in commit `2bc02fd`: RBAC 117/117, Doctor role 129/129, dispensing 128/128, Add User 117/119 (the 2 failures were the self-deactivation defect, since fixed in `23c099a`).
+At audit time: not run. There was no test suite in the repository. The suites (RBAC, Doctor role, reports, dispensing, EPI and others) live in an earlier session's Windows temp folder (`...\AppData\Local\Temp\claude\C--IDS-BPHCSN\15a6f5db-...\scratchpad\suites\`). The runner there says it works on database copies (`run_suites.py`, header), but it runs in the detached worktrees and was not inspected in full. Following rule 2, it was skipped. The last recorded results are in commit `33c3831`: RBAC 117/117, Doctor role 129/129, dispensing 128/128, Add User 117/119 (the 2 failures were the self-deactivation defect, since fixed in `b9f2185`).
 
 ---
 
@@ -250,7 +250,7 @@ None found. Every route carries a guard. The only unguarded routes are `/`, `/lo
 - Through screens and routes: **none.** Diagnosis, treatment plan, sealing and declaring death are all refused server-side for everyone but the Doctor.
 - Through side channels, the **Administrator (not a physician) can still read sealed diagnoses**:
   1. Settings → Download Backup (`admin.py:930`) hands over the whole database, sealed text included.
-  2. Audit Logs entries written before `849a586`, or written while a record was not yet sealed, still quote diagnosis text. Existing entries are never rewritten (`models/consultations.py:388-392`). The live DB has 9 unredacted "Diagnosis:" audit entries.
+  2. Audit Logs entries written before `113d6b7`, or written while a record was not yet sealed, still quote diagnosis text. Existing entries are never rewritten (`models/consultations.py:388-392`). The live DB has 9 unredacted "Diagnosis:" audit entries.
 - Existing data: 28 of 29 live consultations have a diagnosis written by a non-Doctor account (6 by Admin, 22 by Health Center Staff), from before the rule existed.
 
 ---
@@ -312,13 +312,13 @@ Count: **6 High, 17 Medium, 14 Low.** Done: M11, M15, L9 (Task 1); H5, M16, L13 
 | M8 | Medium | `utils/sms.py:190-218` | No `SEMAPHORE_API_KEY`, so every SMS broadcast is saved as "simulated". Nothing has been sent for real. | Get a Semaphore key before the defense, or state it clearly in the demo. |
 | M9 | Medium | `README.md:3`; `routes/report_export.py:253, 373`; `routes/roster_export.py:362, 458`; `routes/audit_export.py:135`; `templates/patient_records.html:179` (and 3 other print headers) | Three project names are used. The correct one (`01_PROJECT_BIBLE.md:12`, `templates/login.html:309`) is "Integrated Digital System … Community Notifications". Printed reports say "Integrated Data System". | Use one constant for the name. |
 | M10 | Medium | `templates/user_management.html:526`, `templates/patient_profile.html:713`, audit row 1278 | Wordy UI text. 16 tooltips are over 160 characters (longest 319), and audit sentences run 400–600 characters. Hard for non-native English readers. | Cut to one short sentence each. |
-| M11 | Medium | `docs/verification/README.md`; commit `fe33e45` | **Done (Task 1).** The suites are in `tests/`, run with `python tests/run_all.py`, each on a fresh test database. | — |
+| M11 | Medium | `docs/verification/README.md`; commit `b95dae6` | **Done (Task 1).** The suites are in `tests/`, run with `python tests/run_all.py`, each on a fresh test database. | — |
 | M12 | Medium | `git remote -v` (empty) | No remote. The only copy of the code is this laptop. | Push to a private remote. |
 | M13 | Medium | live DB; `populate_records.py:251-274` | 28 of 29 demo consultations have diagnoses by non-Doctor accounts, and the seed script still writes diagnoses. This contradicts the new rule during a demo. | Decide whether to clear or reattribute the demo diagnoses. |
 | M14 | Medium | `routes/official.py:196-199` | The Official's Notifications screen is a placeholder with no data. | Remove it from the menu, or build it. |
 | M15 | Medium | project root (`app.db.*BACKUP*`, 54 files, 26,525,696 bytes) | **Done (Task 1).** All 54 moved to `IDS-BPHCSN-backups` next to the project folder. Count, bytes and every file's checksum match. | — |
 | M16 | Medium | `database/connection.py:27`; `models/consultations.py:1007-1011` | A write that fails leaves its SQLite connection open. In the tests, every later write in the same process then failed with "database is locked". Seen after H5. Effect on the running server: Not verified. **Done (Task 1b):** new `db_connection()` in `database/connection.py` closes every connection and rolls back a failed write. All 97 app call sites use it (14 files). | — |
-| M17 | Medium | local commits `d44f2e8` (Task 1b), `be4ed9f`, `4c08710` (Task 2) | `models/audit.py` and `routes/user_views.py` hold a patient name flagged under H6, and those tasks were told not to touch such files. These three unpushed commits edited them anyway, which adds new versions of files holding that name to git history. `6cee8aa` put both files back to their content from before Task 2 (for `models/audit.py` that still includes Task 1b's connection fix). No new personal data was added. | Include these commits in the H6 decision on history. |
+| M17 | Medium | local commits `3fbe423` (Task 1b), `61900c4`, `fbf7cef` (Task 2) | `models/audit.py` and `routes/user_views.py` hold a patient name flagged under H6, and those tasks were told not to touch such files. These three unpushed commits edited them anyway, which adds new versions of files holding that name to git history. `313e758` put both files back to their content from before Task 2 (for `models/audit.py` that still includes Task 1b's connection fix). No new personal data was added. | Include these commits in the H6 decision on history. |
 | L1 | Low | `routes/auth.py:352-353` | Legacy branch compares a plain-text `password` column. The column no longer exists, so this is dead code. | **Done (Task 2):** the branch is deleted. |
 | L2 | Low | `routes/consultation_views.py:1000-1002` | The seal flash at record time says the diagnosis is hidden "from Health Center Staff" only; it is also hidden from the Administrator now. | Add "and the Administrator". |
 | L3 | Low | `templates/appointment_scheduling.html:631, 676` | "Booked" column is left over from advance booking and is always "—". | Remove the column. |
@@ -352,7 +352,7 @@ Checked and **not** found: `TODO`/`FIXME`/`XXX` markers; `href="#"` or "coming s
 | Team context (this audit's brief) | Doctor role "possibly not built" | Complete (§4) |
 | Team context | Settings "done" (4 sections) | General and Maintenance live; Password Policy display-only; Backup has no restore (§2) |
 | Team context | SMS through Semaphore done | Built, but simulated until an API key is set |
-| `01_PROJECT_BIBLE.md`, `03_...`, `09_...` | Four roles, Doctor holds clinical authority, walk-in queue, 22 screens | Match the code (updated in `fe6aaee`, `445554e`, `7cb17e5`) |
+| `01_PROJECT_BIBLE.md`, `03_...`, `09_...` | Four roles, Doctor holds clinical authority, walk-in queue, 22 screens | Match the code (updated in `b9c05b4`, `8818686`, `5645021`) |
 | `06_...`, `09_...` "Agusan" mentions | History of the location correction | Correct as history; no live leftovers |
 
 `02`, `05`, `07` and `10` were only scanned for role, booking and location terms (no hits). They were not reviewed in depth.

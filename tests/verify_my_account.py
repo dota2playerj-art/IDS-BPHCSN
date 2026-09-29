@@ -268,7 +268,7 @@ for spec in ROLES:
     check(f"[{name}] after every refusal the old password still verifies",
           check_password_hash(user_row(name)["password_hash"], spec["old"]))
     # STALE-FIX (2026-09-25): this asserted that NO refusal writes an audit row.
-    # ef47b94 deliberately made one refusal auditable: a wrong CURRENT password
+    # 012b65c deliberately made one refusal auditable: a wrong CURRENT password
     # on My Account now writes one "Refused own-password change attempt" row,
     # built from the stored account row and never from the typed text. Two of
     # the submits above carry a wrong current password ("wrong current

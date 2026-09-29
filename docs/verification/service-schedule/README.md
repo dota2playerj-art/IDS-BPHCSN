@@ -1,7 +1,7 @@
 # service-schedule
 
-Evidence folder for the Service Schedule (Screen 22): 90c21b3 (storage, empty),
-a940314 (the screen, Administrator-only writes, audit) and af97f43 (today's
+Evidence folder for the Service Schedule (Screen 22): 085d14d (storage, empty),
+f87282d (the screen, Administrator-only writes, audit) and 9d13b7f (today's
 services on the Patient Queue).
 
 It keeps **no images**, for the reason the other folders here give. What is
@@ -67,14 +67,14 @@ closed as Completed.
 ## Route × role matrix
 
 All registered rules were requested for the four roles and anonymous, at
-2bc02fd (before the task) and at af97f43. The 460 cells from before are
+33c3831 (before the task) and at 9d13b7f. The 460 cells from before are
 unchanged. The 30 added cells are the six new routes and nothing else. There
 were no 5xx responses. POST-only rules were requested only by roles their guard
 refuses, so no write view ran.
 
 ## Regression suites
 
-Every suite was run at 2bc02fd and at af97f43 on copies of the same data, and
+Every suite was run at 33c3831 and at 9d13b7f on copies of the same data, and
 compared check by check. No check went from pass to fail. Add User's 2 failing
 checks fail identically at both commits. They are the real defect recorded in
 `stale-suite-assertions/`.

@@ -1,6 +1,6 @@
 # medicine-dispensing/
 
-Real-browser verification of medicine dispensing (`fa34a46`), run against the
+Real-browser verification of medicine dispensing (`a8b213f`), run against the
 real `app.db` as the Administrator after the feature had already been verified
 at the code and database level by four automated suites (140 checks).
 

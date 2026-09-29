@@ -921,7 +921,7 @@ way it loses that trust is by being written once and never re-read while the sys
 
 | Previous claim | Actual state on 21 August 2026 |
 |---|---|
-| "The project is NOT under version control… there is no history and no rollback." | 27 commits on `master`, from the initial commit to `a46ee83`. |
+| "The project is NOT under version control… there is no history and no rollback." | 27 commits on `master`, from the initial commit to `a8a1cfb`. |
 | "No README.md, although 04_DEVELOPMENT_GUIDE.md lists one." | `README.md` exists, and states how to run the system, the three roles, and the migration order. |
 | Nine screens listed as hard-coded or presentation-only. | One (Notifications). Settings is partly live. The other seven named are all data-driven. |
 | "User Management — the `users` table holds 3 accounts; the screen shows 7 fixed rows." | The screen lists the real roster and derives each role's permissions from the live `url_map`. Only the account *writes* are still disabled. |

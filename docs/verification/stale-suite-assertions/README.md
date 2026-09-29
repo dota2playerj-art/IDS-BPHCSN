@@ -1,6 +1,6 @@
 # Clearing the pre-existing suite failures (2026-09-25)
 
-The Doctor-role work (0f33500, 849a586, fe6aaee) reported suite failures that were
+The Doctor-role work (262465a, 113d6b7, b9c05b4) reported suite failures that were
 there **before** it began: 17 in the dispensing suite, plus checks in three other
 suites. This pass took each failing check in turn and asked one question: is the
 **test** out of date, or is the **application** wrong?
@@ -41,7 +41,7 @@ management.
 
 ### Dispensing: 17 failures, 11 distinct checks, one cause plus one date
 
-**Cause: 5747d94**, *Record the supplies and equipment a visit uses*. When gauze
+**Cause: 60940ce**, *Record the supplies and equipment a visit uses*. When gauze
 and masks became dispensable, the section stopped saying "medicine" on purpose,
 so a pack of gauze would not sit under a heading that says medicines. The suite
 was written before that commit.
@@ -81,15 +81,15 @@ asserts that `Item on line 5` is absent, and it tests something again.
   touch the real database. They now compare that database with itself before the
   run, instead of with the literals 3 and 0.
 - **Persona (2 checks).** The audit entries were expected to name "Dr. Joshua
-  Reyes". **f7e2607** corrected the Administrator's persona to Kagawad Antonio
+  Reyes". **1c3efc7** corrected the Administrator's persona to Kagawad Antonio
   Acido. The checks now read the acting account's name from the database.
-- **Password wording.** Expected `at least 3 of these four`. **65e0d7c** builds
+- **Password wording.** Expected `at least 3 of these four`. **3610e21** builds
   the sentence from `PASSWORD_CHARACTER_KINDS` and says `Use at least 3 of these
   4:`. The password `allsmallletters` is still refused under that rule.
 
 ### My Account: 3 failures, one per role
 
-The suite asserted that **no** refusal writes an audit row. **ef47b94**, *Record a
+The suite asserted that **no** refusal writes an audit row. **012b65c**, *Record a
 refused own-password change*, deliberately made one refusal auditable: a wrong
 current password on My Account now writes a "Refused own-password change attempt"
 row, built from the stored account row and never from what was typed.
@@ -104,12 +104,12 @@ wrong-current-password submits. The suite now asserts:
 ### Account management (Edit User / Reset Password): 1 failure
 
 "Audit names the acting administrator" expected "Dr. Joshua Reyes", which was
-**f7e2607** again. The same literal was also used as the value the suite wrote
+**1c3efc7** again. The same literal was also used as the value the suite wrote
 back when it "put the name back", so each run renamed the scratch database's
 Administrator to the retired persona. The suite now reads the name once from the
 database and uses it in both places.
 
-### Doctor-role suite: 1 check, changed by 445554e, not pre-existing
+### Doctor-role suite: 1 check, changed by 8818686, not pre-existing
 
 `accessible_screens(Doctor) == accessible_screens(Health Center Staff)` stopped
 holding when the Doctor was granted Reports & Analytics. That is the change
@@ -138,20 +138,20 @@ What happens. `admin.set_user_status()` flashes the result and redirects to User
 Management. `process_account_status()` composes the right message for this case:
 "…You deactivated your own account, so you will be signed out on your next action
 and will not be able to sign back in." But the redirect *is* the next action. The
-guard added in **63f6962** sees an inactive account on that GET and clears the
+guard added in **b70c28e** sees an inactive account on that GET and clears the
 session, which discards the flash with it. It then sends the person to
 `/login?error=Invalid security credentials.`, the sentence a wrong password
 produces. Someone who just made a deliberate, irreversible change to their own
 access is told something that reads as a typing mistake, and the message written
 for exactly this moment is never shown.
 
-It has **never** worked. Run at its own commit (3494e7e), over the database as it
+It has **never** worked. Run at its own commit (e9f29ae), over the database as it
 stood before that commit, the add-user suite passes 117 of 119. These are the
 two failures. So it is not a regression, and the suite has been correct about it
 from the start.
 
 The decision for the team. The generic "Invalid security credentials." is
-deliberate for anyone *else* whose session is revoked (63f6962: "Nowhere in the
+deliberate for anyone *else* whose session is revoked (b70c28e: "Nowhere in the
 application says an account has been deactivated"). The account holder who
 switched themselves off is the one person that rule does not need to protect
 from. Two ways to close it:
@@ -222,7 +222,7 @@ credentials." Three checks were added beside them, for the redirect carrying no
 `?error=`, no identity left in the session, and the notice appearing once only.
 Each is marked `DEFECT-FIX` in the suite.
 
-**How it was verified.** Worktrees at 7d12fe1 (before) and with the fix (after),
+**How it was verified.** Worktrees at fe2cfb9 (before) and with the fix (after),
 each over a fresh copy of the live database. The live `app.db` had the same
 SHA-256 before and after.
 
@@ -287,7 +287,7 @@ so the check was left alone and the fixture now always queues a child.
 **Runs, all on copies:**
 
 - **The live data:** 117 / 117, before and after the login-message change
-  (a47a53d).
+  (be20dfc).
 - **A variant with every fallback forced:** no consultation carries clinical
   text, the only Doctor is deactivated, and another patient is already
   `In Consultation` (the condition the old setup relied on). Result: 117 / 117.

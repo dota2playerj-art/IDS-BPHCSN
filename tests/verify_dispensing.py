@@ -236,7 +236,7 @@ check("never more than the ceiling",
       _dispensing_row_count({item_field(i): "1" for i in range(DISPENSE_MAX_ROWS)})
       == DISPENSE_MAX_ROWS)
 
-# STALE-FIX (2026-09-25): 5747d94 made supplies and equipment dispensable and
+# STALE-FIX (2026-09-25): 60940ce made supplies and equipment dispensable and
 # renamed the section's wording from "medicine" to "item" on purpose (the
 # button id, the field labels, the flash, the helper note, and the profile tab
 # "Dispensing History"). Every check below asserting the old word now asserts

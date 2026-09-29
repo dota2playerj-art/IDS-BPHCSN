@@ -5,7 +5,7 @@ Logs trail, that nothing was orphaned by their removal, and that the one thing
 the icon did carry beyond duplication — keyboard access to an entry — survives
 the deletion.
 
-This is the second half of the removal `1d48f1c` began on User Management, and
+This is the second half of the removal `4ebc551` began on User Management, and
 it is the same removal for the same reason. The screen it leaves behind is the
 shape that commit's message said this one had had all along, which turned out to
 be true of everything except the Actions column itself.
@@ -121,7 +121,7 @@ each landing on the same dashboard. `python app.py` starts clean and serves
 ## The live browser pass
 
 Driven as the Administrator, the only role that can open this screen since
-`2208e51`. Staff and Official refusal is covered in the suite above against the
+`4abb291`. Staff and Official refusal is covered in the suite above against the
 same running application rather than clicked through.
 
 The session was established without typing a password into the sign-in form: a

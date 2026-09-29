@@ -265,7 +265,7 @@ def main():
     check("the dispensing appears in the profile", item["name"] in body)
     # FIXED 2026-09-28 (L13): this compared against "Restricted — Administrator
     # access only", text the app stopped showing when the Doctor role arrived
-    # (849a586), so it passed whatever the page said. It now uses the text the
+    # (113d6b7), so it passed whatever the page said. It now uses the text the
     # app really shows on a sealed record.
     check("no restriction notice on an unsealed record",
           RESTRICTED_PLACEHOLDER not in body)

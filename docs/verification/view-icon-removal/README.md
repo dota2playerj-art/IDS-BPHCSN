@@ -92,7 +92,7 @@ drift.** `python app.py` starts clean.
 ## The live browser pass
 
 Driven as the Administrator, the **only** role that can open this screen — the
-task asked for both roles that can reach it and there is one, since `2208e51`
+task asked for both roles that can reach it and there is one, since `4abb291`
 closed User Management to everyone else. Staff and Official refusal is covered in
 the suite above against the same running application rather than clicked through.
 

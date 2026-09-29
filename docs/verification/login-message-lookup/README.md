@@ -4,7 +4,7 @@ Before this change, `login.html` printed whatever arrived in `?error=`.
 `/login?error=Call 0917-000-0000 to verify your account` put that sentence in
 the red alert box, on a page headed with the health center's name. Autoescaping
 meant HTML came out as text rather than markup, but the text itself was shown,
-and anyone could send the link. The self-deactivation notice added in 23c099a
+and anyone could send the link. The self-deactivation notice added in b9f2185
 could be summoned the same way, by typing it into the address bar. Nothing
 about any account was disclosed.
 
@@ -41,7 +41,7 @@ browser that earned it, and a key for it would let anybody display it.
 
 ## How it was verified
 
-A git worktree at ffec974 (before) and one with the change (after), each over
+A git worktree at 355c2ed (before) and one with the change (after), each over
 a fresh copy of the live database. The live `app.db` had the same SHA-256
 before and after. The probe served each tree with werkzeug on a real socket,
 drove it with a cookie-jar HTTP client, and did not follow redirects

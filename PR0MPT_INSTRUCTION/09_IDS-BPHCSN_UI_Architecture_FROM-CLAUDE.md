@@ -925,7 +925,7 @@ loudly. It quietly records the nearest wrong answer and looks like clean data fo
 
 Two commits, both structural-first so that no correction could orphan the data it was correcting.
 
-**`14452ce`** — the core. `MUNICIPALITIES` became San Francisco plus the three LGUs it shares a land
+**`c94924a`** — the core. `MUNICIPALITIES` became San Francisco plus the three LGUs it shares a land
 border with (Surigao City, Malimono, Sison); `PROVINCES` became Surigao del Norte, keeping Surigao
 del Sur because it genuinely adjoins and dropping Agusan del Sur and Davao de Oro, which border
 neither. The ZIP example moved 8501 → 8401 and Settings' area code 085 → 086. Correcting the lists
@@ -935,7 +935,7 @@ repaired all eleven in the same change. The fifteen patients with no municipalit
 deliberately left alone: NULL is incomplete, not wrong, and inventing an address for them would have
 been fabricating clinical data.
 
-**`5050bf8`** — the leftovers. Settings' Province, Complete Address and Institution;
+**`da7c927`** — the leftovers. Settings' Province, Complete Address and Institution;
 `populate_records.py`'s infant seed and three inventory supplier strings, plus
 `migrate_correct_supplier_location.py` for the three live rows a reseed would not have touched
 (`INSERT OR IGNORE`); and the login page's "San Francisco, Philippines", which was ambiguous against

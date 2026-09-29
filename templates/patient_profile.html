@@ -1531,7 +1531,7 @@
                   <input type="number" class="form-control{% if cerr.get(correction.dose_field) %} is-invalid{% endif %}" id="correctDose" name="{{ correction.dose_field }}"
                          min="{{ correction.dose_range[0] }}" max="{{ correction.dose_range[1] }}" step="1" placeholder="Leave blank if none"
                          value="{{ cform.get(correction.dose_field, '') if cstate and not state_is_epi else '' }}"{% if cstate and state_is_epi %} disabled{% endif %}>
-{#- The surviving twin of the sentence c3ea786 cut from the consultation form:
+{#- The surviving twin of the sentence ba308da cut from the consultation form:
     "an invented number is worse than a blank", reworded. Same fix here, so the
     project does not go on saying the thing it decided not to say. #}
 {%- if cerr.get(correction.dose_field) %}
@@ -1902,7 +1902,7 @@
   // into the dialog's markup. This is the half that makes any of that visible:
   // without it the redisplay sits at display:none and the operator is left
   // looking at the profile with their edit apparently gone -- which is exactly
-  // the failure e2616a5 found on four other dialogs, and this is its fix, not a
+  // the failure c7beac4 found on four other dialogs, and this is its fix, not a
   // new one.
   //
   // DOMContentLoaded rather than a bare statement, for the reason base.html

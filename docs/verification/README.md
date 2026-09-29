@@ -62,9 +62,9 @@ work began: 17 checks in dispensing, plus checks in Add User, My Account and
 account management. Each failure was classed either as a stale assertion (the
 application had since changed on purpose) or as a real defect.
 
-**30 were stale.** The causes are the "medicine" → "item" rename in 5747d94, the
-Administrator's persona correction in f7e2607, the audited password-change
-refusal in ef47b94, a reworded password rule, and counts and dates written in as
+**30 were stale.** The causes are the "medicine" → "item" rename in 60940ce, the
+Administrator's persona correction in 1c3efc7, the audited password-change
+refusal in 012b65c, a reworded password rule, and counts and dates written in as
 literals. Each was corrected to check the same property, and one check that had
 been passing vacuously was repaired.
 
@@ -317,7 +317,7 @@ Patient use. The vaccine tab is opened underneath, since that is where the recor
 and the Correct button live. A `DOMContentLoaded` callback shows the dialog, for
 the reason `base.html` documents at the scripts block: it is rendered before
 Bootstrap loads, so a bare `if (window.bootstrap)` there would be silently false —
-exactly the trap `e2616a5` fixed on four other dialogs. The successful and
+exactly the trap `c7beac4` fixed on four other dialogs. The successful and
 no-change paths are unchanged: they still flash a sentence and redirect, which is
 right for an outcome no retyping fixes.
 
@@ -561,7 +561,7 @@ three roles with no 5xx.
 
 ## vaccination-correction/
 
-Real-browser verification of the vaccination correction path (`e7416d8`), run
+Real-browser verification of the vaccination correction path (`6628a66`), run
 against the real `app.db` after the feature had already been verified at the
 code and database level. Four corrections were made through the UI — both record
 types, under both roles that hold the capability.

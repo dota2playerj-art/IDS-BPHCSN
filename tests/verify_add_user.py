@@ -135,7 +135,7 @@ with app.test_client() as admin:
          "at least 12 characters; this one is 7"),
         ("password with too few character kinds",
          {"password": "allsmallletters", "confirm_password": "allsmallletters"},
-         # STALE-FIX: was "at least 3 of these four"; 65e0d7c now builds the
+         # STALE-FIX: was "at least 3 of these four"; 3610e21 now builds the
          # sentence from PASSWORD_CHARACTER_KINDS and says "3 of these 4".
          "Use at least 3 of these 4:"),
         ("password containing the username",
@@ -226,7 +226,7 @@ with app.test_client() as admin:
           entry and '"mdelacruz"' in entry["details"]
           and "Marivic Dela Cruz" in entry["details"]
           and "Health Center Staff" in entry["details"])
-    # STALE-FIX: was the literal "Dr. Joshua Reyes"; f7e2607 corrected the
+    # STALE-FIX: was the literal "Dr. Joshua Reyes"; 1c3efc7 corrected the
     # Administrator's persona. The property is that the acting account's own
     # name is recorded, so read that name from the database.
     check("its details name the administrator who created it",
@@ -487,7 +487,7 @@ with app.test_client() as admin:
     # account's own, so the session ends on the next request.
     #
     # DEFECT-FIX (2026-09-26): these two checks failed from the day they were
-    # written (3494e7e). The redirect went to User Management, the guard found the
+    # written (e9f29ae). The redirect went to User Management, the guard found the
     # account deactivated on that GET and cleared the session -- and the flash with
     # it -- and the page said "Invalid security credentials." The route now signs
     # the holder out in the same request and sends them to the login form with a
