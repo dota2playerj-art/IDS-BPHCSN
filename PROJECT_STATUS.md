@@ -1,7 +1,7 @@
 # IDS-BPHCSN — Project Status
 
 Last updated: 2026-09-29
-Updated by: Task H6 — privacy cleanup
+Updated by: Task 3 — CSRF protection
 
 Sections 1–7 started as a read-only status audit. The Task Log below says what each task after it changed. The live `app.db` has only ever been opened read-only by these tasks.
 
@@ -15,6 +15,7 @@ Newest first.
 
 | Date | Task | Result |
 |---|---|---|
+| 2026-09-29 | Task 3 — CSRF protection | M2 done. Every POST (26 forms, and the keep-alive) must carry a form token (Flask-WTF). A refused request shows "Your session expired" and is audited when the account is known. Logout is a POST form. New suite `verify_csrf.py`. Each laptop must run `pip install -r requirements.txt` once (new package Flask-WTF), or the app will not start. Tests: 1399/1399, 14 of 14 suites. |
 | 2026-09-29 | Task H6 — privacy cleanup | H6 and M17 done. Real patient names, patient contacts' numbers, the test-account name and the retired demo passwords were replaced with fictional ones in the files, then in every commit and commit message (`git filter-repo`). Every commit hash changed. The migration `migrate_add_must_change_password.py` now stops when history has no old password; run it with `--flag-all`. Tests: 1331/1331, 13 of 13 suites. |
 | 2026-09-29 | Task 2 — security basics | H1 (code side), H2, M1, M3, L1, L5 and L8 done. Secret key from `.env`, debug off, 30-minute idle and 12-hour limits, forced password change, random first-time passwords. The migration ran on this laptop's `app.db` and flagged 4 accounts. New suite `verify_security_basics.py`. Tests: 1331/1331, 13 of 13 suites. |
 | 2026-09-28 | Task 1b — fresh install and connection fixes | H5, M16 and L13 done. `schema.sql` now matches the live database (see "Schema drift"). Every app connection goes through `db_connection()`. New suite `verify_database_integrity.py`. Tests: 1249/1249, 12 of 12 suites. |
@@ -30,7 +31,7 @@ Newest first.
 From the project folder, with the virtual environment active:
 
 ```
-python tests/run_all.py            all 11 suites
+python tests/run_all.py            all suites
 python tests/run_all.py -v         also print each suite's full output
 python tests/run_all.py rbac       only the suites whose names contain "rbac"
 ```
@@ -39,10 +40,11 @@ python tests/run_all.py rbac       only the suites whose names contain "rbac"
 - The live `app.db` is never used. A guard stops the whole run if any database path is inside the project folder. The runner also checks that `app.db` has the same size, time and checksum after the run.
 - Test accounts use test-only passwords (`tests/_support.py`), not the demo passwords.
 - All test data is made up. The old suites used a real staff member's name for account 4; the tests now use `bhwtest` / "Test Health Worker".
-- "All passing" looks like: one `ok` line per suite, then `TOTAL: 1331/1331 checks passed in 13/13 suites` and `All checks passed.` Exit code 0.
-- **Today (after Task 2): 1331/1331, all 13 suites pass.** Before Task 1b it was 906/921; every failure came from H5.
+- "All passing" looks like: one `ok` line per suite, then `TOTAL: 1399/1399 checks passed in 14/14 suites` and `All checks passed.` Exit code 0.
+- **Today (after Task 3): 1399/1399, all 14 suites pass.** Before Task 1b it was 906/921; every failure came from H5.
+- Every POST needs a form token (Task 3). The suites' clients add a valid one for their own session (`tests/_support.py`, `TokenClient`); `verify_csrf.py` uses plain clients to test refusals.
 
-| Suite | Checks | Result after Task 2 |
+| Suite | Checks | Result after Task 3 |
 |---|---|---|
 | verify_epi.py | 15 | 15/15 |
 | verify_staff_capabilities.py | 27 | 27/27 |
@@ -57,6 +59,7 @@ python tests/run_all.py rbac       only the suites whose names contain "rbac"
 | verify_service_schedule.py | 157 | 157/157 |
 | verify_database_integrity.py (Task 1b) | 18 | 18/18 |
 | verify_security_basics.py (Task 2) | 82 | 82/82 |
+| verify_csrf.py (Task 3) | 68 | 68/68 |
 
 Not brought in: the four `d4d04b0e_*` scripts (they print values but have no pass/fail checks; they were only compared between two code trees), the three retired originals that `*_ported.py` replaced, the mutation worktrees, and one Doctor-suite check that ran old code from a worktree (L13).
 
@@ -295,7 +298,7 @@ None found. Every route carries a guard. The only unguarded routes are `/`, `/lo
 ## 5. Issues Found
 
 Severity: High = breaks a feature, or is a security or legal risk. Medium = wrong behavior or confusing. Low = cleanup.
-Count: **6 High, 19 Medium, 15 Low.** Done: M11, M15, L9 (Task 1); H5, M16, L13 (Task 1b); H1 (code side), H2, M1, M3, L1, L5, L8 (Task 2); H6, M17 (Task H6). Added in Task 1: H5, H6, M16, L13. Added in Task 1b: L14. Added in Task 2: M17. Added in Task H6: M18, M19, L15.
+Count: **6 High, 20 Medium, 17 Low.** Done: M11, M15, L9 (Task 1); H5, M16, L13 (Task 1b); H1 (code side), H2, M1, M3, L1, L5, L8 (Task 2); H6, M17 (Task H6); M2 (Task 3). Added in Task 1: H5, H6, M16, L13. Added in Task 1b: L14. Added in Task 2: M17. Added in Task H6: M18, M19, L15. Added in Task 3: M20, L16, L17.
 
 | # | Severity | File:line | Problem | Suggested direction |
 |---|---|---|---|---|
@@ -306,7 +309,7 @@ Count: **6 High, 19 Medium, 15 Low.** Done: M11, M15, L9 (Task 1); H5, M16, L13 
 | H5 | High | `schema.sql:114` (consultations `updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP`); `models/consultations.py:999-1005` | On a database built from `schema.sql` (any fresh install or new clone), recording a consultation fails with HTTP 500: the insert writes `updated_at = NULL` into a NOT NULL column. The live `app.db` works only because a migration added this column as nullable. Found by the test run in Task 1. **Done (Task 1b):** `schema.sql` now declares `updated_at TEXT` (nullable, no default), as the live DB does, so the app behaves the same on both. | — |
 | H6 | High | 12 tracked files, e.g. `docs/verification/retire-advance-booking/README.md`, `migrate_clear_seeded_remarks.py`, `AUDIT_REPORT_2026-08-06_v2.md`, comments in `models/audit.py` and `routes/user_views.py`; 10 commits; 3 commit messages | 16 of the 29 patient full names in the live `app.db`, and 6 patient contact numbers, appear in tracked files and in git history. They are not from the demo seed script. Whether they are real people: Not verified. A push would publish them. | **Done (Task H6):** the 12 patients not from the seed, their contacts, their 11 numbers, the test account named after a real person and the 4 retired passwords now read as fictional names, `0900000NNNN` numbers and "(retired demo password)", in the files and in all history. The team member's name stays where it credits the proposal. |
 | M1 | Medium | `app.py:67` | `debug=True` whenever the app starts with `python app.py` (the README's run command). The Werkzeug debugger allows code execution if reached. Default bind is 127.0.0.1, so the risk is lower. | **Done (Task 2):** debug follows IDS_DEBUG; only `1` turns it on. Host 127.0.0.1, port 5001. |
-| M2 | Medium | (none found: no `csrf` anywhere) | POST forms have no CSRF token. Logout is a GET (`routes/auth.py:458`). | Add a CSRF token (e.g. Flask-WTF `CSRFProtect`). |
+| M2 | Medium | (none found: no `csrf` anywhere) | POST forms have no CSRF token. Logout is a GET (`routes/auth.py:458`). | **Done (Task 3):** Flask-WTF `CSRFProtect` checks every POST (`utils/csrf.py`); each form starts with `{{ csrf_field() }}`, scripts send the X-CSRFToken header from a meta tag, and logout is POST only. |
 | M3 | Medium | `templates/settings.html:659`; `config.py` | No idle timeout. The "Auto Logout on Inactivity" toggle is disabled. Audit rows 1277→1278 show a session still in use 2 days after sign-in. Risky on a shared health-center PC. | **Done (Task 2):** signed out after 30 minutes without activity and 12 hours after sign-in (`config.py`), enforced on the server, audited, with a warning 2 minutes before the idle limit (`static/js/session.js`). |
 | M4 | Medium | `routes/consultation_views.py:190-196` | Doctor has no "awaiting diagnosis" list; visits saved by staff without a diagnosis are easy to miss. | Add a panel on the Doctor Dashboard. |
 | M5 | Medium | `utils/unavailable.py:399` | A patient who leaves before being seen cannot be closed; the row stays Waiting. | Add a "Left without being seen" status. |
@@ -324,6 +327,7 @@ Count: **6 High, 19 Medium, 15 Low.** Done: M11, M15, L9 (Task 1); H5, M16, L13 
 | M17 | Medium | local commits `3fbe423` (Task 1b), `61900c4`, `fbf7cef` (Task 2) | `models/audit.py` and `routes/user_views.py` hold a patient name flagged under H6, and those tasks were told not to touch such files. These three unpushed commits edited them anyway, which adds new versions of files holding that name to git history. `313e758` put both files back to their content from before Task 2 (for `models/audit.py` that still includes Task 1b's connection fix). No new personal data was added. | **Done (Task H6):** the history rewrite covered these commits. The session-timeout phrases went back to `models/audit.py`, and the reset passes `must_change=True` itself again. |
 | M18 | Medium | `../IDS-BPHCSN-backups/repo-before-history-rewrite-20260929_101023.bundle` | The backup of the old history taken before the rewrite. It still holds every real name, number and old password that Task H6 removed. | Delete it once the team confirms the rewritten repository is good. Never push or share it. |
 | M19 | Medium | `%TEMP%\claude\C--IDS-BPHCSN\` (earlier session folders, outside the repo) | About 30 folders from earlier AI sessions (scratch copies, old suites, task logs), about 530 files, still hold real patient names or the old passwords. Task H6 did not delete them. | Delete the old session folders on this laptop once nothing in them is needed. |
+| M20 | Medium | `utils/csrf.py` `_log_refusal()`; `schema.sql` (`audit_logs.user_id` NOT NULL) | A request refused for a bad form token is recorded only when a signed-in account is known. A refused request with nobody signed in (for example the login form) leaves no trace, because an audit row must name an account. | Decide whether anonymous refusals matter. If so, allow a NULL user in `audit_logs` or keep a separate count. |
 | L1 | Low | `routes/auth.py:352-353` | Legacy branch compares a plain-text `password` column. The column no longer exists, so this is dead code. | **Done (Task 2):** the branch is deleted. |
 | L2 | Low | `routes/consultation_views.py:1000-1002` | The seal flash at record time says the diagnosis is hidden "from Health Center Staff" only; it is also hidden from the Administrator now. | Add "and the Administrator". |
 | L3 | Low | `templates/appointment_scheduling.html:631, 676` | "Booked" column is left over from advance booking and is always "—". | Remove the column. |
@@ -339,6 +343,8 @@ Count: **6 High, 19 Medium, 15 Low.** Done: M11, M15, L9 (Task 1); H5, M16, L13 
 | L13 | Low | `tests/verify_doctor.py` (section H); `tests/verify_staff_capabilities.py` | Two test gaps. (1) One Doctor-suite check ran the old code from a worktree; it is not run now, and the row it made is written directly. (2) The staff suite checks that "Restricted — Administrator access only" is absent; that text no longer exists, so the check always passes. **Done (Task 1b):** (2) now uses the app's real placeholder text, and fails on a sealed record. (1) is not replaced: it tested old code that no longer exists. What it protected (an old Administrator seal stays sealed) is still checked in section S, and section F checks that the Administrator cannot seal now. | — |
 | L14 | Low | `migrate_add_consultation_columns.py:47-52` | Its note says the `updated_at` difference between a migrated and a fresh database is "deliberate" and "the only one". After Task 1b there is no such difference. This task may not edit migrations. | Update the note when migrations are next touched. |
 | L15 | Low | `routes/user_views.py` (`process_create_user`, `process_reset_password`) | Task 2 added "must change it the first time they sign in" to the Add User and Reset Password confirmations, then took it out to avoid touching this file under H6. The forms still say it; the confirmation does not. | Put the sentence back in both messages (and the tests that read them). |
+| L16 | Low | `routes/auth.py` `logout()` | Opening `/logout` in the address bar (an old bookmark) now shows the framework's plain "405 Method Not Allowed" page, in technical words. It does not sign anyone out, which is correct. | Send a GET to /logout to the dashboard or login page instead. |
+| L17 | Low | `static/js/session.js` | The keep-alive handles 204, 401 and (Task 3) 400. A 503 (maintenance mode switched on) is ignored, so the page only shows the maintenance screen at the next click. | Reload the page on a 503, so the maintenance screen appears. |
 
 Checked and **not** found: `TODO`/`FIXME`/`XXX` markers; `href="#"` or "coming soon" stubs; broken `url_for()` targets (123 literal calls and 73 context endpoint names all resolve); missing static files; "Agusan del Sur" as a live value (it appears only in notes about the correction, in code comments and docs 06/09, and not at all in the live DB); passwords sent by email or SMS; offline mode, national database integration, or non-plain-text SMS.
 

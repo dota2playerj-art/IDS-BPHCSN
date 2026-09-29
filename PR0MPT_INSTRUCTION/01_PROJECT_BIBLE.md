@@ -404,6 +404,12 @@ How these are done now (2026-09-29):
   Debug mode is off unless IDS_DEBUG=1.
 - A person is signed out after 30 minutes without activity, and 12 hours after they sign
   in. The page warns 2 minutes before the idle limit.
+- Every form, and every request a page sends from script, carries a form token from the
+  page (added 2026-09-29, Task 3). Another website cannot make a signed-in browser change
+  anything. A request without a valid token is refused with a page that says "Your session
+  expired", and is recorded in the audit trail when the account is known.
+- Signing out is a button that sends a form, not a link. Opening the logout address does
+  not sign anyone out.
 - No password is written in the code. A new install makes random first-time passwords and
   shows them once in the terminal.
 - A new account, a password reset by the Administrator, and a first-time password must all
@@ -542,3 +548,9 @@ Security basics. The secret key comes from .env, and debug mode is off by defaul
 after 30 minutes without activity or 12 hours after sign-in. No password is written in the code:
 first-time passwords are random and shown once, and every new or reset password must be changed
 at first sign-in. See "Security Principles".
+
+Version 2.4 (2026-09-29)
+
+Form tokens (CSRF). Every form and script request carries a token from its page, and signing
+out is a form, not a link. A refused request shows "Your session expired". See "Security
+Principles".

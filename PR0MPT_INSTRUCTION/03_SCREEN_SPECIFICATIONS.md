@@ -78,6 +78,8 @@ If the account must set its own password (new account, password reset by an Admi
 
 Session limits (added 2026-09-29): a person is signed out after 30 minutes without activity, and 12 hours after they sign in. Two minutes before the idle limit, the page asks "Are you still there?". The server enforces both limits and records each sign-out in the audit trail.
 
+Form tokens (added 2026-09-29): the login form, like every form, carries a hidden token from the page. A form sent without a valid token (for example, an old page after signing out in another tab) is not acted on. The person sees a plain page, "Your session expired. Please sign in again and repeat what you were doing.", with a Sign in button.
+
 Messages
 
 The login form shows only known messages: invalid credentials, maintenance mode, signed out after 30 minutes without activity, and signed out after 12 hours. The link carries a short key, never the sentence. An unknown key shows nothing.
@@ -1182,7 +1184,7 @@ Module
 
 Back to Dashboard
 
-Logout available on every page.
+Logout available on every page. It is a button in the account menu that opens "Confirm Logout"; its Logout button sends a small form (with its token), not a link. The maintenance page's "Sign out" works the same way.
 
 ---
 
