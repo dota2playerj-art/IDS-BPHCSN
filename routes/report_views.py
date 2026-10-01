@@ -14,8 +14,8 @@ to write -- every route reaching it is GET, and no action on the page posts
 anywhere -- rather than by handing that role a reduced set of numbers. A
 statistics screen that showed two roles different totals would be two reports
 wearing one name. The Doctor is given no view of their own for the same reason:
-a sealed diagnosis is left out of the ranking for every viewer, the Doctor
-included, and is read on the patient's record rather than here.
+a sealed diagnosis appears in the ranking only as "Confidential" for every
+viewer, the Doctor included, and is read on the patient's record rather than here.
 
 
 WHAT THIS SCREEN CANNOT REPORT

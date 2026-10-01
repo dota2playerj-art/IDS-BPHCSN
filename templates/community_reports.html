@@ -459,49 +459,29 @@
         <div class="panel-card h-100 mb-0">
           <h2 class="print-only print-section-title">Diagnoses Recorded in This Range</h2>
           <div class="panel-title mb-0 no-print">Diagnoses Recorded in This Range</div>
-{#- The same seal that keeps a restricted diagnosis off the Patient Profile keeps
-    it out of this ranking, and this panel is the reason it has to: a Barangay
-    Official reads this screen, sets its date range, and a rare diagnosis
-    appearing here with a count of 1 is a record with the name filed off. The
-    exclusion is made once, in models/consultations.py; this states it. #}
+{#- Restricted consultations are counted under one "Confidential" row, never
+    by their text (D3). Made once, in models/consultations.py; this states it. #}
 {%- set withheld = consultation_report_stats.window.diagnoses_withheld %}
           <div class="panel-sub mb-0">
             {{ window.start | display_date }} &ndash; {{ window.end | display_date }} &middot;
-{%- if withheld %}
-            from {{ consultation_report_stats.window.total - withheld }} of {{ consultation_report_stats.window.total }} consultation{{ '' if consultation_report_stats.window.total == 1 else 's' }}
-{%- else %}
             from {{ consultation_report_stats.window.total }} consultation{{ '' if consultation_report_stats.window.total == 1 else 's' }}
-{%- endif %}
           </div>
           <div style="height:12px;"></div>
 {%- for entry in consultation_report_stats.window.top_diagnoses %}
           <div class="fig-row">
-            <span class="fig-name">{{ entry.label }}</span>
+            <span class="fig-name">{% if entry.confidential %}<span class="material-symbols-outlined" style="font-size:14px; vertical-align:-2px;">lock</span> {% endif %}{{ entry.label }}</span>
             <span class="fig-value">{{ entry.count }}</span>
           </div>
 {%- else %}
-{%- if withheld %}
-          <div class="empty-note">Every consultation in this range is restricted, so there is nothing to rank.</div>
-{%- else %}
           <div class="empty-note">No consultation was written up in this range.</div>
-{%- endif %}
 {%- endfor %}
 {%- if consultation_report_stats.window.top_diagnoses %}
           <div class="basis-note mt-3">
             Grouped by the text entered, ignoring case. Free text is not coded, so two
             spellings of one condition count separately.
 {%- if withheld %}
-            {{ withheld }} restricted consultation{{ '' if withheld == 1 else 's' }} in this range
-            {{ 'is' if withheld == 1 else 'are' }} not ranked here &mdash; a diagnosis marked
-            Restricted is withheld from this list however few or many times it occurs. Those
-            visits are still counted in the figures beside this panel.
+            Restricted consultations are counted under Confidential. Their diagnoses are not shown.
 {%- endif %}
-          </div>
-{%- elif withheld %}
-          <div class="basis-note mt-3">
-            {{ withheld }} restricted consultation{{ '' if withheld == 1 else 's' }} in this range
-            {{ 'is' if withheld == 1 else 'are' }} not ranked here. Those visits are still counted
-            in the figures beside this panel.
           </div>
 {%- endif %}
         </div>

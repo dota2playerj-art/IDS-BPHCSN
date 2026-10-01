@@ -524,8 +524,8 @@ def _ranked_block(title, entries, label_key, count_key, heads, note=None,
 # WHAT A DIAGNOSIS RANKING IN AN EXPORT MAY SAY ABOUT WHAT IT LEFT OUT
 #
 # A consultation the clinician has sealed is counted in this range's totals and
-# its trend, and is kept out of the diagnosis ranking entirely -- the rule and
-# the reason are in models/consultations.py, above _rank_free_text(). These three
+# its trend, and appears in the diagnosis ranking only as one "Confidential" row
+# -- the rule is in models/consultations.py, _rank_diagnoses(). These three
 # helpers exist so the two blocks below state that consistently.
 #
 # THEY ARE SHARED BECAUSE THE WORKBOOK AND THE PDF ARE THE SAME ASSEMBLY. Both
@@ -539,48 +539,25 @@ def _ranked_block(title, entries, label_key, count_key, heads, note=None,
 # whole of what they publish.
 # ---------------------------------------------------------------------------
 def _ranked_count(consultations):
-    """How many of the range's consultations the diagnosis ranking was drawn from.
-
-    The range total less the sealed ones. This is the number a "ranked from N"
-    sentence has to carry: the plain total was right until a record could be in
-    the range without being in the ranking, and an export whose stated basis its
-    own table does not meet cannot be reconciled by whoever reads it later.
-    """
-    window = consultations["window"]
-    return window["total"] - window["diagnoses_withheld"]
+    """How many of the range's consultations the diagnosis ranking covers: all
+    of them. Restricted ones are counted under Confidential (D3)."""
+    return consultations["window"]["total"]
 
 
 def _withheld_note(consultations):
-    """The sentence appended to a ranking's note when something was held back.
+    """The sentence added to a ranking's note when the range has sealed visits.
 
-    Empty string when nothing was, which is the ordinary case -- a standing
-    paragraph about a rule that did not apply is a paragraph readers learn to
-    skip, and it would appear on every export this health centre ever produced.
+    Empty string when it has none, which is the ordinary case.
     """
-    withheld = consultations["window"]["diagnoses_withheld"]
-    if not withheld:
+    if not consultations["window"]["diagnoses_withheld"]:
         return ""
-    return (
-        f" {withheld} restricted consultation"
-        f"{'' if withheld == 1 else 's'} in this range "
-        f"{'is' if withheld == 1 else 'are'} not ranked here: a diagnosis the "
-        "clinician has marked Restricted is withheld from this list however few "
-        "or many times it occurs. Those visits are still counted in the totals "
-        "and the trend."
-    )
+    return (" Restricted consultations are counted under Confidential. Their "
+            "diagnoses are not shown.")
 
 
 def _ranking_empty(consultations):
-    """The empty state, which is two different facts and must not be one sentence.
-
-    "Nothing was written up in this range" and "everything written up in this
-    range is restricted" produce the same empty table, and the first is false in
-    the second case -- printed directly beneath a total saying otherwise, in a
-    document somebody files.
-    """
-    if consultations["window"]["diagnoses_withheld"]:
-        return ("Every consultation in this range is restricted, so there is "
-                "nothing to rank. Those visits are still counted in the totals.")
+    """The empty state. Sealed visits always appear as Confidential, so an empty
+    ranking means nothing was written up."""
     return "No consultation was written up in this range."
 
 
@@ -691,19 +668,11 @@ def _diagnoses(context):
             empty="No consultation was written up in this range.",
         ),
         figures("Basis", [
-            # What the DIAGNOSIS ranking was actually drawn from, which is the
-            # range's consultations less any that are sealed. It was the plain
-            # total until a sealed record could be in one and not the other, and
-            # a workbook stating a basis its own table does not meet is the kind
-            # of figure nobody can reconcile six months later.
-            ("Consultations these are ranked from",
-             consultations["window"]["total"]
-             - consultations["window"]["diagnoses_withheld"],
+            ("Consultations these are ranked from", _ranked_count(consultations),
              f"{display_date(window['start'])} to {display_date(window['end'])}"),
-            ("Consultations recorded in this range",
-             consultations["window"]["total"],
-             "Includes any restricted consultation, which is counted here and in "
-             "the totals but is not ranked by diagnosis"),
+            ("Restricted consultations, counted under Confidential",
+             consultations["window"]["diagnoses_withheld"],
+             "Counted in the totals. Their diagnoses are not shown"),
         ]),
     ]
 

@@ -367,6 +367,13 @@
     </div>{% endblock %}
 
 {% block content %}
+{#- Sealed text for the Doctor, on screen only (D4). A printout, or a PDF saved
+    from the print dialog, shows the placeholder instead. Other roles already
+    receive the placeholder from the server, so for them this changes nothing. #}
+{%- macro screen_only(value, sealed) -%}
+{%- if sealed -%}<span class="no-print">{{ value }}</span><span class="print-only">{{ restricted_placeholder }}</span>
+{%- else -%}{{ value }}{%- endif -%}
+{%- endmacro %}
 {#- PRINT LETTERHEAD. Invisible on screen, first thing on paper. A printed
     record leaves the health centre, so the sheet states which patient it is
     about, who printed it and when -- an unlabelled printout of a medical
@@ -570,8 +577,8 @@
     not merely its display twin, precisely so a line like this one, written long
     before the seal existed, prints the withheld text rather than the real
     thing. There is no branch here to forget. #}
-              <div class="timeline-title">{{ consultation.diagnosis or consultation.chief_complaint or 'Consultation' }}</div>
-              <div class="timeline-desc">{{ consultation.treatment_plan or 'No treatment plan recorded.' }}</div>
+              <div class="timeline-title">{{ screen_only(consultation.diagnosis or consultation.chief_complaint or 'Consultation', consultation.is_restricted and not consultation.withheld) }}</div>
+              <div class="timeline-desc">{{ screen_only(consultation.treatment_plan or 'No treatment plan recorded.', consultation.is_restricted and not consultation.withheld) }}</div>
               <div class="timeline-meta">Attending: {{ consultation.recorded_by }}
 {%- if consultation.withheld %} &middot; <span class="restricted-chip"><span class="material-symbols-outlined" style="font-size:13px; vertical-align:-2px;">lock</span> Restricted</span>{% endif %}
               </div>
@@ -654,7 +661,7 @@
     here. An em dash would say the field is empty, which is the one thing about a
     sealed record that is not true and the thing most likely to make a health
     worker go and ask the patient a question their record already answers. #}
-                  <td{% if consultation.withheld %} style="color:var(--text-muted); font-style:italic;"{% endif %}>{{ consultation.diagnosis or '—' }}</td>
+                  <td{% if consultation.withheld %} style="color:var(--text-muted); font-style:italic;"{% endif %}>{{ screen_only(consultation.diagnosis or '—', consultation.is_restricted and not consultation.withheld) }}</td>
                   <td>{{ consultation.recorded_by }}</td>
                   <td><span class="badge-status badge-completed">Completed</span>
 {%- if consultation.is_restricted %}
@@ -744,8 +751,8 @@
     was built. `withheld` is true only when something was actually taken out of
     THIS entry for THIS reader, so the Doctor -- who has nothing withheld --
     never sees the muted styling, and an unsealed record never carries it. #}
-                          <div class="info-item" style="grid-column:1/-1;"><div class="info-label">Diagnosis</div><div class="info-value{% if consultation.withheld %} restricted-value{% endif %}">{{ consultation.diagnosis_display }}</div></div>
-                          <div class="info-item" style="grid-column:1/-1;"><div class="info-label">Treatment Plan / Medicines Given</div><div class="info-value{% if consultation.withheld %} restricted-value{% endif %}">{{ consultation.treatment_plan_display }}</div></div>
+                          <div class="info-item" style="grid-column:1/-1;"><div class="info-label">Diagnosis</div><div class="info-value{% if consultation.withheld %} restricted-value{% endif %}">{{ screen_only(consultation.diagnosis_display, consultation.is_restricted and not consultation.withheld) }}</div></div>
+                          <div class="info-item" style="grid-column:1/-1;"><div class="info-label">Treatment Plan / Medicines Given</div><div class="info-value{% if consultation.withheld %} restricted-value{% endif %}">{{ screen_only(consultation.treatment_plan_display, consultation.is_restricted and not consultation.withheld) }}</div></div>
                           <div class="info-item" style="grid-column:1/-1;"><div class="info-label">Additional Notes</div><div class="info-value">{{ consultation.remarks_display }}</div></div>
                         </div>
 {#- Doses given at this visit. The panel described the visit's clinical text and
@@ -938,7 +945,7 @@
     only at the obvious place leaves behind. What the row is FOR is never
     withheld: the item, the quantity, the date and who issued it are what a
     health worker needs, and none of them is sealed. #}
-                  <td{% if record.consultation_restricted %} style="color:var(--text-muted); font-style:italic;"{% endif %}>{{ record.consultation_diagnosis or '—' }}</td>
+                  <td{% if record.consultation_restricted %} style="color:var(--text-muted); font-style:italic;"{% endif %}>{{ screen_only(record.consultation_diagnosis or '—', record.consultation_restricted and may_view_restricted) }}</td>
                   <td>{{ record.dispensed_by_name }}</td>
                 </tr>
 {%- endfor %}
