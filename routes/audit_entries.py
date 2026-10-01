@@ -15,6 +15,8 @@ fields that changed, not their values.
 """
 from models.audit import (
     ACTION_CONSULTATION_COMPLETED,
+    ACTION_LEFT_BEFORE_SEEN,
+    ACTION_LEFT_UNDONE,
     ACTION_CONSULTATION_RECORDED,
     ACTION_CONSULTATION_STARTED,
     ACTION_EPI_DOSES_RECORDED,
@@ -273,3 +275,12 @@ def consultation_started(appointment_id, user_id, ip_address=None):
 
 def consultation_completed(appointment_id, user_id, ip_address=None):
     return _queue_move(ACTION_CONSULTATION_COMPLETED, appointment_id, user_id, ip_address)
+
+
+def left_before_seen(appointment_id, user_id, ip_address=None):
+    """The patient and the visit, as Name (PAT-005), visit APT-00081. Never why."""
+    return _queue_move(ACTION_LEFT_BEFORE_SEEN, appointment_id, user_id, ip_address)
+
+
+def left_undone(appointment_id, user_id, ip_address=None):
+    return _queue_move(ACTION_LEFT_UNDONE, appointment_id, user_id, ip_address)

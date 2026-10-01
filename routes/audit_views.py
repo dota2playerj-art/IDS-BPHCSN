@@ -67,6 +67,8 @@ reason is deleted the moment the gap it describes is closed.
 """
 from models.audit import (
     ACTION_CONSULTATION_COMPLETED,
+    ACTION_LEFT_BEFORE_SEEN,
+    ACTION_LEFT_UNDONE,
     ACTION_CONSULTATION_RECORDED,
     ACTION_CONSULTATION_STARTED,
     ACTION_INVENTORY_ADDED,
@@ -423,6 +425,8 @@ _ICONS = {
     ACTION_PATIENT_CHECKED_IN: "event_upcoming",
     ACTION_CONSULTATION_STARTED: "play_arrow",
     ACTION_CONSULTATION_COMPLETED: "task_alt",
+    ACTION_LEFT_BEFORE_SEEN: "directions_walk",
+    ACTION_LEFT_UNDONE: "undo",
 }
 _MODULE_ICONS = {
     MODULE_SMS: "campaign",

@@ -378,30 +378,9 @@ UNAVAILABLE = {
         "center confirms."
     ),
 
-    # A GAP LEFT BY THE REMOVAL, NAMED RATHER THAN QUIETLY CARRIED.
-    # Cancel / No-show closed a booking, and it went with booking. It was never
-    # the queue's own closure: it acted on a row nobody had arrived for, and it
-    # refused outright once check_in_patient() had turned that row into a patient
-    # in the building. So nothing was taken away from the queue here -- but its
-    # absence makes visible something the queue never had.
-    #
-    # Somebody checks in, waits, and leaves before being seen. There is no honest
-    # thing to press. Mark Completed says a consultation happened; nothing says
-    # the patient went home. Today the row simply stays Waiting, and a queue that
-    # cannot be emptied of somebody who is not in the building is a queue that
-    # gradually stops describing the room.
-    #
-    # This is a feature, not a wording fix, and it is a task of its own: it needs
-    # a status the schema's CHECK does not currently admit, a guarded write like
-    # complete_consultation()'s, and a decision about whether "left before being
-    # seen" and "no-show" are the same fact. Naming it here is what stops it
-    # being rediscovered as a bug.
-    "queue_exit": (
-        "A patient who checks in and leaves before being seen cannot be closed "
-        "off the queue -- their row stays Waiting. Mark Completed is not it: it "
-        "records that the visit happened. Recording that somebody left is a "
-        "status this system does not yet have."
-    ),
+    # "queue_exit" WAS HERE: a patient who left before being seen could not be closed. Staff
+    # and the Doctor can now mark the visit "Left before being seen" (Task 6, M5), so the
+    # reason is deleted rather than left describing a state the system has left.
 
     # ---- Records ------------------------------------------------------------
     # THERE IS NO "medicine_detail" ENTRY ANY MORE.

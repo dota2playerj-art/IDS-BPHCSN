@@ -39,8 +39,10 @@ from routes.appointment_views import (
     appointment_scheduling_context,
     process_check_in,
     process_complete_consultation,
+    process_mark_left,
     process_new_patient_check_in,
     process_start_consultation,
+    process_undo_left,
 )
 from routes.broadcast_views import sms_notifications_context
 from routes.consultation_views import (
@@ -418,6 +420,25 @@ def staff_check_in_patient():
 @role_required(*CLINICAL_FLOOR_ROLES)
 def staff_start_consultation():
     flash(process_start_consultation(request.form, session.get("user_id"), request.remote_addr))
+    return redirect(url_for("staff.staff_appointment_scheduling"))
+
+
+# "Left before being seen" and its same-day undo (Task 6, M5). Staff and the Doctor
+# only; there is no /admin/ twin, so the Administrator's queue stays read-only. The
+# rules are in models/appointments.py mark_left() and undo_left().
+@staff_bp.route('/appointment_scheduling/mark-left', methods=["POST"])
+@login_required
+@role_required(*CLINICAL_FLOOR_ROLES)
+def staff_mark_left():
+    flash(process_mark_left(request.form, session.get("user_id"), request.remote_addr))
+    return redirect(url_for("staff.staff_appointment_scheduling"))
+
+
+@staff_bp.route('/appointment_scheduling/undo-left', methods=["POST"])
+@login_required
+@role_required(*CLINICAL_FLOOR_ROLES)
+def staff_undo_left():
+    flash(process_undo_left(request.form, session.get("user_id"), request.remote_addr))
     return redirect(url_for("staff.staff_appointment_scheduling"))
 
 

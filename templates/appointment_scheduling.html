@@ -726,6 +726,23 @@
                     <span class="material-symbols-outlined" style="font-size:16px;">check_circle</span>Mark Completed
                   </button>
 {%- endif %}
+{#- Left before being seen (Task 6). Offered where mark_left() would accept it, and
+    the server decides again. A dialog asks first. #}
+{%- if entry.can_leave %}
+                  <button type="button" class="btn-outline-teal" style="padding:6px 12px; font-size:12.5px;"
+                          data-bs-toggle="modal" data-bs-target="#leftModal"
+                          data-appointment="{{ entry.id }}" data-name="{{ patient_name }}"
+                          title="{{ patient_name }} went home before being seen">
+                    <span class="material-symbols-outlined" style="font-size:16px;">directions_walk</span>Left before being seen
+                  </button>
+{%- endif %}
+{%- if entry.can_undo_left %}
+                  <button type="submit" form="undoLeftForm" name="appointment_id" value="{{ entry.id }}"
+                          class="btn-outline-teal" style="padding:6px 12px; font-size:12.5px;"
+                          title="Put {{ patient_name }} back to {{ entry.status_before_left }}. Today only.">
+                    <span class="material-symbols-outlined" style="font-size:16px;">undo</span>Undo
+                  </button>
+{%- endif %}
 {%- endif %}
                   <a href="{{ url_for(patient_profile_endpoint, patient_id=entry.patient_id) }}" class="action-icon" title="Open {{ patient_name }}'s profile"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></a>
                   {#- Printing from a booking means printing the patient's record,
@@ -760,6 +777,7 @@
 {%- if care_team_view %}
       <form id="startConsultationForm" method="post" action="{{ url_for(start_consultation_endpoint) }}">{{ csrf_field() }}</form>
       <form id="completeConsultationForm" method="post" action="{{ url_for(complete_consultation_endpoint) }}">{{ csrf_field() }}</form>
+      <form id="undoLeftForm" method="post" action="{{ url_for(undo_left_endpoint) }}">{{ csrf_field() }}</form>
 {%- endif %}
 
       <!-- EMPTY STATE — shown when nobody is booked or checked in for today, and
@@ -801,35 +819,73 @@
 {%- if queue_stats.completed %}
           &middot; {{ queue_stats.completed }} completed
 {%- endif %}
+{%- if queue_stats.left %}
+          &middot; {{ queue_stats.left }} left before being seen
+{%- endif %}
         </div>
       </div>
 
 {%- endif %}
 
-      {#- WHAT THIS SCREEN DOES NOT DO, SAID ON IT.
-          Both sentences come from utils/unavailable.py, which is where every
-          other "this cannot be done and here is why" in the project lives. They
-          are stated rather than hung on a disabled control because there is no
-          control to hang them on: advance booking was removed, and closing a
-          patient who left was never built.
+{#- STILL WAITING FROM EARLIER DAYS (Task 6, D5). A visit still Waiting from a day that
+    has gone is not in today's table. Listed here so Staff can close it. Nothing closes
+    it automatically. Staff and the Doctor only. #}
+{%- if care_team_view and earlier_waiting %}
+      <div class="mt-4" id="earlierWaiting">
+        <h2 style="font-size:16px; font-weight:600; color:var(--text-dark); margin-bottom:2px;">Still waiting from earlier days</h2>
+        <div class="panel-sub" style="margin-bottom:10px;">These patients checked in on an earlier day and are still marked Waiting. If they went home, close the visit.</div>
+        <div style="overflow-x:auto;">
+          <table class="appt-table">
+            <thead>
+              <tr>
+                <th>Appointment ID</th>
+                <th>Patient Name</th>
+                <th>Checked in</th>
+                <th>Waiting</th>
+                <th>Service</th>
+                <th style="text-align:right;">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+{%- for entry in earlier_waiting %}
+{%- set patient_name = entry.first_name ~ ' ' ~ entry.last_name %}
+              <tr>
+                <td class="appt-id">{{ entry.reference }}</td>
+                <td><div class="pat-name"><a href="{{ url_for(patient_profile_endpoint, patient_id=entry.patient_id) }}">{{ patient_name }}</a></div><div class="po-meta">{{ entry.patient_reference }}</div></td>
+                <td>{{ entry.checked_in_date | display_date }}{% if entry.arrival_time %} &middot; {{ entry.arrival_time }}{% endif %}</td>
+                <td>{{ entry.waiting_text }}</td>
+                <td>{{ entry.appointment_type or 'Consultation' }}</td>
+                <td>
+                  <div class="d-flex justify-content-end">
+{%- if entry.can_leave %}
+                    <button type="button" class="btn-outline-teal" style="padding:6px 12px; font-size:12.5px;"
+                            data-bs-toggle="modal" data-bs-target="#leftModal"
+                            data-appointment="{{ entry.id }}" data-name="{{ patient_name }}">
+                      <span class="material-symbols-outlined" style="font-size:16px;">directions_walk</span>Left before being seen
+                    </button>
+{%- endif %}
+                  </div>
+                </td>
+              </tr>
+{%- endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+{%- endif %}
 
-          The first is here because this screen used to book. Somebody who used
-          that last week and cannot find it now has no way to tell a deliberate
-          removal from a fault unless the screen says which, and "no New
-          Appointment button" on its own says nothing at all.
-
-          The second is here because this is the table it is about. A row that
-          can only be left Waiting is a gap in the queue itself, and naming it
-          beside the queue is what stops it being rediscovered as a bug. #}
+      {#- WHAT THIS SCREEN DOES NOT DO, SAID ON IT. The sentence comes from
+          utils/unavailable.py. It is here because this screen used to book:
+          somebody who used that last week has no way to tell a deliberate
+          removal from a fault unless the screen says which. (The second sentence
+          that stood here, about closing a patient who left, went with Task 6:
+          "Left before being seen" is that status.) #}
       <div class="untracked mt-3">
         <span class="material-symbols-outlined">event_busy</span>
         <div>
-          <div class="untracked-title">Two things this screen does not do</div>
+          <div class="untracked-title">One thing this screen does not do</div>
           <div class="untracked-body">
             {{ unavailable.advance_booking }}
-          </div>
-          <div class="untracked-body" style="margin-top:8px;">
-            {{ unavailable.queue_exit }}
           </div>
         </div>
       </div>
@@ -837,6 +893,39 @@
     </div>
 
 {%- if care_team_view %}
+    <!-- LEFT BEFORE BEING SEEN: the question is asked before anything is saved. -->
+    <div class="modal fade" id="leftModal" tabindex="-1" aria-labelledby="leftModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.12);">
+          <div class="modal-header">
+            <h5 class="modal-title" id="leftModalLabel">Mark this patient as left before being seen?</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <form method="post" action="{{ url_for(mark_left_endpoint) }}">
+            {{ csrf_field() }}
+            <input type="hidden" name="appointment_id" id="leftAppointmentId" value="">
+            <div class="modal-body">
+              <p style="font-size:13.5px; margin-bottom:6px;"><strong id="leftPatientName"></strong></p>
+              <p style="font-size:13.5px; color:var(--text-muted); margin:0;">
+                Use this when the patient went home before the Doctor saw them. You can undo it today.
+              </p>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn-reset" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn-primary-teal">Mark as left</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+    <script>
+      document.getElementById('leftModal').addEventListener('show.bs.modal', function (event) {
+        var trigger = event.relatedTarget;
+        document.getElementById('leftAppointmentId').value = trigger.getAttribute('data-appointment');
+        document.getElementById('leftPatientName').textContent = trigger.getAttribute('data-name');
+      });
+    </script>
+
     <!-- CHECK-IN DIALOG — same modal shape as Patient Records' status dialog:
          centred, 16px radius, header / body / footer.
 

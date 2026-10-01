@@ -8,25 +8,30 @@ each keeps its own role_required guard and its own redirect target.
 This mirrors routes/patient_views.py and routes/inventory_views.py exactly.
 """
 from models.appointments import (
+    attach_leave_flags,
     attach_visit_reasons,
     check_in_patient,
     complete_consultation,
     get_active_consultation,
     get_appointment_by_id,
     get_calendar_month,
+    get_earlier_waiting,
     get_queue_entry,
     get_queue_stats,
     get_todays_appointments,
+    mark_left,
     parse_month,
     queue_display_name,
     start_consultation,
+    undo_left,
 )
 from models.consultations import RESTRICTED_PLACEHOLDER
 from models.immunizations import get_immunization_alert, get_immunization_status
 from models.patients import get_all_patients, get_patient_by_id
 from models.service_schedule import get_entries as get_schedule_entries, services_on
 from routes.audit_entries import (
-    consultation_completed, consultation_started, patient_checked_in,
+    consultation_completed, consultation_started, left_before_seen, left_undone,
+    patient_checked_in,
 )
 from utils.dates import today
 from utils.roles import is_care_team
@@ -73,6 +78,11 @@ def appointment_scheduling_context(month=None):
     # Check In dialog's picker is a patient write: both are the care team's
     # (Task 5c). For the Administrator neither is read.
     care_team = is_care_team(role)
+    # The buttons for Left before being seen, and the visits still Waiting from earlier
+    # days (Task 6). Only the care team gets either: the Administrator's queue is
+    # read-only and the server refuses his POST anyway.
+    if care_team:
+        entries = attach_leave_flags(entries)
     immunization_alert = (get_immunization_alert() if care_team
                           else {"children": [], "child_count": 0,
                                 "overdue_child_count": 0})
@@ -109,6 +119,7 @@ def appointment_scheduling_context(month=None):
 
     return {
         "queue": entries,
+        "earlier_waiting": get_earlier_waiting() if care_team else [],
         # False for the Administrator: the screen and the exports leave the reason
         # column out altogether.
         "show_visit_reason": is_care_team(role),
@@ -377,6 +388,53 @@ def process_start_consultation(form_data, user_id=None, ip_address=None):
         f"{name} is marked {appointment['status']}, not Waiting. "
         "Only a waiting patient can be brought in."
     )
+
+
+def process_mark_left(form_data, user_id=None, ip_address=None):
+    """Mark one visit as left before being seen. Returns the message to flash.
+
+    The rules are mark_left()'s, which settles them in SQL. This only turns its
+    outcome into a sentence a person at the desk can act on.
+    """
+    raw_id = (form_data.get("appointment_id") or "").strip()
+    if not raw_id.isdigit():
+        return "Choose a patient from the queue."
+    appointment_id = int(raw_id)
+    appointment = get_appointment_by_id(appointment_id)
+    if appointment is None:
+        return "That queue entry could not be found."
+    name = queue_display_name(appointment)
+    outcome = mark_left(
+        appointment_id, user_id, audit=left_before_seen(appointment_id, user_id, ip_address))
+    if outcome == "marked":
+        return (f"{name} is marked as left before being seen. "
+                "You can undo this today.")
+    if outcome == "already":
+        return f"{name} is already marked as left before being seen."
+    return (f"{name} cannot be marked as left before being seen. "
+            "A visit with a diagnosis, or one that is finished, cannot be changed here.")
+
+
+def process_undo_left(form_data, user_id=None, ip_address=None):
+    """Undo "left before being seen" on the day it was set. Returns the message."""
+    raw_id = (form_data.get("appointment_id") or "").strip()
+    if not raw_id.isdigit():
+        return "Choose a patient from the queue."
+    appointment_id = int(raw_id)
+    appointment = get_appointment_by_id(appointment_id)
+    if appointment is None:
+        return "That queue entry could not be found."
+    name = queue_display_name(appointment)
+    outcome = undo_left(appointment_id, audit=left_undone(appointment_id, user_id, ip_address))
+    if outcome == "undone":
+        return f"{name} is back to {appointment['status_before_left']}."
+    if outcome == "too-late":
+        return (f"{name} was marked on an earlier day. It can only be undone "
+                "on the same day.")
+    if outcome == "busy":
+        return (f"Another patient is in consultation, so {name} cannot go back in "
+                "yet. Try again when that visit is complete.")
+    return f"{name} is not marked as left before being seen."
 
 
 def process_complete_consultation(form_data, user_id=None, ip_address=None):

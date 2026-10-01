@@ -547,6 +547,10 @@ ACTION_INVENTORY_RESTORED = "Returned inventory item to service"
 ACTION_PATIENT_CHECKED_IN = "Checked patient in"
 ACTION_CONSULTATION_STARTED = "Started consultation"
 ACTION_CONSULTATION_COMPLETED = "Completed consultation"
+# A patient who checked in and went home before the Doctor saw them (Task 6, M5),
+# and the same-day undo. The entry names the patient and the visit, never why.
+ACTION_LEFT_BEFORE_SEEN = "Marked as left before being seen"
+ACTION_LEFT_UNDONE = "Undid left before being seen"
 
 # Every action that means somebody was turned away at the login form. Grouped so
 # the Security Events figure counts refusals rather than one particular kind of

@@ -27,6 +27,7 @@ import calendar as _calendar
 from datetime import date, datetime
 
 from database.connection import db_connection
+from models.doctor_worklist import has_diagnosis, needs_doctor, waiting_text
 from utils.dates import now, recent_months, resolve_range, today
 from utils.roles import is_care_team
 from utils.small_counts import fold_small_counts, shown_count
@@ -37,7 +38,7 @@ PENDING_STATUSES = ("Scheduled", "Confirmed")
 # The full vocabulary the appointments.status CHECK admits, in queue order.
 APPOINTMENT_STATUSES = (
     "Scheduled", "Confirmed", "Waiting", "In Consultation",
-    "Completed", "Cancelled", "No-show",
+    "Completed", "Cancelled", "No-show", "Left before being seen",
 )
 
 # The patient has arrived and has not yet been dealt with. These two are what the
@@ -45,6 +46,13 @@ APPOINTMENT_STATUSES = (
 WAITING = "Waiting"
 IN_CONSULTATION = "In Consultation"
 COMPLETED = "Completed"
+
+# The patient checked in and went home before the Doctor saw them (Task 6, M5). Set
+# by Staff or the Doctor from the queue, undone the same day. It is not "No-show"
+# (never came) and not "Cancelled" (a booking withdrawn): they were here.
+LEFT = "Left before being seen"
+# The statuses a visit can be marked as left from. See leave_allowed().
+LEAVABLE_STATUSES = (WAITING, IN_CONSULTATION, COMPLETED)
 QUEUE_STATUSES = (WAITING, IN_CONSULTATION)
 
 # The label the queue prints for the one patient who may be brought in right now.
@@ -93,6 +101,7 @@ STATUS_BADGE_CLASS = {
     "Completed": "badge-completed",
     "Cancelled": "badge-cancelled",
     "No-show": "badge-noshow",
+    "Left before being seen": "badge-noshow",
 }
 
 # Where each status sorts in the queue. In Consultation first because that is who
@@ -107,6 +116,7 @@ _STATUS_RANK = {
     "Completed": 3,
     "Cancelled": 4,
     "No-show": 4,
+    "Left before being seen": 4,
 }
 
 
@@ -191,7 +201,7 @@ def get_appointments_for_patient(patient_id, viewer_role):
 _QUEUE_SELECT = """
     SELECT a.id, a.patient_id, a.appointment_type, a.appointment_date,
            a.appointment_time, a.status, a.is_walkin, a.checked_in_at,
-           a.created_at,
+           a.created_at, a.left_at, a.status_before_left,
            p.patient_id AS patient_reference,
            p.first_name, p.middle_name, p.last_name, p.sex, p.birth_date,
            u.full_name AS assigned_staff,
@@ -470,6 +480,7 @@ def get_queue_stats(entries=None, active=None):
             1 for entry in entries if entry["is_in_consultation"]
         ),
         "completed": sum(1 for entry in entries if entry["status"] == COMPLETED),
+        "left": sum(1 for entry in entries if entry["status"] == LEFT),
         "not_arrived": sum(
             1 for entry in entries if entry["status"] in PENDING_STATUSES
         ),
@@ -809,6 +820,196 @@ def complete_consultation(appointment_id, audit=None):
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# LEFT BEFORE BEING SEEN (Task 6, M5)
+# ---------------------------------------------------------------------------
+# A patient who checks in and goes home before the Doctor sees them could not be
+# closed: the visit stayed Waiting for ever and the queue figures were wrong. Staff
+# and the Doctor can now mark it, and undo it the same day. Nothing closes a visit
+# automatically.
+#
+# WHEN IT CAN BE SET. The visit is Waiting, In Consultation, or Completed, and it has
+# no diagnosis. Completed is on the list because saving the intake form completes the
+# queue entry: a visit with intake and no diagnosis is already Completed, and it is
+# the patient who left before the Doctor saw them. A Completed visit with a diagnosis
+# is a finished visit and cannot be marked. A Completed visit is also only markable
+# when its service needs the Doctor, so an immunization is never "left".
+#
+# WHEN IT CAN BE UNDONE. The same day it was marked, back to the status it had.
+# Putting a visit back In Consultation is refused while someone else holds the room.
+#
+# THE RULES ARE ENFORCED HERE, IN SQL, not by the buttons: a stale page or a forged
+# POST gets the same answer. The Administrator has no route to either function.
+
+def leave_allowed(status, appointment_type, consultation_id, diagnosis):
+    """Whether a visit in this state may be marked as left before being seen."""
+    if status not in LEAVABLE_STATUSES or has_diagnosis(diagnosis):
+        return False
+    if status == COMPLETED:
+        return consultation_id is not None and needs_doctor(appointment_type)
+    return True
+
+
+def _leave_row(conn, appointment_id):
+    return conn.execute(
+        """
+    SELECT a.id, a.status, a.appointment_type, a.appointment_date, a.left_at,
+           a.status_before_left, c.id AS consultation_id, c.diagnosis
+      FROM appointments a
+      LEFT JOIN consultations c ON c.appointment_id = a.id
+     WHERE a.id = ?
+    """,
+        (appointment_id,),
+    ).fetchone()
+
+
+def mark_left(appointment_id, user_id, audit=None):
+    """Mark one visit as left before being seen. Returns the outcome:
+
+        "marked"       done; who and when are stored
+        "already"      it is already marked
+        "not-allowed"  it has a diagnosis, or is finished, or is not in the queue
+        "missing"      no such appointment
+
+    `audit(conn)` is called before the commit, only when the visit was marked.
+    """
+    stamp = now().strftime("%Y-%m-%d %H:%M:%S")
+    with db_connection() as conn:
+        row = _leave_row(conn, appointment_id)
+        if row is None:
+            return "missing"
+        if row["status"] == LEFT:
+            return "already"
+        if not leave_allowed(row["status"], row["appointment_type"],
+                             row["consultation_id"], row["diagnosis"]):
+            return "not-allowed"
+        # The guard is repeated in the UPDATE, so a diagnosis written a moment ago, or a
+        # status that moved, loses the race instead of being overwritten.
+        cursor = conn.execute(
+            """
+        UPDATE appointments
+           SET status_before_left = status, status = ?, left_by = ?, left_at = ?,
+               updated_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND status = ?
+           AND NOT EXISTS (
+                 SELECT 1 FROM consultations c
+                  WHERE c.appointment_id = appointments.id
+                    AND TRIM(COALESCE(c.diagnosis, '')) != ''
+               )
+        """,
+            (LEFT, user_id, stamp, appointment_id, row["status"]),
+        )
+        if cursor.rowcount != 1:
+            conn.rollback()
+            return "not-allowed"
+        if audit:
+            audit(conn)
+        conn.commit()
+    return "marked"
+
+
+def undo_left(appointment_id, audit=None):
+    """Put a visit marked as left back to the status it had. Returns the outcome:
+
+        "undone"     done
+        "not-left"   it is not marked as left
+        "too-late"   it was marked on an earlier day; it stays closed
+        "busy"       it was In Consultation and someone else is in the room now
+        "missing"    no such appointment
+
+    `audit(conn)` is called before the commit, only when it was undone.
+    """
+    with db_connection() as conn:
+        row = _leave_row(conn, appointment_id)
+        if row is None:
+            return "missing"
+        if row["status"] != LEFT:
+            return "not-left"
+        if (row["left_at"] or "")[:10] != today().isoformat():
+            return "too-late"
+        before = row["status_before_left"]
+        if before not in LEAVABLE_STATUSES:
+            return "not-left"
+        cursor = conn.execute(
+            """
+        UPDATE appointments
+           SET status = status_before_left, status_before_left = NULL,
+               left_by = NULL, left_at = NULL, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND status = ?
+           AND (status_before_left != ?
+                OR NOT EXISTS (SELECT 1 FROM appointments busy WHERE busy.status = ?))
+        """,
+            (appointment_id, LEFT, IN_CONSULTATION, IN_CONSULTATION),
+        )
+        if cursor.rowcount != 1:
+            conn.rollback()
+            return "busy"
+        if audit:
+            audit(conn)
+        conn.commit()
+    return "undone"
+
+
+def attach_leave_flags(entries):
+    """Add `can_leave` and `can_undo_left` to queue rows, for the buttons.
+
+    Mutates and returns the list. The buttons are offered where mark_left() and
+    undo_left() would accept; those two decide, so a stale page changes nothing.
+    """
+    entries = list(entries)
+    ids = [entry["id"] for entry in entries]
+    found = {}
+    if ids:
+        marks = ", ".join("?" for _ in ids)
+        with db_connection() as conn:
+            found = {
+                row["appointment_id"]: row
+                for row in conn.execute(
+                    f"SELECT appointment_id, id, diagnosis FROM consultations "
+                    f"WHERE appointment_id IN ({marks})", ids)
+            }
+    day = today().isoformat()
+    for entry in entries:
+        consultation = found.get(entry["id"])
+        entry["can_leave"] = leave_allowed(
+            entry["status"], entry.get("appointment_type"),
+            consultation["id"] if consultation else None,
+            consultation["diagnosis"] if consultation else None,
+        )
+        entry["can_undo_left"] = (
+            entry["status"] == LEFT and (entry.get("left_at") or "")[:10] == day
+            and entry.get("status_before_left") in LEAVABLE_STATUSES
+        )
+    return entries
+
+
+def get_earlier_waiting():
+    """Visits still Waiting from an earlier day, oldest first (Task 6, D5).
+
+    Shown to Staff and the Doctor under "Still waiting from earlier days" so they can
+    close them. Nothing closes them automatically.
+    """
+    with db_connection() as conn:
+        rows = conn.execute(
+            _QUEUE_SELECT
+            + " WHERE a.status = ? AND date(a.appointment_date) < ? "
+              "ORDER BY a.appointment_date, a.checked_in_at, a.id",
+            (WAITING, today().isoformat()),
+        ).fetchall()
+    moment = now().replace(tzinfo=None)
+    entries = []
+    for row in rows:
+        entry = _to_queue_entry(row)
+        try:
+            since = datetime.strptime((entry["checked_in_at"] or "")[:19], "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            since = None
+        entry["waiting_text"] = waiting_text(since, moment)
+        entry["checked_in_date"] = _as_date(entry["appointment_date"])
+        entries.append(entry)
+    return attach_leave_flags(entries)
+
+
 def parse_iso_date(value):
     """'2026-08-20' -> date, or None if it is absent or malformed."""
     if not value:
@@ -841,7 +1042,8 @@ def get_appointment_day_summary(start_date, end_date):
     for row in rows:
         bucket = summary.setdefault(
             row["day"],
-            {"total": 0, "pending": 0, "in_queue": 0, "completed": 0, "cancelled": 0},
+            {"total": 0, "pending": 0, "in_queue": 0, "completed": 0, "cancelled": 0,
+             "left": 0},
         )
         bucket["total"] += row["count"]
         if row["status"] in PENDING_STATUSES:
@@ -850,6 +1052,8 @@ def get_appointment_day_summary(start_date, end_date):
             bucket["in_queue"] += row["count"]
         elif row["status"] == COMPLETED:
             bucket["completed"] += row["count"]
+        elif row["status"] == LEFT:
+            bucket["left"] += row["count"]
         else:
             bucket["cancelled"] += row["count"]
     return summary
@@ -864,12 +1068,13 @@ def get_appointment_day_summary(start_date, end_date):
 # windows which do have to cross from UTC.
 # ---------------------------------------------------------------------------
 
-# The three outcomes Screen 10's Appointment Statistics chart stacks. Every
+# The four outcomes Screen 10's Appointment Statistics chart stacks. Every
 # status the CHECK admits maps into exactly one of them, so the bars sum to the
 # month's total appointments and nothing is quietly dropped.
 OUTCOME_EXPECTED = "Expected"       # Scheduled / Confirmed -- still to happen
 OUTCOME_ATTENDED = "Attended"       # Waiting / In Consultation / Completed
 OUTCOME_MISSED = "Missed"           # Cancelled / No-show
+OUTCOME_LEFT = "Left"               # Left before being seen (Task 6, D6)
 
 _OUTCOME_BY_STATUS = {
     "Scheduled": OUTCOME_EXPECTED,
@@ -879,9 +1084,10 @@ _OUTCOME_BY_STATUS = {
     "Completed": OUTCOME_ATTENDED,
     "Cancelled": OUTCOME_MISSED,
     "No-show": OUTCOME_MISSED,
+    "Left before being seen": OUTCOME_LEFT,
 }
 
-OUTCOMES = (OUTCOME_EXPECTED, OUTCOME_ATTENDED, OUTCOME_MISSED)
+OUTCOMES = (OUTCOME_EXPECTED, OUTCOME_ATTENDED, OUTCOME_MISSED, OUTCOME_LEFT)
 
 
 def _outcome_summary(counts, walk_ins, total, services, viewer_role):
@@ -891,12 +1097,15 @@ def _outcome_summary(counts, walk_ins, total, services, viewer_role):
     two cannot compute an attendance rate differently. The rate is of *resolved*
     appointments for the reason get_appointment_report() gives.
     """
-    resolved = counts[OUTCOME_ATTENDED] + counts[OUTCOME_MISSED]
+    # A patient who left before being seen is resolved (the visit is over) and is
+    # neither attended nor missed: it is its own figure (Task 6, D6).
+    resolved = counts[OUTCOME_ATTENDED] + counts[OUTCOME_MISSED] + counts[OUTCOME_LEFT]
     return {
         "total": total,
         "expected": counts[OUTCOME_EXPECTED],
         "attended": counts[OUTCOME_ATTENDED],
         "missed": counts[OUTCOME_MISSED],
+        "left": counts[OUTCOME_LEFT],
         "walk_ins": walk_ins,
         "booked": total - walk_ins,
         "resolved": resolved,
@@ -1020,6 +1229,7 @@ def get_appointment_report(months=6, on_date=None, start=None, end=None, *, view
             "expected": bucket[OUTCOME_EXPECTED],
             "attended": bucket[OUTCOME_ATTENDED],
             "missed": bucket[OUTCOME_MISSED],
+            "left": bucket[OUTCOME_LEFT],
             "total": bucket["total"],
         })
 
@@ -1030,6 +1240,7 @@ def get_appointment_report(months=6, on_date=None, start=None, end=None, *, view
         "ytd_expected": ytd[OUTCOME_EXPECTED],
         "ytd_attended": ytd[OUTCOME_ATTENDED],
         "ytd_missed": ytd[OUTCOME_MISSED],
+        "ytd_left": ytd[OUTCOME_LEFT],
         "ytd_walk_ins": ytd_walk_ins,
         "ytd_booked": ytd_total - ytd_walk_ins,
         "resolved": ytd_summary["resolved"],

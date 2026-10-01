@@ -189,6 +189,10 @@ CREATE TABLE inventory_items (
 --   Waiting                 checked in, in the queue
 --   In Consultation         with the clinician now
 --   Completed / Cancelled / No-show
+--   Left before being seen  checked in, then went home before the Doctor saw them
+--                           (Task 6, M5). Set by Staff or the Doctor, and undone the
+--                           same day. left_by, left_at and status_before_left record
+--                           who, when and what the status was before.
 --
 -- is_walkin records whether there was a prior booking. Once a scheduled patient
 -- is checked in their row is otherwise indistinguishable from a walk-in's, so the
@@ -206,15 +210,19 @@ CREATE TABLE appointments (
     appointment_date TEXT NOT NULL,
     appointment_time TEXT,
     assigned_staff_id INTEGER,
-    status TEXT NOT NULL DEFAULT 'Scheduled' CHECK (status IN ('Scheduled', 'Confirmed', 'Waiting', 'In Consultation', 'Completed', 'Cancelled', 'No-show')),
+    status TEXT NOT NULL DEFAULT 'Scheduled' CHECK (status IN ('Scheduled', 'Confirmed', 'Waiting', 'In Consultation', 'Completed', 'Cancelled', 'No-show', 'Left before being seen')),
     notes TEXT,
     is_walkin INTEGER NOT NULL DEFAULT 0,
     checked_in_at TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    left_by INTEGER,
+    left_at TEXT,
+    status_before_left TEXT,
     FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
     FOREIGN KEY (scheduled_by) REFERENCES users(id) ON DELETE RESTRICT,
-    FOREIGN KEY (assigned_staff_id) REFERENCES users(id) ON DELETE SET NULL
+    FOREIGN KEY (assigned_staff_id) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (left_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
 -- One row per dose a child has had. The schedule these are measured against is
