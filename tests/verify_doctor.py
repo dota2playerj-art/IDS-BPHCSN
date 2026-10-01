@@ -20,6 +20,7 @@ import sys
 import zlib
 
 import _support  # noqa: E402  (first: builds the test database, points the app at it)
+from utils import sealed_crypto as _sc  # noqa: E402  (Task 5: sealed fields are encrypted)
 PROJECT = str(_support.REPO)
 os.chdir(PROJECT)
 
@@ -274,9 +275,12 @@ r = doctor.post(f"/staff/consultation/record/{appt}", data={
     "treatment_plan": "SENTINEL-REC-TX-51f0 rest", "is_restricted": "1"})
 rec = q1("SELECT * FROM consultations WHERE appointment_id=?", (appt,))
 check("doctor record saved (302 to profile)", r.status_code == 302, r.status_code)
-check("stored diagnosis and plan are exactly the doctor's",
-      rec is not None and rec["diagnosis"] == REC_DX
-      and rec["treatment_plan"] == "SENTINEL-REC-TX-51f0 rest" and rec["recorded_by"] == DOCTOR_ID,
+# Task 5 (H4): sealed at record time, so both are stored encrypted.
+check("stored diagnosis and plan are exactly the doctor's (encrypted, decrypts back)",
+      rec is not None
+      and _sc.decrypt(rec["diagnosis"], rec["id"], "diagnosis") == REC_DX
+      and _sc.decrypt(rec["treatment_plan"], rec["id"], "treatment_plan") == "SENTINEL-REC-TX-51f0 rest"
+      and REC_DX not in rec["diagnosis"] and rec["recorded_by"] == DOCTOR_ID,
       dict(rec) if rec else None)
 check("sealed from the form, restricted_by = Doctor",
       rec is not None and rec["is_restricted"] == 1 and rec["restricted_by"] == DOCTOR_ID)
@@ -513,22 +517,33 @@ section("A. AUDIT TRAIL NEVER QUOTES SEALED TEXT TO THE ADMINISTRATOR")
 EDIT_DX = "SENTINEL-EDIT-DX-77aa revised sealed assessment"
 mark = q1("SELECT MAX(id) FROM audit_logs")[0]
 doctor.post(f"/staff/consultation/edit/{CID_DOC}", data=edit_form(CID_DOC, diagnosis=EDIT_DX))
-check("doctor's edit of the sealed diagnosis stored",
-      q1("SELECT diagnosis FROM consultations WHERE id=?", (CID_DOC,))[0] == EDIT_DX)
+# Task 5 (H4): a sealed diagnosis is stored encrypted, so the database holds
+# ciphertext and the Doctor's profile shows the new text.
+stored_dx = q1("SELECT diagnosis FROM consultations WHERE id=?", (CID_DOC,))[0]
+check("doctor's edit of the sealed diagnosis stored (encrypted, opens for the Doctor)",
+      stored_dx.startswith("enc:v1:") and EDIT_DX not in stored_dx
+      and EDIT_DX in body(doctor.get(f"/staff/patient_profile/{PID_DOC}")))
 entry = q1("SELECT details FROM audit_logs WHERE id>? AND action='Updated consultation record' "
            "ORDER BY id DESC", (mark,))
 if entry is None:
     entry = q1("SELECT details FROM audit_logs WHERE id>? ORDER BY id DESC", (mark,))
+# Task 5 (D2): the entry names the field, "Changed: Diagnosis", and quotes nothing.
 check("edit entry names the change but quotes neither old nor new sealed text",
-      entry is not None and "[withheld — Restricted]" in entry[0]
+      entry is not None and "Changed: Diagnosis" in entry[0]
       and "SENTINEL" not in entry[0], entry[0] if entry else None)
 audit_page = body(admin.get("/admin/audit_logs"))
 x = admin.get("/admin/audit_logs/export.xlsx").data
 pdf = admin.get("/admin/audit_logs/export.pdf").data
 xt, pt = xlsx_text(x), pdf_text(pdf)
-check("control: the unsealed diagnosis edit IS quoted in page, xlsx and pdf (extraction works)",
-      "CONTROLDX7a1" in audit_page and "CONTROLDX7a1" in xt and "CONTROLDX7a1" in pt,
-      f"page={'CONTROLDX7a1' in audit_page} xlsx={'CONTROLDX7a1' in xt} pdf={'CONTROLDX7a1' in pt}")
+# Task 5 (D2) changed this control: no entry quotes a diagnosis, sealed or not.
+# The extraction is shown to work on the field name instead.
+check("control: the edit entries are in page, xlsx and pdf (extraction works)",
+      "Changed: Diagnosis" in audit_page and "Changed: Diagnosis" in xt
+      and "Changed: Diagnosis" in pt,
+      f"page={'Changed: Diagnosis' in audit_page} xlsx={'Changed: Diagnosis' in xt} "
+      f"pdf={'Changed: Diagnosis' in pt}")
+check("an unsealed diagnosis is not quoted either (D2)",
+      not any("CONTROLDX7a1" in s for s in (audit_page, xt, pt)))
 check("no sealed sentinel in Audit Logs page, xlsx or pdf",
       not any("SENTINEL" in s for s in (audit_page, xt, pt)))
 

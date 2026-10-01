@@ -217,8 +217,9 @@ for label, cl, url in screens:
     check(f"{label}: sealed diagnosis ABSENT from the page", SEALED not in page)
     check(f"{label}: control diagnosis PRESENT (positive control)",
           CONTROL in page)
-    check(f"{label}: states that a restricted consultation was not ranked",
-          "not ranked here" in page)
+    # Task 5 (D3): a sealed visit is now a "Confidential" row, for every role.
+    check(f"{label}: counts the restricted consultation under Confidential",
+          "Confidential" in page and "counted under Confidential" in page)
 
 # ---------------------------------------------------------------------------
 # 3. Freshly generated exports, both roles, both formats

@@ -16,6 +16,7 @@ import sqlite3
 import sys
 
 import _support  # noqa: E402  (first: builds the test database, points the app at it)
+from utils import sealed_crypto as _sc  # noqa: E402  (Task 5: sealed fields are encrypted)
 PROJECT = str(_support.REPO)
 os.chdir(PROJECT)
 
@@ -505,8 +506,12 @@ check("restricted_by names the Administrator", sealed["restricted_by"] == DOCTOR
       f"restricted_by={sealed['restricted_by']}")
 check("restricted_at was stamped", bool(sealed["restricted_at"]),
       f"restricted_at={sealed['restricted_at']}")
-check("The clinical content itself was NOT altered by sealing",
-      sealed["diagnosis"] == REAL_DIAGNOSIS and sealed["treatment_plan"] == REAL_PLAN)
+# Task 5 (H4): sealing now encrypts the two fields. The content is unaltered
+# if it decrypts back to exactly what was there.
+check("The clinical content itself was NOT altered by sealing (stored encrypted)",
+      _sc.is_encrypted(sealed["diagnosis"]) and _sc.is_encrypted(sealed["treatment_plan"])
+      and _sc.decrypt(sealed["diagnosis"], CID, "diagnosis") == REAL_DIAGNOSIS
+      and _sc.decrypt(sealed["treatment_plan"], CID, "treatment_plan") == REAL_PLAN)
 check("Sealing did NOT stamp updated_at (it is not a clinical edit)",
       sealed["updated_at"] == pre_seal["updated_at"],
       f"{pre_seal['updated_at']} -> {sealed['updated_at']}")
@@ -750,11 +755,12 @@ check("Staff's honest intake edit was saved (temperature moved)",
       str(post["temperature"]) == "36.8", f"temperature={post['temperature']}")
 check("Staff's intake edit was saved (chief complaint moved)",
       post["chief_complaint"] == "Follow-up, reviewed by BHW")
+# Task 5 (H4): stored encrypted, so it is compared after decrypting.
 check("*** The sealed diagnosis was NOT erased by Staff's edit ***",
-      post["diagnosis"] == REAL_DIAGNOSIS,
+      _sc.decrypt(post["diagnosis"], CID, "diagnosis") == REAL_DIAGNOSIS,
       f"stored: {str(post['diagnosis'])[:70]}")
 check("*** The sealed treatment plan was NOT erased by Staff's edit ***",
-      post["treatment_plan"] == REAL_PLAN)
+      _sc.decrypt(post["treatment_plan"], CID, "treatment_plan") == REAL_PLAN)
 check("*** The placeholder text was NOT written into the database ***",
       "Restricted" not in str(post["diagnosis"]))
 check("Staff's edit did NOT lift the seal (no is_restricted in their form)",
