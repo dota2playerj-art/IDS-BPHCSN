@@ -355,7 +355,7 @@
         <div class="panel-card">
           <h2 class="print-only print-section-title">Appointment Statistics</h2>
           <div class="panel-title no-print">Appointment Statistics</div>
-          <!-- The three bars partition every status the appointments CHECK
+          <!-- The four bars partition every status the appointments CHECK
                admits, so a month's stack is that month's whole appointment
                count. See _OUTCOME_BY_STATUS in models/appointments.py.
 
@@ -378,11 +378,13 @@
                   atrend | map(attribute='label') | list,
                   [{'name': 'Attended',            'values': atrend | map(attribute='attended') | list},
                    {'name': 'Still expected',      'values': atrend | map(attribute='expected') | list},
-                   {'name': 'Cancelled / no-show', 'values': atrend | map(attribute='missed')   | list}]) }}
+                   {'name': 'Cancelled / no-show', 'values': atrend | map(attribute='missed')   | list},
+                   {'name': 'Left before being seen', 'values': atrend | map(attribute='left') | list}]) }}
           <div class="mini-legend no-print">
             <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--success);"></span>Attended ({{ appt.attended }}) &mdash; arrived, seen or completed</div>
             <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--info);"></span>Still expected ({{ appt.expected }})</div>
             <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--danger);"></span>Cancelled or no-show ({{ appt.missed }})</div>
+            <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--warning);"></span>Left before being seen ({{ appt.left }}) &mdash; checked in, then went home</div>
           </div>
 {%- if not appt.expected %}
           <div class="panel-sub" style="margin-top:8px; line-height:1.55;">
@@ -870,7 +872,8 @@
       labels: {{ appointment_report.trend | map(attribute='label') | list | tojson }},
       attended: {{ appointment_report.trend | map(attribute='attended') | list | tojson }},
       expected: {{ appointment_report.trend | map(attribute='expected') | list | tojson }},
-      missed: {{ appointment_report.trend | map(attribute='missed') | list | tojson }}
+      missed: {{ appointment_report.trend | map(attribute='missed') | list | tojson }},
+      left: {{ appointment_report.trend | map(attribute='left') | list | tojson }}
     },
     consultations: {
       labels: {{ consultation_report_stats.trend | map(attribute='label') | list | tojson }},
@@ -935,7 +938,7 @@
     options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:countAxis, x:{grid:{display:false}}} }
   });
 
-  // Appointment Statistics (stacked bar) — the three outcome buckets partition
+  // Appointment Statistics (stacked bar) — the four outcome buckets partition
   // every appointment status, so a month's stack is that month's total.
   draw('chartAppt', {
     type: 'bar',
@@ -944,7 +947,8 @@
       datasets: [
         { label:'Attended', data:reportData.appointments.attended, backgroundColor: success, borderRadius:4 },
         { label:'Still expected', data:reportData.appointments.expected, backgroundColor: info, borderRadius:4 },
-        { label:'Cancelled / no-show', data:reportData.appointments.missed, backgroundColor: danger, borderRadius:4 }
+        { label:'Cancelled / no-show', data:reportData.appointments.missed, backgroundColor: danger, borderRadius:4 },
+        { label:'Left before being seen', data:reportData.appointments.left, backgroundColor: warning, borderRadius:4 }
       ]
     },
     options: {

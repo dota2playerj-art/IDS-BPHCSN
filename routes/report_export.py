@@ -743,8 +743,9 @@ def _appointments(context):
         _trend_block(
             "Appointment outcomes, by month", appointments["trend"],
             [("Attended", "attended"), ("Still expected", "expected"),
-             ("Cancelled / no-show", "missed")],
-            note=("The three outcomes partition every status an appointment can "
+             ("Cancelled / no-show", "missed"),
+             ("Left before being seen", "left")],
+            note=("The four outcomes partition every status an appointment can "
                   "hold, so a month's row totals that month's appointments."),
         ),
         figures("Appointment outcomes in this range", [
@@ -752,12 +753,14 @@ def _appointments(context):
             ("Attended", window["attended"],
              "Completed, plus those in the clinic right now"),
             ("Cancelled or no-show", window["missed"], ""),
+            ("Left before being seen", window["left"],
+             "Checked in, then went home before the Doctor saw them"),
             ("Still expected", window["expected"],
              "Booked and not yet resolved. Zero from September 2026 on, when "
              "advance booking was retired — a visit is now recorded on the day "
              "the patient arrives, so none is ever pending"),
             ("Resolved", window["resolved"],
-             "Attended plus cancelled/no-show — a visit still to happen has "
+             "Attended plus cancelled/no-show plus left before being seen — a visit still to happen has "
              "neither succeeded nor failed"),
             ("Attendance rate (%)", window["attendance_pct"],
              "Of the resolved appointments only"),

@@ -509,6 +509,74 @@ def plan_visits(rng, today, people):
     return last_day
 
 
+LEFT_VISITS = 8
+INTAKE_ONLY_VISITS = 6
+STALE_WAITING_VISITS = 2
+
+
+def plan_extras(rng, today, people, last_day):
+    """The visits that show the Doctor's list and "Left before being seen" (Task 6).
+
+    Planned after everything else, with the random stream continuing from where the
+    rest stopped, so the rest of the data is the same as it was without them.
+
+    * left: the patient checks in, then Staff mark the visit as left before being seen.
+      Most are spread over the year, two are in the last three weeks.
+    * intake_only: Staff took the intake and the Doctor has not yet written a diagnosis,
+      on days within the last two weeks. These are the Doctor's list.
+    * stale: checked in on an earlier day and never started: still Waiting. They show
+      under "Still waiting from earlier days" and on the Doctor's list.
+    """
+    first_day = weekday_on_or_after(today - timedelta(days=WINDOW_DAYS - 1))
+
+    def weekday_before(days_back):
+        day = last_day - timedelta(days=days_back)
+        while day.weekday() >= 5:
+            day -= timedelta(days=1)
+        return day
+
+    def eligible(person, day, quiet_after=False):
+        event = person["status_event"]
+        if event and day > event[1] - timedelta(days=8):
+            return False
+        if day < person["register_on"] or day < first_day:
+            return False
+        taken = {v["date"] for v in person["visits"]}
+        if day in taken:
+            return False
+        if quiet_after and any(v["date"] > day for v in person["visits"]):
+            return False
+        return True
+
+    pool = list(people)
+    rng.shuffle(pool)
+    acute = ("ari", "fever", "diarrhea", "skin")
+    plans = (
+        [("left", False, rng.randint(0, (last_day - first_day).days)) for _ in range(LEFT_VISITS - 2)]
+        + [("left", False, (last_day - first_day).days - rng.randint(0, 14)) for _ in range(2)]
+        + [("intake_only", True, (last_day - first_day).days - rng.randint(1, 12))
+           for _ in range(INTAKE_ONLY_VISITS)]
+        + [("stale", True, (last_day - first_day).days - rng.randint(3, 8))
+           for _ in range(STALE_WAITING_VISITS)]
+    )
+    placed = []
+    cursor = 0
+    for variant, quiet_after, offset in plans:
+        day = weekday_on_or_after(first_day + timedelta(days=max(0, offset)))
+        if day > last_day:
+            day = weekday_before(1)
+        for _ in range(len(pool)):
+            person = pool[cursor % len(pool)]
+            cursor += 1
+            if eligible(person, day, quiet_after):
+                visit = {"date": day, "case": rng.choice(acute), "variant": variant}
+                person["visits"].append(visit)
+                person["visits"].sort(key=lambda v: v["date"])
+                placed.append((person, visit))
+                break
+    return placed
+
+
 def build_visit_details(rng, person, visit, today):
     """Complaint, vitals, diagnosis, plan and dispensing for one planned visit."""
     case = visit["case"]
@@ -788,6 +856,9 @@ def build(path, say=print, show_passwords=True, today_override=None):
         for visit in person["visits"]:
             details[id(visit)] = build_visit_details(rng, person, visit, today)
     broadcasts = plan_broadcasts(rng, last_day)
+    for person, visit in plan_extras(rng, today, people, last_day):
+        details[id(visit)] = build_visit_details(rng, person, visit, today)
+        details[id(visit)]["dispense"] = []  # nothing is dispensed on these visits
 
     # ---- the stock the visits need, so the shelf makes sense afterwards
     needed = {}
@@ -871,7 +942,8 @@ def build(path, say=print, show_passwords=True, today_override=None):
 
         per_day = {}
         patient_row = {}
-        counters = {"registered": 0, "visits": 0, "sealed": 0, "status": 0, "broadcasts": 0}
+        counters = {"registered": 0, "visits": 0, "sealed": 0, "status": 0, "broadcasts": 0,
+                    "left": 0, "stale": 0, "waiting for the Doctor": 0}
         for moment, _order, kind, index, payload in events:
             day = moment.date()
             if kind == "register":
@@ -892,11 +964,24 @@ def build(path, say=print, show_passwords=True, today_override=None):
                 doses = visit.get("doses", [])
                 elsewhere = visit.get("elsewhere", [])
 
+                variant = visit.get("variant")
                 set_clock(base)
                 staff.post("/staff/appointment_scheduling/check-in",
                            {"patient_id": str(pid), "reason": data["complaint"]})
                 appointment = rows(path, "SELECT MAX(id) FROM appointments WHERE patient_id = ?", (pid,))[0][0]
                 stamper.stamp(_clock["now"])
+                if variant == "stale":
+                    # Checked in and never started: still Waiting on a later day.
+                    counters["stale"] += 1
+                    continue
+                if variant == "left":
+                    # Went home before being seen: Staff close the visit the same day.
+                    set_clock(base + timedelta(minutes=25))
+                    staff.post("/staff/appointment_scheduling/mark-left",
+                               {"appointment_id": str(appointment)})
+                    stamper.stamp(_clock["now"])
+                    counters["left"] += 1
+                    continue
                 set_clock(base + timedelta(minutes=8))
                 staff.post("/staff/appointment_scheduling/start-consultation",
                            {"appointment_id": str(appointment)})
@@ -907,6 +992,11 @@ def build(path, say=print, show_passwords=True, today_override=None):
                 consultation = rows(path, "SELECT id FROM consultations WHERE appointment_id = ?",
                                     (appointment,))[0][0]
                 stamper.stamp(_clock["now"])
+                if variant == "intake_only":
+                    # Intake taken; the Doctor has not been yet. This is the Doctor's list.
+                    counters["visits"] += 1
+                    counters["waiting for the Doctor"] += 1
+                    continue
                 set_clock(base + timedelta(minutes=33))
                 actors["doctor"].post(f"/staff/consultation/edit/{consultation}",
                                       consult_form(data, doses, elsewhere, with_diagnosis=True))
@@ -951,6 +1041,9 @@ def build(path, say=print, show_passwords=True, today_override=None):
         "patients": rows(path, "SELECT COUNT(*) FROM patients")[0][0],
         "visits": rows(path, "SELECT COUNT(*) FROM consultations")[0][0],
         "sealed visits": rows(path, "SELECT COUNT(*) FROM consultations WHERE is_restricted = 1")[0][0],
+        "left before being seen": rows(path, "SELECT COUNT(*) FROM appointments WHERE status = 'Left before being seen'")[0][0],
+        "still waiting from earlier days": rows(path, "SELECT COUNT(*) FROM appointments WHERE status = 'Waiting'")[0][0],
+        "waiting for the Doctor": count_waiting(path),
         "immunizations": rows(path, "SELECT COUNT(*) FROM immunizations")[0][0],
         "dispensing issues": rows(path, "SELECT COUNT(*) FROM medicine_dispensing")[0][0],
         "inventory items": rows(path, "SELECT COUNT(*) FROM inventory_items")[0][0],
@@ -964,6 +1057,17 @@ def build(path, say=print, show_passwords=True, today_override=None):
         from models.users import print_first_passwords
         print_first_passwords(passwords)
     return {"counts": counts, "passwords": passwords}
+
+
+def count_waiting(path):
+    """How many visits are waiting for the Doctor in the database at `path`."""
+    from models.doctor_worklist import count_waiting_for_doctor
+
+    config.DATABASE = str(path)
+    import app as app_module
+
+    with app_module.create_app().app_context():
+        return count_waiting_for_doctor()
 
 
 def archive_existing(target, backup_dir=None):
