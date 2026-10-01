@@ -526,6 +526,13 @@ identify a person (RA 10173, minimum necessary).
 number shows its last four digits only ("•••• ••• 1234"). Recipient counts and delivery results stay.
 Full numbers stay only where the system sends messages.
 
+**Small counts everywhere (2026-10-02, Task 5e).** The rule covers any count tied to a health service
+or condition: "Appointments by service requested" folds rows of 1 to 4 into "Other (each fewer than
+5)" for the Administrator and the Official, and a single count tied to a condition or service (such as
+patients with only free-text conditions, or Prenatal Check-up visits) reads "Fewer than 5" when it is 1
+to 4. Zero stays "0". Audit entries never store a whole phone number: they are written masked, and
+`migrate_mask_audit_phone_numbers.py` masked the old ones.
+
 **Stock accountability.** Dispensing writes no stock entry, because an entry per issue would tie a
 medicine to a visit time. Accountability comes from the stock levels and from the dispensed totals
 in Reports & Analytics. The Doctor and Health Center Staff hold the full dispensing records.

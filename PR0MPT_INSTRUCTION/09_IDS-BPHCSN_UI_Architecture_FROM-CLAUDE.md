@@ -1165,6 +1165,9 @@ The Doctor, Health Center Staff and the Barangay Official are unchanged.
   and when, so a count of 1 over a short range can identify a person (RA 10173, minimum necessary).
 - *Masked numbers.* On every SMS screen, export and JSON response, for every role, a phone number
   shows its last four digits ("•••• ••• 1234"). Full numbers stay only where messages are sent.
+- *Task 5e.* The small-count rule also covers "Appointments by service requested", and single counts
+  tied to a condition or service read "Fewer than 5" when 1 to 4. Audit entries are written with phone
+  numbers masked.
 - *Stock accountability.* Dispensing writes no stock entry. Accountability comes from the stock
   levels and the dispensed totals in Reports. The Doctor and Health Center Staff hold the full
   dispensing records.

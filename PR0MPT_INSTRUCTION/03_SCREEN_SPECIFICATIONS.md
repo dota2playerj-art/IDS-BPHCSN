@@ -1203,6 +1203,12 @@ number of issues, since one issue is one visit. The reason: the Administrator ca
 queue and when, so a count of 1 over a short range can identify a person. The threshold is
 `SMALL_COUNT_THRESHOLD` in `config.py`.
 
+**Screens 10 and 18, services and single counts (Task 5e).** "Appointments by service requested"
+(screen, chart, print table, Excel, PDF) folds like the other rankings. A single count tied to a
+condition or service reads "Fewer than 5" when it is 1 to 4, for the Administrator and the Official.
+
+**Screen 12 (Task 5e).** No audit entry stores a whole phone number; entries are written masked.
+
 **Screen 09, masked numbers (Task 5d).** The recipient list and the appointment-confirmation panel
 show a number as "•••• ••• 1234" for every role. The Administrator's list shows names and delivery
 results and no number at all. Audit entries mask any mobile number in their text.
