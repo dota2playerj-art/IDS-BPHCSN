@@ -91,12 +91,14 @@ WHAT IS DELIBERATELY IN EVERY FILE
 ----------------------------------
 A "Not Tracked" sheet, last, exactly as report_export.py and audit_export.py put
 one on theirs. A roster leaving the building is the copy where an unexplained
-blank does the most damage, and each of these four screens has real absences: no
-patient write is recorded in the audit trail, a stock level carries no movement
-column beside it, no appointment write is recorded either, and User Management's
-own UNTRACKED dict names five more. Where the screen already holds the wording -- User
-Management's does -- it is quoted rather than rewritten, so the file and the
-screen say the same thing in the same words.
+blank does the most damage, and each of these four screens has real absences: a
+stock export is a position with no movement column beside it, a patient who
+leaves before being seen has no status for it, and User Management's own
+UNTRACKED dict names five more. (Patient, inventory and queue writes themselves
+are recorded in the audit trail since Task 4 -- what is listed below is what is
+still genuinely absent, not those writes.) Where the screen already holds the
+wording -- User Management's does -- it is quoted rather than rewritten, so the
+file and the screen say the same thing in the same words.
 """
 from models.settings import health_center_name
 from routes.report_export import _download  # noqa: F401  (re-exported below)
@@ -123,17 +125,10 @@ UNTRACKED_INTRO = (
     "not evidence that they did not happen."
 )
 
-# Screen 03. Every write path on this screen is unaudited, which is a fact about
-# the system rather than about this file, and the file is where a reader is most
-# likely to assume otherwise.
+# Screen 03. Registration, edits and status changes to a patient are recorded in
+# the audit trail (Task 4, H3); the entry that said otherwise is removed. What is
+# still genuinely absent from the system is listed below.
 PATIENT_UNTRACKED = (
-    (
-        "Who changed a patient record, and when",
-        "The audit trail records consultation edits, SMS broadcasts and sign-ins. "
-        "It does not record registrations, edits or status changes to a patient, "
-        "so this roster shows the position now with no history of how it got "
-        "here.",
-    ),
     (
         "Prenatal enrolment",
         "Nothing marks a patient as pregnant or stores an expected delivery "
@@ -170,6 +165,10 @@ PATIENT_UNTRACKED = (
 # about is still true of *this file*: a stock export is a position, not a
 # movement record, and restocking in particular is still not recorded as a
 # movement anywhere at all.
+#
+# "Who changed a stock level, and when" is removed outright, not corrected: Task
+# 4 (H3) added an audit entry to every inventory write -- add, edit, stock
+# adjustment, archive and restore -- so the absence it named no longer exists.
 INVENTORY_UNTRACKED = (
     (
         "Stock movement, in this file",
@@ -179,14 +178,6 @@ INVENTORY_UNTRACKED = (
         "stands today, with no movement column beside it. Restocking is not "
         "recorded as a movement at all; an item's stock figure is raised by "
         "editing it through Add / Edit Medicine, which overwrites the number.",
-    ),
-    (
-        "Who changed a stock level, and when",
-        "The audit trail does not record inventory writes. An item's stock figure "
-        "can be corrected through Add / Edit Medicine and nothing keeps a note of "
-        "it, so this file is the position now with no history behind it. "
-        "Dispensing is the one exception and is not in this file: it moves stock "
-        "down through a recorded, dated row of its own.",
     ),
     (
         "Batch history",
@@ -208,14 +199,11 @@ INVENTORY_UNTRACKED = (
 # does not have is exactly the drift utils/unavailable.py exists to prevent.
 # What replaced them is not filler -- the removal made one genuinely new gap, and
 # it is named here as well as on the screen.
+#
+# "Who checked a patient in" is removed in turn: Task 4 (H3) added an audit entry
+# for check-in, for starting a consultation and for completing one, so the queue
+# writes this row used to say nothing recorded are recorded now.
 APPOINTMENT_UNTRACKED = (
-    (
-        "Who checked a patient in",
-        "The audit trail does not record queue writes. Every row here carries the "
-        "staff member the visit is assigned to, because that is a stored column, "
-        "but nothing says who took the arrival at the desk, who started the "
-        "consultation, or who closed it.",
-    ),
     (
         "That a patient left before being seen",
         "There is no status for it. Somebody who checks in and goes home stays "

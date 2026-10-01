@@ -290,9 +290,9 @@ def _untracked_sheet(context):
     """What the trail does not record, in the screen's own words.
 
     The last sheet on purpose, and never omitted. A reader who has just been told
-    this file is the complete record needs, in the same breath, to know that the
-    record covers three write paths and not the whole system -- otherwise the
-    absence of a patient-archive entry reads as nobody having archived a patient.
+    this file is the complete record needs, in the same breath, to know the two
+    places that record still has an edge -- otherwise a figure's boundary reads as
+    a gap in what was written down.
 
     Sign-ins used to head this sheet, as the largest thing the trail did not
     hold. They are in the file now, so what is left of that row is the boundary
@@ -317,10 +317,11 @@ def _untracked_sheet(context):
             empty="Everything this screen can show is in this file.",
         )],
         intro=(
-            "The entries in this file are complete for what the system records, "
-            "which is the consultation edit path, the SMS broadcast path and the "
-            "login route. It does not record the following, so their absence from "
-            "the trail is not evidence that they did not happen."
+            "The entries in this file are complete for what the system records: "
+            "changes to patient, clinical, stock and account records, the Patient "
+            "Queue, sign-ins, settings and SMS broadcasts. It does not record the "
+            "following, so their absence from the trail is not evidence that they "
+            "did not happen."
         ),
     )
 
