@@ -437,7 +437,7 @@ def _summary_sheet(context, sections):
     if "concerns" in sections:
         conditions = context["conditions"]
         rows.append(("Patients with a recorded chronic condition",
-                     conditions["with_any"], standing))
+                     conditions["with_any_shown"], standing))
     for key in ("sms", "notifications"):
         if key in sections:
             broadcasts = context["broadcast_stats"]
@@ -696,6 +696,7 @@ def _concerns(context):
     window = context["report_window"]
 
     other_only = conditions["other_only"]
+    other_only_shown = conditions["other_only_shown"]
     basis = (
         "Counted from the registration form's own condition list. A patient with "
         "two conditions is counted under each, so these do not sum to the "
@@ -703,8 +704,8 @@ def _concerns(context):
     )
     if other_only:
         basis += (
-            f" {other_only} patient{'' if other_only == 1 else 's'} recorded only "
-            f"free-text conditions and {'is' if other_only == 1 else 'are'} not "
+            f" {other_only_shown} patient{'' if other_only_shown == 1 else 's'} recorded only "
+            f"free-text conditions and {'is' if other_only_shown == 1 else 'are'} not "
             "counted here."
         )
 
@@ -728,8 +729,8 @@ def _concerns(context):
         ),
         figures("Register totals", [
             ("Patients on the register", conditions["cohort_size"], "Today"),
-            ("Patients with any recorded condition", conditions["with_any"], "Today"),
-            ("Patients with free-text conditions only", other_only,
+            ("Patients with any recorded condition", conditions["with_any_shown"], "Today"),
+            ("Patients with free-text conditions only", other_only_shown,
              "Not counted in the table above"),
         ]),
     ]
@@ -778,7 +779,8 @@ def _services(context):
             "service", "count", ("Service", "Appointments"),
             note=("What was actually asked for, walk-ins included. This is a record "
                   "of visits, not of who is enrolled in a programme -- nothing in "
-                  "this system stores an enrolment."),
+                  "this system stores an enrolment."
+                  + small_count_note(window["services"])),
             empty="No appointment falls in this range, so there is nothing to rank.",
         ),
         figures("Basis", [
@@ -876,7 +878,7 @@ def _seniors(context):
         figures("The senior cohort", [
             (f"Patients aged {age} and above", patients["senior_count"], "By birthdate"),
             ("Share of the roster (%)", patients["senior_share_pct"], ""),
-            ("Seniors with free-text conditions only", seniors["other_only"],
+            ("Seniors with free-text conditions only", seniors["other_only_shown"],
              "Not counted in the table above"),
         ]),
     ]

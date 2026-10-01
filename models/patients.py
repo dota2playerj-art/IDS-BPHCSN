@@ -21,7 +21,7 @@ from utils.dates import (
 )
 from utils.phone import is_valid_ph_mobile, to_local_ph_mobile
 from utils.roles import holds_clinical_authority
-from utils.small_counts import fold_small_counts
+from utils.small_counts import fold_small_counts, shown_count
 
 # The vocabularies the Register Patient form offers. The template renders its
 # <select>/radio/chip options from these same tuples, so a constrained field
@@ -631,6 +631,7 @@ def get_condition_counts(patients=None, conditions=CONDITION_OPTIONS, min_age=No
         if recorded and not matched:
             other_only += 1
 
+    with_any = sum(1 for patient in patients if patient.get("medical_conditions_list"))
     return {
         "cohort_size": len(patients),
         "counts": fold_small_counts(
@@ -639,9 +640,11 @@ def get_condition_counts(patients=None, conditions=CONDITION_OPTIONS, min_age=No
             viewer_role, label_key="condition", sum_keys=("count",),
         ),
         "other_only": other_only,
-        "with_any": sum(
-            1 for patient in patients if patient.get("medical_conditions_list")
-        ),
+        "with_any": with_any,
+        # Task 5e (D2): the same two counts as a viewer may read them. Under 5 and
+        # above 0 they read "Fewer than 5" for the Administrator and the Official.
+        "other_only_shown": shown_count(other_only, viewer_role),
+        "with_any_shown": shown_count(with_any, viewer_role),
     }
 
 

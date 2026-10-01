@@ -29,6 +29,7 @@ from datetime import date, datetime
 from database.connection import db_connection
 from utils.dates import now, recent_months, resolve_range, today
 from utils.roles import is_care_team
+from utils.small_counts import fold_small_counts, shown_count
 
 # Statuses that still represent a commitment the patient is expected to keep.
 PENDING_STATUSES = ("Scheduled", "Confirmed")
@@ -883,7 +884,7 @@ _OUTCOME_BY_STATUS = {
 OUTCOMES = (OUTCOME_EXPECTED, OUTCOME_ATTENDED, OUTCOME_MISSED)
 
 
-def _outcome_summary(counts, walk_ins, total, services):
+def _outcome_summary(counts, walk_ins, total, services, viewer_role):
     """One period's appointment outcomes, however that period was chosen.
 
     Shared by the year-to-date block and the ranged `window` block below so the
@@ -905,14 +906,19 @@ def _outcome_summary(counts, walk_ins, total, services):
         "missed_pct": (
             round(counts[OUTCOME_MISSED] / resolved * 100, 1) if resolved else None
         ),
-        "services": sorted(
-            ({"service": name, "count": count} for name, count in services.items()),
-            key=lambda item: (-item["count"], item["service"].lower()),
+        # Task 5e (D1): a service with 1 to 4 appointments folds into one Other
+        # row for the Administrator and the Official. The total above is exact.
+        "services": fold_small_counts(
+            sorted(
+                ({"service": name, "count": count} for name, count in services.items()),
+                key=lambda item: (-item["count"], item["service"].lower()),
+            ),
+            viewer_role, label_key="service", sum_keys=("count",),
         ),
     }
 
 
-def get_appointment_report(months=6, on_date=None, start=None, end=None):
+def get_appointment_report(months=6, on_date=None, start=None, end=None, *, viewer_role):
     """The appointment figures Screen 10 reports.
 
     Three things: how the year's appointments have turned out, how that breaks
@@ -1017,7 +1023,7 @@ def get_appointment_report(months=6, on_date=None, start=None, end=None):
             "total": bucket["total"],
         })
 
-    ytd_summary = _outcome_summary(ytd, ytd_walk_ins, ytd_total, services)
+    ytd_summary = _outcome_summary(ytd, ytd_walk_ins, ytd_total, services, viewer_role)
     return {
         "year": year,
         "ytd_total": ytd_total,
@@ -1041,8 +1047,13 @@ def get_appointment_report(months=6, on_date=None, start=None, end=None):
             "end": window["end"],
             "custom": window["custom"],
             **_outcome_summary(
-                scoped_counts, scoped_walk_ins, scoped_total, scoped_services
+                scoped_counts, scoped_walk_ins, scoped_total, scoped_services,
+                viewer_role,
             ),
+            # The Prenatal Check-up count printed beside the prenatal note. It is
+            # tied to a service, so it reads "Fewer than 5" for those two roles.
+            "prenatal_visits": shown_count(
+                scoped_services.get("Prenatal Check-up", 0), viewer_role),
         },
     }
 

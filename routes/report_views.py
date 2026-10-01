@@ -330,7 +330,8 @@ def reports_analytics_context(report_type="all", args=None):
                                   viewer_role=viewer_role)
     consultations = get_consultation_stats(months=TREND_MONTHS, start=start, end=end,
                                            viewer_role=viewer_role)
-    appointments = get_appointment_report(months=TREND_MONTHS, start=start, end=end)
+    appointments = get_appointment_report(months=TREND_MONTHS, start=start, end=end,
+                                          viewer_role=viewer_role)
     # Coverage is judged as of the range's closing date; the doses inside it are
     # counted between the two. See get_immunization_coverage() for why only one
     # of those two can honestly be ranged.

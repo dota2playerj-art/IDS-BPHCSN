@@ -431,8 +431,8 @@
           <div class="basis-note mt-3">
             A patient with two conditions is counted under each, so these do not sum to the roster.{{ small_count_note(top_conditions) }}
 {%- if conditions.other_only %}
-            {{ conditions.other_only }} patient{{ '' if conditions.other_only == 1 else 's' }}
-            recorded only free-text conditions and {{ 'is' if conditions.other_only == 1 else 'are' }} not counted here.
+            {{ conditions.other_only_shown }} patient{{ '' if conditions.other_only_shown == 1 else 's' }}
+            recorded only free-text conditions and {{ 'is' if conditions.other_only_shown == 1 else 'are' }} not counted here.
 {%- endif %}
           </div>
 {%- else %}

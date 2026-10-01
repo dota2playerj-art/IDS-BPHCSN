@@ -649,10 +649,9 @@
               <div class="untracked-body">{{ untracked.prenatal }}</div>
             </div>
           </div>
-{%- set prenatal_visits = appointment_report.window.services | selectattr('service', 'equalto', 'Prenatal Check-up') | list %}
           <div class="basis-note mt-3">
-            For reference, {{ prenatal_visits[0].count if prenatal_visits else 0 }} Prenatal Check-up
-            appointment{{ '' if (prenatal_visits and prenatal_visits[0].count == 1) else 's' }} were booked
+            For reference, {{ appointment_report.window.prenatal_visits }} Prenatal Check-up
+            appointment{{ '' if appointment_report.window.prenatal_visits == 1 else 's' }} were booked
             between {{ window.start | display_date }} and {{ window.end | display_date }}
             &mdash; a count of visits, not of patients enrolled.
           </div>
@@ -690,8 +689,8 @@
             Conditions counted from the Register Patient form's own list
             ({{ seniors.counts | rejectattr('other') | map(attribute='condition') | join(', ') }}). A patient with two is
             counted under each, so these do not sum to {{ seniors.cohort_size }}.{{ small_count_note(seniors.counts) }}
-{%- if seniors.other_only %} {{ seniors.other_only }} senior{{ '' if seniors.other_only == 1 else 's' }}
-            recorded only free-text conditions and {{ 'is' if seniors.other_only == 1 else 'are' }} not counted here.{% endif %}
+{%- if seniors.other_only %} {{ seniors.other_only_shown }} senior{{ '' if seniors.other_only_shown == 1 else 's' }}
+            recorded only free-text conditions and {{ 'is' if seniors.other_only_shown == 1 else 'are' }} not counted here.{% endif %}
           </div>
           <div class="snapshot-note">{{ snapshot_note }}</div>
         </div>
@@ -718,6 +717,7 @@
                   svc | map(attribute='service') | list,
                   [{'name': 'Appointments', 'values': svc | map(attribute='count') | list}],
                   first_head='Service') }}
+      <div class="basis-note">{{ small_count_note(svc) | trim }}</div>
 {%- else %}
       <div class="empty-note">No appointments fall in this range, so there is nothing to rank.</div>
 {%- endif %}
