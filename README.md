@@ -66,8 +66,8 @@ After pulling an update that adds a migration, run it once on each laptop, for e
 rebuild it is tracked:
 
 ```
-python app.py              # creates app.db from schema.sql on first run
-python populate_records.py # fills it with the demo dataset
+python seed_demo_data.py   # builds app.db with fictional demo data (see below)
+python app.py              # starts the app
 ```
 
 If the schema changes after a database already exists, the `migrate_*.py`
@@ -76,7 +76,35 @@ re-run — and each verifies afterwards that no existing row moved.
 
 Because `app.db` is untracked, **a fresh clone starts with no data.** If the
 current demo dataset matters to you, copy `app.db` across by hand or restore it
-from a backup; regenerating produces a comparable dataset, not an identical one.
+from a backup. Regenerating the demo data gives the same people and records on every
+laptop (see "Demo data").
+
+## Demo data
+
+`python seed_demo_data.py` builds a new `app.db` from `schema.sql` and fills it with
+**fictional** data: about 150 patients and about 400 visits over the past 12 months.
+Every name, address and phone number is invented, and phone numbers all look like
+`0900000NNNN`. It is deterministic: the same people and visits on every laptop, dated
+relative to the day you run it. It writes through the app's own routes, as each role
+(Staff intake, Doctor diagnosis, sealing), so the rules, encryption and audit entries
+are the real ones. The Service Schedule is left empty on purpose.
+
+It prints the five account passwords **once**, in a block on the screen. Write them
+down. Each account must change its password at first sign-in. If `app.db` already
+exists, the script stops; add `--replace` to archive the old one first (see below)
+and build a new one. `--path` builds somewhere else.
+
+## Archiving old databases
+
+Older databases and backups may hold real people's records as plain files. Run
+`python archive_plain_databases.py` **once on each laptop**. It finds `app.db` and
+every plain file in `IDS-BPHCSN-backups`, encrypts each into an
+`archive-<name>-<time>.idsbackup` file (the same format as the Backup download,
+opened with `restore_backup.py`), decrypts it again and compares every table, and only
+then removes the plain file. A file that does not match is kept and reported. `app.db`
+is moved aside as `previous-app.db` until the new demo database works; then run
+`python archive_plain_databases.py --remove-previous`. It prints counts only, and it
+is safe to run twice.
 
 ## Version control
 
@@ -108,7 +136,8 @@ app.py                  application factory and entry point
 config.py               paths and SECRET_KEY
 schema.sql              full schema for a fresh database
 migrate_*.py            idempotent schema migrations, each self-verifying
-populate_records.py     demo dataset
+seed_demo_data.py       builds the fictional demo database
+archive_plain_databases.py   encrypts old plain databases, verifies, removes
 routes/                 blueprints, one per role surface, plus shared context builders
 models/                 all data access; each figure has exactly one owner here
 utils/                  dates, roles, security, SMS, phone formatting, endpoint shim
