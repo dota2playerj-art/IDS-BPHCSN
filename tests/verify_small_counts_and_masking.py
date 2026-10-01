@@ -676,6 +676,170 @@ check("the broadcast's audit entry names no number", audit_row
       and not re.search(r"(?<!\d)(?:\+?63|0)9\d{9}(?!\d)", audit_row[0]))
 
 # ===========================================================================
+section("7. TASK 5e: SERVICE BREAKDOWN FOLDS, SINGLE COUNTS READ 'FEWER THAN 5'")
+from models.appointments import get_appointment_report  # noqa: E402
+from models.patients import get_condition_counts  # noqa: E402
+
+
+def free_appointment_day():
+    day = date.today() - timedelta(days=40)
+    while q1("SELECT COUNT(*) FROM appointments WHERE appointment_date = ?",
+             (day.isoformat(),))[0]:
+        day -= timedelta(days=1)
+    return day.isoformat()
+
+
+SVC_DAY = free_appointment_day()
+SVC_RANGE = f"?from={SVC_DAY}&to={SVC_DAY}"
+for name, count in (("ONE", 1), ("FOUR", 4), ("FIVE", 5), ("TWELVE", 12)):
+    for _ in range(count):
+        _n[0] += 1
+        run_sql("INSERT INTO appointments (patient_id, scheduled_by, appointment_type, "
+                "appointment_date, status, is_walkin) VALUES (?,?,?,?,'Completed',1)",
+                (patient_ids[_n[0] % len(patient_ids)], STAFF_ID, f"ZZSVC{name}", SVC_DAY))
+day_obj = date.fromisoformat(SVC_DAY)
+
+
+def services(role):
+    with app.app_context():
+        return get_appointment_report(months=6, start=day_obj, end=day_obj,
+                                      viewer_role=role)["window"]
+
+
+for who in ("Administrator", "Barangay Official"):
+    window = services(ROLES[who])
+    check(f"{who}: services show 12 and 5 named, and 1 + 4 fold into Other = 5",
+          pairs(window["services"], "service", "count")
+          == [("ZZSVCTWELVE", 12), ("ZZSVCFIVE", 5), (OTHER_LABEL, 5)], window["services"])
+window_d = services("doctor")
+check("Doctor: every service is named with its own count, no Other row",
+      pairs(window_d["services"], "service", "count")
+      == [("ZZSVCTWELVE", 12), ("ZZSVCFIVE", 5), ("ZZSVCFOUR", 4), ("ZZSVCONE", 1)])
+check("service totals are equal for all roles and the rows add up to the total",
+      len({services(r)["total"] for r in ROLES.values()}) == 1
+      and window_d["total"] == 22
+      and sum(e["count"] for e in services("admin")["services"]) == 22)
+check("with no prenatal visits the count reads 0 for every role",
+      services("admin")["prenatal_visits"] == 0 and window_d["prenatal_visits"] == 0)
+for _ in range(2):
+    _n[0] += 1
+    run_sql("INSERT INTO appointments (patient_id, scheduled_by, appointment_type, "
+            "appointment_date, status, is_walkin) VALUES (?,?,'Prenatal Check-up',?,"
+            "'Completed',1)", (patient_ids[_n[0] % len(patient_ids)], STAFF_ID, SVC_DAY))
+check("two prenatal visits: 'Fewer than 5' for the Administrator, 2 for the Doctor",
+      services("admin")["prenatal_visits"] == "Fewer than 5"
+      and services("doctor")["prenatal_visits"] == 2)
+for who, client, urls in (("Administrator", admin, SURFACES["Administrator"]),
+                          ("Barangay Official", official, SURFACES["Barangay Official"]),
+                          ("Doctor", doctor, SURFACES["Doctor"])):
+    page = body(client.get(urls["page"] + SVC_RANGE))
+    table_rows = print_table(page, "Appointments by service requested")
+    expected = pairs(services(ROLES[who])["services"], "service", "count")
+    check(f"{who}: the screen's service chart data and print table are the model's",
+          table_rows == expected and js_series(page, "services", "counts") == expected,
+          (table_rows, expected))
+    xl = [(r[0], r[1]) for r in sheet_rows(client.get(urls["xlsx"] + SVC_RANGE).data,
+                                          "Health Services")
+          if r and isinstance(r[1], int)
+          and str(r[0]).startswith(("ZZSVC", "Other (each", "Prenatal"))]
+    check(f"{who}: the Excel service table is the model's", xl == expected, (xl, expected))
+    text = pdf_text(client.get(urls["pdf"] + SVC_RANGE).data)
+    check(f"{who}: the PDF names exactly the model's services",
+          set(re.findall(r"ZZSVC[A-Z]+", text))
+          == {l for l, _ in expected if l.startswith("ZZSVC")})
+    if ROLES[who] != "doctor":
+        check(f"{who}: no service of 1 to 4 appointments is named on the screen",
+              "ZZSVCONE" not in page and "ZZSVCFOUR" not in page)
+
+
+def other_only(role, free_text_patients):
+    """Condition counts with N patients holding only free-text conditions."""
+    run_sql("UPDATE patients SET medical_conditions = '[]'")
+    for pid in patient_ids[:free_text_patients]:
+        run_sql("UPDATE patients SET medical_conditions = ? WHERE id = ?",
+                ('["ZZFREETEXT"]', pid))
+    with app.app_context():
+        return get_condition_counts(viewer_role=role)
+
+
+for n, expected_admin in ((0, 0), (1, "Fewer than 5"), (4, "Fewer than 5"), (5, 5), (12, 12)):
+    for who in ("admin", "barangay official"):
+        counts = other_only(who, n)
+        check(f"{who}: {n} patient(s) with only free-text conditions read {expected_admin!r}",
+              counts["other_only_shown"] == expected_admin and counts["other_only"] == n
+              and counts["with_any_shown"] == expected_admin)
+    check(f"doctor: {n} patient(s) with only free-text conditions read exactly {n}",
+          other_only("doctor", n)["other_only_shown"] == n)
+other_only("official", 3)
+page = body(official.get("/official/community-reports"))
+check("Community Reports prints 'Fewer than 5 patients', not the number, for the Official",
+      "Fewer than 5 patients" in re.sub(r"\s+", " ", page))
+check("and its Excel file carries 'Fewer than 5' for the free-text-only count",
+      "Fewer than 5" in xlsx_text(official.get("/official/community-reports/export.xlsx").data))
+
+# ===========================================================================
+section("8. TASK 5e: NO AUDIT ENTRY STORES A WHOLE PHONE NUMBER")
+from models.audit import log_action  # noqa: E402
+
+with app.app_context():
+    entry_id = log_action(STAFF_ID, "Sent appointment SMS to patient", MODULE_SMS,
+                          "Texted 09123450009 and +639123450008 about a booking.")
+    plain_id = log_action(STAFF_ID, "Test entry", MODULE_SMS, "Ref 20260905 id 12345678901")
+check("a new audit entry that quotes numbers stores them as their last four digits",
+      q1("SELECT details FROM audit_logs WHERE id = ?", (entry_id,))[0]
+      == "Texted •••• ••• 0009 and •••• ••• 0008 about a booking.")
+check("an entry with no number is stored unchanged",
+      q1("SELECT details FROM audit_logs WHERE id = ?", (plain_id,))[0]
+      == "Ref 20260905 id 12345678901")
+
+import shutil as _shutil  # noqa: E402
+import tempfile  # noqa: E402
+from pathlib import Path  # noqa: E402
+import migrate_mask_audit_phone_numbers as migration  # noqa: E402
+
+work = Path(tempfile.mkdtemp(prefix="idsmask_"))
+copy = work / "copy.db"
+_shutil.copy(TEST_DB, copy)
+c = sqlite3.connect(copy)
+for text in ("Sent to 09123450011 on a booking.", "No number here, ref 20260905.",
+             "Two: 639123450012 and +639123450013."):
+    c.execute("INSERT INTO audit_logs (user_id, action, module, details) VALUES (1,'Old entry',"
+              "'SMS',?)", (text,))
+c.commit()
+before_rows = c.execute("SELECT COUNT(*) FROM audit_logs").fetchone()[0]
+c.close()
+result = migration.run(copy, backup_dir=work / "backups")
+c = sqlite3.connect(copy)
+rows = [r[0] for r in c.execute("SELECT details FROM audit_logs WHERE action = 'Old entry' "
+                                "ORDER BY id")]
+check("the migration masks the numbers in old entries and leaves the rest of the text",
+      rows == ["Sent to •••• ••• 0011 on a booking.", "No number here, ref 20260905.",
+               "Two: •••• ••• 0012 and •••• ••• 0013."], rows)
+# Three: the two numbered entries added here and the one section 6 inserted raw.
+check("it reports counts only: 3 entries masked, one record written, no problems",
+      result["entries_masked"] == 3 and result["record_written"] and not result["problems"],
+      result)
+check("it backed the database up first",
+      result["backup"] and Path(result["backup"]).exists()
+      and len(list((work / "backups").iterdir())) == 1)
+check("it wrote exactly ONE audit entry recording the run",
+      c.execute("SELECT COUNT(*) FROM audit_logs WHERE action = ?",
+                (migration.ACTION,)).fetchone()[0] == 1
+      and c.execute("SELECT COUNT(*) FROM audit_logs").fetchone()[0] == before_rows + 1)
+check("that entry holds no number", not re.search(
+    r"\d{9,}", c.execute("SELECT details FROM audit_logs WHERE action = ?",
+                         (migration.ACTION,)).fetchone()[0]))
+c.close()
+again = migration.run(copy, backup_dir=work / "backups")
+c = sqlite3.connect(copy)
+check("a second run changes nothing: no backup, no entry, no masking",
+      again["backup"] is None and not again["entries_masked"]
+      and c.execute("SELECT COUNT(*) FROM audit_logs").fetchone()[0] == before_rows + 1
+      and len(list((work / "backups").iterdir())) == 1)
+c.close()
+_shutil.rmtree(work, ignore_errors=True)
+
+# ===========================================================================
 passed = sum(1 for _, ok in results if ok)
 print("\n" + "=" * 78)
 print(f"RESULT: {passed}/{len(results)} checks passed")
