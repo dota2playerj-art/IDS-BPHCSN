@@ -187,6 +187,18 @@
         </div>
       </div>
     </div>
+{#- Task 6 (M4). A count for the Administrator: it is operational, not clinical, so
+    there is no name and no list. The same function the Doctor's list uses. #}
+    <div class="row g-3 mb-4">
+      <div class="col-lg-4 col-md-6">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#FEF3C7;"><span class="material-symbols-outlined" style="color:var(--warning); font-size:20px;">stethoscope</span></div>
+          <div class="stat-value">{{ waiting_for_doctor_count }}</div>
+          <div class="stat-label">Waiting for the Doctor: {{ waiting_for_doctor_count }}</div>
+          <div class="stat-trend" style="color:var(--text-muted);">Visits with no diagnosis yet</div>
+        </div>
+      </div>
+    </div>
 
 
     <!-- ACTIVE CONSULTATION SHORTCUT

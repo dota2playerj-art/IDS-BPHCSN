@@ -48,7 +48,8 @@ from models.patients import (
     get_registration_trend,
 )
 from utils.dates import to_clinic_time, today
-from utils.roles import is_care_team
+from models.doctor_worklist import count_waiting_for_doctor, get_waiting_for_doctor
+from utils.roles import holds_clinical_authority, is_care_team
 from utils.security import current_role
 
 # How many rows each dashboard list shows before it stops.
@@ -220,8 +221,18 @@ def dashboard_context():
     # can never disagree about whether the room is occupied. It is read once at
     # the top of this function and used here.
 
+    # Visits waiting for the Doctor (Task 6, M4). One rule in models/doctor_worklist.py
+    # for all three readers. The Doctor gets the list, with names. Health Center
+    # Staff and the Administrator get the count only, and for them no name is read.
+    doctor = holds_clinical_authority(current_role())
+    waiting_for_doctor = get_waiting_for_doctor() if doctor else None
+    waiting_for_doctor_count = (len(waiting_for_doctor) if doctor
+                                else count_waiting_for_doctor())
+
     return {
         "clinic_date": reference,
+        "waiting_for_doctor": waiting_for_doctor,
+        "waiting_for_doctor_count": waiting_for_doctor_count,
         "patient_stats": patient_stats,
         "queue": queue if care_team else [],
         "queue_stats": queue_stats,
