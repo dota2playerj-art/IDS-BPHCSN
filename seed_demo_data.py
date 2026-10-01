@@ -334,7 +334,7 @@ def months_to_days(value, unit):
 
 def plan_visits(rng, today, people):
     """Fill each person's visits: [{'date', 'case', ...}], sorted by date."""
-    from models.immunizations import EPI_SCHEDULE
+    from models.immunizations import EPI_SCHEDULE, due_date_for
 
     last_day = today - timedelta(days=1)
     while last_day.weekday() >= 5:
@@ -369,7 +369,7 @@ def plan_visits(rng, today, people):
         dates, given_elsewhere, visited = {}, [], 0
         last_by_code = {}
         for group in ordered:
-            due = person["birth"] + timedelta(days=months_to_days(*group))
+            due = due_date_for(person["birth"], *group)
             delay = rng.randint(0, 5) if behaviour != "late" else rng.randint(20, 55)
             day = due + timedelta(days=delay)
             for code, dose in groups[group]:
@@ -682,6 +682,10 @@ class Stamper:
     def __init__(self, path):
         self.path = path
         self.marks = self._max_ids()
+        # Every simulated moment is before this. A timestamp at or after it was
+        # written by the real clock (a new row, or an UPDATE that touched
+        # updated_at), and is dated to the step instead.
+        self.real_start = utc_text(datetime.now(timezone.utc) - timedelta(minutes=2))
 
     def _max_ids(self):
         conn = sqlite3.connect(self.path)
@@ -700,9 +704,10 @@ class Stamper:
                 for column in ("created_at", "updated_at", "sent_at"):
                     if column in columns:
                         conn.execute(f"UPDATE {table} SET {column} = ? WHERE id > ?", (text, mark))
-                if "restricted_at" in columns:
-                    conn.execute("UPDATE consultations SET restricted_at = ? "
-                                 "WHERE id > ? AND restricted_at IS NOT NULL", (text, mark))
+                for column in ("created_at", "updated_at", "sent_at", "restricted_at"):
+                    if column in columns:
+                        conn.execute(f"UPDATE {table} SET {column} = ? WHERE {column} >= ?",
+                                     (text, self.real_start))
             conn.commit()
         finally:
             conn.close()
@@ -961,6 +966,32 @@ def build(path, say=print, show_passwords=True, today_override=None):
     return {"counts": counts, "passwords": passwords}
 
 
+def archive_existing(target, backup_dir=None):
+    """Archive and verify an existing database, then move it aside.
+
+    Returns "archived", "removed" (a demo database) or False when the check failed.
+
+    A demo database (see archive_plain_databases.DEMO_MARKER) holds nobody real and
+    is simply removed. Any other file is archived and checked first, and moved to
+    previous-app.db in the backups folder only if the check passes.
+    """
+    import archive_plain_databases as archive
+
+    target = Path(target)
+    backup_dir = Path(backup_dir or archive.BACKUP_DIR)
+    if archive.is_plain_sqlite(target) and not archive.is_demo_database(target):
+        _, status = archive.archive_file(target, backup_dir)
+        if status == "failed":
+            return False
+        previous = backup_dir / archive.PREVIOUS_NAME
+        if previous.exists():
+            previous.unlink()
+        os.replace(target, previous)
+        return "archived"
+    target.unlink()
+    return "removed"
+
+
 def main(argv):
     parser = argparse.ArgumentParser(description="Build the fictional demo database.")
     parser.add_argument("--path", default=config.DATABASE)
@@ -973,19 +1004,12 @@ def main(argv):
         if not args.replace:
             print(f"{target} already exists. Use --replace to archive it and build a new one.")
             return 1
-        import archive_plain_databases as archive
-        if archive.is_plain_sqlite(target) and not archive.is_demo_database(target):
-            archived, status = archive.archive_file(target, archive.BACKUP_DIR)
-            if status == "failed":
-                print("The existing database could not be archived and checked. Nothing was changed.")
-                return 1
-            print("existing database archived and checked.")
-            previous = archive.BACKUP_DIR / archive.PREVIOUS_NAME
-            if previous.exists():
-                previous.unlink()
-            os.replace(target, previous)
-        else:
-            target.unlink()
+        done = archive_existing(target)
+        if not done:
+            print("The existing database could not be archived and checked. Nothing was changed.")
+            return 1
+        print("existing database archived and checked." if done == "archived"
+              else "existing fictional demo database removed.")
     try:
         build(target)
     except BaseException:

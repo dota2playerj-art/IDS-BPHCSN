@@ -51,6 +51,7 @@ SUITES = [
     ("verify_sealed_privacy.py", "(new in Task 5)"),
     ("verify_admin_minimum_necessary.py", "(new in Task 5c)"),
     ("verify_small_counts_and_masking.py", "(new in Task 5d)"),
+    ("verify_demo_data.py", "(new in Task 8)"),
 ]
 
 # The suites were written at different times and end with different summary
