@@ -52,7 +52,9 @@ from utils.dates import (
     resolve_range,
     today,
 )
-from utils.phone import is_valid_ph_mobile, normalize_phone_number, to_local_ph_mobile
+from utils.phone import (
+    is_valid_ph_mobile, mask_phone, normalize_phone_number, to_local_ph_mobile,
+)
 from utils.sms import (
     LIVE,
     SIMULATED,
@@ -491,13 +493,18 @@ def get_broadcast_by_id(broadcast_id):
 
 
 def get_broadcast_recipients(broadcast_id, limit=None, with_numbers=True):
-    """Who one broadcast went to, and what the gateway said about each.
+    """Who one broadcast went to, and whether each message was accepted.
 
-    `with_numbers` False leaves out the mobile number and the gateway's reply,
-    for the Administrator, who does not see patient contact numbers (Task 5c).
+    The number is MASKED for every role (Task 5d, D3): the last four digits only.
+    The full number stays in the table and in send_broadcast(), which is what
+    dials it. The gateway's own reply is not returned: no screen prints it, and a
+    reply can repeat the number.
+
+    `with_numbers` False leaves the number out altogether, for the Administrator,
+    who does not see patient contact numbers in any form (Task 5c).
     """
-    columns = "*" if with_numbers else (
-        "id, broadcast_id, patient_id, user_id, recipient_name, status, created_at")
+    columns = ("id, broadcast_id, patient_id, user_id, recipient_name, "
+               "mobile_number, status, created_at")
     with db_connection() as conn:
         rows = conn.execute(
             f"""
@@ -508,7 +515,15 @@ def get_broadcast_recipients(broadcast_id, limit=None, with_numbers=True):
             + (" LIMIT ?" if limit else ""),
             (broadcast_id, limit) if limit else (broadcast_id,),
         ).fetchall()
-    return [dict(row) for row in rows]
+    recipients = []
+    for row in rows:
+        recipient = dict(row)
+        if with_numbers:
+            recipient["mobile_number"] = mask_phone(recipient["mobile_number"])
+        else:
+            del recipient["mobile_number"]
+        recipients.append(recipient)
+    return recipients
 
 
 def get_broadcast_stats(history=None, start=None, end=None, months=6):

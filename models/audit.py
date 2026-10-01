@@ -28,6 +28,7 @@ written here are already in the shape that screen reads:
 import config
 from database.connection import db_connection
 from utils.dates import day_start_utc, today
+from utils.phone import mask_numbers_in_text
 
 # The module pills the Audit Logs screen already renders. Named constants rather
 # than literals at each call site so a typo cannot split one module into two.
@@ -686,7 +687,15 @@ def get_audit_logs(module=None, limit=100):
         """,
             parameters,
         ).fetchall()
-    return [dict(row) for row in rows]
+    entries = []
+    for row in rows:
+        entry = dict(row)
+        # An entry can quote a mobile number in its text. The screen, the export
+        # and the dashboard feed all read here, so they show the last four digits
+        # only (Task 5d, D3).
+        entry["details"] = mask_numbers_in_text(entry["details"])
+        entries.append(entry)
+    return entries
 
 
 def get_latest_entry(module, action):

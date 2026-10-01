@@ -66,6 +66,7 @@ nothing clickable is drawn.
 """
 from database.connection import db_connection
 from utils.dates import display_timestamp
+from utils.phone import mask_phone
 from utils.sms import LIVE, SIMULATED
 
 # THE FACILITY AS IT NAMES ITSELF TO A PATIENT, AND IT IS NO LONGER A CONSTANT.
@@ -125,6 +126,8 @@ STATUS_FAILED = "Failed"
 def _to_message(row):
     """A stored row plus the fields the screens render."""
     record = dict(row)
+    # Masked for every role (Task 5d, D3). The stored row keeps the full number.
+    record["mobile_number"] = mask_phone(record.get("mobile_number"))
     record["event_label"] = EVENT_LABELS.get(record.get("event"), record.get("event"))
     record["is_simulated"] = record.get("delivery_mode") == SIMULATED
     record["is_live"] = record.get("delivery_mode") == LIVE
