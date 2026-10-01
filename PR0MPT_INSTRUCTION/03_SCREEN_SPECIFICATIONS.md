@@ -423,7 +423,10 @@ Fields
 
 Patient
 
-Reason for visit
+Reason for visit (shown to the Doctor and Health Center Staff only; the Administrator's queue, its
+export and its PDF have no reason column, for any visit — updated 2026-10-01, Task 5b. On a
+Restricted visit the reason is encrypted: the Doctor reads it on screen, Health Center Staff see
+"Restricted — Doctor access only", and no file or printout carries it.)
 
 Status
 
@@ -1148,7 +1151,9 @@ account's stored role, not by hiding a control:
 |---|---|---|---|---|
 | Enter or edit Diagnosis and Treatment Plan | 20 | Yes | No — intake only | No — intake only |
 | Mark a consultation Restricted, or lift it | 05, 20 | Yes | No | No |
-| Read a Restricted consultation's diagnosis and plan | 05, 20 | Yes | Placeholder | Placeholder |
+| Read a Restricted consultation's diagnosis, plan, chief complaint and notes | 05, 20 | Yes | Placeholder | Placeholder |
+| Read the check-in reason on the Patient Queue | 08 | Yes | No | Yes (placeholder if Restricted) |
+| Read the medicine names dispensed at a Restricted visit | 05, 20 | Yes | Placeholder | Yes |
 | Set a patient to Deceased, or reverse Deceased | 03 | Yes | No | No |
 | Move a patient between Active and Inactive | 03 | Yes | Yes | Yes |
 
@@ -1157,8 +1162,8 @@ discarded before validation. On an edit, the stored value is put back and the re
 in the audit trail, without the submitted text. The placeholder a non-Doctor sees reads
 **"Restricted — Doctor access only"**. The sealed text is not in the page at all.
 
-**Screen 12.** An audit entry for a consultation edit names the diagnosis or treatment plan as
-changed ("Changed: Diagnosis") and never quotes either value, sealed or not (updated 2026-10-01).
+**Screen 12.** An audit entry for a consultation edit names a free-text field as changed ("Changed:
+Chief complaint, Diagnosis") and never quotes its value, sealed or not (updated 2026-10-01, Task 5b).
 Audit Logs are read by the Administrator.
 
 **Screen 10 and 18.** Restricted consultations count in every total. In the diagnosis ranking they
@@ -1173,19 +1178,31 @@ are unchanged and keep their attribution.
 unlawful to disclose a person's HIV status without written consent, and RA 10173 treats health
 data as sensitive personal information. So:
 
-- On a Restricted consultation, the diagnosis and treatment plan are stored encrypted (AES-256-GCM).
-  Only the Doctor's screens decrypt them. The backup file carries them encrypted.
+- On a Restricted consultation, every free-text field of the visit is stored encrypted
+  (AES-256-GCM): the diagnosis, treatment plan, chief complaint and additional notes, and the check-in
+  reason of its queue visit (Task 5b). The reason is that RA 11166 Section 44 also forbids disclosing
+  that a person has had an HIV-related test, and a chief complaint such as "for HIV testing" does
+  that. Only the Doctor's screens decrypt them. The backup file carries them encrypted. Vitals,
+  immunization records, dates and the fact of the seal are not free text and stay readable.
+- On a Restricted visit, Health Center Staff cannot read or change the chief complaint and notes:
+  the Edit Consultation form shows the placeholder, and a save leaves them as stored.
+- The names of medicines dispensed at a Restricted visit show as the placeholder to the
+  Administrator on the profile, the Edit Consultation form, the dashboard and in flash messages and
+  audit entries. Quantities show as a bare number.
 - Exports and print views never show sealed text, for any role. On Screen 05 the Doctor sees it on
-  screen; Print Record prints "Restricted — Doctor access only" in its place.
+  screen; Print Record prints "Restricted — Doctor access only" in its place. Printing the Edit
+  Consultation page (Screen 20) from the browser prints "Sealed — not printed" in place of each
+  sealed field; the screen itself does not change (Task 5b).
+- Screens 10 and 18 rank chief complaints like diagnoses: a Restricted visit is one "Confidential" row.
 - If the key on the computer cannot open a sealed record, the Doctor sees "This sealed record
   cannot be opened on this computer." Nothing crashes, and the audit trail records it.
 - Screen 13, Backup: "Sealed records stay encrypted in the backup. They can only be opened on a
   computer that has this system's key."
 
-Known limits. These stay readable for a Restricted visit, on screens and in the backup: what was
-dispensed (needed for stock), the visit date, chief complaint, vital signs, additional notes,
-immunizations, and the fact that the record is Restricted. Backups made before 2026-10-01 still
-hold plain text. Printing the Edit Consultation form from the browser prints what is on it.
+Known limits. These stay readable for a Restricted visit, on screens and in the backup: the visit
+date, vital signs, immunizations, and the fact that the record is Restricted. The medicine names stay
+plain in the database and the backup file, because stock counts and the per-item totals on Screens
+10 and 18 read them. Backups made before 2026-10-01 still hold plain text.
 
 ---
 

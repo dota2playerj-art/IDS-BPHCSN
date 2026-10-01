@@ -451,12 +451,32 @@ sealed clinical text inside them must be unreadable without the key.
 - D5. The Doctor keeps a printed copy of the key in a sealed envelope (export_sealed_key.py), so
   sealed records can be recovered if the computer fails.
 
-**Known limits.** For a sealed visit these stay readable, on screens and in the backup: what was
-dispensed (needed for stock counts; a medicine can hint at a condition), the visit date, chief
-complaint, vital signs, additional notes, immunizations, and the fact that the record is sealed.
-Backups made before 2026-10-01 hold plain text. The key sits in .env on the same computer as the
-database, so the encryption protects copies that leave the computer; the computer itself needs
-full-disk encryption (BitLocker).
+**Decisions (2026-10-01, Task 5b).** Task 5 sealed only the diagnosis and treatment plan. Section
+44 also forbids disclosing that a person *has undergone an HIV-related test*. A chief complaint, a
+note or a check-in reason such as "for HIV testing" discloses exactly that, even with the diagnosis
+encrypted. Task 5b closes the rest.
+
+- D1. A sealed visit encrypts every free-text field of that visit: the chief complaint, the
+  additional notes, and the check-in reason of its linked queue visit, as well as the diagnosis and
+  treatment plan. Vitals, immunization records, dates and the fact of the seal stay readable.
+- D2. Those fields follow the existing seal rule: on screen, only the Doctor reads them; everyone
+  else sees "Restricted — Doctor access only". Exports and prints never contain them, for any role.
+- D3. The names of medicines dispensed at a sealed visit are hidden from the Administrator on every
+  patient-linked view, export and print. The Doctor and Health Center Staff, who are part of the
+  patient's care, still see them. Stock levels and per-item totals not tied to a patient stay visible.
+- D4. On the Patient Queue the Administrator sees each patient, their status and times, but not the
+  check-in reason, for any visit (minimum necessary). The Doctor and Health Center Staff still see it.
+- D5. No audit entry stores a chief complaint, note, check-in reason or other free clinical text.
+  An edit entry lists field names only ("Changed: Chief complaint, Additional notes").
+- D6. When the Doctor prints the Edit Consultation page from the browser, sealed fields print as
+  "Sealed — not printed".
+
+**Known limits.** For a sealed visit these stay readable, on screens and in the backup: the visit
+date, vital signs, immunizations, and the fact that the record is sealed. The names of medicines
+dispensed at a sealed visit stay plain in the database and in the backup file, because stock counts
+and the per-item totals in Reports & Analytics read them. Backups made before 2026-10-01 hold plain
+text. The key sits in .env on the same computer as the database, so the encryption protects copies
+that leave the computer; the computer itself needs full-disk encryption (BitLocker).
 
 ---
 
@@ -609,3 +629,11 @@ Version 2.6 (2026-10-01)
 Sealed record privacy (H4). Sealed diagnoses and treatment plans are encrypted, audit entries
 never quote clinical text, reports show sealed visits as "Confidential", and exports and prints
 never carry sealed text. See "Sealed Records and the Law".
+
+Version 2.7 (2026-10-01)
+
+Task 5b, seal all free text. A sealed visit now encrypts its chief complaint, additional notes and
+the check-in reason too, because RA 11166 Section 44 also covers the fact that a person was tested.
+The Administrator no longer sees the check-in reason on the Patient Queue, or the medicine names of
+a sealed visit. Audit entries name free-text fields and never quote them. See "Sealed Records and
+the Law".

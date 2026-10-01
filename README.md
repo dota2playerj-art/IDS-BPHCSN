@@ -41,13 +41,17 @@ with 0 only when every check passes. See `PROJECT_STATUS.md` for current results
 
 ## Sealed records and the encryption key
 
-The Doctor can seal (Restrict) a consultation. Its diagnosis and treatment plan are then
-stored encrypted with `SEALED_DATA_KEY`, a key in `.env`. Each installation has its own key,
+The Doctor can seal (Restrict) a consultation. Everything written on that visit (the chief
+complaint, diagnosis, treatment plan, additional notes, and the reason given at check-in) is
+then stored encrypted with `SEALED_DATA_KEY`, a key in `.env`. Each installation has its own key,
 made by `python setup_env.py`. Run `python export_sealed_key.py` once, write the key on
 paper, seal it in an envelope and give it to the Doctor. Without it, sealed records cannot
 be recovered if the computer fails. A backup opens sealed records only on a computer with
 the same key. Because the key lives in `.env` on the health-center PC, turn on full-disk
 encryption (BitLocker) on that PC.
+
+After pulling an update that adds a migration, run it once on each laptop, for example
+`python migrate_seal_free_text_fields.py`. It makes a backup first and is safe to run twice.
 
 ## The database
 

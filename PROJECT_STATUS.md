@@ -1,7 +1,7 @@
 # IDS-BPHCSN — Project Status
 
 Last updated: 2026-10-01
-Updated by: Task 5 — sealed record privacy
+Updated by: Task 5b — seal all free text
 
 Sections 1–7 started as a read-only status audit. The Task Log below says what each task after it changed. The live `app.db` has only ever been opened read-only by these tasks.
 
@@ -15,6 +15,7 @@ Newest first.
 
 | Date | Task | Result |
 |---|---|---|
+| 2026-10-01 | Task 5b — seal all free text | M21, M24, L19 and L20 done. RA 11166 Section 44 also forbids disclosing that a person was tested, so a sealed visit now encrypts its chief complaint, additional notes and the check-in reason of its queue visit, as well as the diagnosis and treatment plan (same AES-256-GCM, bound to the row and field; the reason is bound to its `appointments` row). Only `open_sealed_value()` decrypts. Health Center Staff cannot read or change those fields on a sealed visit. The Administrator no longer sees the check-in reason on the Patient Queue, its Excel or its PDF, for any visit, and sees the placeholder instead of medicine names at a sealed visit (profile, edit form, dashboard, flash messages, audit entries). The Doctor and Staff still see them. Edit entries name free-text fields and never quote them. Printing Edit Consultation prints "Sealed — not printed" for sealed fields. Reports rank sealed complaints as one "Confidential" row. New `migrate_seal_free_text_fields.py` ran on this laptop's `app.db`: backup `app.db.PRETASK_BACKUP_seal-free-text-fields_20261001_193100`, 6 audit entries cleaned, 0 sealed consultations and 0 check-in reasons to encrypt, 1 record entry. A second run did nothing. Each laptop must run `python migrate_seal_free_text_fields.py` (after `git pull`; no new packages). Changed suites: `verify_rbac.py` (a Staff edit of a sealed record no longer moves the chief complaint; the honest form omits it). Extended `verify_sealed_privacy.py` to 182 checks. New limits M25–M27, L24. Tests: 1640/1640, 16 of 16 suites. |
 | 2026-10-01 | Task 5 — sealed record privacy | H4 and L2 done. A sealed consultation's diagnosis and treatment plan are stored encrypted (AES-256-GCM, key `SEALED_DATA_KEY` in `.env`, separate from SECRET_KEY). Only `open_sealed_value()` decrypts, and only for the Doctor. The backup holds ciphertext, is VACUUMed, and still restores. No audit entry quotes a diagnosis or treatment plan, sealed or not. Reports show sealed visits as one "Confidential" row. Exports and Print Record never carry sealed text. A key that cannot open a record shows one plain line and is audited. `migrate_redact_clinical_audit_text.py` ran on this laptop's `app.db`: backup `app.db.PRETASK_BACKUP_redact-clinical-audit-text_20261001_161011`, 9 entries redacted, 0 sealed records to encrypt, 1 record entry (filed under account 1, the first active Administrator, and saying the migration did it). New: `export_sealed_key.py`, suite `verify_sealed_privacy.py`. Each laptop must run `pip install -r requirements.txt` (new package `cryptography`), `python setup_env.py` (adds the key), then the migration. Known limits recorded as M21–M23 and L19–L20. Tests: 1565/1565, 16 of 16 suites. |
 | 2026-10-01 | Task 4 cleanup | L18 done. The two test fixture numbers with a real-looking `0917` prefix are now the fictional `0900000NNNN` pattern. The two dead functions the audit-coverage EXEMPT list carried, `set_appointment_status` and `remove_immunizations`, are deleted along with their EXEMPT entries and the comments explaining why they were kept, after a repo-wide search confirmed no callers. |
 | 2026-10-01 | Task 4 — audit trail | H3 and M6 done. Patient registration, edits and status changes (a death declaration and its reversal have their own phrases), new consultations, doses recorded at a visit, dispensing, inventory changes and the Patient Queue now write an audit entry, in the same transaction as the change (`routes/audit_entries.py`). A failed or refused write leaves no entry. None of it quotes a diagnosis, a treatment plan, a sealed field, a password or a full contact number. The Audit Logs screen's wrong sentence about what the trail covers is corrected, and so are three stale "Not Tracked" claims this task's first pass missed in `routes/roster_export.py` and `routes/audit_export.py`, which still said patient, inventory and queue writes were unaudited after they had been covered. New suite `verify_audit_coverage.py`, including a structural check that fails if a future write path has no audit entry. Tests: 1457/1457, 15 of 15 suites. |
@@ -26,6 +27,8 @@ Newest first.
 | 2026-09-28 | Status audit | Wrote this file. Read-only. |
 
 **Before the first push to GitHub:** H6 is done (Task H6). First confirm the rewritten history is good, then delete the backup bundle `IDS-BPHCSN-backups/repo-before-history-rewrite-20260929_101023.bundle`: it still holds the real data (M18).
+
+**Standing rule: never print real data from `app.db` in an AI session; use counts and IDs.**
 
 **Commit hashes before 2026-09-29 changed in the history rewrite; the notes were updated.** A hash written anywhere outside this repository (chat logs, messages, old notes) no longer points at anything.
 
@@ -43,12 +46,12 @@ python tests/run_all.py rbac       only the suites whose names contain "rbac"
 - The live `app.db` is never used. A guard stops the whole run if any database path is inside the project folder. The runner also checks that `app.db` has the same size, time and checksum after the run.
 - Test accounts use test-only passwords (`tests/_support.py`), not the demo passwords.
 - All test data is made up. The old suites used a real staff member's name for account 4; the tests now use `bhwtest` / "Test Health Worker".
-- "All passing" looks like: one `ok` line per suite, then `TOTAL: 1565/1565 checks passed in 16/16 suites` and `All checks passed.` Exit code 0.
-- **Today (after Task 5): 1565/1565, all 16 suites pass.** Before Task 1b it was 906/921; every failure came from H5.
+- "All passing" looks like: one `ok` line per suite, then `TOTAL: 1640/1640 checks passed in 16/16 suites` and `All checks passed.` Exit code 0.
+- **Today (after Task 5b): 1640/1640, all 16 suites pass.** Before Task 1b it was 906/921; every failure came from H5.
 - Every POST needs a form token (Task 3). The suites' clients add a valid one for their own session (`tests/_support.py`, `TokenClient`); `verify_csrf.py` uses plain clients to test refusals.
 - Run from `.venv` (`source .venv/Scripts/activate` on this laptop). The global Python install has no `python-dotenv`, and the suites fail to import `config` without it.
 
-| Suite | Checks | Result after Task 5 |
+| Suite | Checks | Result after Task 5b |
 |---|---|---|
 | verify_epi.py | 15 | 15/15 |
 | verify_staff_capabilities.py | 27 | 27/27 |
@@ -65,7 +68,7 @@ python tests/run_all.py rbac       only the suites whose names contain "rbac"
 | verify_security_basics.py (Task 2) | 82 | 82/82 |
 | verify_csrf.py (Task 3) | 68 | 68/68 |
 | verify_audit_coverage.py (Task 4) | 58 | 58/58 |
-| verify_sealed_privacy.py (Task 5) | 107 | 107/107 |
+| verify_sealed_privacy.py (Tasks 5, 5b) | 182 | 182/182 |
 
 Not brought in: the four `d4d04b0e_*` scripts (they print values but have no pass/fail checks; they were only compared between two code trees), the three retired originals that `*_ported.py` replaced, the mutation worktrees, and one Doctor-suite check that ran old code from a worktree (L13).
 
@@ -304,7 +307,7 @@ None found. Every route carries a guard. The only unguarded routes are `/`, `/lo
 ## 5. Issues Found
 
 Severity: High = breaks a feature, or is a security or legal risk. Medium = wrong behavior or confusing. Low = cleanup.
-Count: **6 High, 24 Medium, 23 Low.** Done: M11, M15, L9 (Task 1); H5, M16, L13 (Task 1b); H1 (code side), H2, M1, M3, L1, L5, L8 (Task 2); H6, M17 (Task H6); M2 (Task 3); H3, M6, L18 (Task 4); H4, L2 (Task 5). Added in Task 1: H5, H6, M16, L13. Added in Task 1b: L14. Added in Task 2: M17. Added in Task H6: M18, M19, L15. Added in Task 3: M20, L16, L17. Added in Task 4: L18 (done the same session). Added in Task 5: M21–M24, L19–L23.
+Count: **6 High, 27 Medium, 24 Low.** Done: M11, M15, L9 (Task 1); H5, M16, L13 (Task 1b); H1 (code side), H2, M1, M3, L1, L5, L8 (Task 2); H6, M17 (Task H6); M2 (Task 3); H3, M6, L18 (Task 4); H4, L2 (Task 5); M21, M24, L19, L20 (Task 5b). Added in Task 1: H5, H6, M16, L13. Added in Task 1b: L14. Added in Task 2: M17. Added in Task H6: M18, M19, L15. Added in Task 3: M20, L16, L17. Added in Task 4: L18 (done the same session). Added in Task 5: M21–M24, L19–L23. Added in Task 5b: M25–M27, L24.
 
 | # | Severity | File:line | Problem | Suggested direction |
 |---|---|---|---|---|
@@ -352,15 +355,19 @@ Count: **6 High, 24 Medium, 23 Low.** Done: M11, M15, L9 (Task 1); H5, M16, L13 
 | L16 | Low | `routes/auth.py` `logout()` | Opening `/logout` in the address bar (an old bookmark) now shows the framework's plain "405 Method Not Allowed" page, in technical words. It does not sign anyone out, which is correct. | Send a GET to /logout to the dashboard or login page instead. |
 | L17 | Low | `static/js/session.js` | The keep-alive handles 204, 401 and (Task 3) 400. A 503 (maintenance mode switched on) is ignored, so the page only shows the maintenance screen at the next click. | Reload the page on a 503, so the maintenance screen appears. |
 | L18 | Low | `models/appointments.py:1043`, `models/immunizations.py:1155` | Task 4's audit-coverage EXEMPT list carried two functions, `set_appointment_status` and `remove_immunizations`, kept unused on purpose for a future caller. Confirmed by repo-wide search to have no callers anywhere (routes, templates, JS, tests, migrations). | **Done (session cleanup, 2026-10-01):** both deleted, with the EXEMPT entries and the two comments in `routes/consultation_views.py` that explained why `remove_immunizations` was kept. `PR0MPT_INSTRUCTION/09_IDS-BPHCSN_UI_Architecture_FROM-CLAUDE.md:448` still describes `remove_immunizations()` as deliberately kept and not yet updated. |
-| M21 | Medium | `models/dispensing.py`; `templates/patient_profile.html` (Dispensing History); `templates/admin_dashboard.html` (Medicine column) | Known limit (Task 5). What was dispensed at a sealed visit stays readable to every clinical role and in the backup. It is needed for stock counts and for staff to hand the medicine over. A medicine can hint at the condition (for example, an antiretroviral). The Task 4 audit entry already leaves item names out for a sealed visit. | Team decides whether the profile and dashboard should hide item names for a sealed visit from non-Doctors. Stock rows must stay. |
+| M21 | Medium | `models/dispensing.py`; `templates/patient_profile.html`; `templates/admin_dashboard.html` | What was dispensed at a sealed visit was readable to every role. | **Done (Task 5b, D3):** the Administrator sees the placeholder instead of item names on the profile, the edit form, the dashboard, flash messages and audit entries. The Doctor and Staff still see them. What stays visible: stock, per-item totals, and the backup file (see M25). |
 | M22 | Medium | `../IDS-BPHCSN-backups/` | Known limit (Task 5). Backups made before 2026-10-01 hold plain text: the 9 audit entries that quoted diagnoses, and any record sealed before then. That includes this task's own pre-migration backup. | Keep them locked away, and delete them once the team is sure the migrated `app.db` is good. |
 | M23 | Medium | `.env` on the health-center PC | Known limit (Task 5). The key sits on the same computer as `app.db`, so encryption protects copies that leave the computer (backups), not the computer itself. If the key is lost, sealed records cannot be opened. | Turn on BitLocker on that PC. Run `python export_sealed_key.py` once and give the key to the Doctor in a sealed envelope (D5). |
-| M24 | Medium | `models/consultations.py` `describe_consultation_changes()` | Team decision. D2 covers the diagnosis and treatment plan only. Edit entries still quote the chief complaint and additional notes, which are clinical text read by the Administrator, and those two fields stay plain under a seal. | Decide whether they should be named only, like the diagnosis. |
-| L19 | Low | `models/consultations.py` `DOCTOR_ONLY_FIELDS` | Known limit (Task 5), by design. For a sealed visit, the visit date, chief complaint, vital signs, additional notes, immunizations and the fact of the seal stay readable on screens and in the backup. | None needed. The seal covers the Doctor's two fields. |
-| L20 | Low | `templates/record_consultation.html` | Known limit (Task 5). Print Record on the profile prints the placeholder for the Doctor, but printing the Edit Consultation form from the browser prints what is on the form, sealed text included. | Add a print stylesheet that hides the two fields, if the team wants it. |
+| M24 | Medium | `models/consultations.py` `describe_consultation_changes()` | Edit entries quoted the chief complaint and additional notes. | **Done (Task 5b, D5):** every free-text field is named only ("Changed: Chief complaint"). 6 older entries in this laptop's `app.db` were cleaned by the migration. |
+| L19 | Low | `models/consultations.py` `SEALED_FIELDS` | Known limit, by design. For a sealed visit these stay readable on screens and in the backup: the visit date, vital signs, immunizations and the fact of the seal. They are numbers, dates and flags, not free text. The chief complaint, notes and check-in reason are now encrypted (Task 5b). | None needed. |
+| L20 | Low | `templates/record_consultation.html` | Printing the Edit Consultation page printed sealed text. | **Done (Task 5b, D6):** each sealed field prints as "Sealed — not printed"; the screen does not change. |
 | L21 | Low | `tests/_support.py` (fixture patients' `contact_number`) | Fixture patients use `0917`-prefixed numbers, the real-looking pattern replaced in `verify_audit_coverage.py`. | Use the `0900000NNNN` pattern. |
 | L22 | Low | `routes/patient_views.py` `_log_withheld_consultations()` docstring | Says nothing is written "for the Administrator". Since 2026-09-25 the Administrator is withheld from too. | Fix the sentence. |
 | L23 | Low | `routes/consultation_views.py` `_log_restriction()` | The seal and lift audit entries are written in their own transaction, after the seal commits. Task 4's "same transaction" rule was not applied here. | Pass the entry into `set_consultation_restriction()` as an `audit` callback. |
+| M25 | Medium | `medicine_dispensing.medicine_name`; Reports & Analytics "most dispensed"; `/admin/settings/backup.db` | Known limit (Task 5b). Medicine names at a sealed visit are plain in the database, in the backup file and in the per-item ranking on Reports & Analytics (D3 keeps totals not tied to a patient). The Administrator can download the backup and read them with a database tool. A rare medicine with a count of 1 over a one-day range points at one visit. | Team decides: encrypt `medicine_name` for sealed visits (stock and ranking would then need a separate item reference), or accept. |
+| M26 | Medium | `templates/patient_profile.html` (Appointment History); backup file | Team decision. D4 hides the check-in reason from the Administrator on the Patient Queue only. On a profile, an unsealed visit's reason (and its chief complaint) is still shown to the Administrator, and the backup file holds every unsealed value as written. | Decide whether the minimum-necessary rule should reach the profile, or whether the Doctor is expected to seal any sensitive visit. |
+| M27 | Medium | `audit_logs` (dispensing entries) | Known limit (Task 5b). Dispensing entries written before a visit was sealed name the medicines, with the consultation number. Sealing later does not rewrite them, so the Administrator can still read them in Audit Logs. | Decide whether sealing should redact earlier dispensing entries for that consultation. |
+| L24 | Low | `patients.medical_conditions`, `patients.allergies`; immunization and other-vaccination notes | Known limit (Task 5b). These free-text fields belong to the patient or to a dose, not to a visit, so the seal does not cover them. A condition list can name HIV. | Decide whether the patient-level lists need the same protection. |
 
 Checked and **not** found: `TODO`/`FIXME`/`XXX` markers; `href="#"` or "coming soon" stubs; broken `url_for()` targets (123 literal calls and 73 context endpoint names all resolve); missing static files; "Agusan del Sur" as a live value (it appears only in notes about the correction, in code comments and docs 06/09, and not at all in the live DB); passwords sent by email or SMS; offline mode, national database integration, or non-plain-text SMS.
 
