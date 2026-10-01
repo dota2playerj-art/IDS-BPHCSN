@@ -1193,6 +1193,24 @@ appear as one row, **"Confidential"**, for every viewer, the Doctor included (up
 The Doctor reads sealed text on the patient's own record (Screens 05 and 20), never in an
 aggregate or its exports.
 
+**Screens 10 and 18, small counts (Task 5d, 2026-10-02).** For the Administrator and the Barangay
+Official, every ranking or breakdown by diagnosis, complaint, chronic condition or dispensed
+medicine folds any row with a count of 1 to 4 into one row, **"Other (each fewer than 5)"**. The
+"Confidential" row folds the same way when its count is under 5, and the restricted-visit count line
+reads "Fewer than 5". The charts, the printed tables, the Excel file and the PDF read the same
+folded list. Totals stay exact. The Doctor sees every count. For dispensing, the test is on the
+number of issues, since one issue is one visit. The reason: the Administrator can see who is in the
+queue and when, so a count of 1 over a short range can identify a person. The threshold is
+`SMALL_COUNT_THRESHOLD` in `config.py`.
+
+**Screen 09, masked numbers (Task 5d).** The recipient list and the appointment-confirmation panel
+show a number as "•••• ••• 1234" for every role. The Administrator's list shows names and delivery
+results and no number at all. Audit entries mask any mobile number in their text.
+
+**Stock accountability (Task 5d).** Dispensing writes no stock entry; an entry per issue would link a
+medicine to a visit time. Accountability comes from the stock levels and the dispensed totals in
+Reports & Analytics. The Doctor and Health Center Staff hold the full dispensing records.
+
 **History.** Diagnoses written, and seals set, under the Administrator account before 2026-09-25
 are unchanged and keep their attribution.
 

@@ -1155,3 +1155,16 @@ dashboard. The data builders read demographics only for him (`models/patients.py
 most-dispensed ranking counts sealed-visit dispensing as "Confidential".
 
 The Doctor, Health Center Staff and the Barangay Official are unchanged.
+
+**Task 5d (2026-10-02), two follow-ups.**
+
+- *Small counts.* For the Administrator and the Barangay Official, a ranking or breakdown row by
+  diagnosis, complaint, condition or dispensed medicine with a count of 1 to 4 folds into one row,
+  "Other (each fewer than 5)", on Screens 10 and 18, their charts, prints, Excel and PDF files. The
+  Doctor sees every count. Totals stay exact. Reason: the Administrator can see who is in the queue
+  and when, so a count of 1 over a short range can identify a person (RA 10173, minimum necessary).
+- *Masked numbers.* On every SMS screen, export and JSON response, for every role, a phone number
+  shows its last four digits ("•••• ••• 1234"). Full numbers stay only where messages are sent.
+- *Stock accountability.* Dispensing writes no stock entry. Accountability comes from the stock
+  levels and the dispensed totals in Reports. The Doctor and Health Center Staff hold the full
+  dispensing records.

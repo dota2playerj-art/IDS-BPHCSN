@@ -514,6 +514,22 @@ dispensing as "Confidential".
 
 The Doctor, Health Center Staff and the Barangay Official are unchanged.
 
+**Small counts (2026-10-02, Task 5d).** In Reports & Analytics and Community Reports, for the
+Administrator and the Barangay Official, any row of a ranking or breakdown by diagnosis, complaint,
+condition or dispensed medicine with a count of 1 to 4 is folded into one row, "Other (each fewer
+than 5)". The "Confidential" row folds the same way when its count is under 5. Totals stay exact.
+The Doctor sees every count. The threshold is `SMALL_COUNT_THRESHOLD` in `config.py`. The reason:
+the Administrator can see who is in the queue and when, so a count of 1 over a short date range can
+identify a person (RA 10173, minimum necessary).
+
+**Masked numbers (Task 5d).** On every SMS screen, export and JSON response, for every role, a phone
+number shows its last four digits only ("•••• ••• 1234"). Recipient counts and delivery results stay.
+Full numbers stay only where the system sends messages.
+
+**Stock accountability.** Dispensing writes no stock entry, because an entry per issue would tie a
+medicine to a visit time. Accountability comes from the stock levels and from the dispensed totals
+in Reports & Analytics. The Doctor and Health Center Staff hold the full dispensing records.
+
 ---
 
 # Sample Development Workflow
@@ -679,3 +695,9 @@ Version 2.8 (2026-10-01)
 Task 5c, care-team-only clinical data. The Administrator sees demographics, counts and read-only
 views, and writes no patient or clinical record. Audit entries name no medicine or vaccine. The
 backup download is encrypted. See "Clinical Data Is for the Care Team".
+
+Version 2.9 (2026-10-02)
+
+Task 5d, small counts and masked numbers. Ranking rows with fewer than 5 fold into "Other" for the
+Administrator and the Barangay Official. Phone numbers show their last four digits on SMS screens.
+Stock accountability is stated correctly. See "Clinical Data Is for the Care Team".
