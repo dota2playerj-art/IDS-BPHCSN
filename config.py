@@ -37,6 +37,12 @@ SCHEMA = os.path.join(BASE_DIR, "schema.sql")
 
 # Session limits. The server enforces them on every request (utils/security.py).
 # The computers are shared, so a session must not stay open for the next person.
+# Small-count rule (Task 5d). For the Administrator and the Barangay Official, a
+# row of a ranking by diagnosis, complaint, condition or medicine whose count is
+# from 1 up to one less than this folds into one "Other" row. A count of 1 over a
+# short date range can point at one person. See utils/small_counts.py.
+SMALL_COUNT_THRESHOLD = 5
+
 # Signed out after this long with no activity.
 IDLE_TIMEOUT = timedelta(minutes=30)
 # Signed out this long after signing in, whatever happens.

@@ -637,7 +637,7 @@ check("run from the command line, it prints one line and no traceback",
 section("7. THE MOST-DISPENSED RANKING COUNTS SEALED VISITS AS CONFIDENTIAL")
 with app.app_context():
     from models.dispensing import get_dispensing_stats
-    stats = get_dispensing_stats()
+    stats = get_dispensing_stats(viewer_role="Doctor")
 ranking = stats["window"]["all_medicines"]
 sealed_units = q1("SELECT COALESCE(SUM(d.quantity_dispensed),0) FROM medicine_dispensing d "
                   "JOIN consultations c ON c.id = d.consultation_id WHERE c.is_restricted = 1")[0]
@@ -651,8 +651,18 @@ check("and the totals still match the table",
       stats["total_units"] == q1("SELECT SUM(quantity_dispensed) FROM medicine_dispensing")[0]
       and sum(e["units"] for e in ranking) == stats["window"]["units"])
 text = readable(admin.get("/admin/reports_analytics/export.xlsx"))
-check("the Administrator's report export lists Confidential in the dispensing ranking",
-      "Confidential" in text and "not named" in text)
+# Task 5d: for the Administrator a row of fewer than 5 issues folds into Other, the
+# Confidential row included. The Doctor's own ranking (above) holds the exact row,
+# so the expected label is read from its issue count.
+from utils.small_counts import OTHER_LABEL
+sealed_issues = confidential[0]["events"]
+if sealed_issues >= 5:
+    check("the Administrator's report export lists Confidential in the dispensing ranking",
+          "Confidential" in text and "not named" in text)
+else:
+    check("the Administrator's export folds the small Confidential dispensing row into Other",
+          OTHER_LABEL in text and "Cetirizine" not in text,
+          f"sealed issues={sealed_issues}")
 
 # ===========================================================================
 passed = sum(1 for _, ok in results if ok)

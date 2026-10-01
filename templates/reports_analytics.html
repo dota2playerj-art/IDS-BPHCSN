@@ -491,7 +491,7 @@
 {#- Ranked by units, with the issue count printed beside it, because the two are
     different supply questions: forty patients given ten tablets each and two
     patients given two hundred are not the same shelf problem. #}
-          <div class="snapshot-note">Ranked by units dispensed inside the selected range, most first. Named as the dispensing records name them. An item renamed part way through a range appears under both names.{% if disp.top_medicines | selectattr('confidential') | list %} Items dispensed at Restricted consultations are counted under Confidential and not named.{% endif %}</div>
+          <div class="snapshot-note">Ranked by units dispensed inside the selected range, most first. Named as the dispensing records name them. An item renamed part way through a range appears under both names.{% if disp.top_medicines | selectattr('confidential') | list %} Items dispensed at Restricted consultations are counted under Confidential and not named.{% endif %}{{ small_count_note(disp.top_medicines) }}</div>
         </div>
       </div>
       <div class="col-lg-5">
@@ -688,8 +688,8 @@
                   first_head='Condition') }}
           <div class="basis-note">
             Conditions counted from the Register Patient form's own list
-            ({{ seniors.counts | map(attribute='condition') | join(', ') }}). A patient with two is
-            counted under each, so these do not sum to {{ seniors.cohort_size }}.
+            ({{ seniors.counts | rejectattr('other') | map(attribute='condition') | join(', ') }}). A patient with two is
+            counted under each, so these do not sum to {{ seniors.cohort_size }}.{{ small_count_note(seniors.counts) }}
 {%- if seniors.other_only %} {{ seniors.other_only }} senior{{ '' if seniors.other_only == 1 else 's' }}
             recorded only free-text conditions and {{ 'is' if seniors.other_only == 1 else 'are' }} not counted here.{% endif %}
           </div>
@@ -800,9 +800,7 @@
           <div class="basis-note mt-2">
             Grouped by the text entered, ignoring case. Free text is not coded, so two
             spellings of one condition count separately.
-{%- if withheld %}
-            Restricted consultations are counted under Confidential. Their diagnoses are not shown.
-{%- endif %}
+            {{- ranking_note(diags, withheld, 'diagnoses') }}
           </div>
 {%- endif %}
         </div>

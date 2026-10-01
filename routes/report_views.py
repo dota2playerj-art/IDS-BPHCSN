@@ -39,6 +39,7 @@ from models.dispensing import get_dispensing_stats
 from models.inventory import get_inventory_report
 from models.patients import get_patient_report
 from utils.dates import resolve_range, today
+from utils.security import current_role
 
 # How many months the three trend charts cover. One constant, so the
 # registration, consultation and appointment trends plot the same window and
@@ -320,8 +321,15 @@ def reports_analytics_context(report_type="all", args=None):
     start = selection["start"]
     end = selection["end"]
 
-    patients = get_patient_report(months=TREND_MONTHS, start=start, end=end)
-    consultations = get_consultation_stats(months=TREND_MONTHS, start=start, end=end)
+    # Read from the signed-in account, never from the request. It decides the
+    # small-count rule (Task 5d, D1): the Administrator and the Barangay Official
+    # get rows of 1 to 4 folded into one Other row; the Doctor gets every count.
+    # Every ranking below is built from this one reading.
+    viewer_role = current_role()
+    patients = get_patient_report(months=TREND_MONTHS, start=start, end=end,
+                                  viewer_role=viewer_role)
+    consultations = get_consultation_stats(months=TREND_MONTHS, start=start, end=end,
+                                           viewer_role=viewer_role)
     appointments = get_appointment_report(months=TREND_MONTHS, start=start, end=end)
     # Coverage is judged as of the range's closing date; the doses inside it are
     # counted between the two. See get_immunization_coverage() for why only one
@@ -352,7 +360,7 @@ def reports_analytics_context(report_type="all", args=None):
         # the range's own answers in a `window` block -- so the template reads
         # the two the same way.
         "dispensing_stats": get_dispensing_stats(
-            months=TREND_MONTHS, start=start, end=end
+            months=TREND_MONTHS, start=start, end=end, viewer_role=viewer_role
         ),
         # Screen 09's figures. The SMS panel here used to report only its own
         # gap; sends and failures are stored and are now counted over the range,

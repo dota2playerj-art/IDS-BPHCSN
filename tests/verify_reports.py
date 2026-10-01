@@ -62,6 +62,14 @@ def db():
     return conn
 
 
+def db_one(sql, params=()):
+    conn = db()
+    try:
+        return conn.execute(sql, params).fetchone()[0]
+    finally:
+        conn.close()
+
+
 def client_as(user_id):
     c = app.test_client()
     with c.session_transaction() as sess:
@@ -123,28 +131,40 @@ check("Barangay Official has Community Reports too",
 # ---------------------------------------------------------------------------
 # Fixtures: two consultations, same date, distinctive single-token diagnoses
 # ---------------------------------------------------------------------------
+# TASK 5d: the Administrator and the Barangay Official no longer see a ranking row
+# with fewer than 5 visits by name; it folds into "Other (each fewer than 5)". So the
+# sealed group and the control group each hold FIVE visits here, which is the
+# smallest count a named row can have. Every check below that the control is shown,
+# that Confidential is shown, and that an unsealed diagnosis is ranked keeps its
+# meaning. The folding itself is tested in verify_small_counts_and_masking.py.
+GROUP = 5
 conn = db()
 rows = conn.execute(
     """SELECT id, patient_id, consultation_date FROM consultations
-        ORDER BY id DESC LIMIT 2"""
+        ORDER BY id DESC LIMIT ?""", (2 * GROUP,)
 ).fetchall()
-SEALED_CID, CONTROL_CID = rows[0]["id"], rows[1]["id"]
+assert len(rows) == 2 * GROUP, "the test database needs ten consultations"
+SEALED_CIDS = [row["id"] for row in rows[:GROUP]]
+CONTROL_CIDS = [row["id"] for row in rows[GROUP:]]
+SEALED_CID, CONTROL_CID = SEALED_CIDS[0], CONTROL_CIDS[0]
 VISIT_DATE = rows[0]["consultation_date"][:10]
 
 # Both dated to the same day, so a single-day range holds both: that is the
 # narrowest, most dangerous window a Barangay Official can select, and it is the
 # one the ranking has to survive.
-conn.execute(
-    "UPDATE consultations SET diagnosis = ?, consultation_date = ?, "
-    "is_restricted = 1, restricted_by = 1, restricted_at = '2026-09-05 09:00:00' "
-    "WHERE id = ?",
-    (f"{SEALED} reactive on confirmatory assay", VISIT_DATE, SEALED_CID),
-)
-conn.execute(
-    "UPDATE consultations SET diagnosis = ?, consultation_date = ?, "
-    "is_restricted = 0, restricted_by = NULL, restricted_at = NULL WHERE id = ?",
-    (f"{CONTROL} ordinary unsealed finding", VISIT_DATE, CONTROL_CID),
-)
+for cid in SEALED_CIDS:
+    conn.execute(
+        "UPDATE consultations SET diagnosis = ?, consultation_date = ?, "
+        "is_restricted = 1, restricted_by = 1, restricted_at = '2026-09-05 09:00:00' "
+        "WHERE id = ?",
+        (f"{SEALED} reactive on confirmatory assay", VISIT_DATE, cid),
+    )
+for cid in CONTROL_CIDS:
+    conn.execute(
+        "UPDATE consultations SET diagnosis = ?, consultation_date = ?, "
+        "is_restricted = 0, restricted_by = NULL, restricted_at = NULL WHERE id = ?",
+        (f"{CONTROL} ordinary unsealed finding", VISIT_DATE, cid),
+    )
 conn.commit()
 sealed_row = conn.execute(
     "SELECT * FROM consultations WHERE id = ?", (SEALED_CID,)).fetchone()
@@ -170,7 +190,7 @@ with app.app_context():
     from models.consultations import get_consultation_stats
     from datetime import date
     day = date.fromisoformat(VISIT_DATE)
-    stats = get_consultation_stats(months=6, start=day, end=day)
+    stats = get_consultation_stats(months=6, start=day, end=day, viewer_role="Doctor")
 
 w = stats["window"]
 labels = " | ".join(d["label"] for d in w["top_diagnoses"])
@@ -185,10 +205,11 @@ check("Control diagnosis IS present in the window ranking (positive control)",
 check("Sealed diagnosis is absent from the all-time ranking",
       not any(SEALED in d["label"] for d in stats["top_diagnoses"]))
 check("diagnoses_withheld reports the sealed consultation",
-      w["diagnoses_withheld"] == 1, f"withheld={w['diagnoses_withheld']}")
+      w["diagnoses_withheld"] == GROUP, f"withheld={w['diagnoses_withheld']}")
 
 check("The sealed VISIT is still counted in the range total",
-      w["total"] == 2, f"total={w['total']} (expected both consultations)")
+      w["total"] == 2 * GROUP,
+      f"total={w['total']} (expected every sealed and control consultation)")
 check("The sealed visit is still counted in patients_seen",
       w["patients_seen"] >= 1, f"patients_seen={w['patients_seen']}")
 check("The sealed visit is still counted in the trend",
@@ -280,10 +301,13 @@ check("Staff cannot reach Reports & Analytics at all",
 # 5. Unsealing restores it — the exclusion tracks the flag, not the text
 # ---------------------------------------------------------------------------
 print("\n--- 5. LIFTING THE SEAL RESTORES THE RANKING ---")
-resp = doctor.post(
-    f"/staff/patient_profile/{pid}/restrict-consultation",
-    data={"consultation_id": str(SEALED_CID), "restrict_action": "lift"})
-check("Administrator lifted the seal", resp.status_code == 302)
+for cid in SEALED_CIDS:
+    pid_of = db_one("SELECT patient_id FROM consultations WHERE id = ?", (cid,))
+    resp = doctor.post(
+        f"/staff/patient_profile/{pid_of}/restrict-consultation",
+        data={"consultation_id": str(cid), "restrict_action": "lift"})
+    lifted = resp.status_code == 302
+check("The Doctor lifted the seal on every sealed visit", lifted)
 resp = admin.get(f"/admin/reports_analytics{RANGE}")
 page = resp.get_data(as_text=True)
 check("Once unsealed, the diagnosis DOES appear in the ranking", SEALED in page,
@@ -293,8 +317,10 @@ check("Once unsealed, the Official's ranking shows it too",
       SEALED in resp.get_data(as_text=True))
 
 # re-seal for the whole-range checks below
-doctor.post(f"/staff/patient_profile/{pid}/restrict-consultation",
-           data={"consultation_id": str(SEALED_CID), "restrict_action": "restrict"})
+for cid in SEALED_CIDS:
+    pid_of = db_one("SELECT patient_id FROM consultations WHERE id = ?", (cid,))
+    doctor.post(f"/staff/patient_profile/{pid_of}/restrict-consultation",
+                data={"consultation_id": str(cid), "restrict_action": "restrict"})
 
 # ---------------------------------------------------------------------------
 # 6. Default (unranged) view, and the whole-history ranking

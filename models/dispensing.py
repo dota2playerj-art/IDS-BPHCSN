@@ -124,6 +124,7 @@ from models.inventory import (
 )
 from utils.dates import display_date, resolve_range, today
 from utils.roles import is_care_team
+from utils.small_counts import fold_small_counts
 
 # What this form may dispense: every category the inventory records, read from
 # models.inventory rather than listed again here, so a category added to the
@@ -894,7 +895,7 @@ CONFIDENTIAL_KEY = ""
 
 
 def get_dispensing_stats(months=6, limit=TOP_MEDICINE_LIMIT, on_date=None,
-                         start=None, end=None):
+                         start=None, end=None, *, viewer_role):
     """The dispensing figures Reports & Analytics and the dashboards report.
 
     Deliberately the same shape as models.consultations.get_consultation_stats():
@@ -919,6 +920,13 @@ def get_dispensing_stats(months=6, limit=TOP_MEDICINE_LIMIT, on_date=None,
     date_dispensed is clinic-local date text, exactly as consultation_date is, so
     the range compares against its leading ten characters with no timezone
     conversion.
+
+    `viewer_role` HAS NO DEFAULT. It decides the small-count rule (Task 5d, D1):
+    for the Administrator and the Barangay Official an item issued fewer than 5
+    times in the range, and the Confidential row when it is that small, are folded
+    into one Other row that adds up their units and issues. The test is on issues,
+    not units, because one issue is one visit, and one visit is what a small count
+    can point at. The window's totals are never changed.
     """
     reference = on_date or today()
     window = resolve_range(start=start, end=end, months=months, on_date=reference)
@@ -989,14 +997,22 @@ def get_dispensing_stats(months=6, limit=TOP_MEDICINE_LIMIT, on_date=None,
         by_medicine.values(),
         key=lambda entry: (-entry["units"], entry["medicine_name"].lower()),
     )
+    # Folded before the text is made, so the Other row gets one too. Its unit is
+    # blank for the reason the Confidential row's is: it adds up different items.
+    ranked = fold_small_counts(
+        ranked, viewer_role, label_key="medicine_name",
+        sum_keys=("events", "units"), extra={"unit": None},
+    )
     for entry in ranked:
         entry["units_text"] = _plural(entry["units"], entry["unit"])
     # The Confidential row is ranked by its units like any other, and kept even
-    # when it falls outside the top `limit`, so the list accounts for it.
-    top = ranked[:limit]
-    confidential = by_medicine.get(CONFIDENTIAL_KEY)
-    if confidential is not None and confidential not in top:
-        top.append(confidential)
+    # when it falls outside the top `limit`, so the list accounts for it. The Other
+    # row is always last and is not counted against the limit.
+    named = [entry for entry in ranked if not entry.get("other")]
+    top = named[:limit]
+    top.extend(entry for entry in named[limit:]
+               if entry.get("confidential") and entry not in top)
+    top.extend(entry for entry in ranked if entry.get("other"))
 
     return {
         "total_events": totals["events"],

@@ -665,6 +665,18 @@ section("R. TOP-DIAGNOSES AGGREGATE NEVER REVEALS SEALED TEXT")
 conn = db()
 conn.execute("UPDATE consultations SET consultation_date='2026-08-28' WHERE id IN (?,?,?)",
              (CID_DOC, CID_HIST, CID_CTRL))
+# Task 5d: the Administrator and the Official see a ranking row of fewer than 5 as
+# "Other", so the control diagnosis is given FIVE visits on that day. The check
+# below keeps its meaning: the control is ranked by name, and no sealed text is.
+control_text = conn.execute("SELECT diagnosis FROM consultations WHERE id=?",
+                            (CID_CTRL,)).fetchone()[0]
+more = [row[0] for row in conn.execute(
+    "SELECT id FROM consultations WHERE is_restricted = 0 AND id NOT IN (?,?,?,?) "
+    "ORDER BY id LIMIT 4", (CID_HIST, CID_DOC, CID_CTRL, CID_REC))]
+check("four more visits are available to make the control group five", len(more) == 4, more)
+for cid in more:
+    conn.execute("UPDATE consultations SET consultation_date='2026-08-28', diagnosis=? "
+                 "WHERE id=?", (control_text, cid))
 conn.commit(); conn.close()
 rng = "?from=2026-08-28&to=2026-08-28"
 surfaces = [

@@ -70,6 +70,7 @@ from models.settings import health_center_name
 from utils.dates import display_date, long_date, now, today
 from utils.document import PDF_MIMETYPE, render
 from utils.security import get_current_user
+from utils.small_counts import ranking_note, small_count_note
 from utils.workbook import (
     XLSX_MIMETYPE, build, figures, safe_filename, sheet, table,
 )
@@ -544,15 +545,15 @@ def _ranked_count(consultations):
     return consultations["window"]["total"]
 
 
-def _withheld_note(consultations):
-    """The sentence added to a ranking's note when the range has sealed visits.
+def _ranking_note(consultations, which, what):
+    """The sentences added to a ranking's note: sealed visits, and folded rows.
 
-    Empty string when it has none, which is the ordinary case.
+    `which` is "top_diagnoses" or "top_complaints"; `what` is the word for what is
+    not shown. The wording is utils.small_counts.ranking_note(), which the screens
+    use too. Empty when the range has neither, which is the ordinary case.
     """
-    if not consultations["window"]["diagnoses_withheld"]:
-        return ""
-    return (" Restricted consultations are counted under Confidential. Their "
-            "diagnoses are not shown.")
+    window = consultations["window"]
+    return ranking_note(window[which], window["diagnoses_withheld"], what)
 
 
 def _ranking_empty(consultations):
@@ -658,7 +659,7 @@ def _diagnoses(context):
                   "health worker typed and is not coded against ICD or any other "
                   "classification this system holds, so entries are grouped ignoring "
                   "case and two spellings of one condition count separately."
-                  + _withheld_note(consultations)),
+                  + _ranking_note(consultations, "top_diagnoses", "diagnoses")),
             empty=_ranking_empty(consultations),
         ),
         _ranked_block(
@@ -666,16 +667,14 @@ def _diagnoses(context):
             consultations["window"]["top_complaints"], "label", "count",
             ("Complaint", "Consultations"),
             note=("Ranked from this range's consultations only."
-                  + (" Restricted consultations are counted under Confidential. "
-                     "Their complaints are not shown."
-                     if consultations["window"]["diagnoses_withheld"] else "")),
+                  + _ranking_note(consultations, "top_complaints", "complaints")),
             empty="No consultation was written up in this range.",
         ),
         figures("Basis", [
             ("Consultations these are ranked from", _ranked_count(consultations),
              f"{display_date(window['start'])} to {display_date(window['end'])}"),
             ("Restricted consultations, counted under Confidential",
-             consultations["window"]["diagnoses_withheld"],
+             consultations["window"]["diagnoses_withheld_shown"],
              "Counted in the totals. Their diagnoses are not shown"),
         ]),
     ]
@@ -712,7 +711,8 @@ def _concerns(context):
     return [
         table("Chronic conditions recorded at registration, whole register",
               ("Condition", "Patients"), _condition_rows(ranked),
-              note=(context["snapshot_note"] + " " + basis),
+              note=(context["snapshot_note"] + " " + basis
+                    + small_count_note(ranked)),
               empty="No patient has a recorded chronic condition yet."),
         _ranked_block(
             "Diagnoses recorded in this range",
@@ -722,7 +722,8 @@ def _concerns(context):
                   f"{'' if _ranked_count(consultations) == 1 else 's'} written up "
                   f"between {display_date(window['start'])} and "
                   f"{display_date(window['end'])}. Grouped by the text entered, "
-                  "ignoring case." + _withheld_note(consultations)),
+                  "ignoring case."
+                  + _ranking_note(consultations, "top_diagnoses", "diagnoses")),
             empty=_ranking_empty(consultations),
         ),
         figures("Register totals", [
@@ -858,7 +859,7 @@ def _demographics(context):
               ("Condition", "Patients"), _condition_rows(conditions["counts"]),
               note=("A patient with two conditions is counted under each, so these do "
                     f"not sum to the {conditions['cohort_size']} patients on the "
-                    "register.")),
+                    "register." + small_count_note(conditions["counts"]))),
     ]
 
 
@@ -871,7 +872,7 @@ def _seniors(context):
               ("Condition", "Seniors"), _condition_rows(seniors["counts"]),
               note=(context["snapshot_note"] + " A senior with two conditions is "
                     f"counted under each, so these do not sum to "
-                    f"{seniors['cohort_size']}.")),
+                    f"{seniors['cohort_size']}." + small_count_note(seniors["counts"]))),
         figures("The senior cohort", [
             (f"Patients aged {age} and above", patients["senior_count"], "By birthdate"),
             ("Share of the roster (%)", patients["senior_share_pct"], ""),
@@ -977,7 +978,8 @@ def _dispensing(context):
                    + (" Items dispensed at Restricted consultations are counted "
                       "under Confidential and not named."
                       if any(e.get("confidential") for e in scoped["all_medicines"])
-                      else ""),
+                      else "")
+                   + small_count_note(scoped["all_medicines"]),
               empty="Nothing was dispensed inside this range."),
         figures("All time", [
             ("Units dispensed", dispensing["total_units"], ""),

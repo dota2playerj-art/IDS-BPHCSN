@@ -204,12 +204,15 @@ def _ranked_conditions(conditions):
     them against a fixed axis; a panel headed "Top Community Health Concerns"
     has to lead with the top one. This reorders that list, it does not recount
     it -- ties break alphabetically, so equal counts do not reshuffle between
-    page loads.
+    page loads. The Other row of the small-count rule (Task 5d) stays last: it
+    is the remainder, not a condition to rank.
     """
-    return sorted(
-        conditions["counts"],
+    rows = conditions["counts"]
+    ranked = sorted(
+        (row for row in rows if not row.get("other")),
         key=lambda item: (-item["count"], item["condition"].lower()),
     )
+    return ranked + [row for row in rows if row.get("other")]
 
 
 def _announcement_feed(limit):

@@ -21,6 +21,7 @@ from utils.dates import (
 )
 from utils.phone import is_valid_ph_mobile, to_local_ph_mobile
 from utils.roles import holds_clinical_authority
+from utils.small_counts import fold_small_counts
 
 # The vocabularies the Register Patient form offers. The template renders its
 # <select>/radio/chip options from these same tuples, so a constrained field
@@ -586,7 +587,8 @@ def get_sex_distribution(patients=None):
     }
 
 
-def get_condition_counts(patients=None, conditions=CONDITION_OPTIONS, min_age=None):
+def get_condition_counts(patients=None, conditions=CONDITION_OPTIONS, min_age=None,
+                         *, viewer_role):
     """How many patients have each recorded chronic condition.
 
     Counted from the parsed medical_conditions list, so a patient with both
@@ -602,6 +604,11 @@ def get_condition_counts(patients=None, conditions=CONDITION_OPTIONS, min_age=No
     `other_only` so the omission is visible instead of silent.
 
     `min_age` narrows to a cohort -- the Senior Citizen panel passes SENIOR_AGE.
+
+    `viewer_role` HAS NO DEFAULT. For the Administrator and the Barangay Official a
+    condition with 1 to 4 patients is folded into one Other row (Task 5d, D1; see
+    utils/small_counts.py). A condition with none stays named at 0. `cohort_size`,
+    `other_only` and `with_any` are totals and are never changed.
     """
     if patients is None:
         patients = get_all_patients()
@@ -626,10 +633,11 @@ def get_condition_counts(patients=None, conditions=CONDITION_OPTIONS, min_age=No
 
     return {
         "cohort_size": len(patients),
-        "counts": [
-            {"condition": condition, "count": counts[condition]}
-            for condition in conditions
-        ],
+        "counts": fold_small_counts(
+            [{"condition": condition, "count": counts[condition]}
+             for condition in conditions],
+            viewer_role, label_key="condition", sum_keys=("count",),
+        ),
         "other_only": other_only,
         "with_any": sum(
             1 for patient in patients if patient.get("medical_conditions_list")
@@ -693,7 +701,7 @@ def count_registered_in(window):
     return count
 
 
-def get_patient_report(months=6, start=None, end=None):
+def get_patient_report(months=6, start=None, end=None, *, viewer_role):
     """Everything Screen 10 shows about patients, from one read of the roster.
 
     get_all_patients() is called once and handed to each breakdown, so the age
@@ -725,8 +733,9 @@ def get_patient_report(months=6, start=None, end=None):
         "total": len(patients),
         "age_distribution": get_age_distribution(patients),
         "sex_distribution": get_sex_distribution(patients),
-        "conditions": get_condition_counts(patients),
-        "senior_conditions": get_condition_counts(patients, min_age=SENIOR_AGE),
+        "conditions": get_condition_counts(patients, viewer_role=viewer_role),
+        "senior_conditions": get_condition_counts(
+            patients, min_age=SENIOR_AGE, viewer_role=viewer_role),
         "senior_count": stats["senior_count"],
         "senior_share_pct": stats["senior_share_pct"],
         "registration_trend": get_registration_trend(months, end=end, start=start),

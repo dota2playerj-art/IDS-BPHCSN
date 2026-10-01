@@ -662,7 +662,7 @@ check("running it twice changes nothing and makes no second backup or record",
 section("7. REPORTS COUNT SEALED VISITS UNDER CONFIDENTIAL")
 with app.app_context():
     from models.consultations import get_consultation_stats
-    stats = get_consultation_stats()
+    stats = get_consultation_stats(viewer_role="Doctor")
 sealed_total = q1("SELECT COUNT(*) FROM consultations WHERE is_restricted = 1")[0]
 confidential = [d for d in stats["top_diagnoses"] if d["label"] == "Confidential"]
 check("the all-time ranking has one Confidential row counting every sealed visit",
@@ -678,19 +678,31 @@ check("Task 5b: the complaints ranking has one Confidential row counting every s
       stats["top_complaints"])
 day = q1("SELECT substr(consultation_date, 1, 10) FROM consultations WHERE id=?", (CID_REC,))[0]
 RANGE = f"?from={day}&to={day}"
+# Task 5d: the Administrator and the Official read a ranking row of fewer than 5 as
+# "Other (each fewer than 5)", the Confidential row included. The Doctor reads the
+# exact row. So each viewer is checked against the label THEIR page must carry.
+from utils.small_counts import OTHER_LABEL
+sealed_that_day = q1("SELECT COUNT(*) FROM consultations WHERE is_restricted = 1 "
+                     "AND substr(consultation_date, 1, 10) = ?", (day,))[0]
+check("the sealed visits on that day are counted (the label checks below need them)",
+      sealed_that_day >= 1, sealed_that_day)
+def expected_label(who):
+    if who == "Doctor" or sealed_that_day >= 5:
+        return "Confidential"
+    return OTHER_LABEL
 for who, client, url in (("Administrator", admin, "/admin/reports_analytics"),
                          ("Doctor", doctor, "/staff/reports_analytics"),
                          ("Barangay Official", official, "/official/reports_analytics"),
                          ("Barangay Official", official, "/official/community-reports")):
     page = body(client.get(url + RANGE))
-    check(f"{who}: {url} shows Confidential and no sealed text",
-          "Confidential" in page and not leaks(page))
+    check(f"{who}: {url} shows {expected_label(who)} and no sealed text",
+          expected_label(who) in page and not leaks(page))
 for who, client, url in (("Administrator", admin, "/admin/reports_analytics/export.xlsx"),
                          ("Doctor", doctor, "/staff/reports_analytics/export.pdf"),
                          ("Barangay Official", official, "/official/community-reports/export.xlsx")):
     text = readable(client.get(url + RANGE))
-    check(f"{who}: {url} lists Confidential and no sealed text",
-          "Confidential" in text and not leaks(text))
+    check(f"{who}: {url} lists {expected_label(who)} and no sealed text",
+          expected_label(who) in text and not leaks(text))
 
 # ===========================================================================
 section("8. A WRONG OR MISSING KEY GIVES A PLAIN MESSAGE, NOT A CRASH")
@@ -930,7 +942,7 @@ for url in dash:
               MED_SEALED not in page and not leaks(page))
 with app.app_context():
     from models.dispensing import get_dispensing_stats
-    totals = get_dispensing_stats()
+    totals = get_dispensing_stats(viewer_role="Doctor")
 units = q1("SELECT COALESCE(SUM(quantity_dispensed),0) FROM medicine_dispensing")[0]
 check("stock and dispensing totals are unchanged by hiding the names",
       totals["total_units"] == units

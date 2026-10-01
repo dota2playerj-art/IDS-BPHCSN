@@ -429,7 +429,7 @@
                   [{'name': 'Patients', 'values': top_conditions | map(attribute='count') | list}],
                   first_head='Condition') }}
           <div class="basis-note mt-3">
-            A patient with two conditions is counted under each, so these do not sum to the roster.
+            A patient with two conditions is counted under each, so these do not sum to the roster.{{ small_count_note(top_conditions) }}
 {%- if conditions.other_only %}
             {{ conditions.other_only }} patient{{ '' if conditions.other_only == 1 else 's' }}
             recorded only free-text conditions and {{ 'is' if conditions.other_only == 1 else 'are' }} not counted here.
@@ -479,9 +479,7 @@
           <div class="basis-note mt-3">
             Grouped by the text entered, ignoring case. Free text is not coded, so two
             spellings of one condition count separately.
-{%- if withheld %}
-            Restricted consultations are counted under Confidential. Their diagnoses are not shown.
-{%- endif %}
+            {{- ranking_note(consultation_report_stats.window.top_diagnoses, withheld, 'diagnoses') }}
           </div>
 {%- endif %}
         </div>

@@ -195,8 +195,10 @@ def dashboard_context():
     queue = get_todays_appointments(active=active)
     queue_stats = get_queue_stats(queue, active=active)
     patient_stats = get_patient_stats()
-    consultation_stats = get_consultation_stats(months=TREND_MONTHS)
-    dispensing_stats = get_dispensing_stats(months=TREND_MONTHS)
+    consultation_stats = get_consultation_stats(months=TREND_MONTHS,
+                                                viewer_role=current_role())
+    dispensing_stats = get_dispensing_stats(months=TREND_MONTHS,
+                                            viewer_role=current_role())
     inventory_stats = get_inventory_stats()
 
     # THE ONE VISIT IN PROGRESS, FOR THE DASHBOARD SHORTCUT.

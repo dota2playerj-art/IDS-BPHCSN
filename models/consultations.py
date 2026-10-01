@@ -77,6 +77,7 @@ from models.patients import calculate_age, format_age
 from utils import sealed_crypto
 from utils.dates import recent_months, resolve_range, today
 from utils.roles import holds_clinical_authority
+from utils.small_counts import fold_small_counts, shown_count
 
 # Growth monitoring cohort -- DOH Operation Timbang Plus / WHO 0-59 months.
 PEDIATRIC_AGE_YEARS = 5
@@ -677,6 +678,12 @@ TOP_DIAGNOSIS_LIMIT = 5
 # the diagnosis text is held back, which is exactly what the seal covers on every
 # other screen -- see DOCTOR_ONLY_FIELDS.
 #
+# TASK 5d (D1) ADDS A SECOND RULE ON TOP OF THIS ONE, FOR UNSEALED TEXT. Sealed
+# text is still never ranked, at any count. Separately, the Administrator and the
+# Barangay Official see any row with a count of 1 to 4 -- the Confidential row
+# included -- as one "Other (each fewer than 5)" row, because a small count over a
+# short range can point at one visit. utils/small_counts.py holds the rule.
+#
 # SINCE TASK 5 (D3) SEALED VISITS ARE ONE "Confidential" ROW IN THE RANKING,
 # for every role, so the ranking accounts for every consultation and still
 # shows no sealed text. `diagnoses_withheld` is that row's count. A count
@@ -714,30 +721,38 @@ def _rank_free_text(rows, limit):
 CONFIDENTIAL_LABEL = "Confidential"
 
 
-def _rank_diagnoses(diagnoses, sealed_count, limit):
+def _rank_diagnoses(diagnoses, sealed_count, limit, viewer_role):
     """The diagnosis ranking, with sealed consultations as one Confidential row.
 
     The Confidential row is ranked by its count like any other. If it would
     fall outside the top `limit`, it is added at the end anyway, so the
     breakdown always accounts for every sealed visit.
+
+    For the Administrator and the Barangay Official, every row with a count of 1
+    to 4, the Confidential row included, is then folded into one Other row (Task
+    5d, D1; see utils/small_counts.py). The fold is made on the whole ranking, so
+    the Other row adds up every small group, not only those inside the top
+    `limit`. The Other row comes last and is not counted against the limit.
     """
     ranked = _rank_free_text(diagnoses, None)
-    if not sealed_count:
-        return ranked[:limit] if limit else ranked
-    confidential = {"label": CONFIDENTIAL_LABEL, "count": sealed_count,
-                    "confidential": True}
-    ranked.append(confidential)
-    ranked.sort(key=lambda item: (-item["count"], item["label"].lower()))
-    if limit and len(ranked) > limit:
-        top = ranked[:limit]
-        if confidential not in top:
-            top.append(confidential)
-        return top
-    return ranked
+    if sealed_count:
+        ranked.append({"label": CONFIDENTIAL_LABEL, "count": sealed_count,
+                       "confidential": True})
+        ranked.sort(key=lambda item: (-item["count"], item["label"].lower()))
+    ranked = fold_small_counts(ranked, viewer_role, label_key="label",
+                               sum_keys=("count",))
+    named = [entry for entry in ranked if not entry.get("other")]
+    other = [entry for entry in ranked if entry.get("other")]
+    if limit and len(named) > limit:
+        top = named[:limit]
+        top.extend(entry for entry in named[limit:]
+                   if entry.get("confidential") and entry not in top)
+        named = top
+    return named + other
 
 
 def get_consultation_stats(months=6, limit=TOP_DIAGNOSIS_LIMIT, on_date=None,
-                           start=None, end=None):
+                           start=None, end=None, *, viewer_role):
     """The consultation figures Screen 10 reports.
 
     Returns totals, a month-by-month trend over the same window the other trend
@@ -769,6 +784,12 @@ def get_consultation_stats(months=6, limit=TOP_DIAGNOSIS_LIMIT, on_date=None,
     here. In the diagnosis and complaint rankings it is counted under one
     Confidential row, never by its text (D3, Task 5b). `diagnoses_withheld` is
     that row's count, and it is the same for both rankings.
+
+    `viewer_role` HAS NO DEFAULT, for the reason get_consultations_for_patient()
+    gives. It decides the small-count rule (Task 5d, D1): for the Administrator and
+    the Barangay Official a ranking row with a count of 1 to 4 is folded into one
+    Other row. `diagnoses_withheld_shown` is the restricted-visit count as that
+    viewer may read it: the number, or "Fewer than 5". Totals are never changed.
     """
     reference = on_date or today()
     window = resolve_range(start=start, end=end, months=months, on_date=reference)
@@ -868,9 +889,10 @@ def get_consultation_stats(months=6, limit=TOP_DIAGNOSIS_LIMIT, on_date=None,
         "patients_seen": patients_seen,
         "months": months,
         "trend": trend,
-        "top_diagnoses": _rank_diagnoses(diagnoses, withheld_total, limit),
-        "top_complaints": _rank_diagnoses(complaints, withheld_total, limit),
+        "top_diagnoses": _rank_diagnoses(diagnoses, withheld_total, limit, viewer_role),
+        "top_complaints": _rank_diagnoses(complaints, withheld_total, limit, viewer_role),
         "diagnoses_withheld": withheld_total,
+        "diagnoses_withheld_shown": shown_count(withheld_total, viewer_role),
         "window": {
             "start": window["start"],
             "end": window["end"],
@@ -878,12 +900,15 @@ def get_consultation_stats(months=6, limit=TOP_DIAGNOSIS_LIMIT, on_date=None,
             "total": len(scoped),
             "patients_seen": len({row["patient_id"] for row in scoped}),
             "trend": trend,
-            "top_diagnoses": _rank_diagnoses(scoped_diagnoses, scoped_withheld, limit),
-            "top_complaints": _rank_diagnoses(scoped_complaints, scoped_withheld, limit),
+            "top_diagnoses": _rank_diagnoses(
+                scoped_diagnoses, scoped_withheld, limit, viewer_role),
+            "top_complaints": _rank_diagnoses(
+                scoped_complaints, scoped_withheld, limit, viewer_role),
             # How many of this range's `total` consultations are counted under the
             # Confidential row of the two rankings above. The total,
             # patients_seen and the trend all still count every one of them.
             "diagnoses_withheld": scoped_withheld,
+            "diagnoses_withheld_shown": shown_count(scoped_withheld, viewer_role),
         },
     }
 
