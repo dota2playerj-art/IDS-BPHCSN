@@ -1152,35 +1152,6 @@ def record_reported_immunizations(patient_id, entries, recorded_by,
     return stored
 
 
-def remove_immunizations(patient_id, dose_keys, consultation_id):
-    """Un-record doses entered against one consultation. Returns what was removed.
-
-    Scoped to the consultation that recorded them, deliberately. Correcting a
-    mis-ticked box on the visit you are editing is a clerical fix; reaching
-    across into a dose recorded at some other visit is not something a
-    consultation edit should be able to do, and the WHERE clause is what makes
-    that true rather than the UI merely not offering it.
-    """
-    if not dose_keys or not consultation_id:
-        return []
-
-    removed = []
-    with db_connection() as conn:
-        for code, dose_number in dose_keys:
-            cursor = conn.execute(
-                """
-            DELETE FROM immunizations
-             WHERE patient_id = ? AND consultation_id = ?
-               AND vaccine_code = ? AND dose_number = ?
-            """,
-                (patient_id, consultation_id, code, dose_number),
-            )
-            if cursor.rowcount:
-                removed.append((code, dose_number))
-        conn.commit()
-    return removed
-
-
 def get_immunization_by_id(record_id):
     """One recorded dose by primary key, or None. The correction path's first read.
 

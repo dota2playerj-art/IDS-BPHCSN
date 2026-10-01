@@ -1156,10 +1156,6 @@ def _apply_immunization_edit(patient, consultation_id, consultation, ticked,
     rarer and more consequential than an archive, so it belongs on a deliberate
     correction path of its own, not as a side effect of saving this page.
 
-    models.immunizations.remove_immunizations() is deliberately left in place,
-    unused, for that path to call: it already scopes its DELETE to the
-    consultation that recorded the dose, which is the hard part.
-
     Adding is unchanged. Only doses not already on file anywhere are candidates,
     so saving an edit still cannot re-date somebody else's vaccination.
 
@@ -1234,12 +1230,10 @@ def _apply_general_vaccination_edit(patient, consultation_id, consultation,
     recorded against this visit are rendered as locked fact rather than as
     checkboxes, so no submission -- however it was produced -- can remove one.
 
-    There is no removal function in models/general_vaccinations.py at all, which
-    is a step further than the EPI module goes: that one keeps
-    remove_immunizations() in place, unused, for the deliberate correction path
-    that would one day call it. Nothing here needs a head start on a path that
-    does not exist yet, and an unused DELETE is a thing that can be called by
-    mistake.
+    There is no removal function in models/general_vaccinations.py, nor in
+    models/immunizations.py: neither module needs a head start on a correction
+    path that does not exist yet, and an unused DELETE is a thing that can be
+    called by mistake.
 
     Rows whose vaccine and date already match something on file are absorbed by
     the table's UNIQUE constraint rather than duplicated, so re-saving an edit

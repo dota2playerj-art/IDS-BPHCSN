@@ -432,10 +432,6 @@ EXEMPT = {
     "log_action": "writes audit_logs",
     # A new install, before any account exists, so no one could be named.
     "seed_demo_users": "first install only",
-    # No caller in the app. If one is added, this check fails until its call
-    # site is audited or this entry is reconsidered.
-    "set_appointment_status": "no caller",
-    "remove_immunizations": "no caller",
 }
 # Calls the call graph cannot see: a function reached through a table. Each
 # maps to the function that calls it and writes the audit entry.
