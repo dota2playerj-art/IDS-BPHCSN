@@ -491,7 +491,7 @@
 {#- Ranked by units, with the issue count printed beside it, because the two are
     different supply questions: forty patients given ten tablets each and two
     patients given two hundred are not the same shelf problem. #}
-          <div class="snapshot-note">Ranked by units dispensed inside the selected range, most first. Named as the dispensing records name them. An item renamed part way through a range appears under both names.</div>
+          <div class="snapshot-note">Ranked by units dispensed inside the selected range, most first. Named as the dispensing records name them. An item renamed part way through a range appears under both names.{% if disp.top_medicines | selectattr('confidential') | list %} Items dispensed at Restricted consultations are counted under Confidential and not named.{% endif %}</div>
         </div>
       </div>
       <div class="col-lg-5">

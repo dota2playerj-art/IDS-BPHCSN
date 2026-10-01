@@ -111,6 +111,7 @@ against.
 """
 from database.connection import db_connection
 from models.consultations import (
+    CONFIDENTIAL_LABEL,
     RESTRICTED_PLACEHOLDER,
     can_view_restricted,
     open_sealed_value,
@@ -886,6 +887,11 @@ def get_dispensing_by_consultation(consultation_ids, viewer_role):
 # Analytics are the same length and read as a pair.
 TOP_MEDICINE_LIMIT = 5
 
+# The one row every sealed visit's dispensing is ranked under (Task 5c, M25), the
+# same word the diagnosis ranking uses. The key cannot collide with a medicine
+# name, because no name is empty.
+CONFIDENTIAL_KEY = ""
+
 
 def get_dispensing_stats(months=6, limit=TOP_MEDICINE_LIMIT, on_date=None,
                          start=None, end=None):
@@ -927,12 +933,16 @@ def get_dispensing_stats(months=6, limit=TOP_MEDICINE_LIMIT, on_date=None,
             "SELECT COUNT(DISTINCT patient_id) FROM medicine_dispensing"
         ).fetchone()[0]
 
+        # is_restricted comes along so dispensing at a sealed visit can be counted
+        # under one Confidential row instead of by name (Task 5c, M25).
         scoped = conn.execute(
             """
-        SELECT medicine_name, unit, quantity_dispensed, patient_id,
-               inventory_item_id, substr(date_dispensed, 1, 7) AS month
-        FROM medicine_dispensing
-        WHERE substr(date_dispensed, 1, 10) BETWEEN ? AND ?
+        SELECT d.medicine_name, d.unit, d.quantity_dispensed, d.patient_id,
+               d.inventory_item_id, substr(d.date_dispensed, 1, 7) AS month,
+               COALESCE(c.is_restricted, 0) AS sealed
+        FROM medicine_dispensing d
+        LEFT JOIN consultations c ON c.id = d.consultation_id
+        WHERE substr(d.date_dispensed, 1, 10) BETWEEN ? AND ?
         """,
             (lo, hi),
         ).fetchall()
@@ -943,11 +953,22 @@ def get_dispensing_stats(months=6, limit=TOP_MEDICINE_LIMIT, on_date=None,
         month = row["month"]
         units_by_month[month] = units_by_month.get(month, 0) + row["quantity_dispensed"]
         events_by_month[month] = events_by_month.get(month, 0) + 1
-        entry = by_medicine.setdefault(
-            row["medicine_name"],
-            {"medicine_name": row["medicine_name"], "unit": row["unit"],
-             "units": 0, "events": 0},
-        )
+        # A SEALED VISIT'S MEDICINE IS NOT RANKED BY NAME. A medicine can reveal a
+        # condition, and a ranking with a count of 1 over a one-day range points at
+        # one visit -- the reason models/consultations.py gives for diagnoses.
+        # Its units and events still count, under one Confidential row.
+        if row["sealed"]:
+            entry = by_medicine.setdefault(
+                CONFIDENTIAL_KEY,
+                {"medicine_name": CONFIDENTIAL_LABEL, "unit": None,
+                 "units": 0, "events": 0, "confidential": True},
+            )
+        else:
+            entry = by_medicine.setdefault(
+                row["medicine_name"],
+                {"medicine_name": row["medicine_name"], "unit": row["unit"],
+                 "units": 0, "events": 0},
+            )
         entry["units"] += row["quantity_dispensed"]
         entry["events"] += 1
 
@@ -970,6 +991,12 @@ def get_dispensing_stats(months=6, limit=TOP_MEDICINE_LIMIT, on_date=None,
     )
     for entry in ranked:
         entry["units_text"] = _plural(entry["units"], entry["unit"])
+    # The Confidential row is ranked by its units like any other, and kept even
+    # when it falls outside the top `limit`, so the list accounts for it.
+    top = ranked[:limit]
+    confidential = by_medicine.get(CONFIDENTIAL_KEY)
+    if confidential is not None and confidential not in top:
+        top.append(confidential)
 
     return {
         "total_events": totals["events"],
@@ -984,9 +1011,11 @@ def get_dispensing_stats(months=6, limit=TOP_MEDICINE_LIMIT, on_date=None,
             "events": len(scoped),
             "units": sum(row["quantity_dispensed"] for row in scoped),
             "patients": len({row["patient_id"] for row in scoped}),
-            "medicines": len(by_medicine),
+            # Distinct items handed over, sealed visits included. A count names
+            # nothing.
+            "medicines": len({row["medicine_name"] for row in scoped}),
             "trend": trend,
-            "top_medicines": ranked[:limit],
+            "top_medicines": top,
             "all_medicines": ranked,
         },
     }

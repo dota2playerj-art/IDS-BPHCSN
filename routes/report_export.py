@@ -973,7 +973,11 @@ def _dispensing(context):
                for entry in scoped["all_medicines"]],
               note="Ranked by units dispensed inside the selected range, most "
                    "first. Named as the dispensing records name them. An item "
-                   "renamed part way through a range appears under both names.",
+                   "renamed part way through a range appears under both names."
+                   + (" Items dispensed at Restricted consultations are counted "
+                      "under Confidential and not named."
+                      if any(e.get("confidential") for e in scoped["all_medicines"])
+                      else ""),
               empty="Nothing was dispensed inside this range."),
         figures("All time", [
             ("Units dispensed", dispensing["total_units"], ""),
