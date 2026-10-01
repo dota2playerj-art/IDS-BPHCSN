@@ -153,7 +153,7 @@ register = {
     "sex": "Female", "civil_status": "Single", "address": "Purok 5, Barangay Poblacion",
     "municipality": "San Francisco", "province": "Surigao del Norte", "zip_code": "8405",
     "emergency_contact_name": "Test Relative", "emergency_contact_relationship": "Sibling",
-    "emergency_contact_number": "09179000071", "confirm_duplicate": "yes",
+    "emergency_contact_number": "09000002001", "confirm_duplicate": "yes",
 }
 start = mark()
 r = staff.post("/staff/register-patient", data=dict(register, last_name=""))
@@ -165,7 +165,7 @@ one_entry("registering a patient writes one entry", start, A.ACTION_PATIENT_REGI
           A.MODULE_PATIENTS, STAFF_ID, f"{patient_ref(new_pid)} registered.")
 
 form = patient_to_form(get_patient_by_id(new_pid))
-form.update({"address": "Purok 6, Barangay Poblacion", "contact_number": "09179000072"})
+form.update({"address": "Purok 6, Barangay Poblacion", "contact_number": "09000002002"})
 start = mark()
 staff.post(f"/staff/register-patient/{new_pid}", data=form)
 one_entry("editing a patient writes one entry naming the fields, not the values", start,
