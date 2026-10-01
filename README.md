@@ -17,7 +17,8 @@ python app.py
 ```
 
 `python setup_env.py` is a one-time step on each computer. It creates `.env`
-with a new secret key. The app will not start without it. Never commit `.env`.
+with a new secret key and a key for sealed records, or adds what is missing. The
+app will not start without them. Never commit `.env`.
 
 The app serves on <http://127.0.0.1:5001>. It runs entirely offline: Bootstrap,
 Chart.js and the Inter/Material fonts are vendored under `static/`, so no CDN is
@@ -37,6 +38,16 @@ python tests/run_all.py
 Each suite runs on its own fresh test database in the system temp folder, and
 never on `app.db`. The runner prints one line per suite and a total, and exits
 with 0 only when every check passes. See `PROJECT_STATUS.md` for current results.
+
+## Sealed records and the encryption key
+
+The Doctor can seal (Restrict) a consultation. Its diagnosis and treatment plan are then
+stored encrypted with `SEALED_DATA_KEY`, a key in `.env`. Each installation has its own key,
+made by `python setup_env.py`. Run `python export_sealed_key.py` once, write the key on
+paper, seal it in an envelope and give it to the Doctor. Without it, sealed records cannot
+be recovered if the computer fails. A backup opens sealed records only on a computer with
+the same key. Because the key lives in `.env` on the health-center PC, turn on full-disk
+encryption (BitLocker) on that PC.
 
 ## The database
 

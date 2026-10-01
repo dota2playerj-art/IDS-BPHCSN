@@ -152,6 +152,10 @@ def create_backup_bytes():
         try:
             # pages=0 means "the whole database in one step". See the module note.
             source.backup(destination, pages=0)
+            # Rebuild the copy so it holds live rows only. A page copy also
+            # carries free space, which can still hold old text, such as a
+            # diagnosis from before it was sealed and encrypted.
+            destination.execute("VACUUM")
         finally:
             destination.close()
     finally:
