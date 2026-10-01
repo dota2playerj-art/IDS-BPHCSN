@@ -1157,16 +1157,35 @@ discarded before validation. On an edit, the stored value is put back and the re
 in the audit trail, without the submitted text. The placeholder a non-Doctor sees reads
 **"Restricted — Doctor access only"**. The sealed text is not in the page at all.
 
-**Screen 12.** An audit entry for an edit to a Restricted consultation names the diagnosis or
-treatment plan as changed and does not quote either value, because Audit Logs are read by the
-Administrator.
+**Screen 12.** An audit entry for a consultation edit names the diagnosis or treatment plan as
+changed ("Changed: Diagnosis") and never quotes either value, sealed or not (updated 2026-10-01).
+Audit Logs are read by the Administrator.
 
-**Screen 10 and 18.** A Restricted diagnosis is left out of the top-diagnoses ranking for every
-viewer, as before — the Doctor included. The Doctor reads sealed text on the patient's own record
-(Screens 05 and 20), never in an aggregate or its exports.
+**Screen 10 and 18.** Restricted consultations count in every total. In the diagnosis ranking they
+appear as one row, **"Confidential"**, for every viewer, the Doctor included (updated 2026-10-01).
+The Doctor reads sealed text on the patient's own record (Screens 05 and 20), never in an
+aggregate or its exports.
 
 **History.** Diagnoses written, and seals set, under the Administrator account before 2026-09-25
 are unchanged and keep their attribution.
+
+**Sealed records are encrypted (added 2026-10-01, Task 5).** The law: RA 11166 Section 44 makes it
+unlawful to disclose a person's HIV status without written consent, and RA 10173 treats health
+data as sensitive personal information. So:
+
+- On a Restricted consultation, the diagnosis and treatment plan are stored encrypted (AES-256-GCM).
+  Only the Doctor's screens decrypt them. The backup file carries them encrypted.
+- Exports and print views never show sealed text, for any role. On Screen 05 the Doctor sees it on
+  screen; Print Record prints "Restricted — Doctor access only" in its place.
+- If the key on the computer cannot open a sealed record, the Doctor sees "This sealed record
+  cannot be opened on this computer." Nothing crashes, and the audit trail records it.
+- Screen 13, Backup: "Sealed records stay encrypted in the backup. They can only be opened on a
+  computer that has this system's key."
+
+Known limits. These stay readable for a Restricted visit, on screens and in the backup: what was
+dispensed (needed for stock), the visit date, chief complaint, vital signs, additional notes,
+immunizations, and the fact that the record is Restricted. Backups made before 2026-10-01 still
+hold plain text. Printing the Edit Consultation form from the browser prints what is on it.
 
 ---
 

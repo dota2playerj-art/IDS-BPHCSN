@@ -179,9 +179,9 @@ audit entry was rewritten. The last-Administrator guard still protects the Admin
 not given Reports & Analytics, and the question was left to the team. The team granted it. The
 consultation counts and the top-diagnoses ranking are the doctor's own clinical material, and they
 serve disease prevention, which the RHU named as its main goal. Granting it exposes nothing new:
-the Barangay Official already reads the same figures, and a sealed diagnosis is left out of the
-ranking for every viewer, the Doctor included — the Doctor reads sealed text on the patient's own
-record, never in an aggregate. The Doctor sees the same screen, the same figures and the same two
+the Barangay Official already reads the same figures, and a sealed diagnosis appears in the
+ranking only as "Confidential" for every viewer, the Doctor included — the Doctor reads sealed
+text on the patient's own record, never in an aggregate. The Doctor sees the same screen, the same figures and the same two
 exports as the other two roles; there is no doctor-specific view. User Management, Audit Logs and
 Settings stay with the Administrator.
 
@@ -421,6 +421,42 @@ How these are done now (2026-09-29):
   Queue. Each entry is one short line naming who, what and which record, written in the
   same transaction as the change. None of it quotes a diagnosis, a treatment plan, a sealed
   field, a password or a full contact number.
+- Sealed records are encrypted (added 2026-10-01, Task 5). See "Sealed Records and the Law".
+
+---
+
+# Sealed Records and the Law
+
+**The law.** RA 11166 (Philippine HIV and AIDS Policy Act), Section 44: it is unlawful to disclose,
+without written consent, that a person has HIV or AIDS, has had an HIV-related test, has HIV
+infection or a related illness, or has been exposed to HIV. This binds anyone who handles personal
+data at work. Medical confidentiality allows sharing only with health workers involved in the
+patient's care. RA 10173 (Data Privacy Act) makes health data sensitive personal information. NPC
+Circular 2023-06, which replaced NPC Circular 16-01 in March 2024, requires such data to be
+protected to industry standards, with a written backup-and-restore process. Circular 16-01 set
+AES-256 as the minimum encryption standard. So backups must exist and must restore fully, but
+sealed clinical text inside them must be unreadable without the key.
+
+**Decisions (2026-10-01, Task 5).**
+
+- D1. On a sealed (Restricted) consultation, the diagnosis and treatment plan are stored encrypted
+  with AES-256-GCM. The key is SEALED_DATA_KEY in .env, separate from SECRET_KEY. Only the Doctor's
+  screens decrypt. The backup carries ciphertext and still restores fully.
+- D2. No audit entry stores diagnosis or treatment-plan text, sealed or not. An edit names the
+  field ("Changed: Diagnosis"). Older entries were cleaned by migrate_redact_clinical_audit_text.py.
+- D3. In Reports & Analytics, sealed consultations count in every total and appear in the diagnosis
+  ranking as one "Confidential" row, for every role.
+- D4. Exports (Excel, PDF) and print views never contain sealed text, for any role, the Doctor
+  included. The Doctor reads sealed text on screen only.
+- D5. The Doctor keeps a printed copy of the key in a sealed envelope (export_sealed_key.py), so
+  sealed records can be recovered if the computer fails.
+
+**Known limits.** For a sealed visit these stay readable, on screens and in the backup: what was
+dispensed (needed for stock counts; a medicine can hint at a condition), the visit date, chief
+complaint, vital signs, additional notes, immunizations, and the fact that the record is sealed.
+Backups made before 2026-10-01 hold plain text. The key sits in .env on the same computer as the
+database, so the encryption protects copies that leave the computer; the computer itself needs
+full-disk encryption (BitLocker).
 
 ---
 
@@ -567,3 +603,9 @@ Audit coverage (H3). Patient, consultation, dispensing, inventory and Patient Qu
 leave an audit entry, written with the change so a successful write always has one. The Audit
 Logs screen's description of what the trail covers was corrected (M6). See "Security
 Principles".
+
+Version 2.6 (2026-10-01)
+
+Sealed record privacy (H4). Sealed diagnoses and treatment plans are encrypted, audit entries
+never quote clinical text, reports show sealed visits as "Confidential", and exports and prints
+never carry sealed text. See "Sealed Records and the Law".
