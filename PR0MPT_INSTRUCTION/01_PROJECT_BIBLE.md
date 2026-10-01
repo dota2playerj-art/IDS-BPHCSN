@@ -81,19 +81,21 @@ decision record below says why.
 ## Administrator
 
 The Administrator is Kagawad Antonio Acido, chair of the barangay Health Committee — a barangay
-official, **not a physician**. The role administers the system and holds no clinical authority.
+official, **not a physician**. The role administers the system. It holds no clinical authority and,
+since Task 5c (2026-10-01), sees no clinical data: that is for the care team, the Doctor and Health
+Center Staff (RA 11166; RA 10173; the minimum-necessary standard). See "Clinical Data Is for the
+Care Team".
 
 Responsibilities
 
-- Full system administration (accounts, settings, backup, maintenance mode)
-- User management
-- Dashboard monitoring
-- Reports
-- Inventory supervision
-- System settings
+- Full system administration (accounts, settings, encrypted backup, maintenance mode)
+- User management and the Service Schedule
+- Dashboard monitoring (counts only)
+- Reports & Analytics (counts and rankings)
+- Inventory management (add, edit, archive, stock)
+- SMS broadcasts
 - Audit logs
-- Record consultation intake (complaint, vital signs, vaccinations, dispensing) — not the
-  diagnosis or treatment plan
+- A read-only patient list and profile, demographics only, and a read-only Patient Queue
 
 ---
 
@@ -167,9 +169,9 @@ The system as it stood let the only account that could diagnose be held by someo
 The Administrator is not the doctor, and no part of this project may say it is.
 
 **What the Administrator keeps.** Every system-administration power: User Management, Audit Logs,
-Settings, Backup, Maintenance Mode, Reports & Analytics, and its operational screens. On Record
-Consultation it now records intake exactly as Health Center Staff do. Under RA 11166 it sees the
-"Restricted — Doctor access only" placeholder on a sealed consultation, as Health Center Staff do.
+Settings, Backup, Maintenance Mode, Reports & Analytics, and its operational screens. (As of
+2026-09-25 it still recorded consultation intake; since Task 5c it records none and reads patients
+as demographics only. See "Clinical Data Is for the Care Team".)
 
 **What did not change.** A diagnosis the Administrator account wrote before this decision keeps its
 text and its attribution. A seal the Administrator set stays set and stays attributed to it. No
@@ -471,12 +473,46 @@ encrypted. Task 5b closes the rest.
 - D6. When the Doctor prints the Edit Consultation page from the browser, sealed fields print as
   "Sealed — not printed".
 
-**Known limits.** For a sealed visit these stay readable, on screens and in the backup: the visit
-date, vital signs, immunizations, and the fact that the record is sealed. The names of medicines
-dispensed at a sealed visit stay plain in the database and in the backup file, because stock counts
-and the per-item totals in Reports & Analytics read them. Backups made before 2026-10-01 hold plain
+**Known limits.** For a sealed visit these stay readable to Health Center Staff: the visit date,
+vital signs, immunizations, and the fact that the record is sealed. The names of medicines dispensed
+at a sealed visit stay plain in the database, because stock counts read them. Since Task 5c the
+backup file is encrypted as a whole and Reports & Analytics count them under "Confidential". Backups made before 2026-10-01 hold plain
 text. The key sits in .env on the same computer as the database, so the encryption protects copies
 that leave the computer; the computer itself needs full-disk encryption (BitLocker).
+
+---
+
+# Clinical Data Is for the Care Team
+
+**Decision (2026-10-01, Task 5c).** Clinical data is for the care team only: the Doctor and Health
+Center Staff. The Administrator manages the system, not patients' care.
+
+- RA 11166: medical confidentiality allows sharing only with health workers involved in the
+  patient's care.
+- RA 10173 (Data Privacy Act): processing must be adequate, relevant and not excessive.
+- The HIPAA "minimum necessary" standard, which this project already follows.
+
+This extends the adviser's reasoning behind the Doctor role. That moved clinical authority to the
+Doctor because the Administrator is not a physician; this moves clinical data to the care team for
+the same reason.
+
+**The Administrator keeps** accounts, Settings, maintenance mode, Service Schedule editing, SMS
+broadcasts, Audit Logs, full inventory management, Reports & Analytics, a read-only patient list
+and profile showing demographics only (patient ID, name, sex, age and birth date, address, status,
+registration date), a read-only Patient Queue, and a dashboard of counts.
+
+**He loses, on the server:** every clinical field (chief complaint, vitals, diagnosis, treatment
+plan, notes, check-in reasons, conditions, allergies, immunization records, which medicines a
+patient received), patient contact numbers, and every patient or clinical write (registering or
+editing patients, status changes, the immunization correction, the queue's check-in, start and
+complete, recording or editing consultations).
+
+**With it:** audit entries name no medicine, vaccine or clinical value; the backup download is an
+encrypted `.idsbackup` file, restored with `restore_backup.py` at the health-center PC, using a key
+derived from SEALED_DATA_KEY (one key, one envelope); the most-dispensed ranking counts sealed-visit
+dispensing as "Confidential".
+
+The Doctor, Health Center Staff and the Barangay Official are unchanged.
 
 ---
 
@@ -637,3 +673,9 @@ the check-in reason too, because RA 11166 Section 44 also covers the fact that a
 The Administrator no longer sees the check-in reason on the Patient Queue, or the medicine names of
 a sealed visit. Audit entries name free-text fields and never quote them. See "Sealed Records and
 the Law".
+
+Version 2.8 (2026-10-01)
+
+Task 5c, care-team-only clinical data. The Administrator sees demographics, counts and read-only
+views, and writes no patient or clinical record. Audit entries name no medicine or vaccine. The
+backup download is encrypted. See "Clinical Data Is for the Care Team".

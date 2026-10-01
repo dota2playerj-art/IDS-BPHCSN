@@ -37,13 +37,13 @@ The **Primary Role(s)** column is not a description kept in step by hand. It is 
 | # | Screen | Template | Primary Role(s) | Purpose |
 |---|--------|----------|------------------|---------|
 | 1 | Login Page | `login.html` | All roles (unguarded) | Authenticate users and route them to the correct role-based dashboard. ✅ Approved |
-| 2 | Administrator Dashboard | `admin_dashboard.html` | Administrator | Full operational overview: patient, appointment, inventory, and SMS figures plus recent activity. ✅ Approved |
-| 3 | Patient Records | `patient_records.html` | Administrator, Doctor, Health Center Staff | Browse, search, filter, and manage all registered patients. |
-| 4 | Register Patient | `register_patient.html` | Administrator, Doctor, Health Center Staff | Capture new patient personal, emergency contact, and medical information. |
-| 5 | Patient Profile | `patient_profile.html` | Administrator, Doctor, Health Center Staff | A single patient's full record across six tabs (personal, medical, consultation, medicine, vaccination, appointment history). |
+| 2 | Administrator Dashboard | `admin_dashboard.html` | Administrator | Operational overview: patient, queue, inventory and SMS counts plus recent system activity. No visit or child is listed (Task 5c). ✅ Approved |
+| 3 | Patient Records | `patient_records.html` | Administrator, Doctor, Health Center Staff | Browse, search, filter, and manage all registered patients. The Administrator's copy is read-only and demographics only (Task 5c, §20). |
+| 4 | Register Patient | `register_patient.html` | Doctor, Health Center Staff | Capture new patient personal, emergency contact, and medical information. |
+| 5 | Patient Profile | `patient_profile.html`; `patient_profile_demographics.html` | Doctor, Health Center Staff (full record); Administrator (demographics only) | A single patient's full record across six tabs (personal, medical, consultation, medicine, vaccination, appointment history). The Administrator gets the second template: demographics and one plain line (§20). |
 | 6 | Medicine Inventory | `medicine_inventory.html` | Administrator, Doctor, Health Center Staff | Track medicine stock, expiration, and low-stock/near-expiry status. |
 | 7 | Add/Edit Medicine | `add_edit_medicine.html` | Administrator, Doctor, Health Center Staff | Create or update a medicine record's details and stock. |
-| 8 | Patient Queue | `appointment_scheduling.html` | Administrator, Doctor, Health Center Staff | Check patients in as they arrive, work the live consultation queue, and read the month's calendar. Renamed from Appointment Scheduling on 2026-09-05; the file name is unchanged. |
+| 8 | Patient Queue | `appointment_scheduling.html` | Administrator (read-only), Doctor, Health Center Staff | Check patients in as they arrive, work the live consultation queue, and read the month's calendar. Renamed from Appointment Scheduling on 2026-09-05; the file name is unchanged. |
 | 9 | SMS Notifications | `sms_notifications.html` | Administrator, Doctor, Health Center Staff, Barangay Official | Compose, send, and record SMS broadcasts to a real recipient audience. Specified as "Community Notifications" in `03_SCREEN_SPECIFICATIONS.md`; same screen. |
 | 10 | Reports & Analytics | `reports_analytics.html` | Administrator, Doctor, Barangay Official | Consultation, inventory, registration, and immunisation reporting, over a selectable date range. Export Excel, Export PDF and Print are all built. |
 | 11 | User Management | `user_management.html` | Administrator only | List every account that can sign in, with the screens each role's guards admit it to. Account writes are built: Add User, Edit User, Reset Password, and Deactivate/Reactivate, with the last-Administrator guard on the last two. |
@@ -55,7 +55,7 @@ The **Primary Role(s)** column is not a description kept in step by hand. It is 
 | 17 | Vaccination Campaigns | `vaccination_campaigns.html` | Barangay Official | Immunisation coverage against the DOH EPI schedule. The reporting unit is the scheduled dose, not a named campaign. |
 | 18 | Community Reports | `community_reports.html` | Barangay Official | Community-level health summary, built from `reports_analytics_context()` so it cannot report the barangay differently from Screen 10. Exports a real spreadsheet and PDF. |
 | 19 | Notifications | `notifications.html` | Barangay Official | Notification centre. Presentation only — there is no notifications table. |
-| 20 | Record / Edit Consultation | `record_consultation.html` | Administrator, Doctor, Health Center Staff (diagnosis and treatment plan: Doctor only — §18) | Write up the clinical record of a visit, and edit one already recorded. Two modes of one template and one context builder. See §10. |
+| 20 | Record / Edit Consultation | `record_consultation.html` | Doctor, Health Center Staff (diagnosis and treatment plan: Doctor only — §18) | Write up the clinical record of a visit, and edit one already recorded. Two modes of one template and one context builder. See §10. |
 | 21 | My Account | `my_account.html` | All four roles (`login_required`) | The signed-in person's own details, and a self-service password change requiring the current password. The only screen guarded by `login_required` rather than `role_required`, because what it reaches is one row — the caller's own — rather than a role's worth of screens. Entered from the header profile chip; it has no sidebar entry. |
 | 22 | Service Schedule | `service_schedule.html` | All four roles; Administrator only to add, edit or delete | Which services the health center runs on which days, one entry per service, with an optional note. Ships empty: the health center's days have not been confirmed, and nothing is seeded. Today's services also head the Patient Queue. Information only — it restricts no check-in or consultation. See §19. |
 
@@ -98,10 +98,9 @@ Four screens are reachable but never appear in a sidebar. Three are entered from
 ```
 MAIN MENU
 ├── Dashboard
-├── Patient Records
-├── Register Patient
+├── Patient Records      (demographics only, read-only)
 ├── Medicine Inventory   [low-stock count badge, omitted when zero]
-├── Patient Queue
+├── Patient Queue        (read-only)
 ├── Service Schedule
 ├── SMS Notifications
 └── Reports & Analytics
@@ -113,7 +112,7 @@ ADMINISTRATION
 ```
 
 - **Navigation hierarchy:** Two sidebar groups — "Main Menu" (operational) and "Administration" (governance). This is the only role for which the Administration group is rendered.
-- **Accessible screens (16 of 22):** Login, Administrator Dashboard, Patient Records, Register Patient, Patient Profile, Medicine Inventory, Add/Edit Medicine, Patient Queue, Service Schedule (the only role that can change it), Record / Edit Consultation, SMS Notifications, Reports & Analytics, User Management, Audit Logs, Settings, My Account.
+- **Accessible screens (14 of 22):** Login, Administrator Dashboard, Patient Records (demographics only), Patient Profile (demographics only), Medicine Inventory, Add/Edit Medicine, Patient Queue (read-only), Service Schedule (the only role that can change it), SMS Notifications, Reports & Analytics, User Management, Audit Logs, Settings, My Account. Register Patient and Record / Edit Consultation are the care team's since Task 5c (§20).
 - **Restricted screens:** The two other dashboards, and the four Barangay Official screens — Health Programs, Vaccination Campaigns, Community Reports, Notifications. **The Administrator does not have access to every screen.** The earlier claim in this document that the role reached "all 15 screens" was never true of the built system: the community-facing screens are guarded to the Barangay Official alone.
 
 ### Health Center Staff
@@ -189,13 +188,9 @@ MAIN MENU
 ```
 Login
  → Administrator Dashboard
-   → Patient Records → Patient Profile → (Edit patient / Consultation History → View or Edit)
-   → Register Patient → (Save → back to Patient Records)
+   → Patient Records → Patient Profile (demographics only; Task 5c)
    → Medicine Inventory → Add/Edit Medicine → (Save → back to Inventory)
-   → Patient Queue → (Check in)
-                   → Start Consultation → Record Consultation
-                                        → (Save → patient profile,
-                                           queue entry Completed)
+   → Patient Queue → (read only: who is waiting, status, times)
    → SMS Notifications → (Compose → Send → History)
    → Reports & Analytics → (View over a date range; Export Excel / Export PDF / Print)
    → User Management → (View roster and derived permissions; writes not implemented)
@@ -218,7 +213,7 @@ Login
  → Logout
 ```
 
-The staff flow is the administrator's operational flow minus Reports & Analytics and the Administration group. It is served by the same templates and the same context builders, under `role_required("Health Staff", "Doctor")` guards. SMS Notifications is view-only for this role.
+The staff flow is the clinical floor's: it registers patients, checks them in and records visits, which the Administrator no longer does (§20). It is served by the same templates and the same context builders, under `role_required("Health Staff", "Doctor")` guards. SMS Notifications is view-only for this role.
 
 ### Doctor Flow
 
@@ -468,7 +463,7 @@ Critically, **no data is hidden from the Administrator by this scoping.** What i
 - **Programme memberships are literally the same object.** `health_programs_context()` calls `reports_analytics_context()` and reads its `programs` key — the identical pair (Immunization, Senior Citizen) that Reports & Analytics prints. The two screens cannot report different memberships, because there is only one list.
 - **Immunisation coverage comes from one function.** Both Screen 17 and Reports & Analytics print `models.immunizations.get_immunization_coverage()`. Same call, same figures.
 - **One aggregate is genuinely only on Screen 17**, and it should be stated rather than glossed: the per-dose DOH EPI schedule table from `get_dose_coverage()`. Reports & Analytics does not render it.
-- **But its underlying records are more visible to the Administrator, not less.** Every dose behind that table is readable per-patient on the Patient Profile immunisation panel — a screen the Barangay Official cannot open at all, because they hold no patient-record access. At record level the Administrator's visibility is a strict superset of the Barangay Official's. What differs is one aggregated civic view, not the clinical data underneath it.
+- *(Superseded by §20 on 2026-10-01: the Administrator no longer reads per-patient doses or any other clinical record. The paragraph is kept as the reasoning of its time.)* **But its underlying records are more visible to the Administrator, not less.** Every dose behind that table is readable per-patient on the Patient Profile immunisation panel — a screen the Barangay Official cannot open at all, because they hold no patient-record access. At record level the Administrator's visibility is a strict superset of the Barangay Official's. What differs is one aggregated civic view, not the clinical data underneath it.
 
 So "the Administrator cannot see this data" is not true. "The Administrator does not get the Barangay Official's outreach dashboard" is true, and is the intent.
 
@@ -478,14 +473,14 @@ So "the Administrator cannot see this data" is not true. "The Administrator does
 
 **HIPAA Minimum Necessary Standard (healthcare-specific).** 45 CFR §164.502(b) and §164.514(d) require a covered entity to limit access to protected health information to the minimum necessary for the purpose. §164.514(d)(2)(i) is explicit about the mechanism: the entity must **identify the persons or classes of persons in its workforce who need access to PHI to carry out their duties, and the category of PHI needed for each**. That is a job-function test, not a rank test. A blanket "administrators get everything" default is a widely-noted compliance weakness in HHS guidance and industry practice precisely because it substitutes seniority for the required duty analysis.
 
-**The treatment exception does not rescue the opposite argument.** §164.502(b)(2)(i) exempts disclosures to, and requests by, a health care provider **for treatment** from the minimum necessary requirement — a clinician treating a patient is not to be throttled. That exception is inapplicable here: Screens 16 and 17 are administrative and reporting surfaces reporting aggregate community statistics, not direct patient-treatment access. Nothing on either screen is consulted to treat a patient. The clinical screens that *are* used in treatment — Patient Records, Patient Profile, Record Consultation — are open to the Administrator and to Health Center Staff, which is where that exception properly applies and where this system already applies it.
+**The treatment exception does not rescue the opposite argument.** §164.502(b)(2)(i) exempts disclosures to, and requests by, a health care provider **for treatment** from the minimum necessary requirement — a clinician treating a patient is not to be throttled. That exception is inapplicable here: Screens 16 and 17 are administrative and reporting surfaces reporting aggregate community statistics, not direct patient-treatment access. Nothing on either screen is consulted to treat a patient. The clinical screens that *are* used in treatment — Patient Records, Patient Profile, Record Consultation — are open to the care team, which is where that exception properly applies. Since §20 that care team is the Doctor and Health Center Staff only; the Administrator is not a treating role, so the exception never covered him.
 
 ### Reconciling this with "Full system access" in the Project Bible
 
 "Full system access" in `01_PROJECT_BIBLE.md` should be read as it is read in real EHR and enterprise systems, and as this build implements it:
 
 1. **Full oversight and data visibility** — the Administrator can see the state of the whole system, achieved through Reports & Analytics, both dashboards, and Audit Logs. No figure in the system is invisible to them.
-2. **Full access to every screen within the Administrator's own operational scope** — clinical records, inventory, scheduling, user management, settings and the audit trail. There is no screen in that scope an Administrator is refused. What the Administrator does **not** hold is clinical authority. Since 2026-09-25 it records consultation intake but not a diagnosis, cannot seal a consultation, sees the placeholder on a sealed one, and cannot declare a patient deceased. Those are the Doctor's (§18). "Full system access" has never meant the right to practise medicine.
+2. **Full access to every screen within the Administrator's own operational scope** — inventory, the queue's state, user management, settings, reports and the audit trail. What the Administrator does **not** hold is clinical authority (§18) or clinical data (§20). Since Task 5c (2026-10-01) he reads patients as demographics only and writes no patient or clinical record. "Full system access" has never meant the right to practise medicine, or to read what a patient told the clinic.
 3. **Not** literal reachability of every role-specific URL regardless of function. No production EHR grants the system administrator the community-health-worker's outreach console on the strength of the job title; it grants oversight of the data that console reports on.
 
 Read that way there is no contradiction. The Administrator has full oversight *of* barangay programme and immunisation activity — via Reports & Analytics — without holding the Barangay Official's screens. Rank confers oversight; function confers the screen.
@@ -1119,3 +1114,44 @@ Status: Approved
 This document is now the official UI Architecture for the IDS-BPHCSN Capstone Project.
 
 All future UI design, frontend development, and interface revisions must conform to this architecture unless an approved revision of this document is created.
+
+---
+
+## 20. Design Decision — Clinical Data Is for the Care Team Only (Task 5c, 2026-10-01)
+
+**The decision.** Clinical data is for the care team: the Doctor and Health Center Staff. The
+Administrator, a barangay Kagawad who chairs the Health Committee, runs the system and is not
+part of anyone's care.
+
+**Why.**
+
+- RA 11166 allows medical information to be shared only with health workers involved in the
+  patient's care.
+- RA 10173 (Data Privacy Act) requires processing to be adequate, relevant and not excessive.
+- The HIPAA "minimum necessary" standard (45 CFR §164.502(b), §164.514(d)) asks which classes of
+  workforce need which information for their duties. §11 already applies it by job function.
+
+This extends the adviser's reasoning behind the Doctor role (§18). That moved clinical
+*authority* to the Doctor because the Administrator is not a physician. This moves clinical
+*data* to the care team for the same reason.
+
+**What the Administrator keeps.** Accounts, Settings, maintenance mode, Service Schedule editing,
+SMS broadcasts, Audit Logs, full inventory management, Reports & Analytics (counts and rankings,
+sealed visits under "Confidential"), a read-only patient list and profile showing demographics
+only (patient ID, name, sex, age and birth date, address, status, registration date), a
+read-only Patient Queue (who, status, times), and a dashboard of counts.
+
+**What he loses, enforced on the server.** Every clinical field, contact numbers, check-in reasons,
+conditions, allergies, immunization records and which medicines a patient received. Every
+patient or clinical write: registering or editing patients, status changes, the immunization
+correction, the queue's check-in, start and complete, and recording or editing consultations.
+The `/admin/...` routes for these are deleted, and the `/staff/...` ones send him to his
+dashboard. The data builders read demographics only for him (`models/patients.py`
+`get_all_patients_demographics()`), so nothing clinical is fetched and then hidden.
+
+**What else changed with it.** Audit entries name no medicine, vaccine or clinical value
+(`migrate_admin_minimum_necessary.py` rewrote the old ones). The backup download is an encrypted
+`.idsbackup` file, opened only with `restore_backup.py` at the health-center PC. The
+most-dispensed ranking counts sealed-visit dispensing as "Confidential".
+
+The Doctor, Health Center Staff and the Barangay Official are unchanged.

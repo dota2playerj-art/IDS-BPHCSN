@@ -1,7 +1,7 @@
 # IDS-BPHCSN — Project Status
 
 Last updated: 2026-10-01
-Updated by: Task 5b — seal all free text
+Updated by: Task 5c — care-team-only clinical data
 
 Sections 1–7 started as a read-only status audit. The Task Log below says what each task after it changed. The live `app.db` has only ever been opened read-only by these tasks.
 
@@ -15,6 +15,7 @@ Newest first.
 
 | Date | Task | Result |
 |---|---|---|
+| 2026-10-01 | Task 5c — care-team-only clinical data | M25, M26, M27 and L24 done. Clinical data is for the care team (the Doctor and Health Center Staff) under RA 11166, RA 10173 and the minimum-necessary standard. The Administrator keeps accounts, settings, maintenance, Service Schedule, SMS broadcasts, Audit Logs, inventory and Reports, and sees patients as demographics only (new `patient_profile_demographics.html`, `get_all_patients_demographics()`) and the Patient Queue read-only. His 8 patient and clinical write routes are deleted (404); the `/staff/` twins redirect him. His dashboard lists no visit or child; his SMS screen shows no numbers and no appointment-SMS panel. Audit entries name no medicine, vaccine or clinical value; `migrate_admin_minimum_necessary.py` ran on this laptop's `app.db`: backup `app.db.PRETASK_BACKUP_admin-minimum-necessary_20261001_201746`, 30 entries rewritten (16 consultation edits, 6 dose corrections, 8 legacy appointment-SMS), 1 record entry; a second run did nothing. The backup download is an encrypted `.idsbackup` file (AES-256-GCM, key from SEALED_DATA_KEY by HKDF-SHA256); new `restore_backup.py` opens it. The most-dispensed ranking counts sealed-visit dispensing as Confidential. New suite `verify_admin_minimum_necessary.py`; changed `verify_dispensing.py`, `verify_doctor.py`, `verify_audit_coverage.py`, `verify_sealed_privacy.py`. Each laptop: `git pull`, then `python migrate_admin_minimum_necessary.py`. New issues M28, M29, L25. Tests: 1741/1741, 17 of 17 suites. |
 | 2026-10-01 | Task 5b — seal all free text | M21, M24, L19 and L20 done. RA 11166 Section 44 also forbids disclosing that a person was tested, so a sealed visit now encrypts its chief complaint, additional notes and the check-in reason of its queue visit, as well as the diagnosis and treatment plan (same AES-256-GCM, bound to the row and field; the reason is bound to its `appointments` row). Only `open_sealed_value()` decrypts. Health Center Staff cannot read or change those fields on a sealed visit. The Administrator no longer sees the check-in reason on the Patient Queue, its Excel or its PDF, for any visit, and sees the placeholder instead of medicine names at a sealed visit (profile, edit form, dashboard, flash messages, audit entries). The Doctor and Staff still see them. Edit entries name free-text fields and never quote them. Printing Edit Consultation prints "Sealed — not printed" for sealed fields. Reports rank sealed complaints as one "Confidential" row. New `migrate_seal_free_text_fields.py` ran on this laptop's `app.db`: backup `app.db.PRETASK_BACKUP_seal-free-text-fields_20261001_193100`, 6 audit entries cleaned, 0 sealed consultations and 0 check-in reasons to encrypt, 1 record entry. A second run did nothing. Each laptop must run `python migrate_seal_free_text_fields.py` (after `git pull`; no new packages). Changed suites: `verify_rbac.py` (a Staff edit of a sealed record no longer moves the chief complaint; the honest form omits it). Extended `verify_sealed_privacy.py` to 182 checks. New limits M25–M27, L24. Tests: 1640/1640, 16 of 16 suites. |
 | 2026-10-01 | Task 5 — sealed record privacy | H4 and L2 done. A sealed consultation's diagnosis and treatment plan are stored encrypted (AES-256-GCM, key `SEALED_DATA_KEY` in `.env`, separate from SECRET_KEY). Only `open_sealed_value()` decrypts, and only for the Doctor. The backup holds ciphertext, is VACUUMed, and still restores. No audit entry quotes a diagnosis or treatment plan, sealed or not. Reports show sealed visits as one "Confidential" row. Exports and Print Record never carry sealed text. A key that cannot open a record shows one plain line and is audited. `migrate_redact_clinical_audit_text.py` ran on this laptop's `app.db`: backup `app.db.PRETASK_BACKUP_redact-clinical-audit-text_20261001_161011`, 9 entries redacted, 0 sealed records to encrypt, 1 record entry (filed under account 1, the first active Administrator, and saying the migration did it). New: `export_sealed_key.py`, suite `verify_sealed_privacy.py`. Each laptop must run `pip install -r requirements.txt` (new package `cryptography`), `python setup_env.py` (adds the key), then the migration. Known limits recorded as M21–M23 and L19–L20. Tests: 1565/1565, 16 of 16 suites. |
 | 2026-10-01 | Task 4 cleanup | L18 done. The two test fixture numbers with a real-looking `0917` prefix are now the fictional `0900000NNNN` pattern. The two dead functions the audit-coverage EXEMPT list carried, `set_appointment_status` and `remove_immunizations`, are deleted along with their EXEMPT entries and the comments explaining why they were kept, after a repo-wide search confirmed no callers. |
@@ -46,12 +47,12 @@ python tests/run_all.py rbac       only the suites whose names contain "rbac"
 - The live `app.db` is never used. A guard stops the whole run if any database path is inside the project folder. The runner also checks that `app.db` has the same size, time and checksum after the run.
 - Test accounts use test-only passwords (`tests/_support.py`), not the demo passwords.
 - All test data is made up. The old suites used a real staff member's name for account 4; the tests now use `bhwtest` / "Test Health Worker".
-- "All passing" looks like: one `ok` line per suite, then `TOTAL: 1640/1640 checks passed in 16/16 suites` and `All checks passed.` Exit code 0.
-- **Today (after Task 5b): 1640/1640, all 16 suites pass.** Before Task 1b it was 906/921; every failure came from H5.
+- "All passing" looks like: one `ok` line per suite, then `TOTAL: 1741/1741 checks passed in 17/17 suites` and `All checks passed.` Exit code 0.
+- **Today (after Task 5c): 1741/1741, all 17 suites pass.** Before Task 1b it was 906/921; every failure came from H5.
 - Every POST needs a form token (Task 3). The suites' clients add a valid one for their own session (`tests/_support.py`, `TokenClient`); `verify_csrf.py` uses plain clients to test refusals.
 - Run from `.venv` (`source .venv/Scripts/activate` on this laptop). The global Python install has no `python-dotenv`, and the suites fail to import `config` without it.
 
-| Suite | Checks | Result after Task 5b |
+| Suite | Checks | Result after Task 5c |
 |---|---|---|
 | verify_epi.py | 15 | 15/15 |
 | verify_staff_capabilities.py | 27 | 27/27 |
@@ -61,14 +62,15 @@ python tests/run_all.py rbac       only the suites whose names contain "rbac"
 | verify_edit_user_reset_password.py | 82 | 82/82 |
 | verify_rbac.py | 117 | 117/117 |
 | verify_reports.py | 61 | 61/61 |
-| verify_dispensing.py | 128 | 128/128 |
-| verify_doctor.py | 129 | 129/129 |
+| verify_dispensing.py | 134 | 134/134 |
+| verify_doctor.py | 131 | 131/131 |
 | verify_service_schedule.py | 157 | 157/157 |
 | verify_database_integrity.py (Task 1b) | 18 | 18/18 |
 | verify_security_basics.py (Task 2) | 82 | 82/82 |
 | verify_csrf.py (Task 3) | 68 | 68/68 |
-| verify_audit_coverage.py (Task 4) | 58 | 58/58 |
-| verify_sealed_privacy.py (Tasks 5, 5b) | 182 | 182/182 |
+| verify_audit_coverage.py (Task 4) | 60 | 60/60 |
+| verify_sealed_privacy.py (Tasks 5, 5b) | 186 | 186/186 |
+| verify_admin_minimum_necessary.py (Task 5c) | 87 | 87/87 |
 
 Not brought in: the four `d4d04b0e_*` scripts (they print values but have no pass/fail checks; they were only compared between two code trees), the three retired originals that `*_ported.py` replaced, the mutation worktrees, and one Doctor-suite check that ran old code from a worktree (L13).
 
@@ -225,47 +227,49 @@ PR0MPT_INSTRUCTION/  01–10 planning docs + Capstone_Proposal.pdf
 
 ### Permission matrix
 
-A = Allowed, D = Denied. "Denied (no route)" means no URL exists for that role.
+Rewritten for Task 5c (2026-10-01). A = Allowed, D = Denied. "Denied (no route)" means no URL exists for that role. "R" = read-only, demographics or counts only.
 
 | Action | Admin | Doctor | HC Staff | Brgy Official | Enforced at |
 |---|---|---|---|---|---|
-| Sign in, My Account, change own password | A | A | A | A | `auth.py:337, 470, 495` |
-| Own dashboard | A | A | A | A | `admin.py:103`, `staff.py:107`, `official.py:37` |
-| Patient Records list / profile / export | A | A | A | D (no route) | `admin.py:114-259`, `staff.py:117-283` |
-| Register / edit patient | A | A | A | D (no route) | `admin.py:276`, `staff.py:556` |
-| Mark Active ↔ Inactive | A | A | A | D (no route) | `admin.py:210`, `staff.py:206` |
-| **Mark Deceased / reverse Deceased** | D | A | D | D | Route admits Admin/Staff, refused in `routes/patient_views.py:406-411` |
-| Correct an immunization record | A | A | A | D (no route) | `admin.py:231`, `staff.py:223` |
-| Medicine Inventory view / export | A | A | A | D (no route) | `admin.py:342-361`, `staff.py:294-314` |
-| Add / edit / archive inventory item | A | A | A | D (no route) | `admin.py:374, 391`, `staff.py:327, 340` |
-| Patient Queue view, check-in, start, complete | A | A | A | D (no route) | `admin.py:418-477`, `staff.py:367-422` |
-| Record / edit consultation intake (vitals, complaint, vaccines, dispensing) | A | A | A | D (no route) | `admin.py:490, 516`, `staff.py:435, 466` |
-| **Write diagnosis / treatment plan** | D | A | D | D | Stripped server-side: `routes/consultation_views.py:178-215` (`can_diagnose`) |
-| **Seal / unseal a consultation** | D (no route) | A | D | D (no route) | `staff.py:265` `role_required("Doctor")` + `routes/consultation_views.py:1603` |
-| **Read a sealed diagnosis on screens** | D | A | D | D | `models/consultations.py:198`, `routes/patient_views.py:583`, `models/dispensing.py:746` |
-| SMS Notifications view | A | A (read) | A (read) | A | `admin.py:549`, `staff.py:494`, `official.py:98` |
-| Send SMS broadcast | A | D (no route) | D (no route) | A | `admin.py:561`, `official.py:111` |
-| Reports & Analytics + exports | A | A | D | A | `admin.py:579-618`, `staff.py:521-541` (Doctor only), `official.py:47-88` |
-| Community Reports, Health Programs, Vaccination Campaigns, Notifications | D (no route) | D (no route) | D (no route) | A | `official.py:126-199` |
-| Service Schedule view | A | A | A | A | `admin.py:948`, `staff.py:627`, `official.py:204` |
-| Service Schedule add / edit / delete | A | D (no route) | D (no route) | D (no route) | `admin.py:975-1001` |
-| User Management (add, edit, reset, status, export) | A | D (no route) | D (no route) | D (no route) | `admin.py:631-770` |
-| Audit Logs + exports | A | D (no route) | D (no route) | D (no route) | `admin.py:783-809` |
-| Settings, maintenance switch, backup download | A | D (no route) | D (no route) | D (no route) | `admin.py:819-930` |
-| Use the system during maintenance | A | D | D | D | `utils/security.py:416`, `routes/auth.py:409-416` |
+| Sign in, My Account, change own password | A | A | A | A | `routes/auth.py` |
+| Own dashboard | R (counts only) | A | A | A | `admin.admin_dashboard`, `staff.staff_dashboard`, `official.official_dashboard`; `routes/dashboard_views.py` reads no visit or child list for the Admin |
+| Patient Records list and its two exports | R (demographics only) | A | A | D (no route) | `models/patients.get_all_patients_demographics()` via `routes/patient_views.patient_records_context()` |
+| Patient Profile | R (demographics only) | A | A | D (no route) | `admin.patient_profile` → `patient_demographics_context()`; `patient_profile_context()` raises for any role outside the care team |
+| Patient contact numbers | D | A | A | D | not selected for the Admin (`DEMOGRAPHIC_COLUMNS`); SMS recipients fetched without numbers |
+| Register / edit patient | D (no route) | A | A | D (no route) | `staff.staff_register_patient` (`CLINICAL_FLOOR_ROLES`) |
+| Mark Active ↔ Inactive | D (no route) | A | A | D (no route) | `staff.staff_archive_patients` |
+| **Mark Deceased / reverse Deceased** | D (no route) | A | D | D (no route) | `routes/patient_views.process_archive_patients()` (`can_declare_death`) |
+| Correct an immunization record | D (no route) | A | A | D (no route) | `staff.staff_correct_vaccination` |
+| Medicine Inventory view / export | A | A | A | D (no route) | `admin.medicine_inventory`, `staff.staff_medicine_inventory` |
+| Add / edit / archive inventory item | A | A | A | D (no route) | `admin.add_edit_medicine`, `admin.archive_medicine`, staff twins |
+| Patient Queue view and export | R (no reason, no actions) | A | A | D (no route) | `routes/appointment_views.appointment_scheduling_context()` (`attach_visit_reasons`, `is_care_team`) |
+| Patient Queue check-in, start, complete | D (no route) | A | A | D (no route) | `staff.staff_check_in_patient`, `staff_start_consultation`, `staff_complete_consultation` |
+| Record / edit consultation (intake, vaccines, dispensing) | D (no route) | A | A | D (no route) | `staff.staff_record_consultation`, `staff.staff_edit_consultation` |
+| **Write diagnosis / treatment plan** | D (no route) | A | D | D (no route) | `routes/consultation_views._apply_clinical_authority()` (`can_diagnose`) |
+| **Seal / unseal a consultation** | D (no route) | A | D | D (no route) | `staff.restrict_consultation` `role_required("Doctor")` + `process_consultation_restriction()` |
+| **Read sealed text** | D | A | D (placeholder) | D | `models/consultations.open_sealed_value()` |
+| SMS Notifications view | A (no numbers, no appointment-SMS panel) | A (read) | A (read) | A | `routes/broadcast_views.sms_notifications_context()` |
+| Send SMS broadcast | A | D (no route) | D (no route) | A | `admin.send_sms_broadcast`, `official.official_send_sms_broadcast` |
+| Reports & Analytics + exports | A | A | D | A | `admin.reports_analytics`, `staff.staff_reports_analytics` (Doctor only), `official.official_reports_analytics` |
+| Community Reports, Health Programs, Vaccination Campaigns, Notifications | D (no route) | D (no route) | D (no route) | A | `routes/official.py` |
+| Service Schedule view | A | A | A | A | `admin.service_schedule`, `staff.staff_service_schedule`, `official.official_service_schedule` |
+| Service Schedule add / edit / delete | A | D (no route) | D (no route) | D (no route) | `admin.add_service_schedule_entry` and its two siblings |
+| User Management (add, edit, reset, status, export) | A | D (no route) | D (no route) | D (no route) | `admin.user_management` and siblings |
+| Audit Logs + exports | A (entries name no medicine, vaccine or clinical value) | D (no route) | D (no route) | D (no route) | `admin.audit_logs`; wording in `routes/audit_entries.py` |
+| Settings, maintenance switch | A | D (no route) | D (no route) | D (no route) | `admin.settings`, `admin.set_maintenance_mode` |
+| Backup download | A (encrypted `.idsbackup`) | D (no route) | D (no route) | D (no route) | `admin.download_backup`; `utils/backup_crypto.py` |
+| Use the system during maintenance | A | D | D | D | `utils/security.py`, `routes/auth.py` |
 
-Wrong-role requests redirect to the user's own dashboard (`utils/security.py:442-443`).
+Wrong-role requests redirect to the user's own dashboard (`utils/security.role_required`). The Administrator's removed write routes no longer exist under `/admin/` (404); their `/staff/` twins redirect him.
 
 ### Template-only restrictions
 
-None found. Every route carries a guard. The only unguarded routes are `/`, `/login` and `/logout`, which are meant to be public. Each hidden control checked has a matching server check: diagnosis, seal, Deceased, schedule edit, and SMS send.
+None found. Every route carries a guard. The only unguarded routes are `/`, `/login` and `/logout`, which are meant to be public. Each hidden control checked has a matching server check: diagnosis, seal, Deceased, schedule edit, SMS send, and (Task 5c) every patient and clinical write the Administrator lost. The `care_team_view` flag in `utils/context.py` only leaves out controls whose routes already refuse him.
 
 ### Clinical actions a non-physician can perform
 
-- Through screens and routes: **none.** Diagnosis, treatment plan, sealing and declaring death are all refused server-side for everyone but the Doctor.
-- Through side channels, the **Administrator (not a physician) can still read sealed diagnoses**:
-  1. Settings → Download Backup (`admin.py:930`) hands over the whole database, sealed text included.
-  2. Audit Logs entries written before `113d6b7`, or written while a record was not yet sealed, still quote diagnosis text. Existing entries are never rewritten (`models/consultations.py:388-392`). The live DB has 9 unredacted "Diagnosis:" audit entries.
+- Through screens and routes: **none.** Diagnosis, treatment plan, sealing and declaring death are refused server-side for everyone but the Doctor.
+- The Administrator's side channels are closed. Sealed fields are encrypted (Tasks 5, 5b), no audit entry quotes clinical text or names a medicine or vaccine (Tasks 5, 5b, 5c), the backup download is encrypted as a whole (Task 5c), and his screens read no clinical data at all (Task 5c).
 - Existing data: 28 of 29 live consultations have a diagnosis written by a non-Doctor account (6 by Admin, 22 by Health Center Staff), from before the rule existed.
 
 ---
@@ -297,7 +301,7 @@ None found. Every route carries a guard. The only unguarded routes are `/`, `/lo
 
 1. The live Doctor account still uses the demo password from source code (`models/users.py:141`). Verified read-only against the stored hash.
 2. No worklist of consultations waiting for a diagnosis. Staff intake saves the visit with no diagnosis (`routes/consultation_views.py:190-196`), and the Doctor has to find it.
-3. Sealed text is still reachable by the Administrator through the backup file and older audit entries (see §3).
+3. ~~Sealed text is still reachable by the Administrator through the backup file and older audit entries.~~ Closed by Tasks 5, 5b and 5c (see §3).
 4. Old diagnoses written by Admin and Staff accounts stay as they are (`models/consultations.py:53`). The demo data contradicts the new rule.
 5. ~~The Doctor's automated suite is outside the repository.~~ Done in Task 1: `tests/verify_doctor.py` (128 checks; one worktree-only check dropped, L13).
 6. `README.md` still lists three roles and no Doctor login. `08_PROJECT_ROADMAP.md` never mentions the Doctor.
@@ -307,7 +311,7 @@ None found. Every route carries a guard. The only unguarded routes are `/`, `/lo
 ## 5. Issues Found
 
 Severity: High = breaks a feature, or is a security or legal risk. Medium = wrong behavior or confusing. Low = cleanup.
-Count: **6 High, 27 Medium, 24 Low.** Done: M11, M15, L9 (Task 1); H5, M16, L13 (Task 1b); H1 (code side), H2, M1, M3, L1, L5, L8 (Task 2); H6, M17 (Task H6); M2 (Task 3); H3, M6, L18 (Task 4); H4, L2 (Task 5); M21, M24, L19, L20 (Task 5b). Added in Task 1: H5, H6, M16, L13. Added in Task 1b: L14. Added in Task 2: M17. Added in Task H6: M18, M19, L15. Added in Task 3: M20, L16, L17. Added in Task 4: L18 (done the same session). Added in Task 5: M21–M24, L19–L23. Added in Task 5b: M25–M27, L24.
+Count: **6 High, 29 Medium, 25 Low.** Done: M11, M15, L9 (Task 1); H5, M16, L13 (Task 1b); H1 (code side), H2, M1, M3, L1, L5, L8 (Task 2); H6, M17 (Task H6); M2 (Task 3); H3, M6, L18 (Task 4); H4, L2 (Task 5); M21, M24, L19, L20 (Task 5b); M25, M26, M27, L24 (Task 5c). Added in Task 1: H5, H6, M16, L13. Added in Task 1b: L14. Added in Task 2: M17. Added in Task H6: M18, M19, L15. Added in Task 3: M20, L16, L17. Added in Task 4: L18 (done the same session). Added in Task 5: M21–M24, L19–L23. Added in Task 5b: M25–M27, L24. Added in Task 5c: M28, M29, L25.
 
 | # | Severity | File:line | Problem | Suggested direction |
 |---|---|---|---|---|
@@ -364,10 +368,13 @@ Count: **6 High, 27 Medium, 24 Low.** Done: M11, M15, L9 (Task 1); H5, M16, L13 
 | L21 | Low | `tests/_support.py` (fixture patients' `contact_number`) | Fixture patients use `0917`-prefixed numbers, the real-looking pattern replaced in `verify_audit_coverage.py`. | Use the `0900000NNNN` pattern. |
 | L22 | Low | `routes/patient_views.py` `_log_withheld_consultations()` docstring | Says nothing is written "for the Administrator". Since 2026-09-25 the Administrator is withheld from too. | Fix the sentence. |
 | L23 | Low | `routes/consultation_views.py` `_log_restriction()` | The seal and lift audit entries are written in their own transaction, after the seal commits. Task 4's "same transaction" rule was not applied here. | Pass the entry into `set_consultation_restriction()` as an `audit` callback. |
-| M25 | Medium | `medicine_dispensing.medicine_name`; Reports & Analytics "most dispensed"; `/admin/settings/backup.db` | Known limit (Task 5b). Medicine names at a sealed visit are plain in the database, in the backup file and in the per-item ranking on Reports & Analytics (D3 keeps totals not tied to a patient). The Administrator can download the backup and read them with a database tool. A rare medicine with a count of 1 over a one-day range points at one visit. | Team decides: encrypt `medicine_name` for sealed visits (stock and ranking would then need a separate item reference), or accept. |
-| M26 | Medium | `templates/patient_profile.html` (Appointment History); backup file | Team decision. D4 hides the check-in reason from the Administrator on the Patient Queue only. On a profile, an unsealed visit's reason (and its chief complaint) is still shown to the Administrator, and the backup file holds every unsealed value as written. | Decide whether the minimum-necessary rule should reach the profile, or whether the Doctor is expected to seal any sensitive visit. |
-| M27 | Medium | `audit_logs` (dispensing entries) | Known limit (Task 5b). Dispensing entries written before a visit was sealed name the medicines, with the consultation number. Sealing later does not rewrite them, so the Administrator can still read them in Audit Logs. | Decide whether sealing should redact earlier dispensing entries for that consultation. |
-| L24 | Low | `patients.medical_conditions`, `patients.allergies`; immunization and other-vaccination notes | Known limit (Task 5b). These free-text fields belong to the patient or to a dose, not to a visit, so the seal does not cover them. A condition list can name HIV. | Decide whether the patient-level lists need the same protection. |
+| M25 | Medium | `medicine_dispensing.medicine_name`; Reports & Analytics "most dispensed"; the backup download | Medicine names at a sealed visit were plain in the backup file and ranked by name on Reports. | **Done (Task 5c):** the backup download is one encrypted `.idsbackup` file (AES-256-GCM, key derived from SEALED_DATA_KEY), opened only by `restore_backup.py`. The ranking counts sealed-visit dispensing under one Confidential row. The names stay plain inside `app.db` on the health-center PC, for stock counts; BitLocker covers that (M23). |
+| M26 | Medium | `templates/patient_profile.html`; backup file | The Administrator saw unsealed check-in reasons and chief complaints on profiles, and the backup held every value plain. | **Done (Task 5c):** the team decided clinical data is for the care team. His profile is demographics only, and the backup is encrypted. |
+| M27 | Medium | `audit_logs` (dispensing entries) | Dispensing entries written before a visit was sealed named the medicines. | **Done (Task 5c):** no dispensing entry names a medicine, sealed or not ("Dispensed 2 items for <Name> (PAT-005) at consultation #42."). The migration rewrote the old ones; this laptop had none. |
+| L24 | Low | `patients.medical_conditions`, `patients.allergies`; dose notes | Patient-level free text could name HIV and was shown to the Administrator. | **Done (Task 5c):** the Administrator no longer reads them. They stay readable to the care team, who need them; the seal is per visit. |
+| M28 | Medium | Reports & Analytics (screen, Excel, PDF): most common diagnoses, complaints and dispensed items | Team decision. The Administrator keeps the rankings, as decided. They name unsealed diagnoses, complaints and medicines with a count and no patient. With a one-day range, a count of 1 can point at one visit. Sealed visits are already counted as Confidential. | Decide whether low counts should fold into "Other", or whether these three rankings should be counts-only for the Administrator. |
+| M29 | Medium | `models/dispensing.py` `record_dispensing()` | Conflict with the Task 5c prompt, which said stock accountability "stays in the inventory's own stock entries". There are none for dispensing: only manual stock edits write an inventory entry. Dispensing is accounted for by the `medicine_dispensing` table and the stock level. Adding a per-item stock entry would let the Administrator match a medicine to a patient by its timestamp. | Decide whether dispensing needs an inventory audit entry; if so, write daily per-item totals rather than one entry per visit. |
+| L25 | Low | `routes/broadcast_views.py`; `templates/sms_notifications.html` | The Barangay Official still sees broadcast recipients' mobile numbers. Task 5c changed only the Administrator, as instructed. | Decide whether the Official should see recipient names only, like the Administrator. |
 
 Checked and **not** found: `TODO`/`FIXME`/`XXX` markers; `href="#"` or "coming soon" stubs; broken `url_for()` targets (123 literal calls and 73 context endpoint names all resolve); missing static files; "Agusan del Sur" as a live value (it appears only in notes about the correction, in code comments and docs 06/09, and not at all in the live DB); passwords sent by email or SMS; offline mode, national database integration, or non-plain-text SMS.
 
@@ -399,5 +406,5 @@ Checked and **not** found: `TODO`/`FIXME`/`XXX` markers; `href="#"` or "coming s
 1. **Reset all live passwords and set a real `SECRET_KEY` from the environment.** Anyone with the code can currently sign in as any account or forge a session (H1, H2). *(Code side done in Task 2. On each laptop: pull, run `python setup_env.py` and `python migrate_add_must_change_password.py --flag-all`, then each person sets a new password.)*
 2. **Add a private git remote and move the test suites into the repo.** The code exists on one laptop, and the tests sit in a temp folder (M11, M12). *(Tests: done in Task 1. Remote: decide H6 first.)*
 3. ~~Audit patient, inventory, queue, dispensing and death-declaration writes.~~ **Done (Task 4).** Every one of these writes an audit entry now (H3).
-4. ~~Decide the RA 11166 policy for sealed text in backups and old audit entries, then build it.~~ **Done (Task 5).** Sealed fields are encrypted, and audit entries hold no clinical text (H4). On each laptop run the steps in the Task 5 log line, and give the Doctor the key envelope.
+4. ~~Decide the RA 11166 policy for sealed text in backups and old audit entries, then build it.~~ **Done (Tasks 5, 5b, 5c).** Clinical data is now the care team's only, and the backup is encrypted. Sealed fields are encrypted, and audit entries hold no clinical text (H4). On each laptop run the steps in the Task 5 log line, and give the Doctor the key envelope.
 5. **Fix the project name and update README and 08_PROJECT_ROADMAP to four roles.** The docs the team relies on were already wrong about the Doctor role (M9, §6).

@@ -108,7 +108,8 @@ Dashboard
 
 Purpose
 
-Provide a complete overview of the health center.
+Provide an operational overview of the health center: counts, stock and system activity. Since
+Task 5c (2026-10-01) it lists no visit and no child by name; clinical data is for the care team.
 
 Components
 
@@ -276,7 +277,13 @@ Duplicate patient detection.
 
 Purpose
 
-Display complete patient information.
+Display complete patient information to the care team: the Doctor and Health Center Staff.
+
+The Administrator's profile (Task 5c, 2026-10-01) is demographics only: patient ID, full name,
+sex, age and birth date, address, status and registration date, read-only, with one plain line
+where the tabs would be: "Clinical details are shown only to the Doctor and Health Center Staff."
+It is a separate template, `patient_profile_demographics.html`, built from the demographic columns
+only. No contact number is shown to him.
 
 Tabs
 
@@ -1149,22 +1156,37 @@ account's stored role, not by hiding a control:
 
 | Action | Screen | Doctor | Administrator | Health Center Staff |
 |---|---|---|---|---|
-| Enter or edit Diagnosis and Treatment Plan | 20 | Yes | No — intake only | No — intake only |
+| Enter or edit Diagnosis and Treatment Plan | 20 | Yes | No (no Screen 20) | No — intake only |
+| Record or edit consultation intake | 20 | Yes | No (no Screen 20) | Yes |
 | Mark a consultation Restricted, or lift it | 05, 20 | Yes | No | No |
-| Read a Restricted consultation's diagnosis, plan, chief complaint and notes | 05, 20 | Yes | Placeholder | Placeholder |
+| Read a Restricted consultation's diagnosis, plan, chief complaint and notes | 05, 20 | Yes | No (demographics only) | Placeholder |
+| Read any clinical field, unsealed or not | 05, 20 | Yes | No (demographics only) | Yes |
+| Read patient contact numbers | 03, 05, 09 | Yes | No | Yes |
 | Read the check-in reason on the Patient Queue | 08 | Yes | No | Yes (placeholder if Restricted) |
-| Read the medicine names dispensed at a Restricted visit | 05, 20 | Yes | Placeholder | Yes |
+| Check in, start or complete a visit on the Patient Queue | 08 | Yes | No (read-only) | Yes |
+| Read the medicine names dispensed to a patient | 05, 20 | Yes | No | Yes |
+| Register or edit a patient | 04 | Yes | No | Yes |
+| Correct a recorded vaccination | 05 | Yes | No | Yes |
 | Set a patient to Deceased, or reverse Deceased | 03 | Yes | No | No |
-| Move a patient between Active and Inactive | 03 | Yes | Yes | Yes |
+| Move a patient between Active and Inactive | 03 | Yes | No | Yes |
+
+The Administrator's column changed on 2026-10-01 (Task 5c). Clinical data is for the care team
+only: RA 11166 allows sharing only with health workers involved in the patient's care, RA 10173
+requires processing to be adequate, relevant and not excessive, and the project follows the
+minimum-necessary standard. This extends the reasoning behind the Doctor role. Each "No" is
+enforced on the server: his `/admin/...` write routes are deleted, the `/staff/...` ones send him
+to his dashboard, and his patient screens read demographic columns only.
 
 A field a role may not write is not drawn for it, and a submission carrying it anyway has it
 discarded before validation. On an edit, the stored value is put back and the refusal is recorded
 in the audit trail, without the submitted text. The placeholder a non-Doctor sees reads
 **"Restricted — Doctor access only"**. The sealed text is not in the page at all.
 
-**Screen 12.** An audit entry for a consultation edit names a free-text field as changed ("Changed:
-Chief complaint, Diagnosis") and never quotes its value, sealed or not (updated 2026-10-01, Task 5b).
-Audit Logs are read by the Administrator.
+**Screen 12.** An audit entry for a consultation edit names the fields that changed ("Changed:
+Temperature, Chief complaint") and never quotes a value, sealed or not (Task 5b; vitals too since
+Task 5c). Dispensing and dose entries say how many, for whom and at which consultation, and never
+which medicine or vaccine: "Dispensed 2 items for <Name> (PAT-005) at consultation #42." Audit Logs
+are read by the Administrator.
 
 **Screen 10 and 18.** Restricted consultations count in every total. In the diagnosis ranking they
 appear as one row, **"Confidential"**, for every viewer, the Doctor included (updated 2026-10-01).
@@ -1196,13 +1218,15 @@ data as sensitive personal information. So:
 - Screens 10 and 18 rank chief complaints like diagnoses: a Restricted visit is one "Confidential" row.
 - If the key on the computer cannot open a sealed record, the Doctor sees "This sealed record
   cannot be opened on this computer." Nothing crashes, and the audit trail records it.
-- Screen 13, Backup: "Sealed records stay encrypted in the backup. They can only be opened on a
-  computer that has this system's key."
+- Screen 13, Backup (Task 5c): "The backup file is encrypted. It can only be opened with this
+  system's key, using restore_backup.py on the health-center computer." The download is one
+  AES-256-GCM `.idsbackup` file; the key is derived from SEALED_DATA_KEY.
 
-Known limits. These stay readable for a Restricted visit, on screens and in the backup: the visit
-date, vital signs, immunizations, and the fact that the record is Restricted. The medicine names stay
-plain in the database and the backup file, because stock counts and the per-item totals on Screens
-10 and 18 read them. Backups made before 2026-10-01 still hold plain text.
+Known limits. These stay readable to Health Center Staff for a Restricted visit: the visit date,
+vital signs, immunizations, and the fact that the record is Restricted. The medicine names stay
+plain in the database, because stock counts read them; Screens 10 and 18 count them under
+"Confidential" (Task 5c), and the backup file is encrypted as a whole. Backups made before
+2026-10-01 still hold plain text.
 
 ---
 
@@ -1394,7 +1418,8 @@ route writes to it". That has not been true since 3 September 2026.
   access is structurally unaffected, so there is no self-lockout.
 - **Password Policy, the sign-in figures and the database size** are read from the running system
   and are not editable anywhere.
-- **Download Backup is real** and serves a verified copy of the database.
+- **Download Backup is real** and serves a verified copy of the database, encrypted as one
+  `.idsbackup` file since Task 5c; `restore_backup.py` opens it at the health-center PC.
 
 What is still disabled, each inside its own fieldset stating its own reason: **Restore** —
 deliberately the harder half, because a restore replaces every record with no way to undo it and
