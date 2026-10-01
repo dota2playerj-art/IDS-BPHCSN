@@ -1304,7 +1304,7 @@ def _apply_general_vaccination_edit(patient, consultation_id, consultation,
 
 
 def _describe_dose_changes(added, removed, general_added=(), dispensed=(),
-                           reported=(), hide_medicines=False):
+                           reported=()):
     """The vaccination and dispensing half of an audit line.
 
     Returns (summary, changed_labels).
@@ -1330,46 +1330,28 @@ def _describe_dose_changes(added, removed, general_added=(), dispensed=(),
     Inventory twenty lighter, and a stock movement that no entry names is exactly
     the kind of change an audit log exists to make answerable.
     """
+    # COUNTS, NEVER NAMES (Task 5c). Audit Logs are read by the Administrator,
+    # who is not part of the patient's care. Which vaccine or medicine a named
+    # patient received stays on the profile, for the care team.
+    def counted(n, noun):
+        return "{} {}{}".format(n, noun, "" if n == 1 else "s")
+
     parts, changed = [], []
     if added:
-        parts.append(
-            "Immunisations added: "
-            + ", ".join(dose_label(code, dose) for code, dose in added)
-        )
+        parts.append("Immunisations added: " + counted(len(added), "dose"))
         changed.append("immunisations added")
     if removed:
-        parts.append(
-            "Immunisations removed: "
-            + ", ".join(dose_label(code, dose) for code, dose in removed)
-        )
+        parts.append("Immunisations removed: " + counted(len(removed), "dose"))
         changed.append("immunisations removed")
     if reported:
-        parts.append(
-            "Doses recorded as previously given elsewhere: "
-            + ", ".join(_reported_labels(reported))
-        )
+        parts.append("Doses recorded as previously given elsewhere: "
+                     + counted(len(reported), "dose"))
         changed.append("doses reported as given elsewhere")
     if general_added:
-        parts.append(
-            "Other vaccinations added: " + ", ".join(_general_labels(general_added))
-        )
+        parts.append("Other vaccinations added: " + counted(len(general_added), "dose"))
         changed.append("other vaccinations added")
     if dispensed:
-        if hide_medicines:
-            # A sealed visit: a medicine can reveal a condition, and this entry is
-            # read by the Administrator. It says how many, not which (D3).
-            parts.append(
-                "Medicine dispensed: {} item{} (names not shown, the consultation "
-                "is restricted)".format(len(dispensed),
-                                        "s" if len(dispensed) != 1 else ""))
-        else:
-            parts.append(
-                "Medicine dispensed: "
-                + ", ".join(
-                    "{} (stock now {})".format(dispensing_label(row), row["stock_after"])
-                    for row in dispensed
-                )
-            )
+        parts.append("Medicine dispensed: " + counted(len(dispensed), "item"))
         changed.append("items dispensed")
     return "; ".join(parts), changed
 
@@ -1562,7 +1544,6 @@ def process_edit_consultation(consultation_id, form_data, user_id, ip_address=No
         summary, changed = describe_consultation_changes(before, after)
     dose_summary, dose_changed = _describe_dose_changes(
         added, removed, general_added, dispensed, reported,
-        hide_medicines=bool(after and after["is_restricted"]),
     )
     # The same rule for what is flashed back to this person.
     hide_names = bool(after and after["is_restricted"]

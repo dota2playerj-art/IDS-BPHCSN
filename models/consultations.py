@@ -493,46 +493,24 @@ def _rendered(field, value, absent):
     return value
 
 
-def _audit_renderer(field):
-    def render(value):
-        return _rendered(field, value, "not recorded")
-
-    return render
-
-
-# Passed to models.audit.describe_changes() so an audit entry reads in the same
-# units and wording the screens use. Only the fields an entry may quote: the
-# measurements and the follow-up date. Free text is never quoted (D5).
-AUDIT_FORMATTERS = {
-    field: _audit_renderer(field)
-    for field in CONSULTATION_FIELDS if field not in CLINICAL_TEXT_FIELDS
-}
-
-
 def describe_consultation_changes(before, after):
     """The audit text for one consultation edit. Returns (summary, changed fields).
 
-    NO AUDIT ENTRY QUOTES FREE CLINICAL TEXT, SEALED OR NOT (D5).
-    Audit Logs are read and exported by the Administrator, who is not a
-    physician. The chief complaint, diagnosis, treatment plan and additional notes
-    are only named: "Changed: Chief complaint, Notes". The measurements and the
-    follow-up date keep their before and after, as before.
+    NO AUDIT ENTRY QUOTES A CLINICAL VALUE (D5, Task 5c).
+    Audit Logs are read and exported by the Administrator, who is not part of
+    the patient's care. Every field is only named, in form order: "Changed:
+    Temperature, Chief complaint". That covers the vitals and the follow-up date
+    too, which Task 5b still quoted.
 
     On a sealed record both sides are ciphertext. A field the Doctor did not
     change keeps its stored ciphertext, so it does not read as changed.
     """
     from models.audit import describe_changes
 
-    open_labels = {f: label for f, label in FIELD_LABELS.items()
-                   if f not in CLINICAL_TEXT_FIELDS}
-    summary, changed = describe_changes(before, after, open_labels,
-                                        formatters=AUDIT_FORMATTERS)
-    _, clinical = describe_changes(
-        before, after, {f: FIELD_LABELS[f] for f in CLINICAL_TEXT_FIELDS})
-    if clinical:
-        names = "Changed: " + ", ".join(FIELD_LABELS[f] for f in clinical)
-        summary = f"{summary}; {names}" if summary else names
-    return summary, list(changed) + list(clinical)
+    _, changed = describe_changes(before, after, FIELD_LABELS)
+    if not changed:
+        return "", []
+    return "Changed: " + ", ".join(FIELD_LABELS[f] for f in changed), list(changed)
 
 
 def _to_consultation(row):

@@ -588,6 +588,10 @@ def process_vaccination_correction(form_data, user_id, ip_address=None):
             f"No change. {original_label} for {patient['full_name']} is "
             "unchanged, and nothing has been written to the audit log."
         )
+    # The entry names the corrected fields and never their values (Task 5c):
+    # which vaccine a named patient had, and when, is an immunization record, and
+    # Audit Logs are read by the Administrator, who is not part of their care.
+    summary = "Changed: " + ", ".join(labels[field] for field in changed)
 
     # Self-contained on purpose, exactly as the consultation entry is: read
     # months later, on its own, it must say which record was touched, whose it

@@ -39,7 +39,6 @@ from models.audit import (
     MODULE_PATIENTS,
     log_action,
 )
-from models.dispensing import _plural as quantity_with_unit
 from models.general_vaccinations import vaccination_label
 from models.immunizations import dose_label
 from utils.dates import display_date, today
@@ -155,12 +154,18 @@ def consultation_recorded(patient_id, visit_date, user_id, ip_address=None):
 
 
 def _doses(action, labels_of, patient_id, consultation_id, user_id, ip_address):
+    """How many doses, for whom, at which consultation. Never which vaccine (Task 5c).
+
+    Audit Logs are read by the Administrator, who is not part of the patient's
+    care. Which vaccines a named patient received is an immunization record, and
+    it stays on the patient's profile for the care team. `labels_of` is kept so
+    the three callers still say which kind of dose they record.
+    """
     write = _entry(user_id, ip_address, action, MODULE_IMMUNIZATIONS)
 
     def audit(conn, stored):
-        labels = ", ".join(labels_of(entry) for entry in stored)
-        write(conn, f"{_count(len(stored), 'dose')} for {_patient(conn, patient_id)} "
-                    f"at consultation #{consultation_id}: {labels}.")
+        write(conn, f"Recorded {_count(len(stored), 'dose')} for "
+                    f"{_patient(conn, patient_id)} at consultation #{consultation_id}.")
     return audit
 
 
@@ -186,25 +191,19 @@ def other_vaccinations_recorded(patient_id, consultation_id, user_id, ip_address
 # --- Medicine Inventory ----------------------------------------------------------
 
 def medicine_dispensed(patient_id, consultation_id, user_id, ip_address=None):
-    """Who received what, and how much. If the consultation is restricted
-    (sealed), the item names are left out: a medicine can reveal a condition."""
+    """Who received how many items, at which consultation. Never which medicine.
+
+    A medicine can reveal a condition, and Audit Logs are read by the
+    Administrator, who is not part of the patient's care (Task 5c). What was
+    handed over stays on the patient's profile for the care team, and the stock
+    level of each item is on Medicine Inventory.
+    """
     write = _entry(user_id, ip_address, ACTION_MEDICINE_DISPENSED, MODULE_INVENTORY)
 
     def audit(conn, stored):
-        where = f"For {_patient(conn, patient_id)}"
-        if consultation_id:
-            where += f", consultation #{consultation_id}"
-        sealed = consultation_id and conn.execute(
-            "SELECT is_restricted FROM consultations WHERE id = ?", (consultation_id,)
-        ).fetchone()
-        if sealed and sealed["is_restricted"]:
-            write(conn, f"{where}: {_count(len(stored), 'item')}. Names not shown: "
-                        "the consultation is restricted.")
-            return
-        items = ", ".join(
-            f"{quantity_with_unit(e['quantity_dispensed'], e['unit'])} of {e['medicine_name']}"
-            for e in stored)
-        write(conn, f"{where}: {items}.")
+        where = f" at consultation #{consultation_id}" if consultation_id else ""
+        write(conn, f"Dispensed {_count(len(stored), 'item')} for "
+                    f"{_patient(conn, patient_id)}{where}.")
     return audit
 
 
