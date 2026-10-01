@@ -4,9 +4,11 @@ AES-256-GCM with the key in SEALED_DATA_KEY (.env). A stored value looks like
 
     enc:v1:<base64 of nonce + ciphertext>
 
-Each value is bound to its row and field: the consultation id and the field name
-are the associated data, so a value copied into another row or field does not
-decrypt. Every encryption uses a fresh random 96-bit nonce.
+Each value is bound to its table, row and field: the table name, the row id and
+the field name are the associated data, so a value copied into another row or
+field does not decrypt. Most values live on a consultation. The check-in reason
+of the linked queue visit lives on an appointments row and is bound to that row.
+Every encryption uses a fresh random 96-bit nonce.
 
 Only models/consultations.py open_sealed_value() may call decrypt(). It checks
 that the reader is the Doctor first. tests/verify_sealed_privacy.py fails if any
@@ -55,15 +57,15 @@ def _key():
     return base64.b64decode(value)
 
 
-def _associated_data(consultation_id, field):
-    return f"consultations:{int(consultation_id)}:{field}".encode("utf-8")
+def _associated_data(row_id, field, table="consultations"):
+    return f"{table}:{int(row_id)}:{field}".encode("utf-8")
 
 
 def is_encrypted(value):
     return isinstance(value, str) and value.startswith(PREFIX)
 
 
-def encrypt(plaintext, consultation_id, field):
+def encrypt(plaintext, row_id, field, table="consultations"):
     """Encrypt one field value. None and "" stay as they are: there is nothing to hide.
 
     Always encrypts what it is given. A caller that may meet a value that is
@@ -74,12 +76,12 @@ def encrypt(plaintext, consultation_id, field):
         return plaintext
     nonce = os.urandom(NONCE_BYTES)
     sealed = AESGCM(_key()).encrypt(
-        nonce, str(plaintext).encode("utf-8"), _associated_data(consultation_id, field)
+        nonce, str(plaintext).encode("utf-8"), _associated_data(row_id, field, table)
     )
     return PREFIX + base64.b64encode(nonce + sealed).decode("ascii")
 
 
-def decrypt(token, consultation_id, field):
+def decrypt(token, row_id, field, table="consultations"):
     """Decrypt one stored value. Raises SealedDataError if it cannot be opened."""
     if token is None or token == "" or not is_encrypted(token):
         return token
@@ -91,7 +93,7 @@ def decrypt(token, consultation_id, field):
         raise SealedDataError("The stored value is damaged.")
     try:
         plain = AESGCM(_key()).decrypt(
-            raw[:NONCE_BYTES], raw[NONCE_BYTES:], _associated_data(consultation_id, field)
+            raw[:NONCE_BYTES], raw[NONCE_BYTES:], _associated_data(row_id, field, table)
         )
     except InvalidTag as error:
         raise SealedDataError("The key does not open this value.") from error

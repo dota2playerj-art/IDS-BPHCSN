@@ -48,6 +48,7 @@ from models.patients import (
     get_registration_trend,
 )
 from utils.dates import to_clinic_time, today
+from utils.security import current_role
 
 # How many rows each dashboard list shows before it stops.
 RECENT_CONSULTATIONS = 5
@@ -128,9 +129,10 @@ def _recent_consultations(limit, reference):
     issued six queries would be the kind of quiet cost that only shows up once
     the register is large.
     """
-    entries = get_consultation_report(limit=limit)["entries"]
+    role = current_role()
+    entries = get_consultation_report(role, limit=limit)["entries"]
     dispensed = get_dispensing_by_consultation(
-        entry.get("id") for entry in entries
+        (entry.get("id") for entry in entries), role
     )
     rows = []
     for entry in entries:

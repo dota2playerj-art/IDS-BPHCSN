@@ -8,6 +8,7 @@ each keeps its own role_required guard and its own redirect target.
 This mirrors routes/patient_views.py and routes/inventory_views.py exactly.
 """
 from models.appointments import (
+    attach_visit_reasons,
     check_in_patient,
     complete_consultation,
     get_active_consultation,
@@ -20,6 +21,7 @@ from models.appointments import (
     queue_display_name,
     start_consultation,
 )
+from models.consultations import RESTRICTED_PLACEHOLDER
 from models.immunizations import get_immunization_alert, get_immunization_status
 from models.patients import get_all_patients, get_patient_by_id
 from models.service_schedule import get_entries as get_schedule_entries, services_on
@@ -27,6 +29,8 @@ from routes.audit_entries import (
     consultation_completed, consultation_started, patient_checked_in,
 )
 from utils.dates import today
+from utils.roles import is_care_team
+from utils.security import current_role
 
 # Only a living, active record may be checked in. An Inactive or Deceased patient
 # appearing in the Check In picker is a data-entry accident waiting to happen, and
@@ -55,6 +59,11 @@ def appointment_scheduling_context(month=None):
     # server will reject. One lookup, one answer, both consumers.
     active = get_active_consultation()
     entries = get_todays_appointments(active=active)
+    # The check-in reason is added here, for this reader (Task 5b, D4). The
+    # Administrator gets no reason on any row; it is decided on the server, so it
+    # is in neither the page nor the export.
+    role = current_role()
+    entries = attach_visit_reasons(entries, role, queue_view=True)
 
     # Which children in today's queue are due or overdue for a dose. Read once
     # for the whole roster rather than per row -- get_immunization_alert() reads
@@ -94,6 +103,10 @@ def appointment_scheduling_context(month=None):
 
     return {
         "queue": entries,
+        # False for the Administrator: the screen and the exports leave the reason
+        # column out altogether.
+        "show_visit_reason": is_care_team(role),
+        "restricted_placeholder": RESTRICTED_PLACEHOLDER,
         "queue_stats": get_queue_stats(entries, active=active),
         # The filter panel's two dropdowns, built from the rows in today's queue
         # rather than from APPOINTMENT_TYPES and the status vocabulary. Those

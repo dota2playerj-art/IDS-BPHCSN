@@ -172,6 +172,13 @@
     color:var(--text-muted); font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.03em;
   }
   .reason-text{color:var(--text-muted); font-size:12.5px;}
+  /* The check-in reason of a sealed visit shows on screen only, and only to the
+     Doctor, who can read it. On paper it is replaced by a plain line. */
+  .print-only{display:none;}
+  @media print{
+    .no-print{display:none !important;}
+    .print-only{display:inline !important;}
+  }
 
   /* SERVICES TODAY -- the strip under the page title. A plain band rather than a
      panel-card, so it reads as a line of information about the day and not as
@@ -523,7 +530,7 @@
         <div class="d-flex align-items-center gap-2 flex-wrap">
           <div class="toolbar-search">
             <span class="material-symbols-outlined" style="font-size:18px;">search</span>
-            <input type="text" id="queueSearch" placeholder="Search by patient name, patient ID, or reason">
+            <input type="text" id="queueSearch" placeholder="Search by patient name, patient ID{% if show_visit_reason %}, or reason{% endif %}">
           </div>
           <button class="filter-btn" id="filterToggleBtn" onclick="toggleFilterPanel()">
             <span class="material-symbols-outlined" style="font-size:18px;">filter_list</span>Advanced Filter
@@ -642,7 +649,7 @@
 {%- for entry in queue %}
 {%- set patient_name = entry.first_name ~ ' ' ~ entry.last_name %}
             <tr class="queue-row{% if entry.is_in_consultation %} row-inconsult{% elif entry.is_ready %} row-ready{% endif %}"
-                data-search="{{ (entry.first_name ~ ' ' ~ (entry.middle_name or '') ~ ' ' ~ entry.last_name ~ ' ' ~ entry.patient_reference ~ ' ' ~ (entry.notes or '') ~ ' ' ~ (entry.appointment_type or '')) | lower }}"
+                data-search="{{ (entry.first_name ~ ' ' ~ (entry.middle_name or '') ~ ' ' ~ entry.last_name ~ ' ' ~ entry.patient_reference ~ ' ' ~ ('' if entry.reason_sealed else (entry.notes or '')) ~ ' ' ~ (entry.appointment_type or '')) | lower }}"
                 data-service="{{ (entry.appointment_type or 'Consultation') | lower }}"
                 data-status="{{ (entry.display_status or '') | lower }}">
               <td>
@@ -669,7 +676,7 @@
               <td>
                 <div>{{ entry.appointment_type or 'Consultation' }}</div>
 {%- if entry.notes %}
-                <div class="reason-text">{{ entry.notes }}</div>
+                <div class="reason-text">{% if entry.reason_sealed %}<span class="no-print">{{ entry.notes }}</span><span class="print-only">{{ restricted_placeholder }}</span>{% else %}{{ entry.notes }}{% endif %}</div>
 {%- endif %}
               </td>
               <td>{{ entry.arrival_time or '—' }}</td>

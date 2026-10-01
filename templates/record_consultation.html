@@ -5,6 +5,16 @@
 {% block styles %}
   .page-desc{font-size:14px; color:var(--text-muted); margin-top:4px; max-width:680px;}
 
+  /* A sealed visit's text, when the Doctor prints this page from the browser (D6).
+     On screen the fields show as usual. On paper each one is replaced by a plain
+     line, so a printout or a PDF saved from the print dialog never carries it. */
+  .sealed-print-note{display:none;}
+  @media print{
+    .sealed-field{display:none !important;}
+    .sealed-print-note{display:block; font-size:13px; font-style:italic; color:#6B7280;
+      padding:8px 0;}
+  }
+
   .panel-card{
     background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:24px; margin-bottom:24px;
   }
@@ -329,10 +339,25 @@
             <div class="section-sub">What the patient came in for, in their own words where possible</div>
           </div>
         </div>
-        <label class="field-label">{{ field_labels.chief_complaint }}<span class="req">*</span></label>
-        <textarea class="form-control{% if errors.chief_complaint %} is-invalid{% endif %}" name="chief_complaint"
+        <label class="field-label">{{ field_labels.chief_complaint }}{% if not (intake_text_withheld or sealed_unopenable) %}<span class="req">*</span>{% endif %}</label>
+{%- if intake_text_withheld %}
+        <div class="restricted-note" style="padding:12px 14px; border:1px solid var(--border-color); border-radius:8px; background:#FAFBFC; color:var(--text-muted); font-style:italic;">
+          <span class="material-symbols-outlined" style="font-size:17px; vertical-align:-3px;">lock</span>
+          {{ restricted_placeholder }}
+        </div>
+{%- elif sealed_unopenable %}
+        <div class="restricted-note" style="padding:12px 14px; border:1px solid var(--border-color); border-radius:8px; background:#FAFBFC;">
+          <span class="material-symbols-outlined" style="font-size:17px; vertical-align:-3px;">lock</span>
+          {{ unopenable_text }}
+        </div>
+{%- else %}
+        <textarea class="form-control{% if errors.chief_complaint %} is-invalid{% endif %}{% if sealed_on_screen %} sealed-field{% endif %}" name="chief_complaint"
                   placeholder="e.g. Fever and cough for three days, worse at night">{{ form.chief_complaint or '' }}</textarea>
+{%- if sealed_on_screen %}
+        <div class="sealed-print-note">Sealed — not printed</div>
+{%- endif %}
         {%- if errors.chief_complaint %}<div class="invalid-feedback d-block">{{ errors.chief_complaint }}</div>{% endif %}
+{%- endif %}
       </div>
 
       <!-- VITAL SIGNS -->
@@ -939,14 +964,17 @@
 {%- elif can_diagnose %}
         <div class="mb-3">
           <label class="field-label">{{ field_labels.diagnosis }}<span class="req">*</span></label>
-          <textarea class="form-control{% if errors.diagnosis %} is-invalid{% endif %}" name="diagnosis"
+          <textarea class="form-control{% if errors.diagnosis %} is-invalid{% endif %}{% if sealed_on_screen %} sealed-field{% endif %}" name="diagnosis"
                     placeholder="e.g. Acute viral upper respiratory infection">{{ form.diagnosis or '' }}</textarea>
+{%- if sealed_on_screen %}
+          <div class="sealed-print-note">Sealed — not printed</div>
+{%- endif %}
           {%- if errors.diagnosis %}<div class="invalid-feedback d-block">{{ errors.diagnosis }}</div>{% endif %}
         </div>
 
         <div class="mb-3">
           <label class="field-label">{{ field_labels.treatment_plan }}<span class="req">*</span></label>
-          <textarea class="form-control{% if errors.treatment_plan %} is-invalid{% endif %}" name="treatment_plan"
+          <textarea class="form-control{% if errors.treatment_plan %} is-invalid{% endif %}{% if sealed_on_screen %} sealed-field{% endif %}" name="treatment_plan"
                     placeholder="e.g. Paracetamol 500mg every 6 hours for 3 days; increased fluids; return if fever persists past 3 days">{{ form.treatment_plan or '' }}</textarea>
           {%- if errors.treatment_plan %}<div class="invalid-feedback d-block">{{ errors.treatment_plan }}</div>
 {#- This hint used to end "Stock deduction is not linked to this yet", which was
@@ -964,6 +992,9 @@
     over are recorded there. Saying so stops the two being filled in as though
     either one were the other. #}
           {%- else %}<div class="form-text-hint">The instruction itself &mdash; what to take, how much, how often, for how long. The amount handed over goes under Items Dispensed above.</div>{% endif %}
+{%- if sealed_on_screen %}
+          <div class="sealed-print-note">Sealed — not printed</div>
+{%- endif %}
         </div>
 
 {#- THE SEAL. Offered inside the same guard as the two fields above it, because
@@ -995,14 +1026,15 @@
     sure of before they use it: sealing a record must not stop the health worker
     at the counter handing over the medicine on it. #}
           <div class="form-text-hint" style="margin-top:6px;">
-            The diagnosis and treatment plan above are then withheld from every other role
-            &mdash; Health Center Staff, BHWs and the Administrator &mdash; who see
-            &ldquo;{{ restricted_placeholder }}&rdquo; in their place.
-            Everything else on this visit &mdash; the date, the complaint, the vital signs,
-            any vaccinations and anything dispensed &mdash; stays visible to them, so intake
-            and dispensing are unaffected. Use it for anything you judge sensitive; HIV
-            status is privileged medical information under RA 11166, and it is not the only
-            such case. Setting or lifting this is recorded in the audit log, as is every
+            Everything written on this visit &mdash; the chief complaint, diagnosis,
+            treatment plan and additional notes, and the reason given at check-in &mdash;
+            is then encrypted and withheld from every other role &mdash; Health Center
+            Staff, BHWs and the Administrator &mdash; who see
+            &ldquo;{{ restricted_placeholder }}&rdquo; in their place. The date, the vital
+            signs and any vaccinations stay visible to them, and Health Center Staff still
+            see what was dispensed. Use it for anything you judge sensitive; HIV status,
+            and the fact that a person was tested for it, are privileged medical
+            information under RA 11166 Section 44, and they are not the only such case. Setting or lifting this is recorded in the audit log, as is every
             view it withholds.
           </div>
         </div>
@@ -1010,14 +1042,27 @@
 
         <div class="mb-3">
           <label class="field-label">{{ field_labels.remarks }}</label>
-          <textarea class="form-control" name="remarks"
+{%- if intake_text_withheld %}
+          <div class="restricted-note" style="padding:12px 14px; border:1px solid var(--border-color); border-radius:8px; background:#FAFBFC; color:var(--text-muted); font-style:italic;">
+            <span class="material-symbols-outlined" style="font-size:17px; vertical-align:-3px;">lock</span>
+            {{ restricted_placeholder }}
+          </div>
+{%- elif sealed_unopenable %}
+          <div class="restricted-note" style="padding:12px 14px; border:1px solid var(--border-color); border-radius:8px; background:#FAFBFC;">
+            <span class="material-symbols-outlined" style="font-size:17px; vertical-align:-3px;">lock</span>
+            {{ unopenable_text }}
+          </div>
+{%- else %}
+          <textarea class="form-control{% if sealed_on_screen %} sealed-field{% endif %}" name="remarks"
                     placeholder="Anything else worth recording — advice given, referrals, observations">{{ form.remarks or '' }}</textarea>
-{#- Said only to the role that has the choice. Additional Notes is written by
-    both roles and read by both, so it is NOT covered by the seal above - and a
-    clinician who put a sensitive detail here having sealed the record would have
-    sealed the wrong box. The rule is one sentence and it is worth one line. #}
+{%- if sealed_on_screen %}
+          <div class="sealed-print-note">Sealed — not printed</div>
+{%- endif %}
+{#- Said only to the role that has the choice. A sealed visit encrypts this box
+    along with the diagnosis, so the hint says who can read it either way. #}
 {%- if can_diagnose %}
-          <div class="form-text-hint">Visible to Health Center Staff and the Administrator whether or not this consultation is Restricted &mdash; anything sensitive belongs in the diagnosis or treatment plan above.</div>
+          <div class="form-text-hint">Visible to Health Center Staff and the Administrator unless this consultation is Restricted. If it is, only the Doctor can read it.</div>
+{%- endif %}
 {%- endif %}
         </div>
 

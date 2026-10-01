@@ -122,6 +122,7 @@ from models.inventory import (
     stock_status,
 )
 from utils.dates import display_date, resolve_range, today
+from utils.roles import is_care_team
 
 # What this form may dispense: every category the inventory records, read from
 # models.inventory rather than listed again here, so a category added to the
@@ -225,6 +226,18 @@ def dispensing_label(record):
         record["medicine_name"],
         _plural(record["quantity_dispensed"], record.get("unit")),
     )
+
+
+# WHO MAY READ THE MEDICINE NAMES OF A SEALED VISIT (Task 5b, D3).
+# A medicine can reveal a condition: an antiretroviral names HIV as surely as a
+# diagnosis does. The care team -- the Doctor and Health Center Staff, who hand the
+# medicine over -- still see what was dispensed. The Administrator runs the system
+# and is not part of the patient's care, so on a patient-linked view of a sealed
+# visit they see the placeholder where the name would be. See
+# utils.roles.is_care_team().
+def can_see_sealed_medicines(role):
+    """Whether this role may read the names dispensed at a sealed visit."""
+    return is_care_team(role)
 
 
 def _describe(item):
@@ -736,10 +749,9 @@ LEFT JOIN consultations c ON c.id = d.consultation_id
 def _to_records(rows, viewer_role=None):
     """Stored dispensing rows -> the dicts the three readers below hand out.
 
-    `viewer_role` None is for the two callers that never put a diagnosis on a
-    screen. A sealed diagnosis is replaced with the placeholder for them too, so
-    nothing they hand on can carry it. Where a diagnosis IS shown, the role is
-    compulsory at that function's own signature rather than defaulted here.
+    `viewer_role` None is for a caller that names no role. It is treated as a
+    role that may read nothing sealed: a sealed diagnosis becomes the placeholder,
+    and so do the medicine names of a sealed visit (D3).
 
     WHY A DISPENSING ROW HAS TO BE REDACTED AT ALL.
     It does not hold a diagnosis; it joins to one. _DISPENSING_SELECT brings
@@ -749,16 +761,34 @@ def _to_records(rows, viewer_role=None):
     diagnosis in one tab and printing it two tabs across would be a seal that
     protects nothing -- and it is exactly the kind of second copy of a value that
     an access rule applied only at the obvious place leaves behind.
+
+    The medicine name is the second such copy. For a role outside the care team
+    the name, the unit and the item code are taken out of the record itself, and
+    the label becomes the placeholder. The quantity stays, as a bare number: a
+    count does not say what was counted.
     """
     can_view = viewer_role is not None and can_view_restricted(viewer_role)
+    can_see_medicines = (viewer_role is not None
+                         and can_see_sealed_medicines(viewer_role))
     records = [dict(row) for row in rows]
     for record in records:
-        record["label"] = dispensing_label(record)
-        record["quantity_text"] = _plural(
-            record["quantity_dispensed"], record.get("unit")
-        )
         record["consultation_restricted"] = bool(
             record.get("consultation_restricted")
+        )
+        record["medicines_withheld"] = (
+            record["consultation_restricted"] and not can_see_medicines
+        )
+        if record["medicines_withheld"]:
+            record["medicine_name"] = RESTRICTED_PLACEHOLDER
+            record["unit"] = None
+            record["item_code"] = None
+            record["inventory_item_id"] = None
+        record["label"] = (
+            RESTRICTED_PLACEHOLDER if record["medicines_withheld"]
+            else dispensing_label(record)
+        )
+        record["quantity_text"] = _plural(
+            record["quantity_dispensed"], record.get("unit")
         )
         record["consultation_unopenable"] = False
         if not record["consultation_restricted"]:
@@ -793,8 +823,8 @@ def get_dispensing_for_patient(patient_id, viewer_role):
     second place on the Patient Profile where a sealed diagnosis would otherwise
     reach the page, and a default would be a decision about confidentiality made
     by whichever value looked harmless when the signature was written. The
-    dispensing itself is never withheld -- what was handed over is what a health
-    worker needs in order to do their job, and none of it is sealed.
+    dispensing itself is withheld only from a role outside the care team, and
+    only on a sealed visit -- see _to_records() and utils.roles.is_care_team().
     """
     with db_connection() as conn:
         rows = conn.execute(
@@ -805,14 +835,13 @@ def get_dispensing_for_patient(patient_id, viewer_role):
     return _to_records(rows, viewer_role)
 
 
-def get_dispensing_for_consultation(consultation_id):
-    """The items issued during one visit, oldest row first.
+def get_dispensing_for_consultation(consultation_id, viewer_role):
+    """The items issued during one visit, oldest row first, redacted to fit.
 
-    Not redacted, and it does not need to be: its two callers are the "already
-    dispensed at this visit" list on the consultation form and the same list in
-    the profile's per-visit detail panel, and both print the medicine, the
-    quantity and who issued it. Neither reads consultation_diagnosis, so there is
-    nothing on this path for a seal to withhold.
+    Its callers are the "already dispensed at this visit" list on the
+    consultation form and the same list in the profile's per-visit detail panel.
+    Both print the medicine, so the role is compulsory: on a sealed visit a role
+    outside the care team gets the placeholder (D3).
     """
     if not consultation_id:
         return []
@@ -821,23 +850,19 @@ def get_dispensing_for_consultation(consultation_id):
             _DISPENSING_SELECT + " WHERE d.consultation_id = ? ORDER BY d.id",
             (consultation_id,),
         ).fetchall()
-    return _to_records(rows)
+    return _to_records(rows, viewer_role)
 
 
-def get_dispensing_by_consultation(consultation_ids):
+def get_dispensing_by_consultation(consultation_ids, viewer_role):
     """{consultation_id: [record, ...]} for a list of visits, in one query.
 
     The Recent Consultations table on the Administrator dashboard has a Dispensed
     column and prints five rows. Asking per row would be five queries for a panel
     that already has its consultations in hand; this is one.
 
-    Not redacted, for the reason get_dispensing_for_consultation() above is not:
-    the only screen behind it is that dashboard panel, which prints the medicines
-    and reads no diagnosis from these rows. That is the whole reason, and it is
-    worth saying because a second one used to be given: the panel is on the
-    Administrator's dashboard only. That no longer helps -- the Administrator may
-    not read a sealed diagnosis either -- so the safety rests on no diagnosis
-    being read here at all, which is true of the query, not of who calls it.
+    Redacted for `viewer_role`, like get_dispensing_for_consultation(): the panel
+    is on the Administrator's dashboard, and the Administrator does not see the
+    medicine names of a sealed visit (D3).
     """
     ids = [int(value) for value in consultation_ids if value]
     if not ids:
@@ -851,7 +876,7 @@ def get_dispensing_by_consultation(consultation_ids):
         ).fetchall()
 
     grouped = {}
-    for record in _to_records(rows):
+    for record in _to_records(rows, viewer_role):
         grouped.setdefault(record["consultation_id"], []).append(record)
     return grouped
 

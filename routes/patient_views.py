@@ -24,7 +24,7 @@ from models.consultations import (
     can_view_restricted,
     get_consultations_for_patient,
 )
-from models.dispensing import get_dispensing_for_patient
+from models.dispensing import can_see_sealed_medicines, get_dispensing_for_patient
 from models.general_vaccinations import get_general_vaccinations_for_patient
 from models.immunizations import (
     UNKNOWN_DATE_TEXT,
@@ -588,9 +588,10 @@ def _log_withheld_consultations(patient, withheld, viewer_role):
             f'Each showed "{RESTRICTED_PLACEHOLDER}" in place of its diagnosis '
             "and treatment plan; the withheld text was not sent to the browser "
             "at all, having been removed before the page was built. The visit "
-            "date, chief complaint, vital signs, immunisations and dispensing on "
-            "the same records were shown as normal, so intake and dispensing are "
-            "unaffected"
+            "date, vital signs and immunisations on the same records were "
+            "shown as normal. Their chief complaint, additional notes and check-in "
+            "reason were withheld with them, and so were the medicine names for "
+            "any role outside the care team"
         ),
         ip_address=request.remote_addr,
     )
@@ -669,6 +670,9 @@ def patient_profile_context(patient_id):
         # whether the seal control and the "you are seeing everything" wording
         # appear at all.
         "may_view_restricted": may_view_restricted,
+        # Whether the medicine names of a sealed visit are shown to this reader
+        # (D3). The care team sees them; the Administrator does not.
+        "may_see_sealed_medicines": can_see_sealed_medicines(viewer_role),
         # How many entries on this page are sealed, so the tab can say so once at
         # the top instead of leaving a health worker to notice it row by row.
         "withheld_count": len(withheld),
@@ -677,7 +681,7 @@ def patient_profile_context(patient_id):
         "restrict_action_field": RESTRICT_ACTION_FIELD,
         "restrict_on": RESTRICT_ON,
         "restrict_off": RESTRICT_OFF,
-        "appointments": get_appointments_for_patient(patient_id),
+        "appointments": get_appointments_for_patient(patient_id, viewer_role),
         "immunization": immunization,
         "show_immunizations": show_immunizations,
         # What the page prints where a reported dose's date would go and there is

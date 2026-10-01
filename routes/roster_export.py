@@ -100,6 +100,7 @@ still genuinely absent, not those writes.) Where the screen already holds the
 wording -- User Management's does -- it is quoted rather than rewritten, so the
 file and the screen say the same thing in the same words.
 """
+from models.consultations import RESTRICTED_PLACEHOLDER
 from models.settings import health_center_name
 from routes.report_export import _download  # noqa: F401  (re-exported below)
 from utils.dates import display_date, display_timestamp, long_date, now, today
@@ -973,6 +974,9 @@ def _inventory_export(context, produced_by):
 # Screen 08 -- Patient Queue
 # ---------------------------------------------------------------------------
 
+# The Notes column holds the check-in reason. It is in the file only for the
+# Doctor and Health Center Staff; the Administrator's file has no such column
+# (Task 5b, D4). See _appointment_export().
 QUEUE_COLUMNS = (
     "#",
     "Appointment ID",
@@ -1031,6 +1035,11 @@ def _appointment_export(context, produced_by):
     calendar = context["calendar"]
     queue_date = context["queue_date"]
 
+    # No check-in reason for a role outside the care team. The column is left out
+    # of the file rather than blanked, so the file does not suggest one was given.
+    show_reason = bool(context.get("show_visit_reason"))
+    queue_columns = [name for name in QUEUE_COLUMNS
+                     if show_reason or name != "Notes"]
     queue_rows = [
         [
             _value(entry.get("line_position")),
@@ -1038,7 +1047,10 @@ def _appointment_export(context, produced_by):
             _value(_patient_name(entry)),
             _value(entry.get("patient_reference")),
             _value(entry.get("appointment_type") or "Consultation"),
-            _value(entry.get("notes")),
+            # A sealed visit's reason never goes into a file, even for the Doctor
+            # who can read it on screen.
+            *([_value(RESTRICTED_PLACEHOLDER if entry.get("reason_sealed")
+                      else entry.get("notes"))] if show_reason else []),
             _value(entry.get("arrival_time")),
             _value(entry.get("booked_time")),
             _value(entry.get("display_status")),
@@ -1051,7 +1063,7 @@ def _appointment_export(context, produced_by):
         "Today's Queue",
         [table(
             f"{display_date(queue_date)} — {_count_label(len(queue), 'patient')}",
-            QUEUE_COLUMNS,
+            queue_columns,
             queue_rows,
             note=("In arrival order, patients in consultation first — the order "
                   "the screen states above its table. The # column is the place in "

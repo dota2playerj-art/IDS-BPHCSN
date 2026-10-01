@@ -54,13 +54,21 @@ doctor is the clinician. Diagnoses the Administrator account wrote before then
 stay exactly as written and attributed, and so does any seal it set; what moved
 is who may write, seal and read from now on.
 
-SEALED FIELDS ARE ENCRYPTED IN THE DATABASE (Task 5, H4)
---------------------------------------------------------
-On a sealed consultation, `diagnosis` and `treatment_plan` are stored encrypted
-(utils/sealed_crypto.py, AES-256-GCM). So the backup file, and anyone who opens
-app.db directly, sees only ciphertext. Sealing encrypts them and lifting the seal
+SEALED FIELDS ARE ENCRYPTED IN THE DATABASE (Task 5, H4; Task 5b)
+-----------------------------------------------------------------
+On a sealed consultation, every free-text field of the visit is stored encrypted
+(utils/sealed_crypto.py, AES-256-GCM): the diagnosis, the treatment plan, the
+chief complaint, the additional notes, and the check-in reason of the linked
+queue visit. See SEALED_FIELDS. So the backup file, and anyone who opens app.db
+directly, sees only ciphertext. Sealing encrypts them and lifting the seal
 decrypts them, each in the same transaction as the flag. open_sealed_value() is
 the only code that decrypts, and it refuses every role but the Doctor.
+
+Why all of them. RA 11166 Section 44 makes it unlawful to disclose that a person
+has HIV or has undergone an HIV-related test, without written consent. A chief
+complaint such as "for HIV testing" discloses exactly that, with the diagnosis
+encrypted. Vitals, immunisation records, dates and the fact of the seal are not
+free text and stay readable.
 """
 from datetime import datetime
 
@@ -169,6 +177,23 @@ MISSING_TEXT = "Not recorded"
 # so a POST that never touched the page cannot put a diagnosis on a record.
 DOCTOR_ONLY_FIELDS = ("diagnosis", "treatment_plan")
 
+# THE FREE TEXT THAT IS SEALED WITH THEM (Task 5b, D1).
+# These two are the intake: Health Center Staff write them on an unsealed record,
+# so they are not Doctor-only to WRITE. Once the Doctor seals the visit they are
+# stored encrypted and read only by the Doctor, like the two above. A save by any
+# other role on a sealed record keeps them exactly as stored.
+SEALED_WITH_RECORD_FIELDS = ("chief_complaint", "remarks")
+
+# Every consultation column that is encrypted while the record is sealed. This
+# tuple, and nothing else, decides what the seal encrypts, opens and redacts.
+SEALED_FIELDS = DOCTOR_ONLY_FIELDS + SEALED_WITH_RECORD_FIELDS
+
+# The check-in reason lives on the linked queue visit: appointments.notes. It is
+# encrypted with the record and bound to the appointments row, not to the
+# consultation. See _seal_visit_reason().
+VISIT_REASON_TABLE = "appointments"
+VISIT_REASON_FIELD = "notes"
+
 # WHAT A SEALED ENTRY SHOWS INSTEAD, AND WHY IT SHOWS ANYTHING AT ALL.
 # A withheld field is never silently blanked and never quietly dropped from the
 # page. A health worker who opens a record and finds an empty Diagnosis cell has
@@ -209,8 +234,9 @@ def can_view_restricted(role):
 
     Deliberately the same answer as can_diagnose(), and deliberately a separate
     function rather than the same one called twice. They are one rule read from
-    each end: the seal withholds exactly the fields DOCTOR_ONLY_FIELDS names, so
-    the role that may write them is the role that may read them back once sealed.
+    each end: the seal withholds the free text of the visit (SEALED_FIELDS), which
+    includes the fields DOCTOR_ONLY_FIELDS names, so the role that may write
+    those is the role that may read them all back once sealed.
     Written as a delegation so that stays true by construction -- if the write
     rule ever moves, the read rule moves with it rather than being a second copy
     that quietly disagrees.
@@ -250,7 +276,7 @@ def redact(consultation, viewer_can_view):
         values["withheld"] = False
         return values
 
-    for field in DOCTOR_ONLY_FIELDS:
+    for field in SEALED_FIELDS:
         values[field] = RESTRICTED_PLACEHOLDER
         values[f"{field}_display"] = RESTRICTED_PLACEHOLDER
     values["withheld"] = True
@@ -262,7 +288,7 @@ def redact(consultation, viewer_can_view):
 UNOPENABLE_TEXT = "This sealed record cannot be opened on this computer."
 
 
-def open_sealed_value(value, consultation_id, field, role):
+def open_sealed_value(value, row_id, field, role, table="consultations"):
     """Decrypt one sealed field for the Doctor. Returns (text, opened).
 
     THE ONLY PLACE IN THE APP THAT DECRYPTS. Every other role is refused here,
@@ -275,7 +301,7 @@ def open_sealed_value(value, consultation_id, field, role):
     if not sealed_crypto.is_encrypted(value):
         return value, True
     try:
-        return sealed_crypto.decrypt(value, consultation_id, field), True
+        return sealed_crypto.decrypt(value, row_id, field, table), True
     except sealed_crypto.SealedDataError:
         return UNOPENABLE_TEXT, False
 
@@ -292,7 +318,7 @@ def open_sealed(consultation, role):
     values["unopenable"] = False
     if not values.get("is_restricted"):
         return values
-    for field in DOCTOR_ONLY_FIELDS:
+    for field in SEALED_FIELDS:
         text, opened = open_sealed_value(values.get(field), values["id"], field, role)
         values[field] = text
         values[f"{field}_display"] = _rendered(field, text, MISSING_TEXT)
@@ -309,24 +335,63 @@ def for_viewer(consultation, role):
 
 
 def _encrypt_sealed_fields(conn, consultation_id):
-    """Encrypt the sealed fields of one row, on the caller's connection. No commit.
+    """Encrypt the sealed fields of one row, and its visit's check-in reason, on
+    the caller's connection. No commit.
 
     Values already encrypted are left alone, so running it twice is safe.
     """
     row = conn.execute(
-        f"SELECT {', '.join(DOCTOR_ONLY_FIELDS)} FROM consultations WHERE id = ?",
+        f"SELECT appointment_id, {', '.join(SEALED_FIELDS)} FROM consultations WHERE id = ?",
         (consultation_id,),
     ).fetchone()
     if row is None:
         return
     conn.execute(
-        f"UPDATE consultations SET {', '.join(f'{f} = ?' for f in DOCTOR_ONLY_FIELDS)} "
+        f"UPDATE consultations SET {', '.join(f'{f} = ?' for f in SEALED_FIELDS)} "
         "WHERE id = ?",
         [row[f] if sealed_crypto.is_encrypted(row[f])
          else sealed_crypto.encrypt(row[f], consultation_id, f)
-         for f in DOCTOR_ONLY_FIELDS]
+         for f in SEALED_FIELDS]
         + [consultation_id],
     )
+    _seal_visit_reason(conn, row["appointment_id"])
+
+
+def _seal_visit_reason(conn, appointment_id):
+    """Encrypt the check-in reason of one queue visit. No commit. Safe to repeat."""
+    if not appointment_id:
+        return
+    row = conn.execute(
+        f"SELECT {VISIT_REASON_FIELD} FROM {VISIT_REASON_TABLE} WHERE id = ?",
+        (appointment_id,),
+    ).fetchone()
+    if row is None or sealed_crypto.is_encrypted(row[VISIT_REASON_FIELD]):
+        return
+    conn.execute(
+        f"UPDATE {VISIT_REASON_TABLE} SET {VISIT_REASON_FIELD} = ? WHERE id = ?",
+        (sealed_crypto.encrypt(row[VISIT_REASON_FIELD], appointment_id,
+                               VISIT_REASON_FIELD, VISIT_REASON_TABLE),
+         appointment_id),
+    )
+
+
+def _open_visit_reason(conn, appointment_id, role):
+    """The decrypted check-in reason of one queue visit, as (text, ok, row_exists).
+
+    Used when a seal is lifted, so the reason goes back to plain text. Reads
+    through open_sealed_value(), so only the Doctor can get anything.
+    """
+    if not appointment_id:
+        return None, True, False
+    row = conn.execute(
+        f"SELECT {VISIT_REASON_FIELD} FROM {VISIT_REASON_TABLE} WHERE id = ?",
+        (appointment_id,),
+    ).fetchone()
+    if row is None:
+        return None, True, False
+    text, ok = open_sealed_value(row[VISIT_REASON_FIELD], appointment_id,
+                                 VISIT_REASON_FIELD, role, VISIT_REASON_TABLE)
+    return text, ok, True
 
 
 def as_date(value):
@@ -430,28 +495,28 @@ def _rendered(field, value, absent):
 
 def _audit_renderer(field):
     def render(value):
-        text = _rendered(field, value, "not recorded")
-        # Free text is quoted in an audit line so a changed case or a trailing
-        # space is visible rather than looking like no change at all.
-        if field in CLINICAL_TEXT_FIELDS and value not in (None, ""):
-            return f'"{text}"'
-        return text
+        return _rendered(field, value, "not recorded")
 
     return render
 
 
 # Passed to models.audit.describe_changes() so an audit entry reads in the same
-# units and wording the screens use.
-AUDIT_FORMATTERS = {field: _audit_renderer(field) for field in CONSULTATION_FIELDS}
+# units and wording the screens use. Only the fields an entry may quote: the
+# measurements and the follow-up date. Free text is never quoted (D5).
+AUDIT_FORMATTERS = {
+    field: _audit_renderer(field)
+    for field in CONSULTATION_FIELDS if field not in CLINICAL_TEXT_FIELDS
+}
 
 
 def describe_consultation_changes(before, after):
     """The audit text for one consultation edit. Returns (summary, changed fields).
 
-    NO AUDIT ENTRY QUOTES A DIAGNOSIS OR A TREATMENT PLAN, SEALED OR NOT (D2).
+    NO AUDIT ENTRY QUOTES FREE CLINICAL TEXT, SEALED OR NOT (D5).
     Audit Logs are read and exported by the Administrator, who is not a
-    physician. So those two fields are only named: "Changed: Diagnosis". The
-    other fields keep their before and after, as before.
+    physician. The chief complaint, diagnosis, treatment plan and additional notes
+    are only named: "Changed: Chief complaint, Notes". The measurements and the
+    follow-up date keep their before and after, as before.
 
     On a sealed record both sides are ciphertext. A field the Doctor did not
     change keeps its stored ciphertext, so it does not read as changed.
@@ -459,11 +524,11 @@ def describe_consultation_changes(before, after):
     from models.audit import describe_changes
 
     open_labels = {f: label for f, label in FIELD_LABELS.items()
-                   if f not in DOCTOR_ONLY_FIELDS}
+                   if f not in CLINICAL_TEXT_FIELDS}
     summary, changed = describe_changes(before, after, open_labels,
                                         formatters=AUDIT_FORMATTERS)
     _, clinical = describe_changes(
-        before, after, {f: FIELD_LABELS[f] for f in DOCTOR_ONLY_FIELDS})
+        before, after, {f: FIELD_LABELS[f] for f in CLINICAL_TEXT_FIELDS})
     if clinical:
         names = "Changed: " + ", ".join(FIELD_LABELS[f] for f in clinical)
         summary = f"{summary}; {names}" if summary else names
@@ -522,7 +587,7 @@ _CONSULTATION_SELECT = """
 """
 
 
-def get_consultation_report(limit=None):
+def get_consultation_report(viewer_role, limit=None):
     """Every consultation with its patient and author, newest first.
 
     Written for Screen 10, which does not use it: that screen wants counts and
@@ -543,11 +608,15 @@ def get_consultation_report(limit=None):
     come back newest-first rather than in whatever order SQLite happens to scan.
     """
     # No diagnosis or treatment plan: the dashboard panel shows neither, and a
-    # column nobody prints is a column that can leak a sealed field later.
+    # column nobody prints is a column that can leak a sealed field later. The
+    # chief complaint is sealed with the record (Task 5b), so it is shaped for
+    # `viewer_role` here: opened for the Doctor, the placeholder for everyone
+    # else. `viewer_role` has no default, for the reason
+    # get_consultations_for_patient() gives.
     with db_connection() as conn:
         rows = conn.execute(
             f"""
-        SELECT c.id, c.consultation_date, c.chief_complaint,
+        SELECT c.id, c.consultation_date, c.chief_complaint, c.is_restricted,
                c.created_at, c.appointment_id,
                p.id AS patient_row_id, p.patient_id, p.first_name, p.last_name,
                p.birth_date, u.full_name AS recorded_by
@@ -560,8 +629,19 @@ def get_consultation_report(limit=None):
             (limit,) if limit else (),
         ).fetchall()
 
+    entries = []
+    for row in rows:
+        entry = dict(row)
+        if entry["is_restricted"]:
+            if can_view_restricted(viewer_role):
+                entry["chief_complaint"], _ = open_sealed_value(
+                    entry["chief_complaint"], entry["id"], "chief_complaint",
+                    viewer_role)
+            else:
+                entry["chief_complaint"] = RESTRICTED_PLACEHOLDER
+        entries.append(entry)
     return {
-        "entries": [dict(row) for row in rows],
+        "entries": entries,
         "total_entries": len(rows),
     }
 
@@ -708,8 +788,9 @@ def get_consultation_stats(months=6, limit=TOP_DIAGNOSIS_LIMIT, on_date=None,
     SEALED CONSULTATIONS
     --------------------
     A consultation the clinician has marked Restricted counts in every figure
-    here. In the two diagnosis rankings it is counted under one Confidential
-    row, never by its text (D3). `diagnoses_withheld` is that row's count.
+    here. In the diagnosis and complaint rankings it is counted under one
+    Confidential row, never by its text (D3, Task 5b). `diagnoses_withheld` is
+    that row's count, and it is the same for both rankings.
     """
     reference = on_date or today()
     window = resolve_range(start=start, end=end, months=months, on_date=reference)
@@ -741,14 +822,14 @@ def get_consultation_stats(months=6, limit=TOP_DIAGNOSIS_LIMIT, on_date=None,
         withheld_total = conn.execute(
             "SELECT COUNT(*) FROM consultations WHERE is_restricted = 1"
         ).fetchone()[0]
-        # THE COMPLAINTS QUERY IS DELIBERATELY NOT FILTERED, and the asymmetry is the
-        # point rather than an oversight. The seal covers DOCTOR_ONLY_FIELDS and
-        # nothing else: chief_complaint is shown in full to Health Center Staff on a
-        # sealed record's own profile panel, so withholding it from a ranking nobody
-        # can attribute to a patient would protect nothing and would quietly
-        # understate what the barangay presented with.
+        # THE COMPLAINTS ARE RANKED THE SAME WAY (Task 5b). The chief complaint is
+        # sealed with the record, and a complaint such as "for HIV testing" is
+        # itself the disclosure RA 11166 Section 44 forbids. A sealed visit is
+        # counted under the one Confidential row and its text is never ranked.
         complaints = [
-            row[0] for row in conn.execute("SELECT chief_complaint FROM consultations")
+            row[0] for row in conn.execute(
+                "SELECT chief_complaint FROM consultations WHERE is_restricted = 0"
+            )
         ]
 
         # The window's own rows. consultation_date is stored as clinic-local date
@@ -799,6 +880,8 @@ def get_consultation_stats(months=6, limit=TOP_DIAGNOSIS_LIMIT, on_date=None,
     # from, and that sentence would otherwise be making a claim the ranking no
     # longer meets. What is published is a count and never a hint of content.
     scoped_diagnoses = [row["diagnosis"] for row in scoped if not row["is_restricted"]]
+    scoped_complaints = [row["chief_complaint"] for row in scoped
+                         if not row["is_restricted"]]
     scoped_withheld = sum(1 for row in scoped if row["is_restricted"])
 
     return {
@@ -808,7 +891,7 @@ def get_consultation_stats(months=6, limit=TOP_DIAGNOSIS_LIMIT, on_date=None,
         "months": months,
         "trend": trend,
         "top_diagnoses": _rank_diagnoses(diagnoses, withheld_total, limit),
-        "top_complaints": _rank_free_text(complaints, limit),
+        "top_complaints": _rank_diagnoses(complaints, withheld_total, limit),
         "diagnoses_withheld": withheld_total,
         "window": {
             "start": window["start"],
@@ -818,12 +901,10 @@ def get_consultation_stats(months=6, limit=TOP_DIAGNOSIS_LIMIT, on_date=None,
             "patients_seen": len({row["patient_id"] for row in scoped}),
             "trend": trend,
             "top_diagnoses": _rank_diagnoses(scoped_diagnoses, scoped_withheld, limit),
-            "top_complaints": _rank_free_text(
-                [row["chief_complaint"] for row in scoped], limit),
-            # How many of this range's `total` consultations were left out of the
-            # diagnosis ranking above -- and only that ranking. The complaints
-            # beside it, the total, patients_seen and the trend all still count
-            # every one of them.
+            "top_complaints": _rank_diagnoses(scoped_complaints, scoped_withheld, limit),
+            # How many of this range's `total` consultations are counted under the
+            # Confidential row of the two rankings above. The total,
+            # patients_seen and the trend all still count every one of them.
             "diagnoses_withheld": scoped_withheld,
         },
     }
@@ -1078,7 +1159,8 @@ def create_consultation(patient_id, recorded_by, values, age_context,
     """Insert a consultation and return its new primary key.
 
     `sealed_by` is the Doctor's user id when the record is sealed as it is
-    written. The seal and the encryption then commit with the record.
+    written. The seal and the encryption then commit with the record, and the
+    check-in reason of the linked queue visit is encrypted with them.
 
     consultation_date is the clinic-local calendar date, matching the format the
     five seeded rows already use, so the history table sorts and prints one way.
@@ -1098,7 +1180,7 @@ def create_consultation(patient_id, recorded_by, values, age_context,
     # A record sealed as it is written never holds its sealed fields as plain
     # text: they go in empty, and the encrypted values follow once the id (which
     # each value is bound to) exists. Same transaction.
-    parameters += [None if (sealed_by and field in DOCTOR_ONLY_FIELDS) else record[field]
+    parameters += [None if (sealed_by and field in SEALED_FIELDS) else record[field]
                    for field in CONSULTATION_FIELDS]
     # Equal to created_at on an unedited record, which is what was_edited reads.
     parameters += [None]
@@ -1116,12 +1198,13 @@ def create_consultation(patient_id, recorded_by, values, age_context,
         if sealed_by:
             conn.execute(
                 "UPDATE consultations SET "
-                + ", ".join(f"{f} = ?" for f in DOCTOR_ONLY_FIELDS)
+                + ", ".join(f"{f} = ?" for f in SEALED_FIELDS)
                 + ", is_restricted = 1, restricted_by = ?, "
                 "restricted_at = strftime('%Y-%m-%d %H:%M:%f', 'now') WHERE id = ?",
-                [sealed_crypto.encrypt(record[f], new_id, f) for f in DOCTOR_ONLY_FIELDS]
+                [sealed_crypto.encrypt(record[f], new_id, f) for f in SEALED_FIELDS]
                 + [sealed_by, new_id],
             )
+            _seal_visit_reason(conn, appointment_id)
         if audit:
             audit(conn, new_id)
         conn.commit()
@@ -1169,12 +1252,12 @@ def update_consultation(consultation_id, values, age_context):
         # is. Anything else is new text from the Doctor and is encrypted here, in
         # the same transaction, so it is never stored as plain text.
         stored = conn.execute(
-            f"SELECT is_restricted, {', '.join(DOCTOR_ONLY_FIELDS)} "
+            f"SELECT is_restricted, {', '.join(SEALED_FIELDS)} "
             "FROM consultations WHERE id = ?",
             (consultation_id,),
         ).fetchone()
         if stored is not None and stored["is_restricted"]:
-            for field in DOCTOR_ONLY_FIELDS:
+            for field in SEALED_FIELDS:
                 if record[field] != stored[field]:
                     record[field] = sealed_crypto.encrypt(record[field], consultation_id, field)
         parameters = (
@@ -1222,6 +1305,8 @@ def set_consultation_restriction(consultation_id, restricted, user_id, role=None
     event, and an audit entry for it would bury the ones that matter.
 
     SEALING ENCRYPTS, LIFTING DECRYPTS, IN THE SAME TRANSACTION AS THE FLAG.
+    That is every free-text field of the visit and the check-in reason of its
+    queue visit (Task 5b, D1).
     Lifting needs `role`, because only the Doctor may decrypt. If the key on this
     computer cannot open the record, nothing changes and "cannot_open" is
     returned: the record stays sealed rather than losing its text.
@@ -1230,7 +1315,7 @@ def set_consultation_restriction(consultation_id, restricted, user_id, role=None
 
     with db_connection() as conn:
         row = conn.execute(
-            f"SELECT is_restricted, {', '.join(DOCTOR_ONLY_FIELDS)} "
+            f"SELECT is_restricted, appointment_id, {', '.join(SEALED_FIELDS)} "
             "FROM consultations WHERE id = ?",
             (consultation_id,),
         ).fetchone()
@@ -1243,17 +1328,29 @@ def set_consultation_restriction(consultation_id, restricted, user_id, role=None
         if flag:
             _encrypt_sealed_fields(conn, consultation_id)
         else:
+            # Everything is opened before anything is written, so a key that cannot
+            # open one value leaves the whole record sealed and untouched.
             opened = []
-            for field in DOCTOR_ONLY_FIELDS:
+            for field in SEALED_FIELDS:
                 text, ok = open_sealed_value(row[field], consultation_id, field, role)
                 if not ok:
                     return "cannot_open"
                 opened.append(text)
+            reason, ok, has_reason = _open_visit_reason(
+                conn, row["appointment_id"], role)
+            if not ok:
+                return "cannot_open"
             conn.execute(
                 "UPDATE consultations SET "
-                + ", ".join(f"{f} = ?" for f in DOCTOR_ONLY_FIELDS) + " WHERE id = ?",
+                + ", ".join(f"{f} = ?" for f in SEALED_FIELDS) + " WHERE id = ?",
                 opened + [consultation_id],
             )
+            if has_reason:
+                conn.execute(
+                    f"UPDATE {VISIT_REASON_TABLE} SET {VISIT_REASON_FIELD} = ? "
+                    "WHERE id = ?",
+                    (reason, row["appointment_id"]),
+                )
 
         conn.execute(
             """

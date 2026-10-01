@@ -464,7 +464,7 @@
           <div class="stat-icon" style="background:var(--teal-light);"><span class="material-symbols-outlined" style="color:var(--teal-dark);">event_available</span></div>
           <div class="stat-value">{{ patient.last_visit | display_date('No visits yet') }}</div>
           <div class="stat-label">Last Visit</div>
-          <div class="stat-trend" style="color:var(--text-muted);">{{ consultations[0].chief_complaint if consultations else 'No consultations recorded' }}</div>
+          <div class="stat-trend" style="color:var(--text-muted);">{{ screen_only(consultations[0].chief_complaint if consultations else 'No consultations recorded', consultations|length > 0 and consultations[0].is_restricted and not consultations[0].withheld) }}</div>
         </div>
       </div>
       <div class="col-md-4 col-sm-6">
@@ -615,11 +615,12 @@
             <div>
               <strong>{{ withheld_count }} of these consultation{{ 's' if consultations|length != 1 else '' }} {{ 'are' if withheld_count != 1 else 'is' }} Restricted</strong>
               The Doctor has marked {{ 'them' if withheld_count != 1 else 'it' }} as holding sensitive medical
-              information, so the diagnosis and treatment plan are not shown to your role and are not
-              part of this page. Everything else about {{ 'those visits' if withheld_count != 1 else 'that visit' }}
-              &mdash; the date, the chief complaint, the vital signs, any vaccinations given and anything
-              dispensed &mdash; is shown in full, so intake and dispensing are unaffected. This view has
-              been recorded in the audit log.
+              information, so its diagnosis, treatment plan, chief complaint, additional notes and
+              check-in reason are not shown to your role and are not part of this page. The date,
+              the vital signs and any vaccinations given for {{ 'those visits' if withheld_count != 1 else 'that visit' }}
+              are shown in full.
+{%- if not may_see_sealed_medicines %} The names of medicines dispensed at {{ 'those visits' if withheld_count != 1 else 'that visit' }} are not shown either.{% endif %}
+              This view has been recorded in the audit log.
             </div>
           </div>
 {%- endif %}
@@ -655,7 +656,7 @@
                     </button>
                   </td>
                   <td>{{ consultation.consultation_date | display_date }}{% if consultation.was_edited %}<div style="font-size:11.5px; color:var(--text-muted);">edited</div>{% endif %}</td>
-                  <td>{{ consultation.chief_complaint or '—' }}</td>
+                  <td{% if consultation.withheld %} style="color:var(--text-muted); font-style:italic;"{% endif %}>{{ screen_only(consultation.chief_complaint or '—', consultation.is_restricted and not consultation.withheld) }}</td>
 {#- Prints the placeholder rather than an em dash on a sealed entry, because the
     value in `consultation.diagnosis` IS the placeholder by the time it reaches
     here. An em dash would say the field is empty, which is the one thing about a
@@ -717,7 +718,7 @@
                               data-date="{{ consultation.consultation_date | display_date }}"
                               data-recorded-by="{{ consultation.recorded_by_name }}"
                               data-restricted="{{ '1' if consultation.is_restricted else '0' }}"
-                              title="{% if consultation.is_restricted %}Lift the restriction — the diagnosis and treatment plan become legible to Health Center Staff and the Administrator again{% else %}Mark Restricted — withhold the diagnosis and treatment plan from Health Center Staff and the Administrator{% endif %}">
+                              title="{% if consultation.is_restricted %}Lift the restriction — the written text of this visit becomes legible to Health Center Staff and the Administrator again{% else %}Mark Restricted — withhold the written text of this visit from Health Center Staff and the Administrator{% endif %}">
                         <span class="material-symbols-outlined" style="font-size:18px;">{% if consultation.is_restricted %}lock{% else %}lock_open{% endif %}</span>
                       </button>
 {%- endif %}
@@ -746,14 +747,14 @@
                           <div class="info-item"><div class="info-label">Follow-up Date</div><div class="info-value">{{ consultation.follow_up_date_display }}</div></div>
                         </div>
                         <div class="info-grid">
-                          <div class="info-item" style="grid-column:1/-1;"><div class="info-label">Chief Complaint</div><div class="info-value">{{ consultation.chief_complaint_display }}</div></div>
+                          <div class="info-item" style="grid-column:1/-1;"><div class="info-label">Chief Complaint</div><div class="info-value{% if consultation.withheld %} restricted-value{% endif %}">{{ screen_only(consultation.chief_complaint_display, consultation.is_restricted and not consultation.withheld) }}</div></div>
 {#- Both values arrive redacted or not, decided on the server before this page
     was built. `withheld` is true only when something was actually taken out of
     THIS entry for THIS reader, so the Doctor -- who has nothing withheld --
     never sees the muted styling, and an unsealed record never carries it. #}
                           <div class="info-item" style="grid-column:1/-1;"><div class="info-label">Diagnosis</div><div class="info-value{% if consultation.withheld %} restricted-value{% endif %}">{{ screen_only(consultation.diagnosis_display, consultation.is_restricted and not consultation.withheld) }}</div></div>
                           <div class="info-item" style="grid-column:1/-1;"><div class="info-label">Treatment Plan / Medicines Given</div><div class="info-value{% if consultation.withheld %} restricted-value{% endif %}">{{ screen_only(consultation.treatment_plan_display, consultation.is_restricted and not consultation.withheld) }}</div></div>
-                          <div class="info-item" style="grid-column:1/-1;"><div class="info-label">Additional Notes</div><div class="info-value">{{ consultation.remarks_display }}</div></div>
+                          <div class="info-item" style="grid-column:1/-1;"><div class="info-label">Additional Notes</div><div class="info-value{% if consultation.withheld %} restricted-value{% endif %}">{{ screen_only(consultation.remarks_display, consultation.is_restricted and not consultation.withheld) }}</div></div>
                         </div>
 {#- Doses given at this visit. The panel described the visit's clinical text and
     vitals but never what was put in the child's arm, which is part of the same
@@ -844,17 +845,18 @@
 {%- if may_view_restricted %}
                             <strong>This consultation is Restricted</strong>
                             You are seeing it in full. Health Center Staff, BHWs and the Administrator see
-                            &ldquo;{{ restricted_placeholder }}&rdquo; where the diagnosis and treatment plan are
-                            above; everything else on this panel is visible to them.
+                            &ldquo;{{ restricted_placeholder }}&rdquo; where the chief complaint, diagnosis,
+                            treatment plan and additional notes are above. The vital signs and doses on this
+                            panel are visible to them.
 {%- if consultation.restricted_by_name %}
                             Marked by {{ consultation.restricted_by_name }}{% if consultation.restricted_at %} on {{ consultation.restricted_at | display_date }}{% endif %}.
 {%- endif %}
 {%- else %}
-                            <strong>The diagnosis and treatment plan for this visit are restricted</strong>
+                            <strong>The written text of this visit is restricted</strong>
                             The Doctor has marked this consultation as holding sensitive medical
-                            information, so those two fields are withheld from your role and are not part of
-                            this page. Everything else here &mdash; the vital signs, any doses given and anything
-                            dispensed &mdash; is the complete record. Ask the Doctor if you need the
+                            information, so its chief complaint, diagnosis, treatment plan and additional
+                            notes are withheld from your role and are not part of this page. The vital signs
+                            and any doses given here are the complete record. Ask the Doctor if you need the
                             assessment itself.
 {%- endif %}
                           </div>
@@ -1385,7 +1387,7 @@
     the reason the visit was made -- so a blank cell here would read as a
     rendering fault rather than as the record being silent, which is exactly
     the mistake the consultation panel's "Not recorded" exists to prevent. #}
-                            <div class="info-value">{{ appointment.notes if appointment.notes and appointment.notes.strip() else 'No notes recorded for this visit.' }}</div>
+                            <div class="info-value">{{ screen_only(appointment.notes if appointment.notes and appointment.notes.strip() else 'No notes recorded for this visit.', appointment.reason_sealed and may_view_restricted) }}</div>
                           </div>
                         </div>
                         <div style="font-size:12px; color:var(--text-muted); margin-top:14px; padding-top:12px; border-top:1px dashed var(--border-color);">
@@ -1639,18 +1641,19 @@
 
               <div id="restrictOnBody">
                 <p style="margin-bottom:10px; font-size:13.5px;">
-                  The diagnosis and treatment plan on this visit will be withheld from every other
-                  role &mdash; Health Center Staff, BHWs and the Administrator. They will see
-                  &ldquo;{{ restricted_placeholder }}&rdquo; in their place &mdash; not a blank, so
-                  nobody reads the record as never having been written up.
+                  Everything written on this visit &mdash; the chief complaint, diagnosis, treatment
+                  plan, additional notes and the reason given at check-in &mdash; will be encrypted and
+                  withheld from every other role: Health Center Staff, BHWs and the Administrator. They
+                  will see &ldquo;{{ restricted_placeholder }}&rdquo; in their place &mdash; not a
+                  blank, so nobody reads the record as never having been written up. The Administrator
+                  will not see the names of medicines dispensed at this visit either.
                 </p>
 {#- The half a clinician most needs to be sure of before using this. A seal that
     also broke dispensing would be a seal nobody dared set, and the whole design
     rests on it not doing that. #}
                 <p style="margin-bottom:10px; font-size:13.5px;">
-                  Everything else stays visible to them: the date, the chief complaint, the vital
-                  signs, any vaccinations given and anything dispensed. Intake and dispensing on this
-                  patient are unaffected.
+                  The date, the vital signs and any vaccinations given stay visible to them. Health
+                  Center Staff still see what was dispensed, so handing over medicine is unaffected.
                 </p>
                 <p style="margin-bottom:16px; font-size:13.5px;">
                   Nothing is deleted or changed &mdash; the record keeps exactly what it says, and you
@@ -1660,9 +1663,9 @@
 
               <div id="restrictOffBody" style="display:none;">
                 <p style="margin-bottom:10px; font-size:13.5px;">
-                  The diagnosis and treatment plan on this visit will become legible again to Health
-                  Center Staff, BHWs and the Administrator, and views of it will no longer be
-                  recorded as withheld.
+                  The written text of this visit will become legible again to Health Center Staff,
+                  BHWs and the Administrator, and views of it will no longer be recorded as
+                  withheld.
                 </p>
                 <p style="margin-bottom:16px; font-size:13.5px;">
                   The record itself is unchanged either way &mdash; this only decides who may read it.

@@ -28,6 +28,7 @@ from datetime import date, datetime
 
 from database.connection import db_connection
 from utils.dates import now, recent_months, resolve_range, today
+from utils.roles import is_care_team
 
 # Statuses that still represent a commitment the patient is expected to keep.
 PENDING_STATUSES = ("Scheduled", "Confirmed")
@@ -164,13 +165,18 @@ def _clock(value):
     return f"{int(parts[0]):02d}:{parts[1][:2]}"
 
 
-def get_appointments_for_patient(patient_id):
-    """Appointment History tab on Screen 04, most recent first."""
+def get_appointments_for_patient(patient_id, viewer_role):
+    """Appointment History tab on Screen 04, most recent first.
+
+    `viewer_role` has no default: the check-in reason (`notes`) of a sealed visit
+    is encrypted, and what a reader gets depends on who they are. See
+    attach_visit_reasons().
+    """
     with db_connection() as conn:
         rows = conn.execute(
             """
         SELECT a.id, a.appointment_date, a.appointment_time, a.appointment_type,
-               a.status, a.notes, u.full_name AS assigned_staff
+               a.status, u.full_name AS assigned_staff
         FROM appointments a
         LEFT JOIN users u ON u.id = a.assigned_staff_id
         WHERE a.patient_id = ?
@@ -178,12 +184,12 @@ def get_appointments_for_patient(patient_id):
         """,
             (patient_id,),
         ).fetchall()
-    return [_to_appointment(row) for row in rows]
+    return attach_visit_reasons([_to_appointment(row) for row in rows], viewer_role)
 
 
 _QUEUE_SELECT = """
     SELECT a.id, a.patient_id, a.appointment_type, a.appointment_date,
-           a.appointment_time, a.status, a.notes, a.is_walkin, a.checked_in_at,
+           a.appointment_time, a.status, a.is_walkin, a.checked_in_at,
            a.created_at,
            p.patient_id AS patient_reference,
            p.first_name, p.middle_name, p.last_name, p.sex, p.birth_date,
@@ -194,6 +200,79 @@ _QUEUE_SELECT = """
     LEFT JOIN users u ON u.id = a.assigned_staff_id
     LEFT JOIN users b ON b.id = a.scheduled_by
 """
+
+
+# WHO READS THE CHECK-IN REASON (Task 5b, D1, D4).
+# The reason given at the desk ("for HIV testing") can itself disclose that a
+# person has been tested, which RA 11166 Section 44 forbids without consent. So
+# the queries above do NOT select it, and a row never carries it unless it went
+# through attach_visit_reasons(), which decides per reader:
+#
+#   Patient Queue (queue_view=True)
+#       Doctor and Health Center Staff see it. Everyone else sees no reason at
+#       all, for any visit: the Administrator needs to see who is waiting, not why.
+#   Appointment History on a profile
+#       The reason is shown as it was recorded, except on a visit the Doctor has
+#       sealed. That reason is encrypted, so only the Doctor reads it; everyone
+#       else sees the placeholder.
+#
+# The decryption goes through models.consultations.open_sealed_value(), the one
+# function that may decrypt, and it is refused to every role but the Doctor.
+def attach_visit_reasons(entries, viewer_role, queue_view=False):
+    """Add `notes` (the check-in reason) and `reason_hidden` to appointment rows.
+
+    Mutates and returns the list it is given. A row whose reason this reader may
+    not see gets `notes` None. `reason_hidden` is True when the reader may not see
+    reasons on this screen at all, so a template can leave the column out.
+    `reason_sealed` is True when the visit is sealed, so a page can keep the
+    reason off a printout even for the Doctor, who reads it on screen.
+    """
+    from models.consultations import (
+        RESTRICTED_PLACEHOLDER, can_view_restricted,
+        open_sealed_value,
+    )
+    from utils import sealed_crypto
+
+    entries = list(entries)
+    if queue_view and not is_care_team(viewer_role):
+        for entry in entries:
+            entry["notes"] = None
+            entry["reason_hidden"] = True
+        return entries
+
+    ids = [entry["id"] for entry in entries]
+    stored = {}
+    if ids:
+        placeholders = ", ".join("?" for _ in ids)
+        with db_connection() as conn:
+            stored = {
+                row["id"]: row
+                for row in conn.execute(
+                    f"""
+                SELECT a.id, a.notes,
+                       EXISTS (SELECT 1 FROM consultations c
+                                WHERE c.appointment_id = a.id
+                                  AND c.is_restricted = 1) AS is_sealed
+                  FROM appointments a WHERE a.id IN ({placeholders})
+                """,
+                    ids,
+                ).fetchall()
+            }
+
+    for entry in entries:
+        entry["reason_hidden"] = False
+        entry["reason_sealed"] = False
+        row = stored.get(entry["id"])
+        text = row["notes"] if row else None
+        if text and (row["is_sealed"] or sealed_crypto.is_encrypted(text)):
+            entry["reason_sealed"] = True
+            if can_view_restricted(viewer_role):
+                text, _ = open_sealed_value(text, entry["id"], "notes",
+                                            viewer_role, "appointments")
+            else:
+                text = RESTRICTED_PLACEHOLDER
+        entry["notes"] = text or None
+    return entries
 
 
 def _apply_queue_flow(entries, active=None):

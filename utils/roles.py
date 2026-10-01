@@ -47,3 +47,19 @@ CLINICAL_AUTHORITY_ROLE = "doctor"
 def holds_clinical_authority(role):
     """Whether this role is the licensed clinician. Only the Doctor is."""
     return normalize_role(role) == CLINICAL_AUTHORITY_ROLE
+
+
+# THE CARE TEAM (Task 5b). Medical confidentiality allows sharing a patient's
+# details with the health workers involved in their care, and not with anyone
+# else. At the health center that is the Doctor and Health Center Staff, who take
+# the intake and hand the medicine over. The Administrator is a barangay Kagawad
+# who runs the system, and a Barangay Official has no patient access at all.
+# Only the Doctor reads sealed free text; this is who still sees what is not
+# sealed but is not needed by anyone else: the check-in reason on the Patient
+# Queue, and the medicine names dispensed at a sealed visit.
+CARE_TEAM_ROLES = ("doctor", "health staff")
+
+
+def is_care_team(role):
+    """Whether this role is part of the patient's care: the Doctor or Health Center Staff."""
+    return normalize_role(role) in CARE_TEAM_ROLES

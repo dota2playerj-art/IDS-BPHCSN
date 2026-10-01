@@ -86,6 +86,8 @@ from models.consultations import (
     NUMERIC_LIMITS,
     PEDIATRIC_AGE_YEARS,
     RESTRICTED_PLACEHOLDER,
+    SEALED_FIELDS,
+    SEALED_WITH_RECORD_FIELDS,
     UNOPENABLE_TEXT,
     can_diagnose,
     can_view_restricted,
@@ -106,6 +108,7 @@ from models.dispensing import (
     ITEM_FIELD_PREFIX,
     QUANTITY_FIELD_PREFIX,
     QUANTITY_RANGE,
+    can_see_sealed_medicines,
     check_dispensing,
     dispensable_items,
     dispensing_label,
@@ -224,6 +227,19 @@ def _apply_clinical_authority(values, stored, role):
         if submitted and submitted != current:
             refused.append(field)
         values[field] = (stored or {}).get(field) if stored else None
+
+    # ON A SEALED RECORD THE INTAKE TEXT IS SEALED TOO (Task 5b, D1). The chief
+    # complaint and the additional notes are not Doctor-only to write, but once the
+    # visit is sealed this role cannot read them, so it cannot edit them either.
+    # They are put back to what the record holds, which is the encrypted value, so
+    # the save writes them over themselves and the Doctor's sealed text survives.
+    if stored and stored.get("is_restricted"):
+        for field in SEALED_WITH_RECORD_FIELDS:
+            submitted = str(values.get(field) or "").strip()
+            current = str(stored.get(field) or "").strip()
+            if submitted and submitted != current:
+                refused.append(field)
+            values[field] = stored.get(field)
     return values, refused
 
 
@@ -321,12 +337,13 @@ def _log_restriction(outcome, consultation_id, patient, user_id, ip_address,
     if outcome == "restricted":
         action = ACTION_CONSULTATION_RESTRICTED
         details = (
-            f"{subject} Marked Restricted. Its diagnosis and treatment plan are "
-            "now withheld from every role but Doctor, which is the role licensed "
-            "to record them, the Administrator included; the visit date, chief "
-            "complaint, vital signs, immunisations and dispensing on the same "
-            "record stay legible to Health Center Staff, who take the intake and "
-            "hand the medicine over. Anyone else who opens this patient's profile "
+            f"{subject} Marked Restricted. Its chief complaint, diagnosis, "
+            "treatment plan, additional notes and check-in reason are now "
+            "encrypted and withheld from every role but Doctor, the "
+            "Administrator included; the visit date, vital signs and "
+            "immunisations on the same record stay legible. Health Center Staff "
+            "still see the medicine dispensed, and the Administrator does not. "
+            "Anyone else who opens this patient's profile "
             "is shown a "
             "placeholder naming the restriction rather than an empty field, and "
             "each such view is recorded. The condition itself is deliberately "
@@ -335,7 +352,8 @@ def _log_restriction(outcome, consultation_id, patient, user_id, ip_address,
     else:
         action = ACTION_CONSULTATION_UNRESTRICTED
         details = (
-            f"{subject} Restriction lifted. Its diagnosis and treatment plan are "
+            f"{subject} Restriction lifted. Its chief complaint, diagnosis, "
+            "treatment plan, additional notes and check-in reason are "
             "legible again to every role that can open the patient's profile, "
             "including Health Center Staff and the Administrator, and views of it "
             "are no longer "
@@ -535,7 +553,7 @@ def _dispensing_context(consultation, submitted=None):
     a rejected save does not throw away what they had chosen and typed.
     """
     recorded = get_dispensing_for_consultation(
-        consultation["id"] if consultation else None
+        consultation["id"] if consultation else None, current_role()
     )
     values = submitted or {}
     low, high = QUANTITY_RANGE
@@ -687,15 +705,25 @@ def consultation_form_context(patient, appointment=None, consultation=None,
 
     if sealed_unopenable:
         form = {field: value for field, value in form.items()
-                if field not in DOCTOR_ONLY_FIELDS}
+                if field not in SEALED_FIELDS}
+
+    # A role that cannot read a sealed visit is not shown its intake text, and the
+    # form does not carry it: the stored values are encrypted and must not reach
+    # the page even as ciphertext.
+    intake_text_withheld = bool(
+        not may_diagnose and consultation is not None
+        and consultation.get("is_restricted")
+    )
 
     if not may_diagnose:
         # Off the form dict entirely rather than blanked, so there is no key for
         # a template expression to reach even by accident. `form` is rebuilt
         # rather than mutated: on a validation bounce it is the caller's dict.
+        hidden = DOCTOR_ONLY_FIELDS + (
+            SEALED_WITH_RECORD_FIELDS if intake_text_withheld else ())
         form = {
             field: value for field, value in form.items()
-            if field not in DOCTOR_ONLY_FIELDS
+            if field not in hidden
         }
         # An error against a field this role cannot see would print in the
         # summary at the top of the page with nowhere to go -- and it cannot
@@ -704,7 +732,7 @@ def consultation_form_context(patient, appointment=None, consultation=None,
         # fields are: nothing on this page should mention them to this role.
         errors = {
             field: message for field, message in (errors or {}).items()
-            if field not in DOCTOR_ONLY_FIELDS
+            if field not in hidden
         }
         # The stored record still goes to the template -- it draws the visit
         # date, the original author and the edited banner from it -- so a sealed
@@ -723,6 +751,15 @@ def consultation_form_context(patient, appointment=None, consultation=None,
         # cannot come to disagree with the server about who may diagnose.
         "can_diagnose": may_diagnose,
         "sealed_unopenable": sealed_unopenable,
+        # The chief complaint and additional notes of a sealed visit, for a role
+        # that may not read them: the template prints the placeholder instead.
+        "intake_text_withheld": intake_text_withheld,
+        # The Doctor is looking at a sealed record in full. The page prints a
+        # placeholder in its place (D6).
+        "sealed_on_screen": bool(
+            may_diagnose and consultation is not None
+            and consultation.get("is_restricted") and not sealed_unopenable
+        ),
         "unopenable_text": UNOPENABLE_TEXT,
         "restrict_field": RESTRICT_FIELD,
         # Ticked from what was submitted when a save bounced, and otherwise from
@@ -1033,7 +1070,7 @@ def process_record_consultation(appointment_id, form_data, user_id,
         # rather than of the flag: "Marked Restricted" alone would leave the
         # clinician to work out what that does to everyone else's screen.
         message += (
-            " Marked Restricted — its diagnosis and treatment plan are hidden "
+            " Marked Restricted — everything written on this visit is hidden "
             "from everyone except the Doctor."
         )
     if given:
@@ -1096,7 +1133,7 @@ def process_record_consultation(appointment_id, form_data, user_id,
     return patient["id"], None, message
 
 
-def _dispensing_message(dispensed, failures):
+def _dispensing_message(dispensed, failures, hide_names=False):
     """What to add to the save's flash message about what was dispensed.
 
     Two things it deliberately says that a bare count would not.
@@ -1126,6 +1163,11 @@ def _dispensing_message(dispensed, failures):
         )
     if not dispensed:
         return ""
+
+    if hide_names:
+        # A sealed visit, and a role outside the care team (D3): the count only.
+        return " {} item{} dispensed. Stock updated.".format(
+            len(dispensed), "s" if len(dispensed) != 1 else "")
 
     given = ", ".join(_dispensing_labels(dispensed))
     remaining = ", ".join(
@@ -1262,7 +1304,7 @@ def _apply_general_vaccination_edit(patient, consultation_id, consultation,
 
 
 def _describe_dose_changes(added, removed, general_added=(), dispensed=(),
-                           reported=()):
+                           reported=(), hide_medicines=False):
     """The vaccination and dispensing half of an audit line.
 
     Returns (summary, changed_labels).
@@ -1313,13 +1355,21 @@ def _describe_dose_changes(added, removed, general_added=(), dispensed=(),
         )
         changed.append("other vaccinations added")
     if dispensed:
-        parts.append(
-            "Medicine dispensed: "
-            + ", ".join(
-                "{} (stock now {})".format(dispensing_label(row), row["stock_after"])
-                for row in dispensed
+        if hide_medicines:
+            # A sealed visit: a medicine can reveal a condition, and this entry is
+            # read by the Administrator. It says how many, not which (D3).
+            parts.append(
+                "Medicine dispensed: {} item{} (names not shown, the consultation "
+                "is restricted)".format(len(dispensed),
+                                        "s" if len(dispensed) != 1 else ""))
+        else:
+            parts.append(
+                "Medicine dispensed: "
+                + ", ".join(
+                    "{} (stock now {})".format(dispensing_label(row), row["stock_after"])
+                    for row in dispensed
+                )
             )
-        )
         changed.append("items dispensed")
     return "; ".join(parts), changed
 
@@ -1382,7 +1432,7 @@ def process_edit_consultation(consultation_id, form_data, user_id, ip_address=No
     opened = open_sealed(before, role) if may_diagnose else before
     unopenable = bool(opened.get("unopenable"))
     if unopenable:
-        for field in DOCTOR_ONLY_FIELDS:
+        for field in SEALED_FIELDS:
             values[field] = before[field]
     # Judge a follow-up date against the visit it belongs to, not against today.
     values["_consultation_date"] = before["consultation_date"]
@@ -1433,7 +1483,7 @@ def process_edit_consultation(consultation_id, form_data, user_id, ip_address=No
     # On a sealed record, a field the Doctor left as it was keeps its stored
     # ciphertext, so it is not re-encrypted and does not read as changed.
     if may_diagnose and before["is_restricted"] and not unopenable:
-        for field in DOCTOR_ONLY_FIELDS:
+        for field in SEALED_FIELDS:
             if str(values.get(field) or "").strip() == str(opened.get(field) or "").strip():
                 values[field] = before[field]
 
@@ -1511,8 +1561,12 @@ def process_edit_consultation(consultation_id, form_data, user_id, ip_address=No
     else:
         summary, changed = describe_consultation_changes(before, after)
     dose_summary, dose_changed = _describe_dose_changes(
-        added, removed, general_added, dispensed, reported
+        added, removed, general_added, dispensed, reported,
+        hide_medicines=bool(after and after["is_restricted"]),
     )
+    # The same rule for what is flashed back to this person.
+    hide_names = bool(after and after["is_restricted"]
+                      and not can_see_sealed_medicines(role))
     if dose_summary:
         summary = f"{summary}; {dose_summary}" if summary else dose_summary
     changed = list(changed) + dose_changed
@@ -1535,12 +1589,12 @@ def process_edit_consultation(consultation_id, form_data, user_id, ip_address=No
             return patient["id"], None, (
                 seal_message
                 + " No clinical field was changed by this save."
-                + _dispensing_message(dispensed, dispense_failures)
+                + _dispensing_message(dispensed, dispense_failures, hide_names)
             )
         return patient["id"], None, (
             f"No changes. {patient['full_name']}'s consultation of "
             f"{display_date(before['consultation_date'])} is unchanged."
-            + _dispensing_message(dispensed, dispense_failures)
+            + _dispensing_message(dispensed, dispense_failures, hide_names)
         )
 
     # Self-contained on purpose: an audit entry read months later, on its own,
@@ -1569,7 +1623,7 @@ def process_edit_consultation(consultation_id, form_data, user_id, ip_address=No
         f"{'s' if len(changed) != 1 else ''} changed ({field_names}). "
         "The change has been recorded in the audit log."
         + (f" {seal_message}" if seal_message else "")
-        + _dispensing_message(dispensed, dispense_failures)
+        + _dispensing_message(dispensed, dispense_failures, hide_names)
     )
 
 
@@ -1585,7 +1639,7 @@ def _restriction_message(outcome, patient, consultation):
         return (
             f"{patient['first_name']}'s consultation of "
             f"{display_date(consultation['consultation_date'])} is now Restricted "
-            "— its diagnosis and treatment plan are hidden from everyone except "
+            "— everything written on this visit is hidden from everyone except "
             "the Doctor."
         )
     if outcome == "cannot_open":
@@ -1598,7 +1652,7 @@ def _restriction_message(outcome, patient, consultation):
         return (
             f"The restriction on {patient['first_name']}'s consultation of "
             f"{display_date(consultation['consultation_date'])} has been lifted "
-            "— its diagnosis and treatment plan are legible to Health Center "
+            "— what was written on this visit is legible to Health Center "
             "Staff and the Administrator again."
         )
     return ""

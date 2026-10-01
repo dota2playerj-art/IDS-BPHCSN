@@ -665,6 +665,10 @@ def _diagnoses(context):
             "Most common presenting complaints in this range",
             consultations["window"]["top_complaints"], "label", "count",
             ("Complaint", "Consultations"),
+            note=("Ranked from this range's consultations only."
+                  + (" Restricted consultations are counted under Confidential. "
+                     "Their complaints are not shown."
+                     if consultations["window"]["diagnoses_withheld"] else "")),
             empty="No consultation was written up in this range.",
         ),
         figures("Basis", [
