@@ -2,7 +2,7 @@
 
 Kept as a plain module so it can be consumed two ways: Flask picks up the
 upper-case names via ``app.config.from_object(config)``, and standalone scripts
-(``populate_records.py``) import the paths directly without booting the app.
+(``seed_demo_data.py``) import the paths directly without booting the app.
 
 Secrets come from the environment, never from this file. A .env file in the
 project folder is read at import. Run ``python setup_env.py`` once to create it.

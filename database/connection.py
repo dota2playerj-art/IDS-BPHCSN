@@ -12,7 +12,7 @@ def _database_path():
 
     Inside a request (or any app context) the running app's configuration wins, so
     a test or a future instance config can point somewhere else. Outside one --
-    populate_records.py runs as a plain script -- fall back to the project default.
+    a plain script such as seed_demo_data.py -- fall back to the project default.
     """
     if has_app_context():
         return current_app.config["DATABASE"]

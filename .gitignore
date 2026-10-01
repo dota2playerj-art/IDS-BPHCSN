@@ -7,7 +7,7 @@ __pycache__/
 
 # --- The database -----------------------------------------------------------
 # app.db is generated, not authored. schema.sql builds it, the migrate_*.py
-# scripts evolve it and populate_records.py fills it with demo data, so all
+# scripts evolve it and seed_demo_data.py fills it with fictional demo data, so all
 # three of those ARE tracked and the database itself is not. See README.md for
 # how to rebuild it after a fresh clone.
 app.db
@@ -111,7 +111,7 @@ Thumbs.db
 desktop.ini
 
 # Everything else is tracked on purpose: app.py, config.py, schema.sql, every
-# migrate_*.py, populate_records.py, requirements.txt, and the whole of
+# migrate_*.py, seed_demo_data.py, requirements.txt, and the whole of
 # routes/ models/ utils/ database/ templates/ static/ PR0MPT_INSTRUCTION/.
 # static/ in particular is vendored on purpose -- Bootstrap, Chart.js and the
 # Inter/Material fonts are committed so the app runs with no network at all.
