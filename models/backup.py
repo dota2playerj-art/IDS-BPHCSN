@@ -130,12 +130,16 @@ def _integrity_problems(path):
     return [row[0] for row in rows if row[0] != _INTEGRITY_OK]
 
 
-def create_backup_bytes():
+def create_backup_bytes(path=None):
     """A verified, consistent copy of the database. Returns bytes.
 
     Raises RuntimeError if the copy fails its own integrity check, which is the
     one outcome that must never be served: a corrupt backup handed over as a good
     one is the failure this whole module exists to avoid.
+
+    `path` names another database to copy. archive_plain_databases.py passes one,
+    so an old file is compacted, checked and encrypted by exactly this code. The
+    web app never passes it: the default is the live database.
 
     The temporary file is removed in a finally block, so it does not survive an
     exception either. It is created with delete=False and closed immediately
@@ -146,7 +150,7 @@ def create_backup_bytes():
     temp_path = handle.name
     handle.close()
 
-    source = sqlite3.connect(database_path())
+    source = sqlite3.connect(path or database_path())
     try:
         destination = sqlite3.connect(temp_path)
         try:
