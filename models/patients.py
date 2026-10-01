@@ -379,6 +379,58 @@ def get_patient_by_id(patient_id):
     return _to_patient(row) if row else None
 
 
+# ---------------------------------------------------------------------------
+# THE ADMINISTRATOR'S VIEW OF A PATIENT (Task 5c)
+#
+# Clinical data is for the care team only. The Administrator runs the system and
+# is not part of anyone's care (RA 11166; RA 10173's "adequate, relevant and not
+# excessive"; the minimum-necessary standard). So his screens read patients
+# through these two functions, which select the demographic columns and nothing
+# else: no contact numbers, no conditions or allergies, no blood type, no
+# emergency contact, and no last-visit date. What is not selected cannot reach a
+# page, an export or a print.
+# ---------------------------------------------------------------------------
+DEMOGRAPHIC_COLUMNS = (
+    "id", "patient_id", "first_name", "middle_name", "last_name", "sex",
+    "birth_date", "address", "status", "created_at",
+)
+_DEMOGRAPHIC_SELECT = "SELECT " + ", ".join(DEMOGRAPHIC_COLUMNS) + " FROM patients"
+
+
+def _to_demographics(row):
+    patient = dict(row)
+    patient["full_name"] = _full_name(row)
+    patient["initials"] = _initials(row)
+    patient["age"] = format_age(row["birth_date"])
+    patient["age_years"] = calculate_age(row["birth_date"])
+    patient["display_address"] = (row["address"] or "").strip()
+    patient["status_badge_class"] = STATUS_BADGE_CLASS.get(
+        patient.get("status"), "badge-inactive"
+    )
+    patient["status_rank"] = (
+        PATIENT_STATUSES.index(patient["status"])
+        if patient.get("status") in PATIENT_STATUSES else None
+    )
+    return patient
+
+
+def get_all_patients_demographics():
+    """Every patient's demographic fields only, ordered as get_all_patients()."""
+    with db_connection() as conn:
+        rows = conn.execute(
+            _DEMOGRAPHIC_SELECT
+            + " ORDER BY last_name COLLATE NOCASE, first_name COLLATE NOCASE"
+        ).fetchall()
+    return [_to_demographics(row) for row in rows]
+
+
+def get_patient_demographics(patient_id):
+    """One patient's demographic fields only, or None."""
+    with db_connection() as conn:
+        row = conn.execute(_DEMOGRAPHIC_SELECT + " WHERE id = ?", (patient_id,)).fetchone()
+    return _to_demographics(row) if row else None
+
+
 def get_patient_stats():
     """Counts behind the four stat cards on Screen 03.
 

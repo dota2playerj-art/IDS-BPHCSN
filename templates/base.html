@@ -289,7 +289,9 @@
     <li><a href="{{ url_for('notifications') }}"{% if active_nav == 'notifications' %} class="active"{% endif %}><span class="material-symbols-outlined">notifications</span>Notifications</a></li>
 {%- else %}
     <li><a href="{{ url_for(patient_records_endpoint) }}"{% if active_nav == 'patient_records' %} class="active"{% endif %}><span class="material-symbols-outlined">groups</span>Patient Records</a></li>
+{%- if care_team_view %}
     <li><a href="{{ url_for(register_patient_endpoint) }}"{% if active_nav == 'register_patient' %} class="active"{% endif %}><span class="material-symbols-outlined">person_add</span>Register Patient</a></li>
+{%- endif %}
     <!-- The badge is the low-stock alert count from inject_role_context(), and is
          omitted entirely when nothing is below its reorder level -- a "0" badge
          would read as an alert that is not there. -->

@@ -436,7 +436,9 @@
             <div class="recipient-row">
               <div>
                 <div class="who">{{ recipient.recipient_name }}</div>
+{%- if recipient.mobile_number %}
                 <div class="num">{{ recipient.mobile_number }}</div>
+{%- endif %}
               </div>
               <span class="badge-status {{ 'badge-sent' if recipient.status == 'Sent' else 'badge-failed' }}">{{ recipient.status }}</span>
             </div>

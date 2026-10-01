@@ -1,17 +1,8 @@
 """Administrator screens. Mounted at /admin."""
 from flask import Blueprint, flash, redirect, render_template, request, session, url_for
 
-from models.consultations import PEDIATRIC_AGE_YEARS
-from models.immunizations import get_immunization_alert
-from models.inventory import get_inventory_item_by_id, get_low_stock_alert
-from models.patients import get_patient_by_id
-from routes.appointment_views import (
-    appointment_scheduling_context,
-    process_check_in,
-    process_complete_consultation,
-    process_new_patient_check_in,
-    process_start_consultation,
-)
+from models.inventory import get_inventory_item_by_id
+from routes.appointment_views import appointment_scheduling_context
 from routes.audit_export import (
     audit_document,
     audit_workbook,
@@ -22,12 +13,6 @@ from routes.audit_export import (
 from routes.audit_views import audit_export_context, audit_logs_context
 from routes.dashboard_views import dashboard_context
 from routes.broadcast_views import process_send_broadcast, sms_notifications_context
-from routes.consultation_views import (
-    edit_consultation_context,
-    process_edit_consultation,
-    process_record_consultation,
-    record_consultation_context,
-)
 from routes.inventory_views import (
     add_edit_medicine_context,
     medicine_inventory_context,
@@ -35,22 +20,9 @@ from routes.inventory_views import (
     process_archive_medicine,
 )
 from routes.patient_views import (
-    check_in_handoff_requested,
-    check_in_reason,
-    clear_check_in_reason,
-    check_in_requested,
-    patient_profile_context,
+    patient_demographics_context,
     patient_records_context,
     patient_selection_context,
-    process_archive_patients,
-    address_prefill_args,
-    store_check_in_reason,
-    stored_check_in_reason,
-    address_prefill_form,
-    process_register_patient,
-    register_patient_context,
-    registered_patient_name,
-    save_and_register_another_requested,
 )
 from routes.schedule_views import (
     process_add_entry,
@@ -93,7 +65,6 @@ from routes.user_views import (
     process_reset_password,
     user_management_context,
 )
-from routes.vaccination_correction_views import process_vaccination_correction
 from utils.security import (
     end_session_after_self_deactivation, login_required, role_required,
 )
@@ -205,151 +176,28 @@ def export_patient_selection_pdf():
     ))
 
 
-# POST only: this changes records, so there is no URL anyone can navigate to.
-# A Barangay Official is stopped by role_required and lands on their own
-# dashboard, the same bounce every other Admin-only view gives them.
-@admin_bp.route('/patient_records/archive', methods=["POST"])
-@login_required
-@role_required("Admin")
-def archive_patients():
-    flash(process_archive_patients(request.form, session.get("user_id"), request.remote_addr))
-    return redirect(url_for("admin.patient_records"))
-
-
-# Correcting one recorded vaccination -- an EPI dose or one given outside that
-# schedule. POST only, like archive_patients above and for the same reason: this
-# changes a clinical record, so there is no URL anyone can navigate to.
-#
-# Reachable only from the Patient Profile's Immunization Record tab, never from
-# the consultation form. That separation is the point of the whole path and
-# routes/vaccination_correction_views.py's header sets out why: the recording
-# form is worked at speed with a patient in the room, and a correction has to be
-# a deliberate act on a screen where records are being reviewed.
-#
-# A Barangay Official is stopped by role_required and lands on their own
-# dashboard, the same bounce every other Admin-only view gives them -- and they
-# have no Patient Profile to reach this from in the first place.
-@admin_bp.route('/patient_profile/<int:patient_id>/correct-vaccination', methods=["POST"])
-@login_required
-@role_required("Admin")
-def correct_vaccination(patient_id):
-    corrected_for, reopen, message = process_vaccination_correction(
-        request.form, session.get("user_id"), ip_address=request.remote_addr
-    )
-    # A submit that did not save comes back as the same dialog, on the same page,
-    # holding what was typed with the errors beside the fields -- the pattern
-    # every other form in this project follows. Nothing is flashed: the dialog
-    # carries its own banner, and a flash above a page whose dialog already
-    # explains itself would say it twice.
-    if reopen:
-        context = patient_profile_context(corrected_for or patient_id)
-        if context is not None:
-            context["correction_state"] = reopen
-            return render_template('patient_profile.html', **context)
-
-    flash(message)
-    # The record's own patient wins over the one in the URL. The id in the path
-    # is what the page was rendered for; the id the correction resolved is read
-    # from the stored row, so a mismatched or stale URL cannot land the operator
-    # on a profile that is not the one they just changed.
-    return redirect(url_for(
-        "admin.patient_profile", patient_id=corrected_for or patient_id, tab="vaccine"
-    ))
-
-
 @admin_bp.route('/patient_profile/<int:patient_id>')
 @login_required
 @role_required("Admin")
 def patient_profile(patient_id):
-    context = patient_profile_context(patient_id)
+    # Demographics only (Task 5c). The full record, with its clinical tabs, is
+    # the care team's and is built by patient_profile_context(), which refuses
+    # this role.
+    context = patient_demographics_context(patient_id)
     if context is None:
         flash("That patient record could not be found.")
         return redirect(url_for("admin.patient_records"))
-    return render_template('patient_profile.html', **context)
+    return render_template('patient_profile_demographics.html', **context)
 
 
-# Audit item 7: Register Patient was reachable only by Health Center Staff even
-# though the Administrator holds every Staff permission.
-#
-# No id in the URL means add mode; an id means edit that patient. Same shape as
-# add_edit_medicine above -- one view, one template, distinguished by the path.
-@admin_bp.route('/register_patient', methods=["GET", "POST"])
-@admin_bp.route('/register_patient/<int:patient_id>', methods=["GET", "POST"])
-@login_required
-@role_required("Admin")
-def register_patient(patient_id=None):
-    patient = None
-    if patient_id is not None:
-        patient = get_patient_by_id(patient_id)
-        if patient is None:
-            flash("That patient record could not be found.")
-            return redirect(url_for("admin.patient_records"))
-
-    # The Check In dialog hands its reason over by POST, never in the URL. It is
-    # kept in the session and the form opens with ?check_in=1 only.
-    if request.method == "POST" and patient is None and check_in_handoff_requested(request.form):
-        store_check_in_reason(request.form)
-        return redirect(url_for("admin.register_patient", check_in=1))
-
-    if request.method == "POST":
-        saved_id, context = process_register_patient(
-            request.form, patient=patient, user_id=session.get("user_id"),
-            ip_address=request.remote_addr,
-        )
-        if saved_id:
-            # Opened from the Check In dialog's "New Patient (first visit)" path:
-            # the record now exists, so put that same person into today's queue
-            # and land the operator back on the queue they were working from.
-            # One save, both outcomes -- no second check-in step.
-            if patient is None and check_in_requested(request.form):
-                flash(
-                    process_new_patient_check_in(
-                        saved_id,
-                        check_in_reason(request.form),
-                        session.get("user_id"),
-                        request.remote_addr,
-                    )
-                )
-                clear_check_in_reason()
-                return redirect(url_for("admin.appointment_scheduling"))
-            # Save & Register Another. The record is saved -- the branch above
-            # only runs on a row id returned by the very same
-            # process_register_patient() the ordinary Save calls -- so what is
-            # left is where to put the operator. At a community health drive the
-            # answer is a fresh form, because the next person is already waiting.
-            #
-            # The address is kept and nothing else is. Everyone registered in
-            # one sitting is from the same purok, so that is the retyping worth
-            # removing; a name, a birth date or a blood type carried into the
-            # next registration would be a wrong value sitting in a field that
-            # looks filled in. The URL carries the saved patient's id, and the
-            # fresh form reads the address from that stored record.
-            if patient is None and save_and_register_another_requested(request.form):
-                name = registered_patient_name(request.form)
-                flash(
-                    f"{name} registered successfully. The form below is ready for "
-                    "the next patient, with the address kept."
-                )
-                return redirect(url_for(
-                    "admin.register_patient", **address_prefill_args(saved_id)
-                ))
-            flash("Patient details updated." if patient else "Patient registered successfully.")
-            return redirect(url_for("admin.patient_profile", patient_id=saved_id))
-        return render_template('register_patient.html', **context)
-
-    return render_template(
-        'register_patient.html',
-        **register_patient_context(
-            patient=patient,
-            # Blank on an ordinary open. Set only when Save & Register Another
-            # has just redirected here, and then it holds the address fields and
-            # nothing else, so every other field renders exactly as blank.
-            form=address_prefill_form(request.args) if patient is None else None,
-            check_in=check_in_requested(request.args),
-            # From the session only, never from the URL.
-            check_in_reason_text=stored_check_in_reason(),
-        ),
-    )
+# NO ROUTE HERE WRITES A PATIENT OR A CLINICAL RECORD (Task 5c).
+# Registering and editing patients, changing their status, correcting a dose,
+# the queue's check-in, start and complete, and recording or editing a
+# consultation are the care team's: the Doctor and Health Center Staff, through
+# routes/staff.py. The Administrator runs the system and is not part of anyone's
+# care (RA 11166; RA 10173's "not excessive"; the minimum-necessary standard).
+# There is no /admin/... URL for any of them, so a request from this role has
+# nothing to reach, and the /staff/... ones send him back to his dashboard.
 
 
 @admin_bp.route('/medicine_inventory')
@@ -381,7 +229,7 @@ def export_medicine_inventory_pdf():
     ))
 
 
-# POST only, for the same reason archive_patients above is: this changes a
+# POST only: this changes a
 # record, so there is no URL anyone can navigate to. A Barangay Official is
 # stopped by role_required and lands on their own dashboard.
 @admin_bp.route('/medicine_inventory/archive', methods=["POST"])
@@ -393,7 +241,7 @@ def archive_medicine():
 
 
 # Add mode carries no id; edit mode carries the medicine's id. Same shape as
-# register_patient above -- one view, one template, distinguished by the path.
+# the Register Patient screen -- one view, one template, distinguished by the path.
 #
 # There is no per-item detail screen for inventory the way patient_profile is one
 # for a patient, so a successful save redirects back to the list rather than to a
@@ -466,90 +314,6 @@ def export_appointment_scheduling_pdf():
         appointment_scheduling_context(month=request.args.get("month")),
         produced_by=exported_by(),
     ))
-
-
-# POST only: both of these change records, so there is no URL to navigate to.
-# A Barangay Official is stopped by role_required and lands on their own
-# dashboard, the same bounce every other Admin-only view gives them.
-@admin_bp.route('/appointment_scheduling/check-in', methods=["POST"])
-@login_required
-@role_required("Admin")
-def check_in_patient():
-    flash(process_check_in(request.form, session.get("user_id"), request.remote_addr))
-    return redirect(url_for("admin.appointment_scheduling"))
-
-
-@admin_bp.route('/appointment_scheduling/start-consultation', methods=["POST"])
-@login_required
-@role_required("Admin")
-def start_consultation():
-    flash(process_start_consultation(request.form, session.get("user_id"), request.remote_addr))
-    return redirect(url_for("admin.appointment_scheduling"))
-
-
-# Completing is what frees the clinician for the next patient, so it is part of
-# the queue rather than of the consultation record itself -- recording what
-# happened during the visit is a separate screen and is not wired here.
-@admin_bp.route('/appointment_scheduling/complete-consultation', methods=["POST"])
-@login_required
-@role_required("Admin")
-def complete_consultation():
-    flash(process_complete_consultation(request.form, session.get("user_id"), request.remote_addr))
-    return redirect(url_for("admin.appointment_scheduling"))
-
-
-# The consultation write-up itself. Anchored to the queue entry rather than to
-# the patient: the record documents one specific visit, and the appointment id is
-# what says which. A successful save completes that queue entry and lands on the
-# patient's profile, where the new record is already the top row of Consultation
-# History.
-@admin_bp.route('/consultation/record/<int:appointment_id>', methods=["GET", "POST"])
-@login_required
-@role_required("Admin")
-def record_consultation(appointment_id):
-    if request.method == "POST":
-        patient_id, context, message = process_record_consultation(
-            appointment_id, request.form, session.get("user_id"),
-            ip_address=request.remote_addr,
-        )
-        flash(message)
-        if patient_id:
-            return redirect(url_for("admin.patient_profile", patient_id=patient_id))
-        if context is None:
-            return redirect(url_for("admin.appointment_scheduling"))
-        return render_template('record_consultation.html', **context)
-
-    context, message = record_consultation_context(appointment_id)
-    if context is None:
-        flash(message)
-        return redirect(url_for("admin.appointment_scheduling"))
-    return render_template('record_consultation.html', **context)
-
-
-# Editing a saved consultation. Same template, same validation; the difference is
-# that this writes an audit_logs entry naming what changed, and refuses to move
-# the patient or the visit date.
-@admin_bp.route('/consultation/edit/<int:consultation_id>', methods=["GET", "POST"])
-@login_required
-@role_required("Admin")
-def edit_consultation(consultation_id):
-    if request.method == "POST":
-        patient_id, context, message = process_edit_consultation(
-            consultation_id, request.form, session.get("user_id"),
-            ip_address=request.remote_addr,
-        )
-        flash(message)
-        if patient_id:
-            return redirect(url_for("admin.patient_profile", patient_id=patient_id))
-        if context is None:
-            return redirect(url_for("admin.patient_records"))
-        return render_template('record_consultation.html', **context)
-
-    context, message = edit_consultation_context(consultation_id)
-    if context is None:
-        flash(message)
-        return redirect(url_for("admin.patient_records"))
-    return render_template('record_consultation.html', **context)
 
 
 # NO ROUTE HERE SEALS A CONSULTATION, AND THAT ABSENCE IS THE ENFORCEMENT.

@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% set active_nav = "patient_records" %}
+{#- The Administrator's patient profile (Task 5c). Demographics only.
+
+    Clinical data is for the care team: the Doctor and Health Center Staff.
+    RA 11166 allows medical information to be shared only with health workers
+    involved in the patient's care, and RA 10173 asks for no more than is needed.
+    The Administrator runs the system, so this page shows who the patient is and
+    nothing about their care. It is built from
+    routes/patient_views.patient_demographics_context(), which reads the
+    demographic columns only: what is not on this page was never fetched. #}
+{% block title %}IDS-BPHCSN | Patient Profile{% endblock %}
+
+{% block styles %}
+  .panel-card{
+    background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:24px; margin-bottom:24px;
+  }
+  .profile-header{display:grid; grid-template-columns:minmax(0,1fr) auto; gap:16px 24px; align-items:start;}
+  .profile-id-block{display:flex; gap:18px; min-width:0;}
+  .profile-id-block > div{min-width:0;}
+  .profile-avatar{
+    width:64px; height:64px; border-radius:50%; background:var(--teal-light); color:var(--teal-dark);
+    display:flex; align-items:center; justify-content:center; font-size:22px; font-weight:700; flex-shrink:0;
+  }
+  .profile-name{font-size:22px; font-weight:700; color:var(--text-dark); display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+  .profile-id{font-size:13px; color:var(--text-muted); margin-top:2px;}
+  .profile-meta-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:22px 32px; margin-top:16px;}
+  .meta-item{min-width:0;}
+  .meta-item .meta-label{font-size:11.5px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.04em; font-weight:600;}
+  .meta-item .meta-value{font-size:14px; color:var(--text-dark); font-weight:600; margin-top:2px; overflow-wrap:break-word;}
+  .clinical-note{display:flex; gap:10px; align-items:center; font-size:14px; color:var(--text-muted);}
+  @media (max-width: 575px){ .profile-header{grid-template-columns:1fr;} }
+{% include "_print.html" %}
+@media print{
+  .profile-actions{display:none !important;}
+}
+{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb-nav">
+      <a href="{{ url_for(dashboard_endpoint) }}">Dashboard</a>
+      <span class="sep material-symbols-outlined">chevron_right</span>
+      <a href="{{ url_for(patient_records_endpoint) }}">Patient Records</a>
+      <span class="sep material-symbols-outlined">chevron_right</span>
+      <span class="current">Patient Profile</span>
+    </div>{% endblock %}
+
+{% block content %}
+    <div class="print-only print-head">
+      <div>
+        <div class="print-org-name">{{ health_center.name }}</div>
+        <div class="print-org-sub">Integrated Data System &mdash; IDS-BPHCSN</div>
+      </div>
+      <div class="print-doc">
+        <div class="print-doc-title">Patient Registration Details</div>
+        <div class="print-doc-meta">{{ patient.patient_id }} &middot; {{ patient.full_name }}</div>
+        <div class="print-doc-meta">Printed <span class="print-stamp">&mdash;</span> by {{ sidebar_user_name }}</div>
+      </div>
+    </div>
+
+    <div class="panel-card">
+      <div class="profile-header">
+        <div class="profile-id-block">
+          <div class="profile-avatar">{{ patient.initials }}</div>
+          <div>
+            <div class="profile-name">{{ patient.full_name }} <span class="badge-status {{ patient.status_badge_class }}">{{ patient.status }}</span></div>
+            <div class="profile-id">Patient ID: {{ patient.patient_id }} &middot; Registered {{ patient.created_at | long_date }}</div>
+            <div class="profile-meta-grid">
+              <div class="meta-item">
+                <div class="meta-label">Age / Sex</div>
+                <div class="meta-value">{{ patient.age if patient.age is not none else '—' }} / {{ patient.sex or '—' }}</div>
+              </div>
+              <div class="meta-item">
+                <div class="meta-label">Birth Date</div>
+                <div class="meta-value">{{ patient.birth_date | display_date('Not recorded') }}</div>
+              </div>
+              <div class="meta-item" style="grid-column:span 2;">
+                <div class="meta-label">Address</div>
+                <div class="meta-value">{{ patient.display_address or 'Not recorded' }}</div>
+              </div>
+              <div class="meta-item">
+                <div class="meta-label">Status</div>
+                <div class="meta-value"><span class="badge-status {{ patient.status_badge_class }}">{{ patient.status }}</span></div>
+              </div>
+              <div class="meta-item">
+                <div class="meta-label">Registered</div>
+                <div class="meta-value">{{ patient.created_at | display_date }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="profile-actions">
+          <button class="btn-ghost-ids" type="button" onclick="window.print()"
+                  title="Print {{ patient.full_name }}'s registration details"><span class="material-symbols-outlined" style="font-size:18px;">print</span>Print</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-card">
+      <div class="clinical-note">
+        <span class="material-symbols-outlined" style="font-size:20px;">lock</span>
+        <span>{{ clinical_details_note }}</span>
+      </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // The printed date is stamped at print time, as on the full profile.
+  (function(){
+    function stamp(){
+      var when = new Date().toLocaleString(undefined, {
+        year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit'
+      });
+      document.querySelectorAll('.print-stamp').forEach(function(el){ el.textContent = when; });
+    }
+    window.addEventListener('beforeprint', stamp);
+    stamp();
+    if(new URLSearchParams(window.location.search).has('print')){
+      window.addEventListener('load', function(){ window.print(); });
+    }
+  })();
+</script>
+{% endblock %}

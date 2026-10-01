@@ -48,7 +48,9 @@ from models.patients import (
     find_possible_duplicates,
     generate_next_patient_id,
     get_all_patients,
+    get_all_patients_demographics,
     get_patient_by_id,
+    get_patient_demographics,
     get_patient_statuses,
     get_patient_stats,
     set_patient_status,
@@ -68,6 +70,7 @@ from routes.sealed_access import log_unopenable
 from routes.vaccination_correction_views import correction_options
 from utils.context import HEADER_SEARCH_MAX
 from utils.dates import display_date
+from utils.roles import is_care_team
 from utils.security import current_role
 
 # Bulk status changes are restricted to a selection that is already all on the
@@ -296,9 +299,14 @@ def patient_records_context(search=""):
     substring test against text the server wrote, so there is nothing to escape
     here that Jinja does not escape on the way out.
     """
-    patients = get_all_patients()
+    # The Administrator gets the demographic columns only, read through their own
+    # query (Task 5c). Contact numbers and last-visit dates are never fetched for
+    # him, so neither the page nor its exports can carry them.
+    care_team = is_care_team(current_role())
+    patients = get_all_patients() if care_team else get_all_patients_demographics()
     return {
         "patients": patients,
+        "demographics_only": not care_team,
         "stats": get_patient_stats(),
         "filter_options": _filter_options(patients),
         "search_term": (search or "").strip()[:HEADER_SEARCH_MAX],
@@ -381,6 +389,7 @@ def patient_selection_context(form_data):
 
     return {
         "patients": selected,
+        "demographics_only": context["demographics_only"],
         "requested": len(ids),
         "total_registered": len(context["patients"]),
     }
@@ -612,14 +621,19 @@ def patient_profile_context(patient_id):
     because doing it in each route would be two copies of a confidentiality rule
     that could come to disagree. See _log_withheld_consultations().
     """
-    patient = get_patient_by_id(patient_id)
-    if patient is None:
-        return None
-
     # Read once from the signed-in account and used for every read below, so a
     # single page cannot redact its Consultation History against one answer and
     # its Dispensing History against another.
     viewer_role = current_role()
+    # The full record is the care team's (Task 5c). Any other role is refused
+    # here, whatever route asked; the Administrator's route uses
+    # patient_demographics_context() instead.
+    if not is_care_team(viewer_role):
+        raise PermissionError("Only the Doctor and Health Center Staff may open a full record.")
+
+    patient = get_patient_by_id(patient_id)
+    if patient is None:
+        return None
     may_view_restricted = can_view_restricted(viewer_role)
 
     # Read for every patient, shown for two cases: the paediatric cohort the DOH
@@ -715,6 +729,29 @@ def patient_profile_context(patient_id):
         # and the card is headed with the one a health worker asks. Summed from
         # the list already read rather than by a second query.
         "dispensed_units": sum(row["quantity_dispensed"] for row in dispensing),
+    }
+
+
+# What the Administrator sees in place of every clinical tab on a profile.
+CLINICAL_DETAILS_NOTE = "Clinical details are shown only to the Doctor and Health Center Staff."
+
+
+def patient_demographics_context(patient_id):
+    """The Administrator's read-only patient profile, or None if no such patient.
+
+    Demographics only: patient ID, full name, sex, age and birth date, address,
+    status and registration date (Task 5c). Nothing clinical, no contact number,
+    no visit, dose, medicine or queue row is read. RA 11166 limits medical
+    information to health workers involved in the patient's care, and RA 10173
+    asks for no more than is needed; the Administrator runs the system and needs
+    to know who is registered, not what happened to them.
+    """
+    patient = get_patient_demographics(patient_id)
+    if patient is None:
+        return None
+    return {
+        "patient": patient,
+        "clinical_details_note": CLINICAL_DETAILS_NOTE,
     }
 
 

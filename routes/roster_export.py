@@ -523,6 +523,56 @@ PATIENT_ROW_NOTE = (
 )
 
 
+# The Administrator's patient export is demographics only (Task 5c). His roster
+# is read through get_all_patients_demographics(), so there is no contact number
+# or visit date in it to write; these columns say so rather than leave blanks.
+DEMOGRAPHIC_COLUMNS = (
+    "Patient ID",
+    "Full Name",
+    "Age",
+    "Sex",
+    "Address",
+    "Status",
+    "Registered",
+)
+
+DEMOGRAPHIC_ROW_NOTE = (
+    "Sorted by surname, A–Z. Age is the age today, computed from the stored "
+    "birth date. Demographics only: clinical details and contact numbers are "
+    "shown only to the Doctor and Health Center Staff."
+)
+
+
+def _patient_table(context):
+    """(columns, rows, note) for a patient export, as this reader may have it."""
+    patients = context["patients"]
+    if context.get("demographics_only"):
+        rows = [
+            [
+                _value(patient.get("patient_id")),
+                _value(patient.get("full_name")),
+                _value(patient.get("age")),
+                _value(patient.get("sex")),
+                _value(patient.get("display_address")),
+                _value(patient.get("status")),
+                display_date(patient.get("created_at"), "—"),
+            ]
+            for patient in patients
+        ]
+        return DEMOGRAPHIC_COLUMNS, rows, DEMOGRAPHIC_ROW_NOTE
+    return PATIENT_COLUMNS, _patient_rows(patients), PATIENT_ROW_NOTE
+
+
+def _roster_scope(context, care_team_text):
+    """The Not Tracked sheet's opening sentence, true for the file it is in."""
+    if context.get("demographics_only"):
+        return ("This file holds demographics only: patient ID, name, age, sex, "
+                "address, status and registration date. Clinical details and "
+                "contact numbers are shown only to the Doctor and Health Center "
+                "Staff. The following are not stored at all.")
+    return care_team_text
+
+
 def _patient_rows(patients):
     """Patient records as PATIENT_COLUMNS rows.
 
@@ -556,15 +606,15 @@ def _patient_export(context, produced_by):
     stats = context["stats"]
     total = len(patients)
 
-    rows = _patient_rows(patients)
+    columns, rows, row_note = _patient_table(context)
 
     roster = sheet(
         "Patient Roster",
         [table(
             f"Every registered patient — {_count_label(total, 'record')}",
-            PATIENT_COLUMNS,
+            columns,
             rows,
-            note=PATIENT_ROW_NOTE,
+            note=row_note,
             empty="No patients are registered.",
         )],
         heading="Patient Roster",
@@ -624,10 +674,11 @@ def _patient_export(context, produced_by):
 
     notes = _untracked_sheet(
         PATIENT_UNTRACKED,
-        "The roster is complete for what the system stores about a patient's "
-        "identity, contact and status. It is not a medical record — a patient's "
-        "consultations, immunisations and appointments are on their own profile "
-        "screen — and the following are not stored at all.",
+        _roster_scope(context, "The roster is complete for what the system stores "
+                      "about a patient's identity, contact and status. It is not a "
+                      "medical record — a patient's consultations, immunisations and "
+                      "appointments are on their own profile screen — and the "
+                      "following are not stored at all."),
     )
 
     return _assemble(
@@ -718,9 +769,8 @@ def _patient_selection_export(context, produced_by):
         "Selected Patients",
         [table(
             f"The records selected on Patient Records — {_count_label(total, 'record')}",
-            PATIENT_COLUMNS,
-            _patient_rows(patients),
-            note=PATIENT_ROW_NOTE,
+            *_patient_table(context)[:2],
+            note=_patient_table(context)[2],
             empty="No selected record could be found.",
         )],
         heading="Selected Patients",
@@ -791,11 +841,12 @@ def _patient_selection_export(context, produced_by):
 
     notes = _untracked_sheet(
         SELECTION_UNTRACKED,
-        "These records are complete for what the system stores about a patient's "
-        "identity, contact and status -- the same eight columns the full roster "
-        "export carries. They are not medical records: a patient's "
-        "consultations, immunisations and appointments are on their own profile "
-        "screen. The following are not stored at all.",
+        _roster_scope(context, "These records are complete for what the system "
+                      "stores about a patient's identity, contact and status -- the "
+                      "same eight columns the full roster export carries. They are "
+                      "not medical records: a patient's consultations, immunisations "
+                      "and appointments are on their own profile screen. The "
+                      "following are not stored at all."),
     )
 
     return _assemble(

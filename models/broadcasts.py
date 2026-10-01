@@ -490,12 +490,18 @@ def get_broadcast_by_id(broadcast_id):
     return _to_broadcast(row) if row else None
 
 
-def get_broadcast_recipients(broadcast_id, limit=None):
-    """Who one broadcast went to, and what the gateway said about each."""
+def get_broadcast_recipients(broadcast_id, limit=None, with_numbers=True):
+    """Who one broadcast went to, and what the gateway said about each.
+
+    `with_numbers` False leaves out the mobile number and the gateway's reply,
+    for the Administrator, who does not see patient contact numbers (Task 5c).
+    """
+    columns = "*" if with_numbers else (
+        "id, broadcast_id, patient_id, user_id, recipient_name, status, created_at")
     with db_connection() as conn:
         rows = conn.execute(
-            """
-        SELECT * FROM sms_broadcast_recipients
+            f"""
+        SELECT {columns} FROM sms_broadcast_recipients
         WHERE broadcast_id = ?
         ORDER BY recipient_name COLLATE NOCASE, id
         """

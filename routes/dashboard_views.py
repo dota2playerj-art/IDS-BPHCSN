@@ -48,6 +48,7 @@ from models.patients import (
     get_registration_trend,
 )
 from utils.dates import to_clinic_time, today
+from utils.roles import is_care_team
 from utils.security import current_role
 
 # How many rows each dashboard list shows before it stops.
@@ -153,6 +154,14 @@ def _recent_consultations(limit, reference):
     return rows
 
 
+def _immunization_alert(care_team):
+    """The immunization figure: the list for the care team, counts for anyone else."""
+    alert = get_immunization_alert(limit=ALERT_ROWS)
+    if care_team:
+        return alert
+    return {key: value for key, value in alert.items() if key != "children"}
+
+
 def _activity_feed(limit):
     """Recent audit entries, as the dashboard's System Activity list.
 
@@ -173,6 +182,10 @@ def _activity_feed(limit):
 def dashboard_context():
     """Everything both dashboards render. Neither adds a figure of its own."""
     reference = today()
+    # Clinical lists are the care team's (Task 5c). For the Administrator this
+    # builder reads counts only: no recent consultation, and no child named with
+    # the dose they are due.
+    care_team = is_care_team(current_role())
 
     # Resolved once and handed to both, for the reason spelled out at the
     # active-consultation block below: the queue's flow fields, its stat cards
@@ -208,7 +221,7 @@ def dashboard_context():
     return {
         "clinic_date": reference,
         "patient_stats": patient_stats,
-        "queue": queue,
+        "queue": queue if care_team else [],
         "queue_stats": queue_stats,
         # None when nobody is in consultation, which both dashboards render as a
         # stated "nobody right now" rather than an empty panel.
@@ -218,11 +231,13 @@ def dashboard_context():
         # from.
         "active_consultation_name": queue_display_name(active),
         "consultation_stats": consultation_stats,
-        "recent_consultations": _recent_consultations(RECENT_CONSULTATIONS, reference),
+        "recent_consultations": (
+            _recent_consultations(RECENT_CONSULTATIONS, reference) if care_team else []
+        ),
         "recent_registrations": _recent_registrations(RECENT_REGISTRATIONS),
         "inventory_stats": inventory_stats,
         "low_stock": get_low_stock_alert(limit=ALERT_ROWS),
-        "immunization_alert": get_immunization_alert(limit=ALERT_ROWS),
+        "immunization_alert": _immunization_alert(care_team),
         "broadcast_stats": get_broadcast_stats(),
         "audience_options": audience_options(),
         "activity": _activity_feed(ACTIVITY_EVENTS),

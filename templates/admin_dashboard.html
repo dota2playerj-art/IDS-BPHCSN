@@ -224,15 +224,8 @@
 {%- if active_consultation.assigned_staff %} &middot; {{ active_consultation.assigned_staff }}{% endif %}
           </div>
         </div>
-        {#- Straight to the write-up form for THIS appointment -- the same
-            destination, and the same url_for, as the Record Consultation button
-            on the queue row. One form, two ways in, exactly as the Patient
-            Profile's View panel is reached two ways. #}
-        <a href="{{ url_for(record_consultation_endpoint, appointment_id=active_consultation.id) }}"
-           class="btn-primary-teal" style="text-decoration:none;"
-           title="Continue writing up {{ active_consultation_name }}'s consultation">
-          <span class="material-symbols-outlined" style="font-size:18px;">edit_note</span>Continue Consultation
-        </a>
+        {#- No Continue Consultation button: writing up a visit is the care
+            team's (Task 5c). The Administrator sees who is in and since when. #}
       </div>
 {%- else %}
       <div class="panel-title" style="font-size:15px;">No active consultation right now</div>
@@ -244,66 +237,10 @@
 {%- endif %}
     </div>
 
-    <!-- RECENT PATIENT CONSULTATIONS -->
-    <div class="panel-card">
-      <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-3">
-        <div>
-          <div class="panel-title">Recent Patient Consultations</div>
-          <div class="panel-sub">
-            {{ clinic_today | display_date }} &middot;
-            {{ consultation_stats.total }} record{{ '' if consultation_stats.total == 1 else 's' }} on file
-            &middot; {{ consultation_stats.recorded_this_month }} this month
-          </div>
-        </div>
-        <a href="{{ url_for(patient_records_endpoint) }}" class="panel-link">Patient Records<span class="material-symbols-outlined" style="font-size:15px;">chevron_right</span></a>
-      </div>
-      <div style="overflow-x:auto;">
-        <table class="dash-table">
-          <thead>
-            <tr>
-              <th>Patient</th>
-              <th>ID</th>
-              <th>Age</th>
-              <th>Time</th>
-              <th>Chief Complaint</th>
-              <th>Dispensed</th>
-              <th>BHW</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-{%- for entry in recent_consultations %}
-            <tr>
-              <td class="pat-name"><a href="{{ url_for(patient_profile_endpoint, patient_id=entry.patient_row_id) }}" style="color:inherit; text-decoration:none;">{{ entry.full_name }}</a></td>
-              <td class="pat-id">{{ entry.patient_id }}</td>
-              <td>{{ entry.age if entry.age is not none else '—' }}</td>
-              <td>{{ entry.consultation_date | display_date }}</td>
-              <td>{{ entry.chief_complaint or '—' }}</td>
-{#- This column printed an em dash for the whole life of the project, with
-    untracked.dispensing under the table saying why. It reads the real issues
-    now, named in full rather than counted -- "2 medicines" in a column headed
-    Medicine tells a reader nothing they opened this table for. Grouped in one
-    query for the whole panel by dashboard_views._recent_consultations(). #}
-              <td{% if not entry.medicines %} style="color:var(--text-muted);"{% endif %}>{{ entry.medicines_text or '—' }}</td>
-              <td>{{ entry.recorded_by }}</td>
-              <td><span class="badge-status badge-completed">Recorded</span></td>
-            </tr>
-{%- else %}
-            <tr>
-              <td colspan="8" style="text-align:center; padding:34px 14px; color:var(--text-muted);">
-                <div style="font-weight:600; color:var(--text-dark);">No consultations recorded yet</div>
-                <div style="font-size:13px; margin-top:4px;">A visit written up on Record Consultation appears here.</div>
-              </td>
-            </tr>
-{%- endfor %}
-          </tbody>
-        </table>
-      </div>
-{#- The note that used to sit here explained why the Medicine column was empty.
-    The column is filled, so the note is gone rather than reworded -- a reason
-    with nothing left to be true about is exactly the drift the project's
-    untracked dicts exist to prevent. #}
-    </div>
+    <!-- There was a Recent Patient Consultations table here, with each visit's
+         chief complaint and the medicines dispensed. Clinical data is for the
+         care team (Task 5c), so this dashboard keeps the counts above and the
+         consultation trend below, and lists no visit. -->
 
     <!-- SECOND ROW: ANALYTICS + INVENTORY + SMS + ACTIVITY -->
     <div class="row g-3">
@@ -367,23 +304,18 @@
                It lands here rather than as a seventh stat card because the row
                above is the frozen six-card IA at col-lg-2, which fills twelve
                columns exactly; a seventh would either break the row or squeeze
-               all seven below a readable width. The Administrator's need here is
-               oversight — who is outstanding — which the list serves directly. -->
+               all seven below a readable width. Counts only (Task 5c): which child
+               is due for which dose is an immunization record, for the care team. -->
           <div style="margin-top:18px; padding-top:16px; border-top:1px solid var(--border-color);">
             <div class="panel-title" style="font-size:15px;">Immunization Follow-up</div>
             <div class="panel-sub mb-2">
               {{ immunization_alert.child_count }} child{{ "ren" if immunization_alert.child_count != 1 else "" }} due
 {%- if immunization_alert.overdue_child_count %} &middot; <span style="color:var(--danger); font-weight:600;">{{ immunization_alert.overdue_child_count }} overdue</span>{% endif %}
             </div>
-{%- for child in immunization_alert.children %}
-{%- set overdue = child.overdue_count > 0 %}
-            <div class="inv-item">
-              <div class="inv-item-head"><span class="inv-name">{{ child.patient.full_name }}</span><span class="inv-pct" style="color:{{ 'var(--danger)' if overdue else 'var(--warning)' }};">{{ child.next_status }}</span></div>
-              <div class="inv-qty">{{ child.patient.age or 'age unknown' }} &middot; {{ child.next_label }}{% if child.attention_count > 1 %} +{{ child.attention_count - 1 }} more{% endif %}</div>
-            </div>
-{%- endfor %}
-{%- if not immunization_alert.children %}
+{%- if not immunization_alert.child_count %}
             <div class="panel-sub">Every child under {{ pediatric_age_years }} is up to date with the DOH schedule.</div>
+{%- else %}
+            <div class="panel-sub">Health Center Staff see which children and which doses on their dashboard.</div>
 {%- endif %}
           </div>
         </div>

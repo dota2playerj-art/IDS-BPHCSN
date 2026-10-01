@@ -69,7 +69,13 @@ def appointment_scheduling_context(month=None):
     # for the whole roster rather than per row -- get_immunization_alert() reads
     # every dose in one query -- and matched onto the queue by patient id, so the
     # badge on a row and the count on the dashboard are the same calculation.
-    immunization_alert = get_immunization_alert()
+    # Which child is due for which dose is an immunization record, and the
+    # Check In dialog's picker is a patient write: both are the care team's
+    # (Task 5c). For the Administrator neither is read.
+    care_team = is_care_team(role)
+    immunization_alert = (get_immunization_alert() if care_team
+                          else {"children": [], "child_count": 0,
+                                "overdue_child_count": 0})
     due_by_patient = {
         child["patient"]["id"]: child for child in immunization_alert["children"]
     }
@@ -90,7 +96,7 @@ def appointment_scheduling_context(month=None):
         today_by_patient.setdefault(entry["patient_id"], entry)
 
     patients = []
-    for patient in get_all_patients():
+    for patient in (get_all_patients() if care_team else []):
         if patient.get("status") != SCHEDULABLE_PATIENT_STATUS:
             continue
         patient = dict(patient)

@@ -147,21 +147,13 @@ def inject_role_context():
             "dashboard_endpoint": "admin_dashboard",
             "patient_records_endpoint": "patient_records",
             "patient_profile_endpoint": "patient_profile",
-            "correct_vaccination_endpoint": "correct_vaccination",
             # No restrict_consultation_endpoint. The Administrator held it while
             # taken to be the doctor; sealing is the Doctor's now, and there is
             # no /admin/... route behind the name to hand over.
-            "register_patient_endpoint": "register_patient",
-            "archive_patients_endpoint": "archive_patients",
             "medicine_inventory_endpoint": "medicine_inventory",
             "add_edit_medicine_endpoint": "add_edit_medicine",
             "archive_medicine_endpoint": "archive_medicine",
             "appointment_scheduling_endpoint": "appointment_scheduling",
-            "check_in_patient_endpoint": "check_in_patient",
-            "start_consultation_endpoint": "start_consultation",
-            "complete_consultation_endpoint": "complete_consultation",
-            "record_consultation_endpoint": "record_consultation",
-            "edit_consultation_endpoint": "edit_consultation",
             "sms_notifications_endpoint": "sms_notifications",
             # The Service Schedule, and the three writes only this role has.
             # schedule_views._can_edit() decides whether the form is drawn; these
@@ -227,6 +219,12 @@ def inject_role_context():
         }
 
     context["current_role"] = normalized_role
+    # The care team: the Doctor and Health Center Staff (Task 5c). Only they see
+    # clinical fields, contact numbers and the controls that write a patient or a
+    # clinical record. The Administrator runs the system and sees demographics,
+    # counts and read-only views. The data builders enforce this on the server;
+    # templates read this flag only to leave out what was never fetched.
+    context["care_team_view"] = normalized_role in {"doctor", "health staff"}
 
     # Today, at the health center, for every template that prints it. The page
     # subtitles on the dashboards and the Barangay Official screens each used to

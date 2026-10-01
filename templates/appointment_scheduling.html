@@ -504,8 +504,9 @@
           and was never written up or closed, so it is not in today's queue below.
           One patient is seen at a time here, so it is still holding the clinician:
           {% if queue_stats.next_up_name %}{{ queue_stats.next_up_name }} and everyone behind them cannot be started{% else %}nobody else can be started{% endif %}
-          until it is resolved. Write up what happened, or close it with nothing recorded if nothing was.
+          until it is resolved.{% if care_team_view %} Write up what happened, or close it with nothing recorded if nothing was.{% else %} The Doctor or Health Center Staff resolve it.{% endif %}
           <div class="d-flex gap-2 mt-2 flex-wrap">
+{%- if care_team_view %}
             <a href="{{ url_for(record_consultation_endpoint, appointment_id=queue_stats.active.id) }}"
                class="btn-primary-teal" style="padding:6px 12px; font-size:12.5px; text-decoration:none;"
                title="Write up {{ queue_stats.active_name }}'s consultation and close the visit">
@@ -516,6 +517,7 @@
                     title="Close {{ queue_stats.active_name }}'s visit without recording a consultation{% if queue_stats.next_up_name %} — {{ queue_stats.next_up_name }} can then be started{% endif %}">
               <span class="material-symbols-outlined" style="font-size:16px;">check_circle</span>Mark Completed
             </button>
+{%- endif %}
             <a href="{{ url_for(patient_profile_endpoint, patient_id=queue_stats.active.patient_id) }}"
                class="btn-outline-teal" style="padding:6px 12px; font-size:12.5px; text-decoration:none;"
                title="Open {{ queue_stats.active_name }}'s profile">
@@ -557,10 +559,12 @@
              title="Download today's queue and this calendar month as an Excel workbook — the full lists, not as filtered on screen"><span class="material-symbols-outlined" style="font-size:18px;">description</span>Export Excel</a>
           <a class="btn-outline-teal" href="{{ url_for(appointments_pdf_endpoint, month=calendar.month_start.strftime('%Y-%m')) }}" download
              title="Download today's queue and this calendar month as a PDF on the health center's letterhead — the full lists, not as filtered on screen"><span class="material-symbols-outlined" style="font-size:18px;">picture_as_pdf</span>Export PDF</a>
+{%- if care_team_view %}
           <!-- The one thing a desk does here: record somebody who is standing at
                it now. New Appointment stood beside this and is gone with advance
                booking; a patient is seen on the day they arrive. -->
           <button class="btn-primary-teal" data-bs-toggle="modal" data-bs-target="#checkInModal"><span class="material-symbols-outlined" style="font-size:18px;">how_to_reg</span>Check In Patient</button>
+{%- endif %}
         </div>
       </div>
 
@@ -670,7 +674,7 @@
     on -- once the parent has gone home the information is worth much less. The
     count and the wording come from get_immunization_alert(), the same call the
     dashboard card reads. #}
-{%- if entry.immunization_due %}<span class="immun-tag{% if entry.immunization_overdue %} immun-overdue{% endif %}" title="{{ entry.immunization_count }} dose{{ '' if entry.immunization_count == 1 else 's' }} {{ 'overdue' if entry.immunization_overdue else 'due' }} — next: {{ entry.immunization_next }}"><span class="material-symbols-outlined" style="font-size:13px;">vaccines</span>{{ entry.immunization_count }} {{ 'overdue' if entry.immunization_overdue else 'due' }}</span>{% endif %}</div>
+{%- if care_team_view and entry.immunization_due %}<span class="immun-tag{% if entry.immunization_overdue %} immun-overdue{% endif %}" title="{{ entry.immunization_count }} dose{{ '' if entry.immunization_count == 1 else 's' }} {{ 'overdue' if entry.immunization_overdue else 'due' }} — next: {{ entry.immunization_next }}"><span class="material-symbols-outlined" style="font-size:13px;">vaccines</span>{{ entry.immunization_count }} {{ 'overdue' if entry.immunization_overdue else 'due' }}</span>{% endif %}</div>
                 <div class="po-meta">{{ entry.patient_reference }}</div>
               </td>
               <td>
@@ -684,6 +688,7 @@
               <td><span class="badge-status {{ entry.display_badge_class }}">{{ entry.display_status }}</span></td>
               <td>
                 <div class="d-flex justify-content-end gap-1 align-items-center">
+{%- if care_team_view %}
 {%- if entry.can_start %}
                   <!-- This moves the patient into the room, and is offered only
                        while the room is empty. Recording what happened in the
@@ -721,6 +726,7 @@
                     <span class="material-symbols-outlined" style="font-size:16px;">check_circle</span>Mark Completed
                   </button>
 {%- endif %}
+{%- endif %}
                   <a href="{{ url_for(patient_profile_endpoint, patient_id=entry.patient_id) }}" class="action-icon" title="Open {{ patient_name }}'s profile"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></a>
                   {#- Printing from a booking means printing the patient's record,
                       exactly as it does on a Patient Records row. The row itself is
@@ -751,8 +757,10 @@
            table, which is inside a horizontal scroll container; the forms live
            out here and the buttons reach them by id, the same arrangement
            Patient Records uses for its archive dialog. -->
+{%- if care_team_view %}
       <form id="startConsultationForm" method="post" action="{{ url_for(start_consultation_endpoint) }}">{{ csrf_field() }}</form>
       <form id="completeConsultationForm" method="post" action="{{ url_for(complete_consultation_endpoint) }}">{{ csrf_field() }}</form>
+{%- endif %}
 
       <!-- EMPTY STATE — shown when nobody is booked or checked in for today, and
            reused by the live search below when it filters everything out. -->
@@ -761,7 +769,7 @@
           <span class="material-symbols-outlined" style="font-size:34px; color:var(--teal-dark);">event_busy</span>
         </div>
         <h5>{% if queue %}No matching patients{% else %}Nobody in today's queue yet{% endif %}</h5>
-        <p>{% if queue %}No one in today's queue matches your search. Try a different name or patient ID.{% else %}Nobody has checked in yet. Use Check In Patient when the first patient arrives.{% endif %}</p>
+        <p>{% if queue %}No one in today's queue matches your search. Try a different name or patient ID.{% elif care_team_view %}Nobody has checked in yet. Use Check In Patient when the first patient arrives.{% else %}Nobody has checked in yet. Health Center Staff check patients in at the desk.{% endif %}</p>
         <!-- One action, and it is the one this empty state's own sentence names:
              "Use Check In Patient when the first patient arrives." A second
              button offering a different action was never what an empty queue is
@@ -769,9 +777,11 @@
              In Patient is the button directly above it; that is the test the
              other two empty states failed, and why their prose no longer names
              a control at all. -->
+{%- if care_team_view %}
         <div class="d-flex gap-2">
           <button class="btn-primary-teal" data-bs-toggle="modal" data-bs-target="#checkInModal"><span class="material-symbols-outlined" style="font-size:18px;">how_to_reg</span>Check In Patient</button>
         </div>
+{%- endif %}
       </div>
 
 {%- if queue %}
@@ -826,6 +836,7 @@
 
     </div>
 
+{%- if care_team_view %}
     <!-- CHECK-IN DIALOG — same modal shape as Patient Records' status dialog:
          centred, 16px radius, header / body / footer.
 
@@ -954,6 +965,7 @@
         </div>
       </div>
     </div>
+{%- endif %}
 
 <script>
   function toggleFilterPanel(){

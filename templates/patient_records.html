@@ -244,7 +244,7 @@
                 header does not match anything itself -- it hands the term here
                 and this is what runs it, so a search started from any screen in
                 the app narrows the roster exactly as one typed in place does. #}
-            <input type="text" id="patientSearch" value="{{ search_term }}" placeholder="Search by patient name, patient ID, or contact number">
+            <input type="text" id="patientSearch" value="{{ search_term }}" placeholder="Search by patient name{% if demographics_only %} or patient ID{% else %}, patient ID, or contact number{% endif %}">
           </div>
           <button class="filter-btn" id="filterToggleBtn" onclick="toggleFilterPanel()">
             <span class="material-symbols-outlined" style="font-size:18px;">filter_list</span>Advanced Filter
@@ -272,7 +272,9 @@
               <div class="sort-menu-label">Sort patients by</div>
               <button type="button" class="sort-option" role="menuitem" data-sort-key="name">Name<span class="dir"></span></button>
               <button type="button" class="sort-option" role="menuitem" data-sort-key="age">Age<span class="dir"></span></button>
+{%- if not demographics_only %}
               <button type="button" class="sort-option" role="menuitem" data-sort-key="visit">Last Visit<span class="dir"></span></button>
+{%- endif %}
               <button type="button" class="sort-option" role="menuitem" data-sort-key="status">Status<span class="dir"></span></button>
               <div class="sort-menu-hint">
                 Choosing the column already in use reverses it. Sorting reorders the
@@ -311,7 +313,9 @@
     excluded rows with the `hidden` attribute and hidden rows do not print. #}
           <button class="btn-outline-teal" type="button" onclick="printRoster()"
                   title="Print the patient list exactly as filtered on screen"><span class="material-symbols-outlined" style="font-size:18px;">print</span>Print List</button>
+{%- if care_team_view %}
           <a href="{{ url_for(register_patient_endpoint) }}" class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">person_add</span>Add Patient</a>
+{%- endif %}
         </div>
       </div>
 
@@ -354,6 +358,7 @@
 {%- endfor %}
             </select>
           </div>
+{%- if not demographics_only %}
           <div class="col-md-3 col-sm-6">
             <label for="fVisit">Last Visit</label>
             <select class="form-select" id="fVisit">
@@ -362,6 +367,7 @@
               <option value="never">No visits yet</option>
             </select>
           </div>
+{%- endif %}
           <div class="col-12">
             <div style="font-size:12.5px; color:var(--text-muted); line-height:1.5;">
               Filters narrow the {{ patients|length }} record{{ '' if patients|length == 1 else 's' }} on
@@ -383,7 +389,9 @@
            outside via form="archiveForm". Bulk and single therefore post the same
            form to the same endpoint. There is no Delete button by design: patient
            records are soft-retired through Archive and never removed. -->
-      <form id="archiveForm" method="post" action="{{ url_for(archive_patients_endpoint) }}">
+{#- The Administrator has no Change Status (Task 5c), so for him this form only
+    carries the selection to the two exports below. #}
+      <form id="archiveForm" method="post" action="{{ url_for(archive_patients_endpoint) if care_team_view else url_for(patient_selection_excel_endpoint) }}">
         {{ csrf_field() }}
       <input type="hidden" name="single_patient_id" id="singlePatientId" value="">
 
@@ -433,7 +441,9 @@
     Same page, same stylesheet as Print List; the difference is a class on the
     table that holds back every row the operator did not tick. #}
           <button type="button" onclick="printSelected()" title="Print only the selected patient records"><span class="material-symbols-outlined" style="font-size:16px;">print</span>Print</button>
+{%- if care_team_view %}
           <button type="button" data-bs-toggle="modal" data-bs-target="#archivePatientModal"><span class="material-symbols-outlined" style="font-size:16px;">archive</span>Change Status</button>
+{%- endif %}
           <button type="button" class="clear-btn" onclick="clearSelection()">Clear</button>
         </div>
       </div>
@@ -449,8 +459,15 @@
               <th>Age</th>
               <th>Gender</th>
               <th>Address</th>
+{#- The Administrator's roster is demographics only (Task 5c): no contact
+    number and no visit date, which were never fetched for him. It shows the
+    registration date instead. #}
+{%- if demographics_only %}
+              <th>Registered</th>
+{%- else %}
               <th>Contact Number</th>
               <th>Last Visit</th>
+{%- endif %}
               <th>Status</th>
               <th style="text-align:right;">Actions</th>
             </tr>
@@ -498,8 +515,12 @@
               <td>{{ patient.age if patient.age is not none else '—' }}</td>
               <td>{{ patient.sex or '—' }}</td>
               <td>{{ patient.display_address or '—' }}</td>
+{%- if demographics_only %}
+              <td>{{ patient.created_at | display_date }}</td>
+{%- else %}
               <td>{{ patient.contact_number or '—' }}</td>
               <td>{{ patient.last_visit | display_date('No visits yet') }}</td>
+{%- endif %}
               <td><span class="badge-status {{ patient.status_badge_class }}">{{ patient.status }}</span></td>
               <td>
                 <div class="d-flex justify-content-end gap-1">
@@ -507,7 +528,9 @@
                       links to. It was a dead button; the destination for it
                       already existed. #}
                   <a href="{{ url_for(patient_profile_endpoint, patient_id=patient.id) }}" class="action-icon" title="Open {{ patient.full_name }}'s profile"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></a>
+{%- if care_team_view %}
                   <a href="{{ url_for(register_patient_endpoint, patient_id=patient.id) }}" class="action-icon" title="Edit {{ patient.full_name }}"><span class="material-symbols-outlined" style="font-size:18px;">edit</span></a>
+{%- endif %}
                   {#- Printing one patient from the roster means printing that
                       patient's record, and their record is the profile. So this
                       opens the profile with ?print=1, which goes straight to the
@@ -516,10 +539,12 @@
                       reasoning as View above: the destination already existed. #}
                   <a href="{{ url_for(patient_profile_endpoint, patient_id=patient.id, print=1) }}"
                      class="action-icon" title="Print {{ patient.full_name }}'s full record"><span class="material-symbols-outlined" style="font-size:18px;">print</span></a>
+{%- if care_team_view %}
                   <button type="button" class="action-icon" title="Change status of {{ patient.full_name }} (currently {{ patient.status }})"
                           data-bs-toggle="modal" data-bs-target="#archivePatientModal"
                           data-patient-id="{{ patient.id }}" data-patient-name="{{ patient.full_name }}"
                           data-patient-status="{{ patient.status }}"><span class="material-symbols-outlined" style="font-size:18px;">archive</span></button>
+{%- endif %}
                 </div>
               </td>
             </tr>
@@ -540,7 +565,9 @@
         <p>We couldn't find any patients matching your search or filter criteria. Try adjusting your filters or search terms.</p>
         <div class="d-flex gap-2">
           <button class="btn-outline-teal" type="button" onclick="clearFilters()"><span class="material-symbols-outlined" style="font-size:18px;">restart_alt</span>Clear Filters</button>
+{%- if care_team_view %}
           <a href="{{ url_for(register_patient_endpoint) }}" class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">person_add</span>Add Patient</a>
+{%- endif %}
         </div>
       </div>
 
@@ -586,6 +613,7 @@
          already holds. Rendering all three and hiding one beats building the row
          at open time: the form wiring stays declarative and there is no branch in
          which a button ends up without its form or name attribute. -->
+{%- if care_team_view %}
     {#- data-can-declare-death is the server's answer to whether this viewer may
         move a record to or from Deceased (models/patients.py can_declare_death),
         read by the script below. It decides what the dialog offers and nothing
@@ -638,6 +666,7 @@
         </div>
       </div>
     </div>
+{%- endif %}
 {%- endif %}
 {% endblock %}
 
@@ -918,7 +947,7 @@
       if(term && (row.dataset.search || '').indexOf(term) === -1){ return false; }
       if(fSex.value && row.dataset.sex !== fSex.value){ return false; }
       if(fStatus.value && row.dataset.status !== fStatus.value){ return false; }
-      if(fVisit.value && row.dataset.visited !== fVisit.value){ return false; }
+      if(fVisit && fVisit.value && row.dataset.visited !== fVisit.value){ return false; }
 
       // An age the record does not carry cannot satisfy a bound, so a row with
       // no birth date drops out of an age-bounded search rather than being

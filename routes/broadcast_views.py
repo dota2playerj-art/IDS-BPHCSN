@@ -77,7 +77,9 @@ DETAIL_RECIPIENT_LIMIT = 8
 # honour it. They keep the whole broadcast half of this screen, which names
 # nobody.
 # The Doctor reads it exactly as Health Center Staff do: same screen, same rows.
-APPOINTMENT_SMS_ROLES = {"admin", "doctor", "health staff"}
+# The care team only (Task 5c). Each row names one patient, their mobile number
+# and what was texted about their visit; the Administrator does not see those.
+APPOINTMENT_SMS_ROLES = {"doctor", "health staff"}
 APPOINTMENT_SMS_LIMIT = 25
 
 
@@ -141,13 +143,18 @@ def sms_notifications_context(compose=None, errors=None):
     """
     history = get_broadcast_history()
     latest = history[0] if history else None
+    user = get_current_user()
+    role = normalize_role(user["role"] if user else session.get("role"))
 
     return {
         "broadcasts": history,
         "stats": get_broadcast_stats(history),
         "latest": latest,
         "latest_recipients": (
-            get_broadcast_recipients(latest["id"], limit=DETAIL_RECIPIENT_LIMIT)
+            get_broadcast_recipients(latest["id"], limit=DETAIL_RECIPIENT_LIMIT,
+                                     # No patient contact numbers for the
+                                     # Administrator (Task 5c).
+                                     with_numbers=role != "admin")
             if latest else []
         ),
         "audience_options": audience_options(),
