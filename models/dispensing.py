@@ -110,7 +110,11 @@ medicine is expired is exactly the drift models/inventory.py's own header warns
 against.
 """
 from database.connection import db_connection
-from models.consultations import RESTRICTED_PLACEHOLDER, can_view_restricted
+from models.consultations import (
+    RESTRICTED_PLACEHOLDER,
+    can_view_restricted,
+    open_sealed_value,
+)
 from models.inventory import (
     ITEM_CATEGORIES,
     RETIRED_STATUS,
@@ -732,10 +736,10 @@ LEFT JOIN consultations c ON c.id = d.consultation_id
 def _to_records(rows, viewer_role=None):
     """Stored dispensing rows -> the dicts the three readers below hand out.
 
-    `viewer_role` None means "do not redact", which is the right default for the
-    two callers that never put a diagnosis on a screen -- see each of them. Where
-    a diagnosis IS shown, the role is compulsory at that function's own signature
-    rather than defaulted here.
+    `viewer_role` None is for the two callers that never put a diagnosis on a
+    screen. A sealed diagnosis is replaced with the placeholder for them too, so
+    nothing they hand on can carry it. Where a diagnosis IS shown, the role is
+    compulsory at that function's own signature rather than defaulted here.
 
     WHY A DISPENSING ROW HAS TO BE REDACTED AT ALL.
     It does not hold a diagnosis; it joins to one. _DISPENSING_SELECT brings
@@ -746,7 +750,7 @@ def _to_records(rows, viewer_role=None):
     protects nothing -- and it is exactly the kind of second copy of a value that
     an access rule applied only at the obvious place leaves behind.
     """
-    can_view = can_view_restricted(viewer_role) if viewer_role is not None else True
+    can_view = viewer_role is not None and can_view_restricted(viewer_role)
     records = [dict(row) for row in rows]
     for record in records:
         record["label"] = dispensing_label(record)
@@ -756,7 +760,18 @@ def _to_records(rows, viewer_role=None):
         record["consultation_restricted"] = bool(
             record.get("consultation_restricted")
         )
-        if not can_view and record["consultation_restricted"]:
+        record["consultation_unopenable"] = False
+        if not record["consultation_restricted"]:
+            continue
+        # A sealed diagnosis is stored encrypted. The Doctor gets it decrypted;
+        # everyone else, and every caller that names no role, gets the placeholder.
+        if can_view:
+            text, opened = open_sealed_value(record["consultation_diagnosis"],
+                                             record["consultation_id"], "diagnosis",
+                                             viewer_role)
+            record["consultation_diagnosis"] = text
+            record["consultation_unopenable"] = not opened
+        else:
             record["consultation_diagnosis"] = RESTRICTED_PLACEHOLDER
     return records
 

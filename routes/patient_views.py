@@ -64,6 +64,7 @@ from routes.consultation_views import (
     RESTRICT_OFF,
     RESTRICT_ON,
 )
+from routes.sealed_access import log_unopenable
 from routes.vaccination_correction_views import correction_options
 from utils.context import HEADER_SEARCH_MAX
 from utils.dates import display_date
@@ -645,6 +646,14 @@ def patient_profile_context(patient_id):
     consultations = get_consultations_for_patient(patient_id, viewer_role)
     withheld = [entry for entry in consultations if entry.get("withheld")]
     _log_withheld_consultations(patient, withheld, viewer_role)
+    # The Doctor only: a sealed record the key on this computer cannot open.
+    log_unopenable(
+        patient,
+        [entry["id"] for entry in consultations if entry.get("unopenable")]
+        + [record["consultation_id"] for record in dispensing
+           if record.get("consultation_unopenable")],
+        "Patient Profile",
+    )
 
     return {
         "patient": patient,

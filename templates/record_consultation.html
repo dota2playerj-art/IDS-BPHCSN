@@ -927,7 +927,16 @@
         </div>
 {%- endif %}
 
-{%- if can_diagnose %}
+{#- A sealed record the key on this computer cannot decrypt. The two fields are
+    left off the form, so a save cannot overwrite the encrypted text, and the
+    record stays sealed. #}
+{%- if can_diagnose and sealed_unopenable %}
+        <div class="mb-3 restricted-note" style="padding:12px 14px; border:1px solid var(--border-color); border-radius:8px; background:#FAFBFC;">
+          <span class="material-symbols-outlined" style="font-size:17px; vertical-align:-3px;">lock</span>
+          {{ unopenable_text }}
+          <input type="hidden" name="{{ restrict_field }}" value="1">
+        </div>
+{%- elif can_diagnose %}
         <div class="mb-3">
           <label class="field-label">{{ field_labels.diagnosis }}<span class="req">*</span></label>
           <textarea class="form-control{% if errors.diagnosis %} is-invalid{% endif %}" name="diagnosis"

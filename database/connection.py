@@ -29,6 +29,10 @@ def get_db():
     """Open a new connection. Use db_connection() instead: it always closes it."""
     conn = sqlite3.connect(_database_path())
     conn.row_factory = sqlite3.Row
+    # Overwrite deleted and replaced content with zeros. Without this, the plain
+    # text of a field that was just encrypted can stay in the file's free space,
+    # and so in every backup copied from it.
+    conn.execute("PRAGMA secure_delete = ON")
     return conn
 
 

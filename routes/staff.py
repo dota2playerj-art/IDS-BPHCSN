@@ -91,6 +91,7 @@ from routes.patient_views import (
 from routes.report_export import analytics_pdf, analytics_workbook
 from routes.report_views import reports_analytics_context
 from routes.schedule_views import service_schedule_request
+from routes.sealed_access import log_unopenable
 from routes.vaccination_correction_views import process_vaccination_correction
 from utils.security import login_required, role_required
 
@@ -487,6 +488,8 @@ def staff_edit_consultation(consultation_id):
     if context is None:
         flash(message)
         return redirect(url_for("staff.staff_patient_records"))
+    if context.get("sealed_unopenable"):
+        log_unopenable(context["patient"], [consultation_id], "Edit Consultation")
     return render_template('record_consultation.html', **context)
 
 

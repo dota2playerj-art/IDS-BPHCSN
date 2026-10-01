@@ -488,6 +488,16 @@ ACTION_RESTRICTED_WITHHELD = "Withheld restricted consultation from view"
 # by every Administrator, and carried into every audit export.
 ACTION_DIAGNOSIS_REFUSED = "Refused clinical judgement from an unlicensed role"
 
+# Task 5 (H4). The Doctor opened a sealed record and the key on this computer
+# could not decrypt it: the key is missing or wrong, or the value is damaged.
+# Nothing changed. Written by routes/sealed_access.py. No clinical text.
+ACTION_SEALED_UNOPENABLE = "Could not open sealed consultation"
+# Written once by migrate_redact_clinical_audit_text.py: diagnosis and treatment
+# text was removed from earlier entries. The actor is the first active
+# Administrator account, because audit_logs.user_id must name an account; the
+# entry says it was the migration, not that person.
+ACTION_CLINICAL_TEXT_REDACTED = "Removed clinical text from earlier audit entries"
+
 # The three service-schedule entries, all under MODULE_SERVICE_SCHEDULE.
 #
 # THREE PHRASES RATHER THAN ONE "Changed service schedule", for the reason
@@ -609,7 +619,8 @@ NON_RECORD_MODULES = (
 # query, for the reason that one is a tuple: a fifth confidentiality action added
 # later must be classified deliberately, in this file, next to its own phrase --
 # not discovered afterwards to have been counted as an edit to somebody's record.
-NON_RECORD_ACTIONS = (ACTION_RESTRICTED_WITHHELD, ACTION_DIAGNOSIS_REFUSED)
+NON_RECORD_ACTIONS = (ACTION_RESTRICTED_WITHHELD, ACTION_DIAGNOSIS_REFUSED,
+                      ACTION_SEALED_UNOPENABLE, ACTION_CLINICAL_TEXT_REDACTED)
 
 
 def log_action(user_id, action, module=None, details=None, ip_address=None,

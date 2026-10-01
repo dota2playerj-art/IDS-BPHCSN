@@ -76,7 +76,6 @@ from models.audit import (
     ACTION_DIAGNOSIS_REFUSED,
     MODULE_CONFIDENTIALITY,
     MODULE_CONSULTATIONS,
-    describe_changes,
     log_action,
 )
 from models.consultations import (
@@ -87,13 +86,15 @@ from models.consultations import (
     NUMERIC_LIMITS,
     PEDIATRIC_AGE_YEARS,
     RESTRICTED_PLACEHOLDER,
-    audit_formatters,
+    UNOPENABLE_TEXT,
     can_diagnose,
     can_view_restricted,
     consultation_age_context,
     create_consultation,
+    describe_consultation_changes,
     get_consultation_by_id,
     get_consultation_for_appointment,
+    open_sealed,
     redact,
     set_consultation_restriction,
     update_consultation,
@@ -144,6 +145,7 @@ from models.immunizations import (
     reported_date_field,
 )
 from models.patients import get_patient_by_id
+from routes.sealed_access import log_unopenable
 from routes.audit_entries import (
     consultation_completed,
     consultation_recorded,
@@ -673,8 +675,19 @@ def consultation_form_context(patient, appointment=None, consultation=None,
     role = current_role()
     may_diagnose = can_diagnose(role)
 
+    # The Doctor sees a sealed record decrypted. If the key on this computer
+    # cannot open it, the two fields stay off the form (see the template).
+    sealed_unopenable = False
+    if may_diagnose and consultation is not None:
+        consultation = open_sealed(consultation, role)
+        sealed_unopenable = consultation["unopenable"]
+
     if form is None:
         form = _consultation_to_form(consultation) if consultation else {}
+
+    if sealed_unopenable:
+        form = {field: value for field, value in form.items()
+                if field not in DOCTOR_ONLY_FIELDS}
 
     if not may_diagnose:
         # Off the form dict entirely rather than blanked, so there is no key for
@@ -709,6 +722,8 @@ def consultation_form_context(patient, appointment=None, consultation=None,
         # nothing else about roles -- it does not compare role strings, so it
         # cannot come to disagree with the server about who may diagnose.
         "can_diagnose": may_diagnose,
+        "sealed_unopenable": sealed_unopenable,
+        "unopenable_text": UNOPENABLE_TEXT,
         "restrict_field": RESTRICT_FIELD,
         # Ticked from what was submitted when a save bounced, and otherwise from
         # the stored record -- so a rejected form comes back still holding the
@@ -922,6 +937,9 @@ def process_record_consultation(appointment_id, form_data, user_id,
         audit=consultation_recorded(
             patient["id"], context["visit_date"], user_id, ip_address
         ),
+        # Sealed as it is written: the diagnosis and treatment plan are stored
+        # encrypted from the start, in the same transaction (H4).
+        sealed_by=user_id if restrict else None,
     )
 
     # Written after the record exists, because the refusal entry names the
@@ -932,19 +950,15 @@ def process_record_consultation(appointment_id, form_data, user_id,
         refused, patient, consultation_id, role, user_id, ip_address
     )
 
-    # The seal, if the clinician ticked it while writing the record up. Applied
-    # here rather than as a column on the INSERT so that one function owns every
-    # change to this flag -- the three columns are written together, the audit
-    # entry has one shape, and there is no second path that could set the flag
-    # without stamping who did it. `restrict` is already False for any role that
+    # The seal, if the clinician ticked it while writing the record up. It was
+    # set by create_consultation() above, with the record, so the diagnosis was
+    # never stored as plain text. `restrict` is already False for any role that
     # may not diagnose, so this is unreachable for them twice over.
     if restrict:
-        outcome = set_consultation_restriction(consultation_id, True, user_id)
-        if outcome == "restricted":
-            _log_restriction(
-                outcome, consultation_id, patient, user_id, ip_address,
-                visit_date=context["visit_date"], recorded_by_name=None,
-            )
+        _log_restriction(
+            "restricted", consultation_id, patient, user_id, ip_address,
+            visit_date=context["visit_date"], recorded_by_name=None,
+        )
 
     # Dated to the visit, not to now: a consultation written up is a record of
     # that day, and the dose was given during it.
@@ -1019,9 +1033,8 @@ def process_record_consultation(appointment_id, form_data, user_id,
         # rather than of the flag: "Marked Restricted" alone would leave the
         # clinician to work out what that does to everyone else's screen.
         message += (
-            " Marked Restricted — its diagnosis and treatment plan are withheld "
-            "from Health Center Staff, who still see the visit, the vitals and "
-            "what was dispensed."
+            " Marked Restricted — its diagnosis and treatment plan are hidden "
+            "from everyone except the Doctor."
         )
     if given:
         message += (
@@ -1363,6 +1376,14 @@ def process_edit_consultation(consultation_id, form_data, user_id, ip_address=No
     # writes them over themselves, describe_changes() reports no movement, and a
     # forged value never touches the database. See _apply_clinical_authority().
     values, refused = _apply_clinical_authority(values, before, role)
+    # The Doctor's view of the stored record, decrypted. If the key on this
+    # computer cannot open it, the two sealed fields keep their stored
+    # (encrypted) values and the record stays sealed.
+    opened = open_sealed(before, role) if may_diagnose else before
+    unopenable = bool(opened.get("unopenable"))
+    if unopenable:
+        for field in DOCTOR_ONLY_FIELDS:
+            values[field] = before[field]
     # Judge a follow-up date against the visit it belongs to, not against today.
     values["_consultation_date"] = before["consultation_date"]
     ticked = form_data.getlist(IMMUNIZATION_FIELD) if age_context["is_pediatric"] else []
@@ -1388,10 +1409,10 @@ def process_edit_consultation(consultation_id, form_data, user_id, ip_address=No
     if not dispense_errors:
         dispense_errors = check_dispensing(dispense_entries, consultation_id)
 
-    restrict = _submitted_restriction(form_data) and may_diagnose
+    restrict = (_submitted_restriction(form_data) and may_diagnose) or unopenable
 
     errors = validate_consultation_form(
-        values, age_context, require_diagnosis=may_diagnose
+        values, age_context, require_diagnosis=may_diagnose and not unopenable
     )
     errors.update(general_errors)
     errors.update(reported_errors)
@@ -1408,6 +1429,13 @@ def process_edit_consultation(consultation_id, form_data, user_id, ip_address=No
             f"need{'s' if len(errors) == 1 else ''} attention. "
             "Your changes have not been saved."
         )
+
+    # On a sealed record, a field the Doctor left as it was keeps its stored
+    # ciphertext, so it is not re-encrypted and does not read as changed.
+    if may_diagnose and before["is_restricted"] and not unopenable:
+        for field in DOCTOR_ONLY_FIELDS:
+            if str(values.get(field) or "").strip() == str(opened.get(field) or "").strip():
+                values[field] = before[field]
 
     update_consultation(consultation_id, values, age_context)
 
@@ -1435,8 +1463,10 @@ def process_edit_consultation(consultation_id, form_data, user_id, ip_address=No
     restriction_outcome = None
     if may_diagnose:
         restriction_outcome = set_consultation_restriction(
-            consultation_id, restrict, user_id
+            consultation_id, restrict, user_id, role
         )
+        if restriction_outcome == "cannot_open":
+            log_unopenable(patient, [consultation_id], "Lifting a restriction")
         _log_restriction(
             restriction_outcome, consultation_id, patient, user_id, ip_address,
             visit_date=before["consultation_date"],
@@ -1472,15 +1502,14 @@ def process_edit_consultation(consultation_id, form_data, user_id, ip_address=No
     )
 
     after = get_consultation_by_id(consultation_id)
-    # Sealed on either side of this save means the entry names the doctor-only
-    # fields that moved and does not quote them: Audit Logs are read by the
-    # Administrator, who may not read a sealed diagnosis. See audit_formatters().
-    summary, changed = describe_changes(
-        before, after, FIELD_LABELS,
-        formatters=audit_formatters(
-            bool(before["is_restricted"]) or bool(after["is_restricted"])
-        ),
-    )
+    # The diagnosis and treatment plan are named, never quoted (D2). For the
+    # Doctor both sides are compared decrypted, so sealing or lifting a record
+    # does not read as a change to its text.
+    if may_diagnose:
+        summary, changed = describe_consultation_changes(
+            opened, open_sealed(after, role))
+    else:
+        summary, changed = describe_consultation_changes(before, after)
     dose_summary, dose_changed = _describe_dose_changes(
         added, removed, general_added, dispensed, reported
     )
@@ -1556,9 +1585,14 @@ def _restriction_message(outcome, patient, consultation):
         return (
             f"{patient['first_name']}'s consultation of "
             f"{display_date(consultation['consultation_date'])} is now Restricted "
-            "— its diagnosis and treatment plan are withheld from Health Center "
-            "Staff and the Administrator, who still see the visit, the vitals and "
-            "what was dispensed."
+            "— its diagnosis and treatment plan are hidden from everyone except "
+            "the Doctor."
+        )
+    if outcome == "cannot_open":
+        return (
+            f"{patient['first_name']}'s consultation of "
+            f"{display_date(consultation['consultation_date'])} stays Restricted. "
+            + UNOPENABLE_TEXT
         )
     if outcome == "lifted":
         return (
@@ -1643,8 +1677,11 @@ def process_consultation_restriction(form_data, user_id, ip_address=None):
         return None, "That patient record could not be found."
 
     outcome = set_consultation_restriction(
-        consultation_id, direction == RESTRICT_ON, user_id
+        consultation_id, direction == RESTRICT_ON, user_id, current_role()
     )
+    if outcome == "cannot_open":
+        log_unopenable(patient, [consultation_id], "Lifting a restriction")
+        return patient["id"], _restriction_message(outcome, patient, consultation)
     if outcome == "missing":
         # Reachable only if the record was removed between the two reads above.
         return patient["id"], "That consultation record could not be found."
