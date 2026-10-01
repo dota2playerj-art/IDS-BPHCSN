@@ -646,7 +646,10 @@ def log_action(user_id, action, module=None, details=None, ip_address=None,
         INSERT INTO audit_logs (user_id, action, module, details, ip_address)
         VALUES (?, ?, ?, ?, ?)
         """
-    parameters = (user_id, action, module, details, ip_address)
+    # No audit entry stores a whole phone number (Task 5e). Every writer comes
+    # through here, so a number quoted in any entry's text is cut to its last four
+    # digits before it is stored.
+    parameters = (user_id, action, module, mask_numbers_in_text(details), ip_address)
     if conn is not None:
         return conn.execute(sql, parameters).lastrowid
 
