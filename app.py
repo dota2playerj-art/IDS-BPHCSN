@@ -12,6 +12,8 @@ Keep responsibilities separated." Responsibilities now live in:
 
 This module creates the app, wires those pieces together, and nothing else.
 """
+import os
+
 from flask import Flask, request
 
 import config
@@ -21,6 +23,7 @@ from utils.context import inject_role_context
 from utils.csrf import init_csrf
 from utils.dates import register_date_filters
 from utils.endpoints import register_flat_endpoint_aliases
+from utils.sealed_crypto import key_problem as sealed_key_problem
 
 
 def ensure_db_ready():
@@ -48,6 +51,11 @@ def create_app():
     # Refuse to start without a proper secret key. The key signs every session
     # cookie, so a missing or public key would let anyone sign in as anyone.
     problem = config.secret_key_problem(config.SECRET_KEY)
+    if problem:
+        raise SystemExit("IDS-BPHCSN cannot start. " + problem)
+    # Refuse to start without the key for sealed records, too. Without it the
+    # Doctor could seal a record that nobody can ever open again.
+    problem = sealed_key_problem(os.environ.get("SEALED_DATA_KEY", ""))
     if problem:
         raise SystemExit("IDS-BPHCSN cannot start. " + problem)
 

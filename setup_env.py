@@ -1,36 +1,77 @@
-"""Create the .env file this app needs, once per computer.
+"""Create the .env file this app needs, or add what is missing from it.
 
     python setup_env.py
 
-It writes a new random SECRET_KEY and IDS_DEBUG=0 to .env in the project folder.
-If .env already exists, it changes nothing. It never prints the key.
+A new .env gets a random SECRET_KEY, a random SEALED_DATA_KEY and IDS_DEBUG=0.
+If .env already exists, only missing values are added. Existing values are never
+changed. It never prints a key.
+
+SECRET_KEY signs the sign-in cookies. SEALED_DATA_KEY encrypts sealed
+consultations. Changing SECRET_KEY only signs everyone out. Losing or changing
+SEALED_DATA_KEY makes every sealed record unreadable, so print it once with
+export_sealed_key.py and give it to the Doctor in a sealed envelope.
 
 .env is ignored by git. Never commit it, and never copy it to another computer:
-each computer should have its own key.
+each installation has its own keys.
 """
 import secrets
 import sys
 from pathlib import Path
 
+from utils.sealed_crypto import new_key
+
 ENV_FILE = Path(__file__).resolve().parent / ".env"
+
+HEADER = "# Created by setup_env.py. Keep this file private. Never commit it.\n"
+
+# name -> (comment, function that makes a new value)
+VARIABLES = {
+    "SECRET_KEY": ("# SECRET_KEY signs the sign-in cookies.",
+                   lambda: secrets.token_hex(32)),
+    "SEALED_DATA_KEY": ("# SEALED_DATA_KEY encrypts sealed consultations. Do not change it.\n"
+                        "# Without it, sealed records cannot be opened.",
+                        new_key),
+    "IDS_DEBUG": ("# 1 turns on Flask debug mode. Use it only on your own computer.",
+                  lambda: "0"),
+}
+
+
+def _names_in(text):
+    names = set()
+    for line in text.splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            names.add(line.split("=", 1)[0].strip())
+    return names
+
+
+def _block(name):
+    comment, make = VARIABLES[name]
+    return f"{comment}\n{name}={make()}\n"
 
 
 def main():
-    if ENV_FILE.exists():
-        print(f".env already exists at {ENV_FILE}. Nothing was changed.")
-        print("To make a new key, delete .env and run this again. "
-              "Everyone will have to sign in again.")
+    if not ENV_FILE.exists():
+        ENV_FILE.write_text(HEADER + "".join(_block(name) for name in VARIABLES),
+                            encoding="utf-8")
+        print(f"Created {ENV_FILE} with new keys and debug mode off.")
         return 0
-    key = secrets.token_hex(32)
-    ENV_FILE.write_text(
-        "# Created by setup_env.py. Keep this file private. Never commit it.\n"
-        "# SECRET_KEY signs the sign-in cookies.\n"
-        f"SECRET_KEY={key}\n"
-        "# 1 turns on Flask debug mode. Use it only on your own computer.\n"
-        "IDS_DEBUG=0\n",
-        encoding="utf-8",
-    )
-    print(f"Created {ENV_FILE} with a new secret key and debug mode off.")
+
+    text = ENV_FILE.read_text(encoding="utf-8")
+    missing = [name for name in VARIABLES if name not in _names_in(text)]
+    if not missing:
+        print(f".env already has everything at {ENV_FILE}. Nothing was changed.")
+        return 0
+
+    addition = "".join(_block(name) for name in missing)
+    if text and not text.endswith("\n"):
+        addition = "\n" + addition
+    with ENV_FILE.open("a", encoding="utf-8") as handle:
+        handle.write(addition)
+    print(f"Added to {ENV_FILE}: {', '.join(missing)}. Existing values were not changed.")
+    if "SEALED_DATA_KEY" in missing:
+        print("Next: run python export_sealed_key.py and give the key to the Doctor "
+              "in a sealed envelope.")
     return 0
 
 

@@ -24,6 +24,10 @@ SECRET_KEY_MIN_LENGTH = 32
 # The value this file used to fall back to. It is public, so it is refused.
 _OLD_FALLBACK_KEY = "ids-bphcsn-dev-secret"
 
+# SEALED_DATA_KEY, the key for sealed consultation fields, is also read from
+# .env, but only by utils/sealed_crypto.py. It is kept apart from SECRET_KEY,
+# so a new session key can never make medical records unreadable.
+
 # Debug mode shows code, and lets code run from the browser, when an error
 # happens. It is on only when IDS_DEBUG is exactly 1. Anything else is off.
 DEBUG = os.environ.get("IDS_DEBUG", "").strip() == "1"

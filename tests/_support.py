@@ -18,6 +18,7 @@ IDS_TEST_DIR environment variable, and deletes it after the suite ends. A suite
 run on its own makes its own folder and deletes it at exit.
 """
 import atexit
+import base64
 import os
 import secrets
 import shutil
@@ -33,6 +34,8 @@ from werkzeug.security import generate_password_hash
 # before config is imported. A .env file never overrides a value already set.
 os.environ["SECRET_KEY"] = secrets.token_hex(32)
 os.environ["IDS_DEBUG"] = "0"
+# The same for the sealed-record key: a test-only key, never the one in .env.
+os.environ["SEALED_DATA_KEY"] = base64.b64encode(secrets.token_bytes(32)).decode("ascii")
 
 REPO = Path(__file__).resolve().parent.parent
 LIVE_DB = REPO / "app.db"
