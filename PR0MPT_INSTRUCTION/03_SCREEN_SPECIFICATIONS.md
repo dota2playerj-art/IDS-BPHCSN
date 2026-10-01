@@ -603,6 +603,12 @@ Date
 
 Action
 
+What it records (added 2026-09-29, Task 4): changes to patient, clinical, stock and account
+records, the Patient Queue, sign-ins, settings and SMS broadcasts. Each entry is written in the
+same transaction as the change it describes, so a successful write always has one and a failed
+one never does. No entry quotes a diagnosis, a treatment plan, a sealed field, a password or a
+full contact number.
+
 ---
 
 # SCREEN 13

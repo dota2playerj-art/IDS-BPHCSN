@@ -1,7 +1,7 @@
 # IDS-BPHCSN — Project Status
 
-Last updated: 2026-09-29
-Updated by: Task 3 — CSRF protection
+Last updated: 2026-10-01
+Updated by: Task 4 — audit trail
 
 Sections 1–7 started as a read-only status audit. The Task Log below says what each task after it changed. The live `app.db` has only ever been opened read-only by these tasks.
 
@@ -15,6 +15,7 @@ Newest first.
 
 | Date | Task | Result |
 |---|---|---|
+| 2026-10-01 | Task 4 — audit trail | H3 and M6 done. Patient registration, edits and status changes (a death declaration and its reversal have their own phrases), new consultations, doses recorded at a visit, dispensing, inventory changes and the Patient Queue now write an audit entry, in the same transaction as the change (`routes/audit_entries.py`). A failed or refused write leaves no entry. None of it quotes a diagnosis, a treatment plan, a sealed field, a password or a full contact number. The Audit Logs screen's wrong sentence about what the trail covers is corrected, and so are three stale "Not Tracked" claims this task's first pass missed in `routes/roster_export.py` and `routes/audit_export.py`, which still said patient, inventory and queue writes were unaudited after they had been covered. New suite `verify_audit_coverage.py`, including a structural check that fails if a future write path has no audit entry. Tests: 1457/1457, 15 of 15 suites. |
 | 2026-09-29 | Task 3 — CSRF protection | M2 done. Every POST (26 forms, and the keep-alive) must carry a form token (Flask-WTF). A refused request shows "Your session expired" and is audited when the account is known. Logout is a POST form. New suite `verify_csrf.py`. Each laptop must run `pip install -r requirements.txt` once (new package Flask-WTF), or the app will not start. Tests: 1399/1399, 14 of 14 suites. |
 | 2026-09-29 | Task H6 — privacy cleanup | H6 and M17 done. Real patient names, patient contacts' numbers, the test-account name and the retired demo passwords were replaced with fictional ones in the files, then in every commit and commit message (`git filter-repo`). Every commit hash changed. The migration `migrate_add_must_change_password.py` now stops when history has no old password; run it with `--flag-all`. Tests: 1331/1331, 13 of 13 suites. |
 | 2026-09-29 | Task 2 — security basics | H1 (code side), H2, M1, M3, L1, L5 and L8 done. Secret key from `.env`, debug off, 30-minute idle and 12-hour limits, forced password change, random first-time passwords. The migration ran on this laptop's `app.db` and flagged 4 accounts. New suite `verify_security_basics.py`. Tests: 1331/1331, 13 of 13 suites. |
@@ -40,11 +41,12 @@ python tests/run_all.py rbac       only the suites whose names contain "rbac"
 - The live `app.db` is never used. A guard stops the whole run if any database path is inside the project folder. The runner also checks that `app.db` has the same size, time and checksum after the run.
 - Test accounts use test-only passwords (`tests/_support.py`), not the demo passwords.
 - All test data is made up. The old suites used a real staff member's name for account 4; the tests now use `bhwtest` / "Test Health Worker".
-- "All passing" looks like: one `ok` line per suite, then `TOTAL: 1399/1399 checks passed in 14/14 suites` and `All checks passed.` Exit code 0.
-- **Today (after Task 3): 1399/1399, all 14 suites pass.** Before Task 1b it was 906/921; every failure came from H5.
+- "All passing" looks like: one `ok` line per suite, then `TOTAL: 1457/1457 checks passed in 15/15 suites` and `All checks passed.` Exit code 0.
+- **Today (after Task 4): 1457/1457, all 15 suites pass.** Before Task 1b it was 906/921; every failure came from H5.
 - Every POST needs a form token (Task 3). The suites' clients add a valid one for their own session (`tests/_support.py`, `TokenClient`); `verify_csrf.py` uses plain clients to test refusals.
+- Run from `.venv` (`source .venv/Scripts/activate` on this laptop). The global Python install has no `python-dotenv`, and the suites fail to import `config` without it.
 
-| Suite | Checks | Result after Task 3 |
+| Suite | Checks | Result after Task 4 |
 |---|---|---|
 | verify_epi.py | 15 | 15/15 |
 | verify_staff_capabilities.py | 27 | 27/27 |
@@ -60,6 +62,7 @@ python tests/run_all.py rbac       only the suites whose names contain "rbac"
 | verify_database_integrity.py (Task 1b) | 18 | 18/18 |
 | verify_security_basics.py (Task 2) | 82 | 82/82 |
 | verify_csrf.py (Task 3) | 68 | 68/68 |
+| verify_audit_coverage.py (Task 4) | 58 | 58/58 |
 
 Not brought in: the four `d4d04b0e_*` scripts (they print values but have no pass/fail checks; they were only compared between two code trees), the three retired originals that `*_ported.py` replaced, the mutation worktrees, and one Doctor-suite check that ran old code from a worktree (L13).
 
@@ -298,13 +301,13 @@ None found. Every route carries a guard. The only unguarded routes are `/`, `/lo
 ## 5. Issues Found
 
 Severity: High = breaks a feature, or is a security or legal risk. Medium = wrong behavior or confusing. Low = cleanup.
-Count: **6 High, 20 Medium, 17 Low.** Done: M11, M15, L9 (Task 1); H5, M16, L13 (Task 1b); H1 (code side), H2, M1, M3, L1, L5, L8 (Task 2); H6, M17 (Task H6); M2 (Task 3). Added in Task 1: H5, H6, M16, L13. Added in Task 1b: L14. Added in Task 2: M17. Added in Task H6: M18, M19, L15. Added in Task 3: M20, L16, L17.
+Count: **6 High, 20 Medium, 17 Low.** Done: M11, M15, L9 (Task 1); H5, M16, L13 (Task 1b); H1 (code side), H2, M1, M3, L1, L5, L8 (Task 2); H6, M17 (Task H6); M2 (Task 3); H3, M6 (Task 4). Added in Task 1: H5, H6, M16, L13. Added in Task 1b: L14. Added in Task 2: M17. Added in Task H6: M18, M19, L15. Added in Task 3: M20, L16, L17.
 
 | # | Severity | File:line | Problem | Suggested direction |
 |---|---|---|---|---|
 | H1 | High | `models/users.py:138-141`, `README.md:22-23` | All four seeded accounts in the live DB still use the passwords written in source code and README. That includes the `doctor` account now named after a real physician. The Admin/Staff/Official passwords also fail the app's own 12-character rule (`models/users.py:374`). | **Done in code (Task 2):** no password is in the code or README. A new install makes random first-time passwords, shows them once, and each person must change theirs at first sign-in. `migrate_add_must_change_password.py` flagged admin, staff, official and doctor on this laptop. **Fully closed only when every team laptop has run the migration and each flagged account has set a new password.** Task H6 removed the old passwords from every file and every commit, so on any other laptop run the migration with `--flag-all`. |
 | H2 | High | `config.py:12` | `SECRET_KEY` falls back to the hardcoded `"ids-bphcsn-dev-secret"`, and there is no `.env`. Anyone with the code can forge a session cookie for any user id, including the Administrator. | **Done (Task 2):** `config.py` has no fallback. The app refuses to start when SECRET_KEY is missing, shorter than 32 characters, or the old default. `python setup_env.py` creates `.env` once per computer. |
-| H3 | High | `routes/audit_views.py:58`; `routes/patient_views.py:406-420` | Patient register/edit/status changes (including **declaring a death**), inventory changes, dispensing, queue actions and new consultations write no audit entry. | Add `log_action()` to these write paths, death declaration first. |
+| H3 | High | `routes/audit_views.py:58`; `routes/patient_views.py:406-420` | Patient register/edit/status changes (including **declaring a death**), inventory changes, dispensing, queue actions and new consultations write no audit entry. | **Done (Task 4):** every one of these writes an entry through `routes/audit_entries.py`, in the same transaction as the change. `tests/verify_audit_coverage.py` includes a structural check so a future write path cannot skip it. |
 | H4 | High | `routes/admin.py:930`; `models/consultations.py:388-392` | The Administrator (not a physician) can read sealed diagnoses through the backup download and through audit entries written before sealing. This is an RA 11166 risk. There are 0 sealed records today, so it is a risk path, not a current leak. | Team decides the policy: e.g. redact sealed fields in audit view on read, and limit or encrypt what the backup holds. |
 | H5 | High | `schema.sql:114` (consultations `updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP`); `models/consultations.py:999-1005` | On a database built from `schema.sql` (any fresh install or new clone), recording a consultation fails with HTTP 500: the insert writes `updated_at = NULL` into a NOT NULL column. The live `app.db` works only because a migration added this column as nullable. Found by the test run in Task 1. **Done (Task 1b):** `schema.sql` now declares `updated_at TEXT` (nullable, no default), as the live DB does, so the app behaves the same on both. | — |
 | H6 | High | 12 tracked files, e.g. `docs/verification/retire-advance-booking/README.md`, `migrate_clear_seeded_remarks.py`, `AUDIT_REPORT_2026-08-06_v2.md`, comments in `models/audit.py` and `routes/user_views.py`; 10 commits; 3 commit messages | 16 of the 29 patient full names in the live `app.db`, and 6 patient contact numbers, appear in tracked files and in git history. They are not from the demo seed script. Whether they are real people: Not verified. A push would publish them. | **Done (Task H6):** the 12 patients not from the seed, their contacts, their 11 numbers, the test account named after a real person and the 4 retired passwords now read as fictional names, `0900000NNNN` numbers and "(retired demo password)", in the files and in all history. The team member's name stays where it credits the proposal. |
@@ -313,7 +316,7 @@ Count: **6 High, 20 Medium, 17 Low.** Done: M11, M15, L9 (Task 1); H5, M16, L13 
 | M3 | Medium | `templates/settings.html:659`; `config.py` | No idle timeout. The "Auto Logout on Inactivity" toggle is disabled. Audit rows 1277→1278 show a session still in use 2 days after sign-in. Risky on a shared health-center PC. | **Done (Task 2):** signed out after 30 minutes without activity and 12 hours after sign-in (`config.py`), enforced on the server, audited, with a warning 2 minutes before the idle limit (`static/js/session.js`). |
 | M4 | Medium | `routes/consultation_views.py:190-196` | Doctor has no "awaiting diagnosis" list; visits saved by staff without a diagnosis are easy to miss. | Add a panel on the Doctor Dashboard. |
 | M5 | Medium | `utils/unavailable.py:399` | A patient who leaves before being seen cannot be closed; the row stays Waiting. | Add a "Left without being seen" status. |
-| M6 | Medium | `routes/report_views.py:284-289` | Screen text says Audit Logs records "three things: consultation edits, SMS broadcasts, and sign-ins". It also records users, settings, backup, maintenance, confidentiality, immunization corrections and schedule. | Correct the sentence. |
+| M6 | Medium | `routes/report_views.py:284-289` | Screen text says Audit Logs records "three things: consultation edits, SMS broadcasts, and sign-ins". It also records users, settings, backup, maintenance, confidentiality, immunization corrections and schedule. | **Done (Task 4):** the sentence now names what the trail covers in general terms rather than listing kinds that go stale. The same wrong claim was also found and corrected in `routes/roster_export.py` (three "Not Tracked" rows that said patient, inventory and queue writes were unaudited) and `routes/audit_export.py` (the export's own "Not Tracked" sheet intro). |
 | M7 | Medium | `templates/settings.html:793`; `utils/unavailable.py:601, 637, 664` | Settings is less complete than the team believes. Password Policy is display-only, Backup has no restore, and three panes are disabled. | Confirm this is acceptable for the defense, or finish the missing parts. |
 | M8 | Medium | `utils/sms.py:190-218` | No `SEMAPHORE_API_KEY`, so every SMS broadcast is saved as "simulated". Nothing has been sent for real. | Get a Semaphore key before the defense, or state it clearly in the demo. |
 | M9 | Medium | `README.md:3`; `routes/report_export.py:253, 373`; `routes/roster_export.py:362, 458`; `routes/audit_export.py:135`; `templates/patient_records.html:179` (and 3 other print headers) | Three project names are used. The correct one (`01_PROJECT_BIBLE.md:12`, `templates/login.html:309`) is "Integrated Digital System … Community Notifications". Printed reports say "Integrated Data System". | Use one constant for the name. |
@@ -375,6 +378,6 @@ Checked and **not** found: `TODO`/`FIXME`/`XXX` markers; `href="#"` or "coming s
 
 1. **Reset all live passwords and set a real `SECRET_KEY` from the environment.** Anyone with the code can currently sign in as any account or forge a session (H1, H2). *(Code side done in Task 2. On each laptop: pull, run `python setup_env.py` and `python migrate_add_must_change_password.py --flag-all`, then each person sets a new password.)*
 2. **Add a private git remote and move the test suites into the repo.** The code exists on one laptop, and the tests sit in a temp folder (M11, M12). *(Tests: done in Task 1. Remote: decide H6 first.)*
-3. **Audit patient, inventory, queue, dispensing and death-declaration writes.** A death can be declared with no trail (H3).
+3. ~~Audit patient, inventory, queue, dispensing and death-declaration writes.~~ **Done (Task 4).** Every one of these writes an audit entry now (H3).
 4. **Decide the RA 11166 policy for sealed text in backups and old audit entries, then build it.** The Administrator can still read sealed diagnoses (H4).
 5. **Fix the project name and update README and 08_PROJECT_ROADMAP to four roles.** The docs the team relies on were already wrong about the Doctor role (M9, §6).
