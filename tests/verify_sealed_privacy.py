@@ -1,9 +1,12 @@
-"""Sealed record privacy (H4, L2; RA 11166 Section 44, RA 10173).
+"""Sealed record privacy (H4, L2, Task 5b; RA 11166 Section 44, RA 10173).
 
-Checks that a sealed consultation's diagnosis and treatment plan are encrypted
-in the database, that only the Doctor's screens ever show them, that no export,
-print, report, audit entry or backup carries them, and that a wrong key fails
-with a plain message instead of a crash.
+Checks that every free-text field of a sealed visit is encrypted in the database
+(diagnosis, treatment plan, chief complaint, additional notes, and the check-in
+reason of its queue visit), that only the Doctor's screens ever show them, that
+no export, print, report, audit entry or backup carries them, that the
+Administrator sees neither the check-in reason on the queue nor the medicine
+names of a sealed visit, and that a wrong key fails with a plain message instead
+of a crash.
 
 Runs on a fresh test database built by tests/_support.py, with a test-only key.
 Every "absent" check has a positive control: an unsealed sentinel that must be
@@ -42,7 +45,21 @@ DX_REC, TX_REC = "ZZSEALREC1DX", "ZZSEALREC1TX"
 DX_LATE, TX_LATE = "ZZSEALLATE2DX", "ZZSEALLATE2TX"
 DX_LATE_EDIT = "ZZSEALLATE2EDITDX"
 DX_CTRL = "ZZOPENCTRL3DX"
-SEALED_SENTINELS = (DX_REC, TX_REC, DX_LATE, TX_LATE, DX_LATE_EDIT)
+# Task 5b: the rest of a sealed visit's free text.
+CC_REC, NOTE_REC, REASON_REC = "ZZSEALREC1CC", "ZZSEALREC1NOTE", "ZZSEALREC1REASON"
+CC_LATE, NOTE_LATE, REASON_LATE = "ZZSEALLATE2CC", "ZZSEALLATE2NOTE", "ZZSEALLATE2REASON"
+CC_LATE_EDIT = "ZZSEALLATE2EDITCC"
+# Unsealed controls: the same fields on visits nobody sealed.
+CC_CTRL, NOTE_CTRL, REASON_CTRL = "ZZOPENCTRL3CC", "ZZOPENCTRL3NOTE", "ZZOPENCTRL3REASON"
+REASON_QUEUE = "ZZOPENQUEUE4REASON"  # a visit still waiting in today's queue
+CC_STAFF, NOTE_STAFF = "ZZOPENSTAFF5CC", "ZZOPENSTAFF5NOTE"  # saved by Staff, unsealed
+MED_SEALED, MED_OPEN = "ZZSEALEDMED5", "ZZOPENMED6"  # medicine names, snapshot text
+SEALED_SENTINELS = (DX_REC, TX_REC, DX_LATE, TX_LATE, DX_LATE_EDIT,
+                    CC_REC, NOTE_REC, REASON_REC, CC_LATE, NOTE_LATE, REASON_LATE,
+                    CC_LATE_EDIT)
+# Free clinical text that must not be in any audit entry, sealed or not (D5).
+FREE_TEXT = SEALED_SENTINELS + (DX_CTRL, CC_CTRL, NOTE_CTRL, REASON_CTRL, REASON_QUEUE,
+                                CC_STAFF, NOTE_STAFF)
 
 results = []
 
@@ -121,16 +138,32 @@ def leaks(text):
     return [s for s in SEALED_SENTINELS if s in text]
 
 
-def new_queue_entry(patient_id):
+def new_queue_entry(patient_id, reason=None, status="In Consultation"):
     conn = db()
     cur = conn.execute(
         "INSERT INTO appointments (patient_id, scheduled_by, appointment_date, "
-        "status, is_walkin, checked_in_at) VALUES (?, ?, date('now','localtime'), "
-        "'In Consultation', 1, datetime('now','localtime'))", (patient_id, STAFF_ID))
+        "status, is_walkin, checked_in_at, notes) VALUES (?, ?, date('now','localtime'), "
+        "?, 1, datetime('now','localtime'), ?)", (patient_id, STAFF_ID, status, reason))
     conn.commit()
     new_id = cur.lastrowid
     conn.close()
     return new_id
+
+
+def run_sql(sql, args=()):
+    conn = db()
+    try:
+        conn.execute(sql, args)
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def visible(text, who):
+    """What a person sees on screen. The Doctor's screens hold sealed text inside
+    no-print spans, which never reach paper, so those are taken out for the paper
+    test; every other role has none to take out."""
+    return re.sub(r'<span class="no-print">.*?</span>', "", text, flags=re.S)
 
 
 def edit_form(cid, **overrides):
@@ -140,6 +173,12 @@ def edit_form(cid, **overrides):
                   "temperature", "blood_pressure", "pulse_rate", "respiratory_rate",
                   "weight", "height", "head_circumference", "follow_up_date"):
         value = row.get(field)
+        # The Doctor's form shows a sealed record decrypted, so this does too.
+        if row.get("is_restricted") and sc.is_encrypted(value):
+            try:
+                value = sc.decrypt(value, cid, field)
+            except sc.SealedDataError:
+                pass  # a wrong or missing key: the form would not carry the field
         form[field] = "" if value is None else (f"{value:g}" if isinstance(value, float)
                                                  else str(value))
     if row.get("is_restricted"):
@@ -187,6 +226,12 @@ check("a value moved to another field does not decrypt",
       refuses(lambda: sc.decrypt(token, 7, "treatment_plan")))
 check("a damaged value does not decrypt",
       refuses(lambda: sc.decrypt(token[:-6] + "AAAAAA", 7, "diagnosis")))
+visit_token = sc.encrypt("Sample reason", 7, "notes", "appointments")
+check("a queue visit's reason is bound to its own row and table",
+      sc.decrypt(visit_token, 7, "notes", "appointments") == "Sample reason"
+      and refuses(lambda: sc.decrypt(visit_token, 8, "notes", "appointments"))
+      and refuses(lambda: sc.decrypt(visit_token, 7, "notes"))
+      and refuses(lambda: sc.decrypt(visit_token, 7, "notes", "consultations")))
 check("None and empty text are left as they are",
       sc.encrypt(None, 7, "diagnosis") is None and sc.encrypt("", 7, "diagnosis") == "")
 check("key_problem() refuses a missing, non-base64 or 16-byte key",
@@ -273,9 +318,9 @@ check("and writes nothing to disk", sorted(os.listdir(env_path.parent)) == folde
 # ===========================================================================
 section("3. SEALING, UNSEALING AND EDITING THROUGH THE REAL ROUTES")
 P_REC = 9
-appt = new_queue_entry(P_REC)
+appt = new_queue_entry(P_REC, REASON_REC)
 r = doctor.post(f"/staff/consultation/record/{appt}", data={
-    "chief_complaint": "Follow-up visit", "temperature": "36.9", "weight": "60",
+    "chief_complaint": CC_REC, "remarks": NOTE_REC, "temperature": "36.9", "weight": "60",
     "diagnosis": DX_REC, "treatment_plan": TX_REC, "is_restricted": "1"})
 CID_REC = q1("SELECT id FROM consultations WHERE appointment_id = ?", (appt,))[0]
 row = q1("SELECT * FROM consultations WHERE id = ?", (CID_REC,))
@@ -286,6 +331,18 @@ check("sealed at record time: both fields are stored encrypted",
 check("and they decrypt to what the Doctor typed",
       sc.decrypt(row["diagnosis"], CID_REC, "diagnosis") == DX_REC
       and sc.decrypt(row["treatment_plan"], CID_REC, "treatment_plan") == TX_REC)
+check("Task 5b: the chief complaint and additional notes are encrypted too, and decrypt",
+      sc.is_encrypted(row["chief_complaint"]) and sc.is_encrypted(row["remarks"])
+      and sc.decrypt(row["chief_complaint"], CID_REC, "chief_complaint") == CC_REC
+      and sc.decrypt(row["remarks"], CID_REC, "remarks") == NOTE_REC, dict(row))
+visit = q1("SELECT notes FROM appointments WHERE id = ?", (appt,))
+check("Task 5b: the check-in reason of the linked queue visit is encrypted, bound to that row",
+      sc.is_encrypted(visit["notes"])
+      and sc.decrypt(visit["notes"], appt, "notes", "appointments") == REASON_REC
+      and refuses(lambda: sc.decrypt(visit["notes"], appt, "notes")), dict(visit))
+check("what is not free text stays readable: vitals, date and the seal itself",
+      row["temperature"] == 36.9 and row["weight"] == 60.0 and row["consultation_date"]
+      and row["is_restricted"] == 1)
 profile = body(doctor.get(f"/staff/patient_profile/{P_REC}"))
 check("L2: the seal message says the text is hidden from everyone except the Doctor",
       "hidden from everyone except the Doctor" in profile, profile[:200])
@@ -294,9 +351,15 @@ check("the Doctor's profile shows the sealed text", DX_REC in profile and TX_REC
 CID_LATE = 10
 P_LATE = q1("SELECT patient_id FROM consultations WHERE id = ?", (CID_LATE,))[0]
 doctor.post(f"/staff/consultation/edit/{CID_LATE}",
-            data=edit_form(CID_LATE, diagnosis=DX_LATE, treatment_plan=TX_LATE))
+            data=edit_form(CID_LATE, diagnosis=DX_LATE, treatment_plan=TX_LATE,
+                           chief_complaint=CC_LATE, remarks=NOTE_LATE))
+APPT_LATE = q1("SELECT appointment_id FROM consultations WHERE id=?", (CID_LATE,))[0]
+run_sql("UPDATE appointments SET notes = ? WHERE id = ?", (REASON_LATE, APPT_LATE))
+row = q1("SELECT * FROM consultations WHERE id=?", (CID_LATE,))
 check("before sealing, an ordinary record holds plain text",
-      q1("SELECT diagnosis FROM consultations WHERE id=?", (CID_LATE,))[0] == DX_LATE)
+      row["diagnosis"] == DX_LATE and row["chief_complaint"] == CC_LATE
+      and row["remarks"] == NOTE_LATE
+      and q1("SELECT notes FROM appointments WHERE id=?", (APPT_LATE,))[0] == REASON_LATE)
 restrict_url = f"/staff/patient_profile/{P_LATE}/restrict-consultation"
 doctor.post(restrict_url, data={"consultation_id": str(CID_LATE), "restrict_action": "restrict"})
 row = q1("SELECT * FROM consultations WHERE id = ?", (CID_LATE,))
@@ -304,39 +367,100 @@ first_cipher = row["diagnosis"]
 check("sealing encrypts both fields in the database",
       row["is_restricted"] == 1 and sc.is_encrypted(row["diagnosis"])
       and sc.is_encrypted(row["treatment_plan"]) and DX_LATE not in row["diagnosis"])
+check("Task 5b: sealing a record already on file also encrypts its chief complaint, "
+      "notes and check-in reason, in the same save",
+      sc.is_encrypted(row["chief_complaint"]) and sc.is_encrypted(row["remarks"])
+      and sc.decrypt(row["chief_complaint"], CID_LATE, "chief_complaint") == CC_LATE
+      and sc.decrypt(row["remarks"], CID_LATE, "remarks") == NOTE_LATE
+      and sc.decrypt(q1("SELECT notes FROM appointments WHERE id=?", (APPT_LATE,))[0],
+                     APPT_LATE, "notes", "appointments") == REASON_LATE)
 doctor.post(restrict_url, data={"consultation_id": str(CID_LATE), "restrict_action": "lift"})
 row = q1("SELECT * FROM consultations WHERE id = ?", (CID_LATE,))
 check("lifting the seal restores the plain text",
       row["is_restricted"] == 0 and row["diagnosis"] == DX_LATE
       and row["treatment_plan"] == TX_LATE, dict(row))
+check("Task 5b: and restores the chief complaint, the notes and the check-in reason",
+      row["chief_complaint"] == CC_LATE and row["remarks"] == NOTE_LATE
+      and q1("SELECT notes FROM appointments WHERE id=?", (APPT_LATE,))[0] == REASON_LATE)
 doctor.post(restrict_url, data={"consultation_id": str(CID_LATE), "restrict_action": "restrict"})
 row = q1("SELECT * FROM consultations WHERE id = ?", (CID_LATE,))
 check("sealing again encrypts again, with a new nonce",
       sc.is_encrypted(row["diagnosis"]) and row["diagnosis"] != first_cipher)
 
 plan_before = row["treatment_plan"]
+notes_before = row["remarks"]
 doctor.post(f"/staff/consultation/edit/{CID_LATE}",
-            data=edit_form(CID_LATE, diagnosis=DX_LATE_EDIT, treatment_plan=TX_LATE))
+            data=edit_form(CID_LATE, diagnosis=DX_LATE_EDIT, treatment_plan=TX_LATE,
+                           chief_complaint=CC_LATE_EDIT))
 row = q1("SELECT * FROM consultations WHERE id = ?", (CID_LATE,))
+check("Task 5b: a Doctor edit of the chief complaint on a sealed record stays encrypted",
+      sc.is_encrypted(row["chief_complaint"]) and CC_LATE_EDIT not in row["chief_complaint"]
+      and sc.decrypt(row["chief_complaint"], CID_LATE, "chief_complaint") == CC_LATE_EDIT)
+check("Task 5b: the notes the Doctor left alone keep their stored ciphertext",
+      row["remarks"] == notes_before)
 check("a Doctor edit of a sealed record stays encrypted",
       row["is_restricted"] == 1 and sc.is_encrypted(row["diagnosis"])
       and sc.decrypt(row["diagnosis"], CID_LATE, "diagnosis") == DX_LATE_EDIT)
 check("a field the Doctor left alone keeps its stored ciphertext",
       row["treatment_plan"] == plan_before)
 sealed_now = (row["diagnosis"], row["treatment_plan"])
+sealed_all = tuple(row[f] for f in ("diagnosis", "treatment_plan", "chief_complaint", "remarks"))
+reason_now = q1("SELECT notes FROM appointments WHERE id=?", (APPT_LATE,))[0]
 staff.post(f"/staff/consultation/edit/{CID_LATE}",
            data={k: v for k, v in edit_form(CID_LATE, temperature="37.5").items()
-                 if k not in ("diagnosis", "treatment_plan", "is_restricted")})
+                 if k not in ("diagnosis", "treatment_plan", "is_restricted",
+                              "chief_complaint", "remarks")})
 row = q1("SELECT * FROM consultations WHERE id = ?", (CID_LATE,))
 check("a staff edit of a sealed record leaves both encrypted fields byte for byte",
       (row["diagnosis"], row["treatment_plan"]) == sealed_now and row["is_restricted"] == 1
       and row["temperature"] == 37.5)
+check("Task 5b: and the encrypted chief complaint, notes and check-in reason too",
+      tuple(row[f] for f in ("diagnosis", "treatment_plan", "chief_complaint", "remarks"))
+      == sealed_all
+      and q1("SELECT notes FROM appointments WHERE id=?", (APPT_LATE,))[0] == reason_now)
+mark = audit_max()
+staff.post(f"/staff/consultation/edit/{CID_LATE}",
+           data={k: v for k, v in edit_form(CID_LATE, chief_complaint="ZZFORGEDCC").items()
+                 if k not in ("diagnosis", "treatment_plan", "is_restricted", "remarks")})
+row = q1("SELECT * FROM consultations WHERE id = ?", (CID_LATE,))
+check("Task 5b: a forged chief complaint from Staff on a sealed record is refused and recorded",
+      tuple(row[f] for f in ("diagnosis", "treatment_plan", "chief_complaint", "remarks"))
+      == sealed_all
+      and db().execute("SELECT COUNT(*) FROM audit_logs WHERE id > ? AND action = "
+                       "'Refused clinical judgement from an unlicensed role'", (mark,)
+                       ).fetchone()[0] == 1
+      and not any("ZZFORGEDCC" in (d[0] or "") for d in
+                  db().execute("SELECT details FROM audit_logs WHERE id > ?", (mark,))))
 
 CID_CTRL = 11
 P_CTRL = q1("SELECT patient_id FROM consultations WHERE id = ?", (CID_CTRL,))[0]
 doctor.post(f"/staff/consultation/edit/{CID_CTRL}", data=edit_form(CID_CTRL, diagnosis=DX_CTRL))
+# The unsealed controls for the new fields: plain text, so the same extraction that
+# must not find a sealed sentinel is shown to find these.
+APPT_CTRL = q1("SELECT appointment_id FROM consultations WHERE id=?", (CID_CTRL,))[0]
+run_sql("UPDATE consultations SET chief_complaint = ?, remarks = ? WHERE id = ?",
+        (CC_CTRL, NOTE_CTRL, CID_CTRL))
+run_sql("UPDATE appointments SET notes = ? WHERE id = ?", (REASON_CTRL, APPT_CTRL))
 check("control: an unsealed record keeps plain text",
       q1("SELECT diagnosis FROM consultations WHERE id=?", (CID_CTRL,))[0] == DX_CTRL)
+row = q1("SELECT * FROM consultations WHERE id=?", (CID_CTRL,))
+check("control: an unsealed record's chief complaint, notes and check-in reason stay plain",
+      row["chief_complaint"] == CC_CTRL and row["remarks"] == NOTE_CTRL
+      and q1("SELECT notes FROM appointments WHERE id=?", (APPT_CTRL,))[0] == REASON_CTRL)
+# A waiting visit nobody has written up, with a reason: the queue's own control.
+P_QUEUE = 13
+QUEUE_APPT = new_queue_entry(P_QUEUE, REASON_QUEUE, status="Waiting")
+# Medicine names handed over at a sealed and at an unsealed visit (D3). The rows are
+# written straight to the table: the name is a snapshot of text, which is what the
+# readers under test show.
+run_sql("INSERT INTO medicine_dispensing (patient_id, consultation_id, inventory_item_id, "
+        "medicine_name, unit, quantity_dispensed, date_dispensed, dispensed_by) "
+        "VALUES (?, ?, 2, ?, 'capsule', 7, date('now','localtime'), ?)",
+        (P_REC, CID_REC, MED_SEALED, STAFF_ID))
+run_sql("INSERT INTO medicine_dispensing (patient_id, consultation_id, inventory_item_id, "
+        "medicine_name, unit, quantity_dispensed, date_dispensed, dispensed_by) "
+        "VALUES (?, ?, 3, ?, 'tablet', 5, date('now','localtime'), ?)",
+        (P_CTRL, CID_CTRL, MED_OPEN, STAFF_ID))
 
 # ===========================================================================
 section("4. ONLY THE DOCTOR'S SCREENS SHOW SEALED TEXT")
@@ -351,7 +475,9 @@ for who, client, prefix in (("Administrator", admin, "/admin"), ("Health Center 
     found = []
     for url in plain_gets:
         response = client.get(url)
-        hits = leaks(readable(response))
+        # The Doctor reads sealed text on screen only. A no-print span is on the
+        # screen and not on paper, so it is set aside here; an export has none.
+        hits = leaks(visible(readable(response), who))
         if hits:
             found.append(f"{url}: {hits}")
     check(f"{who}: no sealed text on any screen, export or download without an id",
@@ -395,6 +521,12 @@ data = response.data
 check("the Administrator's backup route answers with a database file",
       response.status_code == 200 and data[:16] == b"SQLite format 3\x00", response.status_code)
 check("control: the unsealed sentinel IS found in the backup bytes", DX_CTRL.encode() in data)
+check("control: an unsealed chief complaint, note and check-in reason ARE found in the "
+      "backup bytes",
+      all(t.encode() in data for t in (CC_CTRL, NOTE_CTRL, REASON_CTRL)))
+check("*** no sealed chief complaint, note or check-in reason is in the backup bytes ***",
+      not [t for t in (CC_REC, NOTE_REC, REASON_REC, CC_LATE, NOTE_LATE, REASON_LATE,
+                       CC_LATE_EDIT) if t.encode() in data])
 check("*** no sealed sentinel appears anywhere in the backup bytes ***",
       not [s for s in SEALED_SENTINELS if s.encode() in data],
       [s for s in SEALED_SENTINELS if s.encode() in data])
@@ -423,6 +555,22 @@ check("no entry quotes a sealed diagnosis or treatment plan",
       not [d for d in details if leaks(d)])
 check("no entry quotes an unsealed diagnosis either (D2)",
       not [d for d in details if DX_CTRL in d])
+mark = audit_max()
+staff.post(f"/staff/consultation/edit/13",
+           data=edit_form(13, chief_complaint=CC_STAFF, remarks=NOTE_STAFF))
+staff_entry = q1("SELECT details FROM audit_logs WHERE id > ? AND action = "
+                 "'Updated consultation record'", (mark,))
+check("D5: Staff changing an unsealed chief complaint and notes is saved",
+      q1("SELECT chief_complaint FROM consultations WHERE id=13")[0] == CC_STAFF)
+check("D5: and its audit entry names the fields only: Changed: Chief complaint, Additional notes",
+      staff_entry is not None and "Changed: Chief complaint, Additional notes" in staff_entry[0]
+      and CC_STAFF not in staff_entry[0] and NOTE_STAFF not in staff_entry[0],
+      staff_entry[0] if staff_entry else None)
+details = [r[0] or "" for r in db().execute("SELECT details FROM audit_logs")]
+check("D5: no audit entry holds any chief complaint, note, check-in reason or other "
+      "free clinical text, sealed or not",
+      not [d for d in details if any(t in d for t in FREE_TEXT)],
+      [t for d in details for t in FREE_TEXT if t in d])
 edit_entry = q1("SELECT details FROM audit_logs WHERE action = 'Updated consultation record' "
                 "AND details LIKE ? ORDER BY id DESC", (f"Consultation #{CID_CTRL} %",))
 check("an edit entry names the field instead: Changed: Diagnosis",
@@ -497,6 +645,12 @@ check("the all-time ranking has one Confidential row counting every sealed visit
       (confidential, sealed_total))
 check("and the total still includes them",
       stats["total"] == q1("SELECT COUNT(*) FROM consultations")[0])
+confidential_cc = [d for d in stats["top_complaints"] if d["label"] == "Confidential"]
+check("Task 5b: the complaints ranking has one Confidential row counting every sealed "
+      "visit, and ranks no sealed complaint text",
+      len(confidential_cc) == 1 and confidential_cc[0]["count"] == sealed_total
+      and not [d for d in stats["top_complaints"] if leaks(d["label"]) or d["label"].startswith("enc:v1:")],
+      stats["top_complaints"])
 day = q1("SELECT substr(consultation_date, 1, 10) FROM consultations WHERE id=?", (CID_REC,))[0]
 RANGE = f"?from={day}&to={day}"
 for who, client, url in (("Administrator", admin, "/admin/reports_analytics"),
@@ -537,7 +691,7 @@ for label, value in (("a wrong key", sc.new_key()), ("no key", None)):
     check(f"with {label}: the edit form shows the line and no diagnosis box",
           UNOPENABLE in page and 'name="diagnosis"' not in page)
     form = {k: v for k, v in edit_form(CID_REC, temperature="37.1").items()
-            if k not in ("diagnosis", "treatment_plan")}
+            if k not in ("diagnosis", "treatment_plan", "chief_complaint", "remarks")}
     form["is_restricted"] = "1"
     doctor.post(f"/staff/consultation/edit/{CID_REC}", data=form)
     doctor.post(f"/staff/patient_profile/{P_REC}/restrict-consultation",
@@ -581,6 +735,18 @@ for role in ("admin", "health staff", "barangay official", None):
     check(f"open_sealed_value() refuses the role {role!r}", refused)
 check("open_sealed_value() opens it for the Doctor",
       open_sealed_value(cipher, CID_REC, "diagnosis", "doctor") == (DX_REC, True))
+visit_cipher = q1("SELECT notes FROM appointments WHERE id=?", (appt,))[0]
+for role in ("admin", "health staff", "barangay official", None):
+    try:
+        open_sealed_value(visit_cipher, appt, "notes", role, "appointments")
+        refused = False
+    except PermissionError:
+        refused = True
+    check(f"Task 5b: the check-in reason is refused to the role {role!r} by the same function",
+          refused)
+check("Task 5b: the same function opens the check-in reason for the Doctor",
+      open_sealed_value(visit_cipher, appt, "notes", "doctor", "appointments")
+      == (REASON_REC, True))
 with app.app_context():
     try:
         set_consultation_restriction(CID_REC, False, ADMIN_ID, "admin")
@@ -589,6 +755,290 @@ with app.app_context():
         raised = True
 check("the model refuses to unseal for a role that may not decrypt, and nothing changes",
       raised and q1("SELECT is_restricted FROM consultations WHERE id=?", (CID_REC,))[0] == 1)
+
+
+# ===========================================================================
+section("10. THE CHECK-IN REASON ON THE PATIENT QUEUE (Task 5b, D1, D4)")
+
+
+def queue_header_and_rows(response):
+    """The queue sheet's header row and body rows, from an Excel download."""
+    book = load_workbook(io.BytesIO(response.data), data_only=True)
+    for sheet in book.worksheets:
+        rows = list(sheet.iter_rows(values_only=True))
+        for index, row in enumerate(rows):
+            if row and row[0] == "#":
+                header = [str(c) for c in row if c is not None]
+                body_rows = [[str(c) for c in r if c is not None] for r in rows[index + 1:]
+                             if r and any(c is not None for c in r)]
+                return header, body_rows
+    return [], []
+
+
+QUEUE_PAGES = {"Administrator": (admin, "/admin"), "Health Center Staff": (staff, "/staff"),
+               "Doctor": (doctor, "/staff")}
+queue_pages = {who: body(client.get(f"{prefix}/appointment_scheduling"))
+               for who, (client, prefix) in QUEUE_PAGES.items()}
+check("control: Health Center Staff see the reason of an ordinary waiting visit",
+      REASON_QUEUE in queue_pages["Health Center Staff"])
+check("control: the Doctor sees it too",
+      REASON_QUEUE in queue_pages["Doctor"])
+check("D4: the Administrator's Patient Queue carries no check-in reason, for any visit",
+      not any(t in queue_pages["Administrator"]
+              for t in (REASON_QUEUE, REASON_REC, REASON_LATE, REASON_CTRL))
+      and 'class="reason-text"' not in queue_pages["Administrator"]
+      and "patient ID, or reason" not in queue_pages["Administrator"],
+      [t for t in (REASON_QUEUE, REASON_REC, REASON_LATE, REASON_CTRL)
+       if t in queue_pages["Administrator"]]
+      + ['class="reason-text"' in queue_pages["Administrator"],
+         "patient ID, or reason" in queue_pages["Administrator"]])
+check("D4: the Administrator still sees each patient and their status in the queue",
+      "Ramos" in queue_pages["Administrator"] and "badge-status" in queue_pages["Administrator"])
+check("D1/D2: Health Center Staff see the placeholder, not the reason, of a sealed visit",
+      REASON_REC not in queue_pages["Health Center Staff"]
+      and PLACEHOLDER in queue_pages["Health Center Staff"])
+check("D1/D2: the Doctor reads a sealed visit's reason on screen, never on paper",
+      REASON_REC in queue_pages["Doctor"]
+      and REASON_REC not in visible(queue_pages["Doctor"], "Doctor")
+      and f'<span class="print-only">{PLACEHOLDER}</span>' in queue_pages["Doctor"])
+check("a sealed reason is not offered to the queue's search box",
+      f'data-search="' in queue_pages["Doctor"]
+      and not re.search(r'data-search="[^"]*' + REASON_REC, queue_pages["Doctor"]))
+for who in ("Administrator", "Health Center Staff", "Doctor"):
+    client, prefix = QUEUE_PAGES[who]
+    for kind in ("xlsx", "pdf"):
+        response = client.get(f"{prefix}/appointment_scheduling/export.{kind}")
+        text = readable(response)
+        if who == "Administrator":
+            check(f"D4: the Administrator's queue export ({kind}) has no check-in reason",
+                  response.status_code == 200
+                  and not [t for t in (REASON_QUEUE, REASON_REC, REASON_LATE, REASON_CTRL)
+                           if t in text])
+        else:
+            check(f"{who}: the queue export ({kind}) has the ordinary reason, never a sealed one",
+                  response.status_code == 200 and REASON_QUEUE in text and not leaks(text),
+                  leaks(text))
+header_admin, _ = queue_header_and_rows(admin.get("/admin/appointment_scheduling/export.xlsx"))
+header_staff, rows_staff = queue_header_and_rows(staff.get("/staff/appointment_scheduling/export.xlsx"))
+check("D4: the Administrator's workbook has no Notes column at all",
+      header_admin and "Notes" not in header_admin and "Patient" in header_admin, header_admin)
+check("control: Staff's workbook keeps the Notes column, with the placeholder for a sealed visit",
+      "Notes" in header_staff and any(PLACEHOLDER in r for r in rows_staff), header_staff)
+response = admin.get("/staff/appointment_scheduling")
+check("D4 is enforced on the server: the Administrator cannot reach the care team's "
+      "queue URL to get the reason",
+      response.status_code in (302, 401, 403) or REASON_QUEUE not in body(response))
+with app.app_context():
+    from models.appointments import attach_visit_reasons, get_todays_appointments
+    rows = get_todays_appointments()
+    check("a queue row carries no reason unless it went through attach_visit_reasons()",
+          rows and all("notes" not in r for r in rows))
+    shaped = {role: attach_visit_reasons(get_todays_appointments(), role, queue_view=True)
+              for role in ("admin", "barangay official", "health staff", "doctor")}
+    check("the model hides the reason from the Administrator and the Official, for every visit",
+          all(r["notes"] is None and r["reason_hidden"]
+              for role in ("admin", "barangay official") for r in shaped[role]))
+    check("and gives it to the care team, the sealed one as placeholder or decrypted",
+          any(r["notes"] == REASON_QUEUE for r in shaped["health staff"])
+          and any(r["notes"] == PLACEHOLDER for r in shaped["health staff"])
+          and any(r["notes"] == REASON_REC for r in shaped["doctor"])
+          and not any(r["notes"] == REASON_REC for r in shaped["health staff"]))
+# The database backup is a copy of the whole file, so it holds every unsealed value as
+# it is stored. That is a known limit recorded in PROJECT_STATUS.md (M25, M26), not a
+# screen or an export of this page, so it is left out of this crawl.
+FILES_OF_THE_WHOLE_DATABASE = ("/admin/settings/backup.db",)
+for who, client in (("Administrator", admin), ("Barangay Official", official)):
+    found = []
+    for url in plain_gets:
+        if url in FILES_OF_THE_WHOLE_DATABASE:
+            continue
+        if REASON_QUEUE in readable(client.get(url)):
+            found.append(url)
+    check(f"D4: {who}: no screen, export or JSON anywhere carries the waiting visit's reason",
+          not found, found)
+
+# ===========================================================================
+section("11. MEDICINE NAMES AT A SEALED VISIT (Task 5b, D3)")
+admin_profile = body(admin.get(f"/admin/patient_profile/{P_REC}"))
+admin_print = body(admin.get(f"/admin/patient_profile/{P_REC}?print=1"))
+staff_profile = body(staff.get(f"/staff/patient_profile/{P_REC}"))
+doctor_profile = body(doctor.get(f"/staff/patient_profile/{P_REC}"))
+check("D3: the Administrator's profile of a sealed visit shows the placeholder, not the name",
+      MED_SEALED not in admin_profile and MED_SEALED not in admin_print
+      and PLACEHOLDER in admin_profile)
+check("D3: Health Center Staff and the Doctor still see what was dispensed",
+      MED_SEALED in staff_profile and MED_SEALED in doctor_profile)
+check("control: the Administrator sees the medicine dispensed at an unsealed visit",
+      MED_OPEN in body(admin.get(f"/admin/patient_profile/{P_CTRL}")))
+for who, client, prefix in (("Administrator", admin, "/admin"), ("Health Center Staff", staff, "/staff"),
+                            ("Doctor", doctor, "/staff")):
+    page = body(client.get(f"{prefix}/consultation/edit/{CID_REC}"))
+    if who == "Administrator":
+        check("D3: the Administrator's edit form lists no medicine name for a sealed visit",
+              MED_SEALED not in page)
+    else:
+        check(f"{who}: the edit form of a sealed visit still lists what was dispensed",
+              MED_SEALED in page)
+found = []
+for url in plain_gets:
+    if url in FILES_OF_THE_WHOLE_DATABASE:
+        continue
+    if MED_SEALED in readable(admin.get(url)):
+        found.append(url)
+check("D3: the Administrator's patient-linked screens, exports and the dashboard never name it",
+      all("reports_analytics" in url for url in found), found)
+check("D3 leaves per-item totals not tied to a patient as they were: Reports still ranks it",
+      any("reports_analytics" in url for url in found), found)
+dash = [u for u in plain_gets if "dashboard" in u]
+for url in dash:
+    if url.startswith("/admin"):
+        page = body(admin.get(url))
+        check(f"D3: the Administrator's dashboard recent-consultations panel hides the "
+              f"medicine of a sealed visit ({url})",
+              MED_SEALED not in page and not leaks(page))
+with app.app_context():
+    from models.dispensing import get_dispensing_stats
+    totals = get_dispensing_stats()
+units = q1("SELECT COALESCE(SUM(quantity_dispensed),0) FROM medicine_dispensing")[0]
+check("stock and dispensing totals are unchanged by hiding the names",
+      totals["total_units"] == units
+      and totals["total_events"] == q1("SELECT COUNT(*) FROM medicine_dispensing")[0])
+inventory = body(admin.get("/admin/medicine_inventory"))
+check("the Administrator's Medicine Inventory still lists the shelf and its stock",
+      "Amoxicillin" in inventory and "Paracetamol" in inventory)
+
+# Dispensing at a sealed visit through the real form: audit entries and flash text.
+losartan = q1("SELECT id FROM inventory_items WHERE name LIKE 'Losartan%'")[0]
+metformin = q1("SELECT id FROM inventory_items WHERE name LIKE 'Metformin%'")[0]
+NO_SEALED_FORM = ("diagnosis", "treatment_plan", "is_restricted", "chief_complaint", "remarks")
+mark = audit_max()
+form = {k: v for k, v in edit_form(CID_LATE).items() if k not in NO_SEALED_FORM}
+form.update({"dispense_item_0": str(losartan), "dispense_qty_0": "2"})
+response = staff.post(f"/staff/consultation/edit/{CID_LATE}", data=form, follow_redirects=True)
+entries = [e[0] or "" for e in db().execute("SELECT details FROM audit_logs WHERE id > ?", (mark,))]
+check("Health Center Staff dispensing at a sealed visit works and still sees the name",
+      q1("SELECT COUNT(*) FROM medicine_dispensing WHERE consultation_id=? AND "
+         "inventory_item_id=?", (CID_LATE, losartan))[0] == 1 and "Losartan" in body(response))
+check("D3: but no audit entry for it names the medicine",
+      entries and not [e for e in entries if "Losartan" in e], entries)
+mark = audit_max()
+form = {k: v for k, v in edit_form(CID_LATE).items() if k not in NO_SEALED_FORM}
+form.update({"dispense_item_0": str(metformin), "dispense_qty_0": "3"})
+response = admin.post(f"/admin/consultation/edit/{CID_LATE}", data=form, follow_redirects=True)
+entries = [e[0] or "" for e in db().execute("SELECT details FROM audit_logs WHERE id > ?", (mark,))]
+check("D3: the Administrator dispensing at a sealed visit is not told the medicine's name back",
+      q1("SELECT COUNT(*) FROM medicine_dispensing WHERE consultation_id=? AND "
+         "inventory_item_id=?", (CID_LATE, metformin))[0] == 1
+      and "Metformin" not in body(response), response.status_code)
+check("D3: and no audit entry for that save names it either",
+      entries and not [e for e in entries if "Metformin" in e], entries)
+
+# ===========================================================================
+section("12. THE EDIT CONSULTATION PAGE PRINTS SEALED FIELDS AS 'Sealed — not printed' (D6)")
+page = body(doctor.get(f"/staff/consultation/edit/{CID_REC}"))
+areas = re.findall(r'<textarea[^>]*name="(chief_complaint|diagnosis|treatment_plan|remarks)"[^>]*>',
+                   page)
+tags = {m.group(1): m.group(0) for m in re.finditer(
+    r'<textarea[^>]*name="(chief_complaint|diagnosis|treatment_plan|remarks)"[^>]*>', page)}
+check("the Doctor's edit page of a sealed visit still shows all four fields to edit",
+      sorted(tags) == ["chief_complaint", "diagnosis", "remarks", "treatment_plan"]
+      and CC_REC in page and NOTE_REC in page and DX_REC in page and TX_REC in page)
+check("each of the four fields carries the sealed-field class",
+      len(tags) == 4 and all("sealed-field" in t for t in tags.values()), tags)
+check("the page's print styles hide sealed fields and show the plain line",
+      "@media print" in page and ".sealed-field{display:none !important;}" in page
+      and ".sealed-print-note{display:block;" in page)
+check("each hidden field has the line 'Sealed — not printed' beside it",
+      page.count('<div class="sealed-print-note">Sealed — not printed</div>') == 4,
+      page.count("sealed-print-note"))
+paper = re.sub(r'<textarea[^>]*sealed-field[^>]*>.*?</textarea>', "", page, flags=re.S)
+check("with those fields removed, as the print styles do, no sealed text is left on the page",
+      not leaks(paper), leaks(paper))
+control = body(doctor.get(f"/staff/consultation/edit/{CID_CTRL}"))
+check("control: an unsealed record's edit page hides nothing when printed",
+      "sealed-field" not in re.sub(r"<style.*?</style>", "", control, flags=re.S)
+      and "Sealed — not printed" not in control and CC_CTRL in control)
+for who, client, prefix in (("Administrator", admin, "/admin"), ("Health Center Staff", staff, "/staff")):
+    page = body(client.get(f"{prefix}/consultation/edit/{CID_REC}"))
+    check(f"{who}: the sealed visit's edit page has no chief complaint or notes box, "
+          "only the placeholder",
+          'name="chief_complaint"' not in page and 'name="remarks"' not in page
+          and PLACEHOLDER in page and not leaks(page), leaks(page))
+
+# ===========================================================================
+section("13. THE SECOND MIGRATION: AUDIT ENTRIES AND ALREADY-SEALED VISITS (Task 5b)")
+import migrate_seal_free_text_fields as migration2  # noqa: E402
+
+copy2 = Path(_support.work_path("migrate2.db"))
+shutil.copyfile(TEST_DB, copy2)
+OLD_CC, OLD_NOTE, OLD_REASON = "ZZOLDAUDIT7CC", "ZZOLDAUDIT7NOTE", "ZZOLDSEALED6REASON"
+OLD_SEALED_CC, OLD_SEALED_NOTE = "ZZOLDSEALED6CC", "ZZOLDSEALED6NOTE"
+conn = sqlite3.connect(copy2)
+conn.execute("INSERT INTO audit_logs (user_id, action, module, details, created_at) VALUES "
+             "(1, 'Updated consultation record', 'Consultation Records', ?, '2026-08-01 01:00:00')",
+             ('Consultation #3 for X (PAT-003). 3 fields changed — Temperature: 36 °C → 37 °C; '
+              f'Chief complaint: "{OLD_CC} a; b" → "{OLD_CC} c"; Additional notes: not '
+              f'recorded → "{OLD_NOTE}"',))
+oc = conn.execute("SELECT appointment_id FROM consultations WHERE id = 14").fetchone()[0]
+conn.execute("UPDATE consultations SET chief_complaint = ?, remarks = ?, is_restricted = 1, "
+             "restricted_by = 5, restricted_at = '2026-08-01 02:00:00' WHERE id = 14",
+             (OLD_SEALED_CC, OLD_SEALED_NOTE))
+conn.execute("UPDATE appointments SET notes = ? WHERE id = ?", (OLD_REASON, oc))
+conn.commit()
+before_entries = conn.execute("SELECT COUNT(*) FROM audit_logs").fetchone()[0]
+before_other = conn.execute("SELECT chief_complaint, remarks FROM consultations WHERE id = 20"
+                            ).fetchone()
+conn.close()
+backups2 = Path(_support.work_path("migration2-backups"))
+with contextlib.redirect_stdout(io.StringIO()):
+    first2 = migration2.run(copy2, backup_dir=backups2)
+conn = sqlite3.connect(copy2)
+texts = [r[0] or "" for r in conn.execute("SELECT details FROM audit_logs")]
+records2 = conn.execute("SELECT user_id, details FROM audit_logs WHERE action = ?",
+                        (migration2.ACTION,)).fetchall()
+row14 = conn.execute("SELECT chief_complaint, remarks, is_restricted FROM consultations "
+                     "WHERE id = 14").fetchone()
+reason14 = conn.execute("SELECT notes FROM appointments WHERE id = ?", (oc,)).fetchone()[0]
+kept = conn.execute("SELECT details FROM audit_logs WHERE details LIKE "
+                    "'Consultation #3 for X (PAT-003)%'").fetchone()[0]
+after_entries = conn.execute("SELECT COUNT(*) FROM audit_logs").fetchone()[0]
+after_other = conn.execute("SELECT chief_complaint, remarks FROM consultations WHERE id = 20"
+                           ).fetchone()
+conn.close()
+check("the second migration made a backup first, in the backups folder",
+      first2["backup"] and Path(first2["backup"]).exists()
+      and Path(first2["backup"]).parent == backups2, first2)
+check("it removed the free text from the old audit entries",
+      first2["entries_redacted"] >= 1
+      and not [t for t in texts if OLD_CC in t or OLD_NOTE in t], first2)
+check("and kept who, when, the action and the other fields",
+      "Temperature: 36 °C → 37 °C" in kept and "Chief complaint: (clinical text removed)" in kept
+      and "Additional notes: (clinical text removed)" in kept, kept)
+check("it encrypted the already-sealed visit's chief complaint, notes and check-in reason",
+      first2["consultations_encrypted"] == 1 and first2["visits_encrypted"] == 1
+      and sc.decrypt(row14[0], 14, "chief_complaint") == OLD_SEALED_CC
+      and sc.decrypt(row14[1], 14, "remarks") == OLD_SEALED_NOTE
+      and sc.decrypt(reason14, oc, "notes", "appointments") == OLD_REASON
+      and row14[2] == 1, first2)
+check("and left an unsealed visit's text alone", before_other == after_other)
+check("it wrote exactly one record of itself, with the reason and no free text",
+      len(records2) == 1 and after_entries == before_entries + 1
+      and "RA 11166 Section 44" in records2[0][1]
+      and not [t for t in (OLD_CC, OLD_NOTE, OLD_REASON, OLD_SEALED_CC) if t in records2[0][1]],
+      records2)
+check("after VACUUM the file holds none of the removed or encrypted text",
+      not [t for t in (OLD_CC, OLD_NOTE, OLD_REASON, OLD_SEALED_CC, OLD_SEALED_NOTE)
+           if t.encode() in copy2.read_bytes()])
+with contextlib.redirect_stdout(io.StringIO()):
+    second2 = migration2.run(copy2, backup_dir=backups2)
+conn = sqlite3.connect(copy2)
+records_after2 = conn.execute("SELECT COUNT(*) FROM audit_logs WHERE action = ?",
+                              (migration2.ACTION,)).fetchone()[0]
+conn.close()
+check("running it twice changes nothing and makes no second backup or record",
+      second2["backup"] is None and records_after2 == 1, second2)
+check("no audit entry in the migrated copy holds any free clinical text",
+      not [t for t in texts if any(x in t for x in (OLD_CC, OLD_NOTE, OLD_REASON))])
 
 # ===========================================================================
 passed = sum(1 for _, ok in results if ok)

@@ -735,9 +735,9 @@ conn.close()
 mark = max_audit_id()
 resp = staff.post(
     f"/staff/consultation/edit/{CID}",
+    # Task 5b: on a sealed record the chief complaint and the notes are sealed
+    # too, so the form does not carry them for this role. An honest save omits them.
     data={
-        "chief_complaint": "Follow-up, reviewed by BHW",
-        "remarks": cur["remarks"] or "",
         "temperature": "36.8",
         "blood_pressure": cur["blood_pressure"] or "",
         "pulse_rate": cur["pulse_rate"] or "",
@@ -753,8 +753,13 @@ post = dict(conn.execute("SELECT * FROM consultations WHERE id = ?", (CID,)).fet
 conn.close()
 check("Staff's honest intake edit was saved (temperature moved)",
       str(post["temperature"]) == "36.8", f"temperature={post['temperature']}")
-check("Staff's intake edit was saved (chief complaint moved)",
-      post["chief_complaint"] == "Follow-up, reviewed by BHW")
+# Task 5b: this check used to say the chief complaint moved. A sealed record's
+# chief complaint is sealed with it, so Staff cannot read it or change it, and it
+# stays exactly as stored (encrypted).
+check("Staff's intake edit leaves the sealed chief complaint and notes as stored",
+      post["chief_complaint"] == cur["chief_complaint"]
+      and post["remarks"] == cur["remarks"]
+      and _sc.is_encrypted(post["chief_complaint"]))
 # Task 5 (H4): stored encrypted, so it is compared after decrypting.
 check("*** The sealed diagnosis was NOT erased by Staff's edit ***",
       _sc.decrypt(post["diagnosis"], CID, "diagnosis") == REAL_DIAGNOSIS,
