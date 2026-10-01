@@ -160,9 +160,18 @@ for row in db.execute("SELECT user_id, details FROM audit_logs WHERE action = 'U
     if match and row["user_id"] == doctor_id and "Diagnosis" in row["details"] \
             and "Treatment plan" in row["details"]:
         diagnosed.add(int(match.group(1)))
-check("every consultation has a diagnosis and treatment plan that the Doctor account wrote",
-      diagnosed == set(consultation_ids) and len(diagnosed) == counts["visits"],
-      (len(diagnosed), len(consultation_ids)))
+# Task 6: a few visits are left waiting for the Doctor on purpose, so the Doctor's list
+# has something to show. They have intake by Staff and no diagnosis yet.
+undiagnosed = {r[0] for r in db.execute(
+    "SELECT id FROM consultations WHERE diagnosis IS NULL OR TRIM(diagnosis) = ''")}
+check("every consultation has a diagnosis and treatment plan that the Doctor account wrote, "
+      "except the six visits left waiting for the Doctor (which have neither)",
+      diagnosed == set(consultation_ids) - undiagnosed and len(undiagnosed) == seed.INTAKE_ONLY_VISITS
+      and not (diagnosed & undiagnosed)
+      and db.execute("SELECT COUNT(*) FROM consultations WHERE id IN (%s) AND "
+                     "(treatment_plan IS NOT NULL AND TRIM(treatment_plan) != '')"
+                     % ",".join(map(str, undiagnosed or [0]))).fetchone()[0] == 0,
+      (len(diagnosed), len(consultation_ids), len(undiagnosed)))
 written_by_others = [r for r in db.execute(
     "SELECT user_id, details FROM audit_logs WHERE action = 'Updated consultation record' "
     "AND user_id != ? AND (details LIKE '%Diagnosis%' OR details LIKE '%Treatment plan%')",
@@ -186,10 +195,15 @@ check("both the Administrator and the Official sent broadcasts, all simulated",
 check("every dispensing was done by Health Center Staff",
       {r[0] for r in db.execute("SELECT u.role FROM medicine_dispensing d "
                                 "JOIN users u ON u.id = d.dispensed_by")} <= {"Health Center Staff"})
-check("every visit was completed: nobody is left waiting or in consultation",
-      {r[0] for r in db.execute("SELECT DISTINCT status FROM appointments")} == {"Completed"})
+statuses = dict(db.execute("SELECT status, COUNT(*) FROM appointments GROUP BY status").fetchall())
+check("nobody is in consultation; eight visits were left before being seen and two are still "
+      "waiting from earlier days; every other visit is completed",
+      set(statuses) == {"Completed", "Left before being seen", "Waiting"}
+      and statuses["Left before being seen"] == seed.LEFT_VISITS
+      and statuses["Waiting"] == seed.STALE_WAITING_VISITS
+      and statuses["Completed"] == counts["visits"], statuses)
 actions = {r[0] for r in db.execute("SELECT DISTINCT action FROM audit_logs")}
-wanted = {"Registered patient", "Checked patient in", "Started consultation",
+wanted = {"Marked as left before being seen", "Registered patient", "Checked patient in", "Started consultation",
           "Recorded consultation", "Updated consultation record", "Completed consultation",
           "Dispensed medicine", "Recorded EPI immunisation doses",
           "Recorded doses given elsewhere", "Marked consultation restricted",
@@ -197,10 +211,13 @@ wanted = {"Registered patient", "Checked patient in", "Started consultation",
           "Sent community SMS broadcast"}
 check("the audit trail holds an entry for every workflow action", wanted <= actions,
       sorted(wanted - actions))
-check("each visit has its check-in, start, record and completion entries",
-      all(db.execute("SELECT COUNT(*) FROM audit_logs WHERE action = ?", (a,)).fetchone()[0]
-          == counts["visits"] for a in ("Checked patient in", "Started consultation",
-                                         "Recorded consultation", "Completed consultation")))
+check("each visit has its check-in, start, record and completion entries (and the eight left "
+      "and two waiting visits have a check-in)",
+      db.execute("SELECT COUNT(*) FROM audit_logs WHERE action = 'Checked patient in'").fetchone()[0]
+      == counts["visits"] + seed.LEFT_VISITS + seed.STALE_WAITING_VISITS
+      and all(db.execute("SELECT COUNT(*) FROM audit_logs WHERE action = ?", (a,)).fetchone()[0]
+              == counts["visits"] for a in ("Started consultation", "Recorded consultation",
+                                             "Completed consultation")))
 check("audit entries carry dates across the year, not the day it was built",
       db.execute("SELECT COUNT(DISTINCT substr(created_at,1,10)) FROM audit_logs").fetchone()[0] > 150)
 today = date.today()
@@ -213,6 +230,35 @@ check("visits cover the last 12 months and none is today or later",
 check("no visit falls on a weekend",
       all(date.fromisoformat(r[0]).weekday() < 5 for r in db.execute(
           "SELECT DISTINCT substr(consultation_date,1,10) FROM consultations")))
+
+# ===========================================================================
+section("3b. THE DOCTOR'S LIST AND 'LEFT BEFORE BEING SEEN' SHOW IN THE DEMO (Task 6)")
+left_rows = db.execute("SELECT * FROM appointments WHERE status = 'Left before being seen'").fetchall()
+staff_ids = {u["id"] for u in users.values() if u["role"] == "Health Center Staff"}
+check("the left visits were marked by Staff, on the day they checked in, with the status before",
+      len(left_rows) == seed.LEFT_VISITS
+      and all(r["left_by"] in staff_ids and r["status_before_left"] == "Waiting"
+              and (r["left_at"] or "")[:10] == r["appointment_date"][:10] for r in left_rows))
+check("a visit that left has no consultation and was not diagnosed",
+      all(db.execute("SELECT COUNT(*) FROM consultations WHERE appointment_id = ?",
+                     (r["id"],)).fetchone()[0] == 0 for r in left_rows))
+marks = db.execute("SELECT user_id, details FROM audit_logs WHERE action = "
+                   "'Marked as left before being seen'").fetchall()
+check("each has exactly one audit entry by Staff, in the existing style: Name (PAT-005), "
+      "visit APT-00081.",
+      len(marks) == seed.LEFT_VISITS and all(m["user_id"] in staff_ids for m in marks)
+      and all(re.fullmatch(r".+ \(PAT-\d{3}\), visit APT-\d{5}\.", m["details"]) for m in marks),
+      [m["details"] for m in marks][:2])
+waiting_rows = db.execute("SELECT * FROM appointments WHERE status = 'Waiting'").fetchall()
+check("the still-waiting visits are from earlier days, never started, with no consultation",
+      len(waiting_rows) == seed.STALE_WAITING_VISITS
+      and all(r["appointment_date"][:10] < date.today().isoformat() for r in waiting_rows)
+      and all(db.execute("SELECT COUNT(*) FROM consultations WHERE appointment_id = ?",
+                         (r["id"],)).fetchone()[0] == 0 for r in waiting_rows))
+check("the intake-only visits are from the last two weeks",
+      all(date.fromisoformat(r[0]) >= date.today() - timedelta(days=16) for r in db.execute(
+          "SELECT substr(consultation_date,1,10) FROM consultations WHERE diagnosis IS NULL "
+          "OR TRIM(diagnosis) = ''")))
 
 # ===========================================================================
 section("4. SEALED VISITS ARE ENCRYPTED; PATIENT STATUS; THE SHELF; THE SCHEDULE")
@@ -375,6 +421,17 @@ with flask_app.app_context():
                   len(top_cc) == 3 and all(e["count"] >= 5 for e in top_cc), top_cc)
             check(f"{who}, {label}: the top three dispensed medicines each have 5 or more issues, named",
                   len(top_med) == 3 and all(e["events"] >= 5 for e in top_med), top_med)
+    from models.doctor_worklist import count_waiting_for_doctor, get_waiting_for_doctor
+
+    listed = get_waiting_for_doctor()
+    check("the Doctor's list holds the six intake-only visits and the two still waiting, oldest "
+          "first, and the count agrees",
+          len(listed) == seed.INTAKE_ONLY_VISITS + seed.STALE_WAITING_VISITS
+          == count_waiting_for_doctor()
+          and [v["checked_in"] for v in listed] == sorted(v["checked_in"] for v in listed),
+          len(listed))
+    check("all of them are from earlier days (the demo ends yesterday)",
+          all(v["from_earlier_day"] for v in listed))
     alert = get_immunization_alert(limit=50)
     check("the immunization alert shows children who are due or overdue",
           alert.get("needs_attention_count", alert.get("count", 0)) > 0
