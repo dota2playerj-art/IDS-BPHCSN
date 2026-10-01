@@ -52,3 +52,18 @@ are not a breakdown by diagnosis, complaint, condition or medicine.
 
 Full numbers stay in `sms_broadcast_recipients`, `appointment_sms_messages`, and in
 `models/broadcasts.py` `send_broadcast()`, which hands them to the gateway.
+
+## Task 5e — what the 5d helper did not yet cover
+
+Counts tied to a health service or condition, shown to the Administrator or the
+Barangay Official.
+
+| Count | Where | Decision |
+|---|---|---|
+| Appointments by service requested (range and year to date) | Reports & Analytics screen, chart, print table, Excel, PDF; Official dashboard reads the same builder | fold under 5 into Other (D1) |
+| Prenatal Check-up count beside the prenatal note | Reports & Analytics | reads "Fewer than 5" (D2) |
+| Patients with any recorded condition | Excel summary and Health Concerns sheets | reads "Fewer than 5" (D2) |
+| Patients (and seniors) with only free-text conditions | Reports & Analytics, Community Reports, Excel, PDF | reads "Fewer than 5" (D2) |
+| Audit text quoting a phone number | Audit Logs screen and exports | masked when written, and by a migration for old entries (D3) |
+| Per-dose and per-vaccine coverage (given, overdue, due now) | Vaccination Campaigns, Official only | not changed: cohort coverage with a denominator, not a ranking. Logged as an issue for the team |
+| Queue "services today" | Patient Queue | not changed: the queue itself is visible to the Administrator |
