@@ -493,14 +493,24 @@ for who, client, prefix in (("Administrator", admin, "/admin"), ("Health Center 
                       leaks(page) and not leaks(screen_only)
                       and f'<span class="print-only">{PLACEHOLDER}</span>' in page,
                       leaks(screen_only))
+            elif who == "Administrator":
+                # Task 5c: his profile is demographics only. There is no clinical
+                # section to hold a placeholder, only one plain line.
+                check(f"{who}: {url} shows demographics only, not the text",
+                      not leaks(page) and "Clinical details are shown only to the Doctor and Health Center Staff." in page, leaks(page))
             else:
                 check(f"{who}: {url} shows the placeholder, not the text",
                       not leaks(page) and PLACEHOLDER in page, leaks(page))
     for cid in (CID_REC, CID_LATE):
-        page = body(client.get(f"{prefix}/consultation/edit/{cid}"))
+        response = client.get(f"{prefix}/consultation/edit/{cid}")
+        page = body(response)
         if who == "Doctor":
             check(f"Doctor: the edit form for #{cid} shows the sealed text to edit",
                   any(s in page for s in SEALED_SENTINELS))
+        elif who == "Administrator":
+            # Task 5c: he has no edit form at all now.
+            check(f"{who}: there is no edit form for #{cid} (404), so no sealed text",
+                  response.status_code == 404 and not leaks(page), response.status_code)
         else:
             check(f"{who}: the edit form for #{cid} carries no sealed text",
                   not leaks(page), leaks(page))
@@ -511,18 +521,33 @@ for who, client, prefix in (("Administrator", admin, "/admin"), ("Health Center 
               not leaks(readable(response)), response.status_code)
 r = doctor.post("/session/keep-alive", headers={"X-Requested-With": "fetch"})
 check("the keep-alive (JSON) response carries no sealed text", not leaks(body(r)))
+# Task 5c: the Administrator sees no clinical text at all, so the control that an
+# unsealed diagnosis IS shown now uses Health Center Staff.
+page = body(staff.get(f"/staff/patient_profile/{P_CTRL}"))
+check("control: an unsealed diagnosis is shown to Health Center Staff", DX_CTRL in page)
 page = body(admin.get(f"/admin/patient_profile/{P_CTRL}"))
-check("control: an unsealed diagnosis is shown to the Administrator", DX_CTRL in page)
+check("and not to the Administrator, sealed or not (Task 5c)", DX_CTRL not in page)
 
 # ===========================================================================
 section("5. THE KEY TEST: THE BACKUP DOWNLOAD HOLDS NO SEALED TEXT")
-response = admin.get("/admin/settings/backup.db")
-data = response.data
-check("the Administrator's backup route answers with a database file",
-      response.status_code == 200 and data[:16] == b"SQLite format 3\x00", response.status_code)
-check("control: the unsealed sentinel IS found in the backup bytes", DX_CTRL.encode() in data)
+# Task 5c (M25): the download is an encrypted .idsbackup file. Its bytes hold no
+# text at all, sealed or not. The checks below that need the database inside it
+# open it the way the health center does, with restore_backup.py's decryptor.
+import restore_backup  # noqa: E402
+
+response = admin.get("/admin/settings/backup.idsbackup")
+encrypted = response.data
+check("the Administrator's backup route answers with an encrypted backup file",
+      response.status_code == 200 and encrypted[:7] == b"IDSBAK1"
+      and encrypted[:16] != b"SQLite format 3\x00", response.status_code)
+check("*** the downloaded file holds no sentinel at all, sealed or unsealed ***",
+      not [t for t in SEALED_SENTINELS + (DX_CTRL, CC_CTRL, NOTE_CTRL, REASON_CTRL)
+           if t.encode() in encrypted])
+data = restore_backup.decrypt_backup(encrypted)
+check("opened with the key, it is a database file", data[:16] == b"SQLite format 3\x00")
+check("control: the unsealed sentinel IS found in the opened backup", DX_CTRL.encode() in data)
 check("control: an unsealed chief complaint, note and check-in reason ARE found in the "
-      "backup bytes",
+      "opened backup",
       all(t.encode() in data for t in (CC_CTRL, NOTE_CTRL, REASON_CTRL)))
 check("*** no sealed chief complaint, note or check-in reason is in the backup bytes ***",
       not [t for t in (CC_REC, NOTE_REC, REASON_REC, CC_LATE, NOTE_LATE, REASON_LATE,
@@ -542,11 +567,11 @@ live = Path(TEST_DB).read_bytes()
 check("the database file itself holds no sealed text either (secure_delete)",
       not [s for s in SEALED_SENTINELS if s.encode() in live])
 settings_page = body(admin.get("/admin/settings"))
-check("Settings → Backup says sealed records stay encrypted",
-      "Sealed records stay encrypted in the backup. They can only be opened on a "
-      "computer that has this system&#39;s key." in settings_page
-      or "Sealed records stay encrypted in the backup. They can only be opened on a "
-      "computer that has this system's key." in settings_page)
+check("Settings → Backup says the backup file is encrypted (Task 5c wording)",
+      "The backup file is encrypted. It can only be opened with this system&#39;s key, "
+      "using restore_backup.py on the health-center computer." in settings_page
+      or "The backup file is encrypted. It can only be opened with this system's key, "
+      "using restore_backup.py on the health-center computer." in settings_page)
 
 # ===========================================================================
 section("6. NO AUDIT ENTRY HOLDS DIAGNOSIS OR TREATMENT TEXT")
@@ -846,7 +871,7 @@ with app.app_context():
 # The database backup is a copy of the whole file, so it holds every unsealed value as
 # it is stored. That is a known limit recorded in PROJECT_STATUS.md (M25, M26), not a
 # screen or an export of this page, so it is left out of this crawl.
-FILES_OF_THE_WHOLE_DATABASE = ("/admin/settings/backup.db",)
+FILES_OF_THE_WHOLE_DATABASE = ("/admin/settings/backup.idsbackup",)
 for who, client in (("Administrator", admin), ("Barangay Official", official)):
     found = []
     for url in plain_gets:
@@ -863,19 +888,24 @@ admin_profile = body(admin.get(f"/admin/patient_profile/{P_REC}"))
 admin_print = body(admin.get(f"/admin/patient_profile/{P_REC}?print=1"))
 staff_profile = body(staff.get(f"/staff/patient_profile/{P_REC}"))
 doctor_profile = body(doctor.get(f"/staff/patient_profile/{P_REC}"))
-check("D3: the Administrator's profile of a sealed visit shows the placeholder, not the name",
+# Task 5c: his profile has no Dispensing History at all, so there is no
+# placeholder to show either -- one plain line instead.
+check("D3: the Administrator's profile of a sealed visit names no medicine (demographics only)",
       MED_SEALED not in admin_profile and MED_SEALED not in admin_print
-      and PLACEHOLDER in admin_profile)
+      and "Clinical details are shown only to the Doctor and Health Center Staff." in admin_profile)
 check("D3: Health Center Staff and the Doctor still see what was dispensed",
       MED_SEALED in staff_profile and MED_SEALED in doctor_profile)
-check("control: the Administrator sees the medicine dispensed at an unsealed visit",
-      MED_OPEN in body(admin.get(f"/admin/patient_profile/{P_CTRL}")))
+check("control: Health Center Staff see the medicine dispensed at an unsealed visit",
+      MED_OPEN in body(staff.get(f"/staff/patient_profile/{P_CTRL}")))
+check("and since Task 5c the Administrator does not, sealed or not",
+      MED_OPEN not in body(admin.get(f"/admin/patient_profile/{P_CTRL}")))
 for who, client, prefix in (("Administrator", admin, "/admin"), ("Health Center Staff", staff, "/staff"),
                             ("Doctor", doctor, "/staff")):
-    page = body(client.get(f"{prefix}/consultation/edit/{CID_REC}"))
+    response = client.get(f"{prefix}/consultation/edit/{CID_REC}")
+    page = body(response)
     if who == "Administrator":
-        check("D3: the Administrator's edit form lists no medicine name for a sealed visit",
-              MED_SEALED not in page)
+        check("D3: the Administrator has no edit form to list a medicine on (404, Task 5c)",
+              response.status_code == 404 and MED_SEALED not in page)
     else:
         check(f"{who}: the edit form of a sealed visit still lists what was dispensed",
               MED_SEALED in page)
@@ -885,10 +915,12 @@ for url in plain_gets:
         continue
     if MED_SEALED in readable(admin.get(url)):
         found.append(url)
-check("D3: the Administrator's patient-linked screens, exports and the dashboard never name it",
-      all("reports_analytics" in url for url in found), found)
-check("D3 leaves per-item totals not tied to a patient as they were: Reports still ranks it",
-      any("reports_analytics" in url for url in found), found)
+# Task 5c (M25): Reports used to rank a sealed visit's medicine by name. It is
+# now counted under "Confidential", so nothing he can reach names it.
+check("D3: no screen, export or dashboard of the Administrator names it, Reports included",
+      not found, found)
+check("Reports count it under Confidential instead",
+      "Confidential" in readable(admin.get("/admin/reports_analytics/export.xlsx")))
 dash = [u for u in plain_gets if "dashboard" in u]
 for url in dash:
     if url.startswith("/admin"):
@@ -924,14 +956,19 @@ check("D3: but no audit entry for it names the medicine",
 mark = audit_max()
 form = {k: v for k, v in edit_form(CID_LATE).items() if k not in NO_SEALED_FORM}
 form.update({"dispense_item_0": str(metformin), "dispense_qty_0": "3"})
-response = admin.post(f"/admin/consultation/edit/{CID_LATE}", data=form, follow_redirects=True)
+# Task 5c: the Administrator no longer dispenses at all. Both URLs refuse him,
+# nothing leaves the shelf, and no entry is written.
+response = admin.post(f"/admin/consultation/edit/{CID_LATE}", data=form)
+response2 = admin.post(f"/staff/consultation/edit/{CID_LATE}", data=form)
 entries = [e[0] or "" for e in db().execute("SELECT details FROM audit_logs WHERE id > ?", (mark,))]
-check("D3: the Administrator dispensing at a sealed visit is not told the medicine's name back",
-      q1("SELECT COUNT(*) FROM medicine_dispensing WHERE consultation_id=? AND "
-         "inventory_item_id=?", (CID_LATE, metformin))[0] == 1
-      and "Metformin" not in body(response), response.status_code)
-check("D3: and no audit entry for that save names it either",
-      entries and not [e for e in entries if "Metformin" in e], entries)
+check("the Administrator cannot dispense at a sealed visit: refused on both URLs, "
+      "and no medicine name comes back",
+      response.status_code == 404 and response2.status_code == 302
+      and q1("SELECT COUNT(*) FROM medicine_dispensing WHERE consultation_id=? AND "
+             "inventory_item_id=?", (CID_LATE, metformin))[0] == 0
+      and "Metformin" not in body(response) + body(response2),
+      (response.status_code, response2.status_code))
+check("and nothing was written to the audit trail for it", entries == [], entries)
 
 # ===========================================================================
 section("12. THE EDIT CONSULTATION PAGE PRINTS SEALED FIELDS AS 'Sealed — not printed' (D6)")
@@ -958,12 +995,15 @@ control = body(doctor.get(f"/staff/consultation/edit/{CID_CTRL}"))
 check("control: an unsealed record's edit page hides nothing when printed",
       "sealed-field" not in re.sub(r"<style.*?</style>", "", control, flags=re.S)
       and "Sealed — not printed" not in control and CC_CTRL in control)
-for who, client, prefix in (("Administrator", admin, "/admin"), ("Health Center Staff", staff, "/staff")):
-    page = body(client.get(f"{prefix}/consultation/edit/{CID_REC}"))
-    check(f"{who}: the sealed visit's edit page has no chief complaint or notes box, "
-          "only the placeholder",
-          'name="chief_complaint"' not in page and 'name="remarks"' not in page
-          and PLACEHOLDER in page and not leaks(page), leaks(page))
+page = body(staff.get(f"/staff/consultation/edit/{CID_REC}"))
+check("Health Center Staff: the sealed visit's edit page has no chief complaint or notes box, "
+      "only the placeholder",
+      'name="chief_complaint"' not in page and 'name="remarks"' not in page
+      and PLACEHOLDER in page and not leaks(page), leaks(page))
+response = admin.get(f"/admin/consultation/edit/{CID_REC}")
+check("Administrator: there is no edit page to print at all (404, Task 5c)",
+      response.status_code == 404 and not leaks(body(response))
+      and 'name="chief_complaint"' not in body(response))
 
 # ===========================================================================
 section("13. THE SECOND MIGRATION: AUDIT ENTRIES AND ALREADY-SEALED VISITS (Task 5b)")

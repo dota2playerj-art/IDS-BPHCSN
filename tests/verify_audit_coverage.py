@@ -251,9 +251,10 @@ for row in rows:
     by_action.setdefault(row["action"], []).append(row)
 expected = {
     A.ACTION_CONSULTATION_RECORDED: f"Consultation #{cid} for {patient_ref(3)}, visit {TODAY}.",
-    A.ACTION_OTHER_VACCINATIONS_RECORDED: f"1 dose for {patient_ref(3)} at consultation #{cid}: Influenza.",
-    A.ACTION_MEDICINE_DISPENSED: f"For {patient_ref(3)}, consultation #{cid}: 1 item. "
-                                 "Names not shown: the consultation is restricted.",
+    # Task 5c: dose and dispensing entries say how many, for whom, at which
+    # consultation, and never which vaccine or medicine, sealed or not.
+    A.ACTION_OTHER_VACCINATIONS_RECORDED: f"Recorded 1 dose for {patient_ref(3)} at consultation #{cid}.",
+    A.ACTION_MEDICINE_DISPENSED: f"Dispensed 1 item for {patient_ref(3)} at consultation #{cid}.",
     A.ACTION_CONSULTATION_COMPLETED: f"{patient_ref(3)}, visit APT-{other:05d}.",
 }
 for action, details in expected.items():
@@ -268,7 +269,8 @@ check("nothing else was written",
 check("the dispensing entry of a sealed consultation does not name the medicine",
       medicine["name"] not in by_action[A.ACTION_MEDICINE_DISPENSED][0]["details"])
 
-# An unsealed visit: the medicine is named, with its quantity.
+# An unsealed visit: since Task 5c the medicine is not named here either. The
+# entry is read by the Administrator, who is not part of the patient's care.
 staff.post("/staff/appointment_scheduling/check-in", data={"patient_id": "4", "reason": "Lagnat"})
 v4 = latest_visit(4)
 doctor.post("/staff/appointment_scheduling/start-consultation", data={"appointment_id": str(v4)})
@@ -278,10 +280,13 @@ doctor.post(f"/staff/consultation/record/{v4}", data=dict(
 c4 = q("SELECT id FROM consultations WHERE appointment_id = ?", (v4,))[0][0]
 unit = (medicine["unit"] or "unit").lower()
 got = [r for r in since(start) if r["action"] == A.ACTION_MEDICINE_DISPENSED]
-check("dispensing writes one entry: who, which patient, which item, how many",
-      len(got) == 1 and got[0]["details"] == f"For {patient_ref(4)}, consultation #{c4}: "
-      f"2 {unit}s of {medicine['name']}." and got[0]["user_id"] == DOCTOR_ID,
+check("dispensing writes one entry: who, which patient, which consultation, how many items",
+      len(got) == 1 and got[0]["details"] == f"Dispensed 1 item for {patient_ref(4)} at "
+      f"consultation #{c4}." and got[0]["user_id"] == DOCTOR_ID,
       [g["details"] for g in got])
+check("and it names no medicine, even on an unsealed visit (Task 5c)",
+      len(got) == 1 and medicine["name"] not in got[0]["details"]
+      and unit not in got[0]["details"])
 
 # A child: an EPI dose given here, and one reported as given elsewhere. The
 # fixture already holds this infant's birth doses (BCG, Hepatitis B).
@@ -294,14 +299,18 @@ r = doctor.post(f"/staff/consultation/record/{v17}", data=dict(
 c17 = q("SELECT id FROM consultations WHERE appointment_id = ?", (v17,))
 c17 = c17[0][0] if c17 else 0
 got = {r["action"]: r for r in since(start)}
+# Task 5c: the entries count the doses and name no vaccine.
 check("EPI doses given here write one entry", A.ACTION_EPI_DOSES_RECORDED in got
       and got[A.ACTION_EPI_DOSES_RECORDED]["details"]
-      == f"1 dose for {patient_ref(17)} at consultation #{c17}: Pentavalent dose 1.",
+      == f"Recorded 1 dose for {patient_ref(17)} at consultation #{c17}.",
       {k: v["details"] for k, v in got.items()})
 check("a dose reported as given elsewhere writes one entry", A.ACTION_REPORTED_DOSES_RECORDED in got
-      and got[A.ACTION_REPORTED_DOSES_RECORDED]["details"].startswith(
-          f"1 dose for {patient_ref(17)} at consultation #{c17}: OPV dose 1 ("),
+      and got[A.ACTION_REPORTED_DOSES_RECORDED]["details"]
+      == f"Recorded 1 dose for {patient_ref(17)} at consultation #{c17}.",
       {k: v["details"] for k, v in got.items()})
+check("neither names the vaccine",
+      not any(v in str({k: r["details"] for k, r in got.items()})
+              for v in ("Pentavalent", "OPV")))
 
 # ===========================================================================
 section("5. EDITING A CONSULTATION: DISPENSING STILL WRITES ITS OWN ENTRY")
@@ -316,8 +325,9 @@ r = doctor.post(f"/staff/consultation/edit/{c4}", data=edit)
 got = [r for r in since(start) if r["action"] == A.ACTION_MEDICINE_DISPENSED]
 unit2 = (second["unit"] or "unit").lower()
 check("an edit that dispenses writes one dispensing entry",
-      len(got) == 1 and got[0]["details"] == f"For {patient_ref(4)}, consultation #{c4}: "
-      f"1 {unit2} of {second['name']}.", [g["details"] for g in since(start)])
+      len(got) == 1 and got[0]["details"] == f"Dispensed 1 item for {patient_ref(4)} at "
+      f"consultation #{c4}." and second["name"] not in got[0]["details"],
+      [g["details"] for g in since(start)])
 
 # ===========================================================================
 section("6. MEDICINE INVENTORY: ADD, EDIT, STOCK, ARCHIVE")

@@ -234,7 +234,7 @@ check("SMS Notifications as staff sees it: no send/compose endpoint for Doctor",
       "/sms_notifications/send" not in sms)
 for path in ("/admin/user_management", "/admin/audit_logs", "/admin/settings",
              "/admin/reports_analytics", "/admin/dashboard", "/official/dashboard",
-             "/official/reports_analytics", "/admin/settings/backup.db",
+             "/official/reports_analytics", "/admin/settings/backup.idsbackup",
              "/admin/audit_logs/export.xlsx"):
     r = doctor.get(path)
     check(f"doctor refused {path}", r.status_code == 302
@@ -255,8 +255,7 @@ check("doctor's forged POSTs to Add User / Maintenance / Settings refused, nothi
 section("D3. WHO IS OFFERED THE DIAGNOSIS FIELDS ON RECORD CONSULTATION")
 appt = new_queue_entry(PID_CTRL)
 for who, client, prefix, should in (("doctor", doctor, "/staff", True),
-                                    ("staff", staff, "/staff", False),
-                                    ("admin", admin, "/admin", False)):
+                                    ("staff", staff, "/staff", False)):
     page = body(client.get(f"{prefix}/consultation/record/{appt}"))
     has = 'name="diagnosis"' in page and 'name="treatment_plan"' in page
     seal = 'name="is_restricted"' in page
@@ -266,6 +265,17 @@ for who, client, prefix, should in (("doctor", doctor, "/staff", True),
     if not should:
         check(f"{who}: form says the Doctor records the assessment",
               "recorded by the Doctor" in page)
+# Task 5c: the Administrator used to open this form without the two fields. He now
+# opens no consultation form at all: his URL is gone and the care team's sends
+# him to his dashboard.
+r_admin = admin.get(f"/admin/consultation/record/{appt}")
+r_staff_url = admin.get(f"/staff/consultation/record/{appt}")
+check("admin: no Record Consultation form at all (Task 5c) -- his URL is gone (404)",
+      r_admin.status_code == 404 and 'name="diagnosis"' not in body(r_admin),
+      r_admin.status_code)
+check("admin: the care team's Record Consultation URL sends him to his dashboard",
+      r_staff_url.status_code == 302 and r_staff_url.headers["Location"].endswith("/dashboard"),
+      r_staff_url.status_code)
 
 # ===========================================================================
 section("D4. DOCTOR RECORDS A DIAGNOSIS (record path, with the seal ticked)")
@@ -335,9 +345,15 @@ check("seal audited, without the sealed text",
       and not any("SENTINEL-DOC" in e[0] for e in entries))
 r = doctor.post(restrict_url, data={"consultation_id": str(CID_DOC), "restrict_action": "lift"})
 check("doctor lifted it", q1("SELECT is_restricted FROM consultations WHERE id=?", (CID_DOC,))[0] == 0)
-p = body(admin.get(f"/admin/patient_profile/{PID_DOC}"))
-check("unsealed: the Administrator now sees the text (the flag, not the text, governs)",
+# Task 5c: the Administrator sees no clinical text, sealed or not, so this
+# control now uses Health Center Staff, the other role the seal withholds from.
+p = body(staff.get(f"/staff/patient_profile/{PID_DOC}"))
+check("unsealed: Health Center Staff now see the text (the flag, not the text, governs)",
       "SENTINEL-DOC-DX-9b2d" in p)
+p = body(admin.get(f"/admin/patient_profile/{PID_DOC}"))
+check("unsealed or not, the Administrator's profile is demographics only (Task 5c)",
+      "SENTINEL-DOC" not in p
+      and "Clinical details are shown only to the Doctor and Health Center Staff." in p)
 doctor.post(restrict_url, data={"consultation_id": str(CID_DOC), "restrict_action": "restrict"})
 check("doctor re-sealed it", q1("SELECT is_restricted FROM consultations WHERE id=?", (CID_DOC,))[0] == 1)
 
@@ -349,7 +365,7 @@ cases = (
     ("sealed at record time", PID_CTRL, CID_REC, ("SENTINEL-REC-DX-51f0", "SENTINEL-REC-TX-51f0")),
 )
 for label, pid, cid, sentinels in cases:
-    for who, client, prefix in (("admin", admin, "/admin"), ("staff", staff, "/staff")):
+    for who, client, prefix in (("staff", staff, "/staff"),):
         p = body(client.get(f"{prefix}/patient_profile/{pid}"))
         check(f"[{label}] {who} profile: placeholder shown, sealed text absent from raw body",
               PLACEHOLDER in p and not any(s in p for s in sentinels),
@@ -359,6 +375,18 @@ for label, pid, cid, sentinels in cases:
         check(f"[{label}] {who} edit form: sealed text absent from raw body",
               e.status_code == 200 and not any(s in eb for s in sentinels),
               f"{e.status_code} {[s for s in sentinels if s in eb]}")
+    # Task 5c: the Administrator gets no clinical section at all, so no
+    # placeholder either -- one plain line -- and no edit form.
+    p = body(admin.get(f"/admin/patient_profile/{pid}"))
+    check(f"[{label}] admin profile: demographics only, sealed text absent from raw body",
+          "Clinical details are shown only to the Doctor and Health Center Staff." in p
+          and not any(s in p for s in sentinels), [s for s in sentinels if s in p])
+    e = admin.get(f"/admin/consultation/edit/{cid}")
+    e2 = admin.get(f"/staff/consultation/edit/{cid}")
+    check(f"[{label}] admin edit form: gone (404), and the care team's URL refuses him",
+          e.status_code == 404 and e2.status_code == 302
+          and not any(s in body(e) + body(e2) for s in sentinels),
+          f"{e.status_code} {e2.status_code}")
     p = body(doctor.get(f"/staff/patient_profile/{pid}"))
     check(f"[{label}] doctor profile: sealed text shown in full",
           all(s in p for s in sentinels), [s for s in sentinels if s not in p])
@@ -368,10 +396,12 @@ for label, pid, cid, sentinels in cases:
 hist_after = q1("SELECT * FROM consultations WHERE id=?", (CID_HIST,))
 check("historic seal row byte-identical after every role viewed it",
       tuple(hist_after) == hist_row_before)
+# Task 5c: the Administrator no longer opens a view that could withhold anything,
+# so the withheld view audited here is Health Center Staff's.
 withheld = db().execute(
     "SELECT COUNT(*) FROM audit_logs WHERE action = 'Withheld restricted consultation from view' "
-    "AND user_id = ? AND details LIKE ?", (ADMIN_ID, f"%#{CID_DOC}%")).fetchone()[0]
-check("an Administrator view that withheld the sealed record is audited", withheld >= 1)
+    "AND user_id = ? AND details LIKE ?", (STAFF_ID, f"%#{CID_DOC}%")).fetchone()[0]
+check("a Health Center Staff view that withheld the sealed record is audited", withheld >= 1)
 
 # Dispensing History joins the diagnosis in; the consultation there has dispensing.
 p = body(admin.get(f"/admin/patient_profile/{PID_DOC}?tab=medicine"))
@@ -383,8 +413,12 @@ section("F. FORGED REQUESTS FROM ADMINISTRATOR AND STAFF")
 FORGED_DX = "FORGED-DX-e3a7 unlicensed guess"
 FORGED_TX = "FORGED-TX-e3a7 unlicensed plan"
 
-for who, client, prefix, uid in (("Administrator", admin, "/admin", ADMIN_ID),
-                                 ("Staff", staff, "/staff", STAFF_ID)):
+# Task 5c: the Administrator used to reach the edit, record and status routes and be
+# refused the clinical fields inside them. He now reaches none of them, so his
+# half of this section is the block after the loop: every one of the same
+# requests is refused before it runs, and the database does not move at all --
+# not even by a refusal entry.
+for who, client, prefix, uid in (("Staff", staff, "/staff", STAFF_ID),):
     print(f"\n  == {who} ==")
     # (a)/(b) on a SEALED record and on an UNSEALED one, via the edit path.
     for target in (CID_DOC, CID_CTRL):
@@ -492,6 +526,85 @@ for who, client, prefix, uid in (("Administrator", admin, "/admin", ADMIN_ID),
     check(f"{who}'s status dialog draws no Mark Deceased button",
           'value="Deceased"' not in page and 'id="archiveDoctorOnly"' in page)
 
+print("\n  == Administrator (Task 5c: refused before anything runs) ==")
+for target in (CID_DOC, CID_CTRL):
+    for field, forged in (("diagnosis", FORGED_DX), ("treatment_plan", FORGED_TX)):
+        before = snapshot()
+        form = edit_form(target)
+        form.pop("diagnosis", None); form.pop("treatment_plan", None)
+        form.pop("is_restricted", None)
+        form[field] = forged
+        before_row = dict(q1("SELECT * FROM consultations WHERE id=?", (target,)))
+        r1 = admin.post(f"/admin/consultation/edit/{target}", data=form)
+        r2 = admin.post(f"/staff/consultation/edit/{target}", data=form)
+        after_row = dict(q1("SELECT * FROM consultations WHERE id=?", (target,)))
+        check(f"Administrator forged {field} on #{target}: refused on both URLs "
+              f"(404, and a redirect to his dashboard); {field} byte-identical",
+              r1.status_code == 404 and r2.status_code == 302
+              and r2.headers["Location"].endswith("/dashboard")
+              and after_row == before_row and FORGED_DX not in str(after_row),
+              f"{r1.status_code} {r2.status_code}")
+        check(f"Administrator forged {field} on #{target}: the whole database is "
+              "byte-identical -- not even a refusal row, because nothing ran",
+              snap_diff(before, snapshot()) == {}, sorted(snap_diff(before, snapshot())))
+appt_f = new_queue_entry(PID_CTRL)
+before = snapshot()
+r1 = admin.post(f"/admin/consultation/record/{appt_f}", data={
+    "chief_complaint": "forged record probe", "diagnosis": FORGED_DX,
+    "treatment_plan": FORGED_TX, "is_restricted": "1"})
+r2 = admin.post(f"/staff/consultation/record/{appt_f}", data={
+    "chief_complaint": "forged record probe", "diagnosis": FORGED_DX,
+    "treatment_plan": FORGED_TX, "is_restricted": "1"})
+check("Administrator forged record: refused on both URLs, no consultation written",
+      r1.status_code == 404 and r2.status_code == 302
+      and q1("SELECT COUNT(*) FROM consultations WHERE appointment_id=?", (appt_f,))[0] == 0
+      and snap_diff(before, snapshot()) == {})
+for sealed_target, pid, action in ((CID_CTRL, PID_CTRL, "restrict"), (CID_DOC, PID_DOC, "lift")):
+    before = snapshot()
+    r1 = admin.post(f"/staff/patient_profile/{pid}/restrict-consultation",
+                    data={"consultation_id": str(sealed_target), "restrict_action": action})
+    r2 = admin.post(f"/admin/patient_profile/{pid}/restrict-consultation",
+                    data={"consultation_id": str(sealed_target), "restrict_action": action})
+    check(f"Administrator forged seal ({action}) on #{sealed_target}: both URLs refused, "
+          "database byte-identical",
+          r1.status_code == 302 and r1.headers["Location"].endswith("/dashboard")
+          and r2.status_code in (404, 405) and snap_diff(before, snapshot()) == {})
+seal_cols = "is_restricted, restricted_by, restricted_at"
+for target, box in ((CID_CTRL, {"is_restricted": "1"}), (CID_DOC, {})):
+    before_seal = tuple(q1(f"SELECT {seal_cols} FROM consultations WHERE id=?", (target,)))
+    form = edit_form(target)
+    form.pop("diagnosis", None); form.pop("treatment_plan", None)
+    form.pop("is_restricted", None)
+    form.update(box)
+    admin.post(f"/admin/consultation/edit/{target}", data=form)
+    admin.post(f"/staff/consultation/edit/{target}", data=form)
+    after_seal = tuple(q1(f"SELECT {seal_cols} FROM consultations WHERE id=?", (target,)))
+    check(f"Administrator edit form {'ticking' if box else 'unticking'} the seal on "
+          f"#{target}: seal columns byte-identical", before_seal == after_seal,
+          f"{before_seal} -> {after_seal}")
+active_pid = q1("SELECT id FROM patients WHERE status='Active' ORDER BY id LIMIT 1")[0]
+deceased_pid = q1("SELECT id FROM patients WHERE status='Deceased' ORDER BY id LIMIT 1")[0]
+for pid, status in ((active_pid, "Deceased"), (deceased_pid, "Active"),
+                    (deceased_pid, "Inactive"), (active_pid, "Inactive")):
+    before = snapshot()
+    r1 = admin.post("/admin/patient_records/archive",
+                    data={"single_patient_id": str(pid), "status": status})
+    r2 = admin.post("/staff/patient_records/archive",
+                    data={"single_patient_id": str(pid), "status": status})
+    check(f"Administrator forged status {status} on patient {pid}: refused on both URLs, "
+          "database byte-identical",
+          r1.status_code == 404 and r2.status_code == 302 and snap_diff(before, snapshot()) == {})
+before = snapshot()
+admin.post("/admin/patient_records/archive", data={"patient_ids": [str(active_pid)], "status": "Deceased"})
+admin.post("/staff/patient_records/archive", data={"patient_ids": [str(active_pid)], "status": "Deceased"})
+check("Administrator forged bulk Deceased: database byte-identical",
+      snap_diff(before, snapshot()) == {})
+check("Administrator can no longer move Active -> Inactive (Task 5c: a patient write)",
+      q1("SELECT status FROM patients WHERE id=?", (active_pid,))[0] == "Active")
+page = body(admin.get("/admin/patient_records"))
+check("Administrator's patient list draws no status dialog and no Mark Deceased button",
+      'value="Deceased"' not in page and 'id="archivePatientModal"' not in page)
+
 # Positive control: the SAME forged-shape request from the Doctor does write,
 # which is what shows the refusals above are the permission and not the harness.
 form = edit_form(CID_CTRL)
@@ -591,9 +704,12 @@ section("P. ADMINISTRATOR KEEPS EVERY SYSTEM-ADMINISTRATION POWER")
 for path in ("/admin/user_management", "/admin/audit_logs", "/admin/settings",
              "/admin/reports_analytics", "/admin/dashboard"):
     check(f"admin GET {path} -> 200", admin.get(path).status_code == 200)
-b = admin.get("/admin/settings/backup.db")
-check("admin backup download is a real SQLite file",
-      b.status_code == 200 and b.data[:15] == b"SQLite format 3")
+b = admin.get("/admin/settings/backup.idsbackup")
+# Task 5c (M25): the backup is an encrypted .idsbackup file now. Same check that a
+# real backup is served, by its own header; tests/verify_admin_minimum_necessary.py
+# restores it and compares every table.
+check("admin backup download is a real, encrypted backup file",
+      b.status_code == 200 and b.data[:7] == b"IDSBAK1" and b.data[:15] != b"SQLite format 3")
 r = admin.post("/admin/user_management/add", data={
     "full_name": "Second Physician", "username": "drsecond", "role": "Doctor",
     "password": "Morning-rounds-77", "confirm_password": "Morning-rounds-77"})

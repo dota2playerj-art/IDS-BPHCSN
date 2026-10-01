@@ -244,10 +244,15 @@ check("never more than the ceiling",
 # medicine" had been passing VACUOUSLY -- "Medicine on line 5" can no
 # longer appear at all -- and tests something again with "Item on line 5".
 # ==================================================== 4. both roles, end to end
+# Task 5c: the Administrator no longer records consultations or dispenses -- that
+# is the care team's. His run through this section became the Doctor's, which is
+# the other role that dispenses, and the refusal of his old route is checked
+# right after the loop.
 ROLES = [
-    ("admin", _support.PASSWORDS["admin"], "/admin/consultation/record/{}", "Administrator", 16),
+    ("doctor", _support.PASSWORDS["doctor"], "/staff/consultation/record/{}", "Doctor", 16),
     ("staff", _support.PASSWORDS["staff"], "/staff/consultation/record/{}", "Health Center Staff", 8),
 ]
+ACCOUNT_IDS = {"admin": 1, "staff": 2, "doctor": 5}
 
 for username, password, url_pattern, role, patient in ROLES:
     section("4. %s -- the form, both hard blocks, and a six-medicine save" % role)
@@ -345,9 +350,30 @@ for username, password, url_pattern, role, patient in ROLES:
           any(r["inventory_item_id"] == six[4][0] for r in stored)
           and any(r["inventory_item_id"] == six[5][0] for r in stored))
     check("the dispensing rows name the acting account",
-          all(r["dispensed_by"] == (1 if username == "admin" else 2) for r in stored),
+          all(r["dispensed_by"] == ACCOUNT_IDS[username] for r in stored),
           [r["dispensed_by"] for r in stored])
     check("the visit is marked Completed", "Completed" in html)
+
+# ==================================================== 4b. the Administrator is refused
+section("4b. Administrator -- refused on the server, and nothing leaves the shelf (Task 5c)")
+client = appmod.app.test_client()
+resp = login(client, "admin", _support.PASSWORDS["admin"])
+check("admin signs in", resp.status_code == 200, resp.status_code)
+appointment = make_in_consultation(14)
+lines = [(item, 3) for item in SHELF_IDS[:2]]
+before = {item: stock_of(item) for item, _ in lines}
+page = client.get("/admin/consultation/record/%d" % appointment)
+check("his old form URL no longer exists (404)", page.status_code == 404, page.status_code)
+resp = client.post("/admin/consultation/record/%d" % appointment, data=with_lines(lines))
+check("a POST to it is refused (404)", resp.status_code == 404, resp.status_code)
+resp = client.post("/staff/consultation/record/%d" % appointment, data=with_lines(lines))
+check("a POST to the care team's URL sends him to his dashboard",
+      resp.status_code == 302 and resp.headers.get("Location", "").endswith("/dashboard"),
+      (resp.status_code, resp.headers.get("Location")))
+check("no consultation was written", consultation_for(appointment) is None)
+check("nothing came off the shelf",
+      all(stock_of(item) == before[item] for item in before),
+      {i: (before[i], stock_of(i)) for i in before})
 
 # ==================================================== 5. the ceiling itself
 section("5. The ceiling itself -- %d medicines in one visit" % len(TEN_ITEMS))
