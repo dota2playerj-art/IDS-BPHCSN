@@ -94,6 +94,7 @@ from models.settings import (
 )
 from models.users import get_all_users, get_user_by_id, password_policy
 from routes.report_export import _download
+from utils.backup_crypto import EXTENSION as BACKUP_EXTENSION, encrypt_backup
 from utils.dates import display_timestamp, now
 from utils.security import SESSION_RULE_TEXT
 from utils.workbook import safe_filename
@@ -465,7 +466,9 @@ def log_backup_download(actor_id, size, filename, ip_address=None):
             "immunisation, appointment, stock movement, SMS broadcast, audit "
             "entry and user account — taken with SQLite's own online backup "
             "interface while the system was running, and checked with PRAGMA "
-            "integrity_check before it was sent. Account passwords are in it "
+            "integrity_check before it was sent. The file is encrypted with this "
+            "system's key and opens only with restore_backup.py on a computer "
+            "that has the key. Account passwords are in it "
             "only as the salted hashes they are stored as; nothing in the file "
             "reveals a password. The copy now exists outside this system and "
             "cannot be recalled or tracked from here, which is why the download "
@@ -481,6 +484,9 @@ def log_backup_download(actor_id, size, filename, ip_address=None):
 # either, so both produce a save; the difference is what the file is labelled as
 # when it lands, and one of the two is true.
 SQLITE_MIMETYPE = "application/vnd.sqlite3"
+# Since Task 5c the download is an encrypted .idsbackup file, which no program
+# but restore_backup.py reads, so it is labelled as plain bytes.
+BACKUP_MIMETYPE = "application/octet-stream"
 
 
 def backup_download_response(actor_id, ip_address=None):
@@ -504,15 +510,17 @@ def backup_download_response(actor_id, ip_address=None):
     routes use, so the attachment header and the filename are decided in one
     place for every file this application hands out.
     """
-    payload = create_backup_bytes()
+    # Encrypted as a whole (Task 5c, M25), after the compacted copy has passed
+    # its integrity check. The file holds no readable record of any kind.
+    payload = encrypt_backup(create_backup_bytes())
     stamped = now()
     filename = safe_filename(
-        f"IDS-BPHCSN backup {stamped.strftime('%Y-%m-%d %H%M')}.db"
+        f"IDS-BPHCSN backup {stamped.strftime('%Y-%m-%d %H%M')}{BACKUP_EXTENSION}"
     )
 
     log_backup_download(actor_id, len(payload), filename, ip_address)
 
-    return _download((payload, filename), SQLITE_MIMETYPE)
+    return _download((payload, filename), BACKUP_MIMETYPE)
 
 
 # ---------------------------------------------------------------------------

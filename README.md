@@ -50,6 +50,13 @@ be recovered if the computer fails. A backup opens sealed records only on a comp
 the same key. Because the key lives in `.env` on the health-center PC, turn on full-disk
 encryption (BitLocker) on that PC.
 
+**Restoring a backup.** The backup you download from Settings is one encrypted file
+(`.idsbackup`). It opens only with this system's key, which is in `.env` and in the
+Doctor's envelope. At the health-center PC, run `python restore_backup.py <file>`. It
+decrypts the file into a new database in `IDS-BPHCSN-backups` and checks it; `app.db` is
+not touched. Add `--replace` to put it in place: it copies the current `app.db` aside
+first, and then you restart the app.
+
 After pulling an update that adds a migration, run it once on each laptop, for example
 `python migrate_seal_free_text_fields.py`. It makes a backup first and is safe to run twice.
 

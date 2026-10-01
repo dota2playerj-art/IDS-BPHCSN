@@ -707,7 +707,7 @@ def set_maintenance_mode():
     return redirect(url_for("admin.settings", tab=TAB_MAINTENANCE))
 
 
-@admin_bp.route('/settings/backup.db')
+@admin_bp.route('/settings/backup.idsbackup')
 @login_required
 @role_required("Admin")
 def download_backup():
