@@ -48,10 +48,12 @@
   .cal-cell.muted .cal-date{color:#C7CBD1;}
   .cal-dot-row{display:flex; flex-wrap:wrap; gap:4px; margin-top:6px;}
   .cal-dot{width:7px; height:7px; border-radius:50%;}
-  .dot-scheduled{background:var(--info);}
+  /* One colour per queue status; the same colours as the status badges in the table. */
+  .dot-waiting{background:#B45309;}
+  .dot-inconsult{background:var(--teal);}
+  .dot-waiting-doctor{background:#6D28D9;}
   .dot-completed{background:var(--success);}
-  .dot-cancelled{background:var(--danger);}
-  .dot-inqueue{background:var(--teal);}
+  .dot-left{background:#9CA3AF;}
   .cal-count{font-size:10.5px; color:var(--text-muted); margin-top:4px;}
 
   .legend-row{display:flex; gap:18px; margin-top:14px; flex-wrap:wrap;}
@@ -167,10 +169,6 @@
     background:var(--bg); border:1px solid var(--border-color); color:#9CA3AF; border-radius:10px;
     padding:6px 12px; font-size:12.5px; font-weight:600; display:inline-flex; align-items:center; gap:6px;
     cursor:not-allowed;
-  }
-  .walkin-tag{
-    display:inline-block; margin-left:6px; padding:2px 7px; border-radius:6px; background:var(--bg);
-    color:var(--text-muted); font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.03em;
   }
   .reason-text{color:var(--text-muted); font-size:12.5px;}
   /* The check-in reason of a sealed visit shows on screen only, and only to the
@@ -405,7 +403,7 @@
           <div class="panel-title">{{ calendar.label }}</div>
           <div class="panel-sub">
             {{ queue_date | long_date }} &middot; Today
-{%- if calendar.month_total %} &middot; {{ calendar.month_total }} appointment{{ '' if calendar.month_total == 1 else 's' }} this month, {{ calendar.month_pending }} still to come{% endif %}
+{%- if calendar.month_total %} &middot; {{ calendar.month_total }} visit{{ '' if calendar.month_total == 1 else 's' }} this month{% endif %}
           </div>
         </div>
         <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -432,31 +430,31 @@
 {%- for week in calendar.weeks %}
 {%- for cell in week %}
 {%- set classes = 'cal-cell' ~ ('' if cell.in_month else ' muted') ~ (' today' if cell.is_today else '') %}
-{#- A pending booking on a day already gone is not "expected" -- it is a booking
-    nobody ever closed, and saying so is what makes it findable. Both readings
-    count the same rows; only the word differs. #}
-{%- set summary %}{{ cell.total }} appointment{{ '' if cell.total == 1 else 's' }}{% if cell.pending %}, {{ cell.pending }} {{ 'never closed — neither arrived, cancelled nor marked a no-show' if cell.is_past else 'still expected' }}{% endif %}{% if cell.in_queue %}, {{ cell.in_queue }} in the queue{% endif %}{% if cell.completed %}, {{ cell.completed }} completed{% endif %}{% if cell.cancelled %}, {{ cell.cancelled }} cancelled or missed{% endif %}{% endset %}
+{#- What the day held, by status, with the same names as the legend under the grid. #}
+{%- set parts = [] %}
+{%- for status, key in (('Waiting', 'waiting'), ('In Consultation', 'in_consultation'), ('Waiting for the Doctor', 'waiting_doctor'), ('Completed', 'completed'), ('Left before being seen', 'left')) %}
+{%- if cell[key] %}{% set _ = parts.append(cell[key] ~ ' ' ~ status) %}{% endif %}
+{%- endfor %}
+{%- set summary = cell.total ~ ' visit' ~ ('' if cell.total == 1 else 's') ~ (': ' ~ (parts | join(', ')) if parts else '') %}
             <div class="{{ classes }}"{% if cell.total %} title="{{ cell.date | long_date }} — {{ summary }}"{% endif %}>
               <div class="cal-date">{{ cell.day }}</div>
 {%- if cell.total %}
               <div class="cal-dot-row">
-{%- for _ in range([cell.pending, 3] | min) %}<span class="cal-dot dot-scheduled"></span>{% endfor %}
-{%- for _ in range([cell.in_queue, 3] | min) %}<span class="cal-dot dot-inqueue"></span>{% endfor %}
-{%- for _ in range([cell.completed, 3] | min) %}<span class="cal-dot dot-completed"></span>{% endfor %}
-{%- for _ in range([cell.cancelled, 3] | min) %}<span class="cal-dot dot-cancelled"></span>{% endfor %}
+{%- for key, dot in (('waiting', 'dot-waiting'), ('in_consultation', 'dot-inconsult'), ('waiting_doctor', 'dot-waiting-doctor'), ('completed', 'dot-completed'), ('left', 'dot-left')) %}
+{%- for _ in range([cell[key], 3] | min) %}<span class="cal-dot {{ dot }}"></span>{% endfor %}
+{%- endfor %}
               </div>
-              <div class="cal-count">{% if cell.pending %}{{ cell.pending }} {{ 'unclosed' if cell.is_past else 'scheduled' }}{% else %}{{ cell.total }} total{% endif %}</div>
+              <div class="cal-count">{{ cell.total }} total</div>
 {%- endif %}
             </div>
 {%- endfor %}
 {%- endfor %}
           </div>
 
-          <div class="legend-row">
-            <div class="legend-item"><span class="cal-dot dot-scheduled"></span>Scheduled &mdash; not yet arrived</div>
-            <div class="legend-item"><span class="cal-dot dot-inqueue"></span>Arrived / in consultation</div>
-            <div class="legend-item"><span class="cal-dot dot-completed"></span>Completed</div>
-            <div class="legend-item"><span class="cal-dot dot-cancelled"></span>Cancelled or missed</div>
+          <div class="legend-row" id="statusLegend">
+{%- for item in legend %}
+            <div class="legend-item"><span class="cal-dot {{ item.dot }}"></span>{{ item.status }}</div>
+{%- endfor %}
           </div>
         </div>
 
@@ -673,13 +671,17 @@
               </td>
               <td class="appt-id">{{ entry.reference }}</td>
               <td>
-                <div class="pat-name"><a href="{{ url_for(patient_profile_endpoint, patient_id=entry.patient_id) }}">{{ entry.first_name }}{% if entry.middle_name %} {{ entry.middle_name }}{% endif %} {{ entry.last_name }}</a>{% if entry.walk_in %}<span class="walkin-tag">Walk-in</span>{% endif %}{% if entry.is_next_up and not entry.is_ready %}<span class="next-tag">Next</span>{% endif %}
+                <div class="pat-name"><a href="{{ url_for(patient_profile_endpoint, patient_id=entry.patient_id) }}">{{ entry.first_name }}{% if entry.middle_name %} {{ entry.middle_name }}{% endif %} {{ entry.last_name }}</a>{% if entry.is_next_up and not entry.is_ready %}<span class="next-tag">Next</span>{% endif %}
 {#- A child in the building who is due or overdue for a dose. Put on the row
     rather than left to the profile because this is the moment it can be acted
     on -- once the parent has gone home the information is worth much less. The
     count and the wording come from get_immunization_alert(), the same call the
     dashboard card reads. #}
-{%- if care_team_view and entry.immunization_due %}<span class="immun-tag{% if entry.immunization_overdue %} immun-overdue{% endif %}" title="{{ entry.immunization_count }} dose{{ '' if entry.immunization_count == 1 else 's' }} {{ 'overdue' if entry.immunization_overdue else 'due' }} — next: {{ entry.immunization_next }}"><span class="material-symbols-outlined" style="font-size:13px;">vaccines</span>{{ entry.immunization_count }} {{ 'overdue' if entry.immunization_overdue else 'due' }}</span>{% endif %}</div>
+{%- if care_team_view and entry.immunization_due %}
+{%- set overdue_n = entry.immunization_overdue_count %}
+{%- set badge_n = overdue_n if entry.immunization_overdue else entry.immunization_due_count %}
+{%- set badge_word = 'overdue' if entry.immunization_overdue else 'due' %}
+<span class="immun-tag{% if entry.immunization_overdue %} immun-overdue{% endif %}" title="{{ badge_n }} vaccine{{ '' if badge_n == 1 else 's' }} {{ badge_word }}{% if entry.immunization_overdue and entry.immunization_due_count %}, {{ entry.immunization_due_count }} more due now{% endif %} — next: {{ entry.immunization_next }}"><span class="material-symbols-outlined" style="font-size:13px;">vaccines</span>{{ badge_n }} vaccine{{ '' if badge_n == 1 else 's' }} {{ badge_word }}</span>{% endif %}</div>
                 <div class="po-meta">{{ entry.patient_reference }}</div>
               </td>
               <td>
@@ -841,27 +843,15 @@
 
 {%- if queue %}
       <div class="table-footer" id="tableFooter">
-        <!-- in consultation / ready / waiting are disjoint counts of the people
-             actually in the building, so they add up rather than overlapping --
-             see get_queue_stats(). Under one-at-a-time the first two are each 0
-             or 1, and the summary reads as the real state of the room. -->
-        <div class="pg-info">
+        <!-- The summary uses the same five status names as the legend above. Each
+             visit is counted once, under the status it holds. -->
+        <div class="pg-info" id="queueSummary">
           <span id="queueShown">{{ queue|length }}</span> of {{ queue|length }} patient{{ '' if queue|length == 1 else 's' }} for today
-          &middot; {{ queue_stats.in_consultation_today }} in consultation
-          &middot; {{ queue_stats.ready }} ready to consult
-          &middot; {{ queue_stats.still_waiting }} waiting
-{%- if queue_stats.not_arrived %}
-          &middot; {{ queue_stats.not_arrived }} not yet arrived
-{%- endif %}
-{%- if queue_stats.waiting_doctor %}
-          &middot; {{ queue_stats.waiting_doctor }} waiting for the Doctor
-{%- endif %}
-{%- if queue_stats.completed %}
-          &middot; {{ queue_stats.completed }} completed
-{%- endif %}
-{%- if queue_stats.left %}
-          &middot; {{ queue_stats.left }} left before being seen
-{%- endif %}
+          &middot; Waiting: {{ queue_stats.waiting }}
+          &middot; In Consultation: {{ queue_stats.in_consultation_today }}
+          &middot; Waiting for the Doctor: {{ queue_stats.waiting_doctor }}
+          &middot; Completed: {{ queue_stats.completed }}
+          &middot; Left before being seen: {{ queue_stats.left }}
         </div>
       </div>
 

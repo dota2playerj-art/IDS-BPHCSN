@@ -104,6 +104,16 @@ STATUS_BADGE_CLASS = {
     "Left before being seen": "badge-noshow",
 }
 
+# The colour of each status's dot in the calendar and its legend (Task 6d), matching the
+# badge the queue row shows for it.
+STATUS_DOT_CLASS = {
+    "Waiting": "dot-waiting",
+    "In Consultation": "dot-inconsult",
+    "Waiting for the Doctor": "dot-waiting-doctor",
+    "Completed": "dot-completed",
+    "Left before being seen": "dot-left",
+}
+
 # Where each status sorts in the queue. In Consultation first because that is who
 # the clinician is with right now, then whoever is next, then the not-yet-arrived,
 # then everything already resolved. Within a group the ORDER BY breaks ties by
@@ -1232,13 +1242,15 @@ def get_appointment_day_summary(start_date, end_date):
         bucket = summary.setdefault(
             row["day"],
             {"total": 0, "pending": 0, "in_queue": 0, "completed": 0, "cancelled": 0,
-             "left": 0, "waiting_doctor": 0},
+             "left": 0, "waiting_doctor": 0, "waiting": 0, "in_consultation": 0},
         )
         bucket["total"] += row["count"]
         if row["status"] in PENDING_STATUSES:
             bucket["pending"] += row["count"]
         elif row["status"] in QUEUE_STATUSES:
             bucket["in_queue"] += row["count"]
+            # The two real statuses behind in_queue, for the calendar's own dots (Task 6d).
+            bucket["waiting" if row["status"] == WAITING else "in_consultation"] += row["count"]
         elif row["status"] == COMPLETED:
             bucket["completed"] += row["count"]
         elif row["status"] == WAITING_DOCTOR:
@@ -1522,6 +1534,9 @@ def get_calendar_month(month_start=None, on_date=None):
                 "in_queue": counts["in_queue"] if counts else 0,
                 "completed": counts["completed"] if counts else 0,
                 "waiting_doctor": counts["waiting_doctor"] if counts else 0,
+                "waiting": counts["waiting"] if counts else 0,
+                "in_consultation": counts["in_consultation"] if counts else 0,
+                "left": counts["left"] if counts else 0,
                 "cancelled": counts["cancelled"] if counts else 0,
             })
         grid.append(cells)

@@ -20,6 +20,7 @@ from models.appointments import (
     get_earlier_waiting,
     get_queue_entry,
     get_queue_stats,
+    STATUS_DOT_CLASS,
     get_todays_appointments,
     mark_left,
     send_to_doctor,
@@ -33,6 +34,7 @@ from models.doctor_worklist import VISIT_SERVICES, clean_service
 from models.immunizations import get_immunization_alert, get_immunization_status
 from models.patients import get_all_patients, get_patient_by_id
 from models.queue_actions import (
+    LEGEND_STATUSES,
     CHANGE_SERVICE, MARK_COMPLETED, MARK_LEFT, SEE_PATIENT, SEND_TO_DOCTOR, START, UNDO_LEFT,
     action_allowed,
 )
@@ -101,6 +103,10 @@ def appointment_scheduling_context(month=None):
         child = due_by_patient.get(entry["patient_id"])
         entry["immunization_due"] = child is not None
         entry["immunization_overdue"] = bool(child and child["overdue_count"])
+        # The badge says how many vaccines are overdue, or how many are due when none is
+        # overdue. It used to print overdue plus due-now under the word "overdue".
+        entry["immunization_overdue_count"] = child["overdue_count"] if child else 0
+        entry["immunization_due_count"] = child["due_count"] if child else 0
         entry["immunization_count"] = child["attention_count"] if child else 0
         entry["immunization_next"] = child["next_label"] if child else None
 
@@ -151,6 +157,10 @@ def appointment_scheduling_context(month=None):
         "checkin_patients": patients,
         # The one fixed list Staff choose from at check-in and when correcting a visit.
         "visit_services": VISIT_SERVICES,
+        # The colour legend: exactly the statuses a visit can hold in the queue, each with
+        # the colour of its badge (Task 6d, D4).
+        "legend": [{"status": status, "dot": STATUS_DOT_CLASS[status]}
+                   for status in LEGEND_STATUSES],
         "queue_date": reference,
         "immunization_alert": immunization_alert,
         # How many of the children needing a dose are actually in the building
