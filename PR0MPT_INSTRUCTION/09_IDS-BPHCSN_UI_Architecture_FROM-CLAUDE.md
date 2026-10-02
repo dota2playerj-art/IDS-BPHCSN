@@ -59,7 +59,7 @@ The **Primary Role(s)** column is not a description kept in step by hand. It is 
 | 21 | My Account | `my_account.html` | All four roles (`login_required`) | The signed-in person's own details, and a self-service password change requiring the current password. The only screen guarded by `login_required` rather than `role_required`, because what it reaches is one row — the caller's own — rather than a role's worth of screens. Entered from the header profile chip; it has no sidebar entry. |
 | 22 | Service Schedule | `service_schedule.html` | All four roles; Administrator only to add, edit or delete | Which services the health center runs on which days, one entry per service, with an optional note. Ships empty: the health center's days have not been confirmed, and nothing is seeded. Today's services also head the Patient Queue. Information only — it restricts no check-in or consultation. See §19. |
 
-**One screen is not backed by data: 19, Notifications.** It is rendered as `render_template('notifications.html')` with no context, because there is no `notifications` table. Nothing on it should be quoted as a system output; recorded activity lives on Screen 12.
+**Every screen is backed by data.** The Notifications placeholder (Screen 19) had no table and rendered with no context; it was removed in Task 7, with its route, menu item and header bell. Recorded activity lives on Screen 12, and community messages on Screen 09.
 
 Screen 13 is the partial case and is stated as one rather than lumped in above: its Security pane is live and everything else on it is a disabled fieldset. Screen 18 was in this sentence until 2026-08-21 and is now fully data-driven, as are 15, 16 and 17 — every Barangay Official screen takes a context from `routes/official_views.py`, and each derives its figures from `reports_analytics_context()` rather than counting anything itself.
 
@@ -79,7 +79,7 @@ Consequences worth knowing:
 
 - The Barangay Official's "Announcements" sidebar item no longer exists. There is no announcements route to restore it to.
 - The SMS sidebar item carries no badge. It used to read "12"; nothing in this system queues or holds SMS, so there was no pending count behind it.
-- The Notifications item carries no badge either, for the same reason — there is no notifications table and nothing writes one.
+- There is no Notifications item in any menu (removed in Task 7). No item carries a badge.
 
 Do not re-add an Announcements screen without adding the table and routes behind it first.
 
@@ -112,8 +112,8 @@ ADMINISTRATION
 ```
 
 - **Navigation hierarchy:** Two sidebar groups — "Main Menu" (operational) and "Administration" (governance). This is the only role for which the Administration group is rendered.
-- **Accessible screens (14 of 22):** Login, Administrator Dashboard, Patient Records (demographics only), Patient Profile (demographics only), Medicine Inventory, Add/Edit Medicine, Patient Queue (read-only), Service Schedule (the only role that can change it), SMS Notifications, Reports & Analytics, User Management, Audit Logs, Settings, My Account. Register Patient and Record / Edit Consultation are the care team's since Task 5c (§20).
-- **Restricted screens:** The two other dashboards, and the four Barangay Official screens — Health Programs, Vaccination Campaigns, Community Reports, Notifications. **The Administrator does not have access to every screen.** The earlier claim in this document that the role reached "all 15 screens" was never true of the built system: the community-facing screens are guarded to the Barangay Official alone.
+- **Accessible screens (14 of 21):** Login, Administrator Dashboard, Patient Records (demographics only), Patient Profile (demographics only), Medicine Inventory, Add/Edit Medicine, Patient Queue (read-only), Service Schedule (the only role that can change it), SMS Notifications, Reports & Analytics, User Management, Audit Logs, Settings, My Account. Register Patient and Record / Edit Consultation are the care team's since Task 5c (§20).
+- **Restricted screens:** The two other dashboards, and the three Barangay Official screens — Health Programs, Vaccination Campaigns, Community Reports. **The Administrator does not have access to every screen.** The earlier claim in this document that the role reached "all 15 screens" was never true of the built system: the community-facing screens are guarded to the Barangay Official alone.
 
 ### Health Center Staff
 
@@ -131,7 +131,7 @@ MAIN MENU
 ```
 
 - **Navigation hierarchy:** Single group, operational only — no "Administration" section is rendered for this role.
-- **Accessible screens (12 of 22):** Login, Health Center Staff Dashboard, Patient Records, Register Patient, Patient Profile, Medicine Inventory, Add/Edit Medicine, Patient Queue, Service Schedule (read-only), Record / Edit Consultation, SMS Notifications, My Account.
+- **Accessible screens (12 of 21):** Login, Health Center Staff Dashboard, Patient Records, Register Patient, Patient Profile, Medicine Inventory, Add/Edit Medicine, Patient Queue, Service Schedule (read-only), Record / Edit Consultation, SMS Notifications, My Account.
 - **Restricted screens:** Reports & Analytics, User Management, Audit Logs, Settings, and all four Barangay Official screens.
 - **Resolved:** an earlier note here hedged that staff might get SMS "send/view only, not necessarily full broadcast history depending on future rule confirmation". The rule is settled in code — Health Center Staff render the same SMS screen as the Administrator, including the full broadcast history, and **do not send**: there is no `/staff/sms_notifications/send` route, so the compose control is absent rather than hidden. (This line previously said staff "may send", which the code has never allowed.) `routes/staff.py` and `routes/admin.py` build it from one shared context builder.
 - **No diagnosis.** On Record Consultation this role records the intake; the diagnosis and treatment plan are the Doctor's. It may move a patient between Active and Inactive but not to or from Deceased. See §18.
@@ -153,7 +153,7 @@ MAIN MENU
 ```
 
 - **Navigation hierarchy:** Single group, operational only. No "Administration" section.
-- **Accessible screens (13 of 22):** Health Center Staff's list above, plus Reports & Analytics. The Doctor is added to every `/staff/*` guard rather than given a copy of those routes, and reaches Reports & Analytics through three `/staff/reports_analytics` routes guarded to the Doctor alone (§18); `accessible_screens("Doctor")` returns Health Center Staff's list plus Reports & Analytics.
+- **Accessible screens (13 of 21):** Health Center Staff's list above, plus Reports & Analytics. The Doctor is added to every `/staff/*` guard rather than given a copy of those routes, and reaches Reports & Analytics through three `/staff/reports_analytics` routes guarded to the Doctor alone (§18); `accessible_screens("Doctor")` returns Health Center Staff's list plus Reports & Analytics.
 - **Restricted screens:** User Management, Audit Logs, Settings, the other two dashboards, and all four Barangay Official screens. Maintenance mode blocks this role.
 - **What only this role may do** — diagnose, write the treatment plan, seal and unseal a consultation, read a sealed one, declare or reverse Deceased — is §18.
 
@@ -169,12 +169,11 @@ MAIN MENU
 ├── Service Schedule     (read-only)
 ├── Vaccination Campaigns
 ├── Community Reports
-├── Reports & Analytics
-└── Notifications
+└── Reports & Analytics
 ```
 
 - **Navigation hierarchy:** Single group, community-facing. No Administration section. No badges on any item — see §1.1.
-- **Accessible screens (10 of 22):** Login, Barangay Official Dashboard, SMS Notifications, Health Programs, Service Schedule (read-only), Vaccination Campaigns, Community Reports, Reports & Analytics, Notifications, My Account.
+- **Accessible screens (9 of 21):** Login, Barangay Official Dashboard, SMS Notifications, Health Programs, Service Schedule (read-only), Vaccination Campaigns, Community Reports, Reports & Analytics, My Account.
 - **Restricted screens:** Patient Records, Patient Profile, Register Patient, Record / Edit Consultation, Medicine Inventory, Add/Edit Medicine, Patient Queue, User Management, Audit Logs, Settings, and the other two dashboards.
 - **The Barangay Official reaches no clinical screen.** This is the system's central access rule, and it holds against the enforced guards independently of this document: `accessible_screens("Barangay Official")` walks the live `url_map` and returns exactly the eight guarded screens above — no patient record, no patient profile, no consultation, no inventory. The Service Schedule is among them and is not a clinical screen: it says which services run on which days and holds nothing about any patient.
 - The "Announcements" item that this section previously listed does not exist. See §1.1.
@@ -244,7 +243,6 @@ Login
    → Vaccination Campaigns → (View per-dose EPI coverage)
    → Community Reports → (View; Export Excel / Export PDF)
    → Reports & Analytics → (View)
-   → Notifications → (Presentation only — the one screen with no data source)
  → Logout
 ```
 
@@ -261,7 +259,7 @@ Every screen — regardless of role — must be built from the same four regions
 | Region | Spec | Behavior |
 |--------|------|----------|
 | **Sidebar** | 280px fixed width, left, teal `#169B92` background, white text/icons | **Identical structure app-wide.** Only the *menu items* change per role (see Section 2) — never the styling, icon set, active/hover treatment, or position. |
-| **Header** | 80px fixed height, white background | **Identical across all screens a role can reach.** Contains: global patient search, a "Loaded HH:MM" pill, the notification bell, and the user avatar + role label + dropdown. Never redesigned per screen — but two of the four are scoped to the role, on the same grounds §2 scopes the sidebar, and the detail is below this table. |
+| **Header** | 80px fixed height, white background | **Identical across all screens a role can reach.** Contains: global patient search, a "Loaded HH:MM" pill, and the user avatar + role label + dropdown. Never redesigned per screen — but two of the four are scoped to the role, on the same grounds §2 scopes the sidebar, and the detail is below this table. |
 | **Main Content Area** | Fluid, Bootstrap 12-column grid, `#F5F7FA` background | **The only region that changes.** Houses the screen-specific cards, tables, forms, and charts defined in the Screen Specifications. |
 | **Footer** | No persistent footer bar observed in approved UI; system status/version info is anchored at the bottom of the sidebar instead (e.g., "System Online," version number) | Retain this sidebar-footer pattern — do not introduce a separate horizontal page footer, to stay consistent with the approved Dashboard. |
 
@@ -271,7 +269,7 @@ Every screen — regardless of role — must be built from the same four regions
 
 The header was drawn with four elements and shipped with three of them wired to
 nothing: a `<div>` reading "Search patient name or ID...", a pill reading "Synced
-just now", and a bell with a red dot. All three appeared on all 21 screens for
+just now", and a bell with a red dot. (The bell and its screen were removed in Task 7.) All three appeared on all 21 screens for
 all three roles. They are now the following, and the rule above is unchanged —
 the header is still never redesigned *per screen*. What varies is per **role**,
 which is the same axis §2 already scopes the sidebar on. The Doctor's header is Health Center
@@ -281,7 +279,7 @@ Staff's in every row below.
 |---|---|---|---|---|
 | **Global patient search** | Yes | Yes | **Absent** | A real form. It submits `search` to that role's Patient Records URL and introduces no matching rule of its own — Patient Records' toolbar box has matched patient ID / name / contact number / address as a lower-cased substring since that screen was built, and it is what runs the term. The Barangay Official has no Patient Records (§2), so there is no destination to give the box; `patient_records_endpoint` is simply absent for that role and the header renders nothing. |
 | **"Loaded HH:MM" pill** | Yes | Yes | Yes | Was "Synced just now". Nothing in this system syncs: one SQLite file, no background job, no second store. What it prints instead is the moment the page was rendered, from `utils.dates.now()` — the same clock every date on the screen comes from. Reload and it changes, which is what makes it checkable. |
-| **Notification bell** | **Absent** | **Absent** | Yes | Links to the Barangay Official's Notifications screen, which is the only role that has one at any URL. The other two have no such screen, so their header has no bell — there is nothing to disable and explain. |
+| **Notification bell** | **Absent** | **Absent** | **Absent** | Removed in Task 7, with the Notifications screen it linked to. No role has a bell. |
 | **Red unread dot** | — | — | — | Removed for every role. There is no notifications table and nothing writes one, so there was no count behind it. Removed rather than zeroed, for the same reason the sidebar's hard-coded "5" badge went: a zero badge reads as an alert that is not there. |
 
 ---
@@ -301,7 +299,6 @@ Staff's in every row below.
 | **Status Badges** (Success/Warning/Danger/Info/Neutral, 999px radius) | Patient status, medicine stock status, appointment status, user status, notification delivery status |
 | **Alerts/Toasts** | Low-stock warnings, save/update confirmations, failed SMS send notices |
 | **Charts** (Bar, Line, Pie, Donut — no 3D) | Administrator Dashboard, Reports & Analytics, Barangay Official Dashboard (community stats) |
-| **Notifications Panel/Bell** | Header — global, all roles |
 | **Profile Dropdown** | Header — global, all roles (shows name, role, logout) |
 | **Breadcrumbs** | Patient Profile, Add/Edit Medicine, Settings sub-sections (to show hierarchy back to parent list) |
 | **SMS Composer / Character Counter / Recipient Selector** | SMS Notifications (Screen 09) only |
@@ -347,7 +344,6 @@ Staff's in every row below.
 | Health Programs | Card, Table (programme membership), Badge, Alert (untracked notice) |
 | Vaccination Campaigns | Card, Table (per-dose coverage), Chart (Chart.js donuts), Badge, Alert (untracked notice) |
 | Community Reports | Card, Chart (Chart.js), Table, Button Group (export) — data-driven from `reports_analytics_context()` |
-| Notifications | List Group, Badge, Nav Pills (category filter) — presentation only, no data source. The only screen still in this position. |
 | Reports & Analytics | Card, Chart (via Chart.js/D3, not native Bootstrap), Table, Button Group (export), Nav Tabs (report type switch) |
 | User Management | Table, Badge (status), Dropdown (role filter), Button. *(The add-user and reset-password controls are present and disabled — see §1.)* |
 | Audit Logs | Table, Dropdown (filters: user/date/action), Pagination |
@@ -382,7 +378,7 @@ Use this checklist for every remaining screen, in order:
 
 1. Patient Records → 2. Register Patient → 3. Patient Profile → 4. Medicine Inventory → 5. Add/Edit Medicine → 6. Patient Queue → 7. SMS Notifications → 8. Reports & Analytics → 9. User Management → 10. Audit Logs → 11. Settings → 12. Health Center Staff Dashboard → 13. Barangay Official Dashboard → 14. Record / Edit Consultation → 15. Health Programs → 16. Vaccination Campaigns
 
-Community Reports and Notifications were built as UI alongside the Barangay Official Dashboard and have not been reconciled against real data. They are the outstanding work, not new screens.
+Community Reports was built as UI alongside the Barangay Official Dashboard and is now driven by real data. The Notifications screen built with it was removed in Task 7.
 
 **One addition to the post-build checklist, learned across the reconciliation passes:** a figure with no data source must report its own absence. Never invent one, and never leave a plausible-looking number in markup — an invented figure gets believed, and on a health record that is the expensive kind of wrong. Every screen already reconciled follows this rule; see the untracked notices listed in §5.
 
@@ -598,6 +594,11 @@ silently disappears teaches a reader that the screen is inconsistent, not that t
 
 ## 14. Design Decision — The Three Header Elements, Answered Three Different Ways
 
+**Update (Task 7, final fixes).** The Barangay Official's Notifications screen, its route
+(`/official/notifications`) and the header bell were removed, so no role has a bell now. The rest of
+this section is kept as the record of how the header was reasoned about; where it speaks of the bell or
+the Notifications screen as present, read it as history.
+
 The header carried a search box, a status pill and a notification bell on all 21 screens for all
 three roles, and none of the three did anything. They were raised together, and the useful part of
 the finding is that they were **not the same kind of problem** — one was an unbuilt feature worth
@@ -752,11 +753,10 @@ then the not-yet-arrived, then everything resolved, ties broken by arrival time 
 `models/appointments.py`). That order tells the desk who may be brought in next. Re-sorting it by
 name or by booked time would throw that away while still looking like a working queue.
 
-So the shared `sort` reason was **narrowed rather than deleted** — the arc `utils/unavailable.py`
-documents for `export`, happening again. It stopped describing an unbuilt feature and started
-describing a screen, and it now names the two screens where sorting *is* built, because a reader who
-has just used Sort on Patient Records and then finds it disabled here is owed the difference between
-the two screens rather than a blanket claim they can already disprove.
+So the shared `sort` reason was first **narrowed rather than deleted**, and in the final fixes the
+disabled Sort button was **removed from the queue altogether** (with its `sort` reason in
+`utils/unavailable.py`). A control that can never work does not belong on the screen, even with a
+reason beside it; the queue's order is its own explanation.
 
 A roster and a shelf have no inherent order and several are useful. A queue has exactly one.
 

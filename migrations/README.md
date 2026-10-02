@@ -30,7 +30,7 @@ Run a migration only on a database that was built before the change it describes
 | 2026-08-28 | `migrate_add_medicine_dispensing.py` | add the medicine_dispensing table. |
 | 2026-08-29 | `migrate_close_stuck_consultation.py` | close the visit left In Consultation on 2026-08-28. |
 | 2026-09-01 | `migrate_add_appointment_sms.py` | add the appointment_sms_messages table. |
-| 2026-09-04 | `migrate_correct_admin_persona.py` | give the Administrator account its real persona. |
+| 2026-09-04 | `migrate_correct_admin_persona.py` | give the Administrator account a generic name. |
 | 2026-09-05 | `migrate_add_consultation_restriction.py` | give a consultation somewhere to record that it is confidential. |
 | 2026-09-06 | `migrate_add_immunization_source.py` | let an immunisation record say whether this health center gave it. |
 | 2026-09-24 | `migrate_add_doctor_role.py` | add the Doctor role, and the demo account that holds it. |

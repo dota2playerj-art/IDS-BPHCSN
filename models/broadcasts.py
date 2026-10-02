@@ -48,9 +48,8 @@ AUDIENCE_NOT_AVAILABLE = (
     {
         "label": "Entire Barangay / All Residents",
         "reason": (
-            "The system holds no resident registry — only registered patients. "
-            "Reaching every resident needs a barangay contact list that does not "
-            "exist in this project yet."
+            "The system holds registered patients only, not every resident. "
+            "Reaching every resident needs a barangay contact list this project does not have."
         ),
     },
     {

@@ -92,7 +92,7 @@ def attach(app):
 # because several suites address accounts by id.
 ACCOUNTS = [
     # id, username, full name, role, password
-    (1, "admin", "Kagawad Antonio Acido", "Admin", "TestOnly-Admin-Key-8841"),
+    (1, "admin", "Kagawad Juan Dela Cruz", "Admin", "TestOnly-Admin-Key-8841"),
     (2, "staff", "Health Center Staff", "Health Center Staff", "TestOnly-Staff-Key-5127"),
     (3, "official", "Barangay Official", "Barangay Official", "TestOnly-Official-Key-3390"),
     (4, "bhwtest", "Test Health Worker", "Health Center Staff", "TestOnly-Bhw-Key-6602"),

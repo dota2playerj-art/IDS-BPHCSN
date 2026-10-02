@@ -44,8 +44,6 @@ from models.audit import (
     MODULE_PATIENTS,
     log_action,
 )
-from models.general_vaccinations import vaccination_label
-from models.immunizations import dose_label
 from utils.dates import display_date, today
 
 DECEASED = "Deceased"
@@ -158,13 +156,12 @@ def consultation_recorded(patient_id, visit_date, user_id, ip_address=None):
               f"visit {display_date(visit_date)}.")
 
 
-def _doses(action, labels_of, patient_id, consultation_id, user_id, ip_address):
+def _doses(action, patient_id, consultation_id, user_id, ip_address):
     """How many doses, for whom, at which consultation. Never which vaccine (Task 5c).
 
     Audit Logs are read by the Administrator, who is not part of the patient's
     care. Which vaccines a named patient received is an immunization record, and
-    it stays on the patient's profile for the care team. `labels_of` is kept so
-    the three callers still say which kind of dose they record.
+    it stays on the patient's profile for the care team.
     """
     write = _entry(user_id, ip_address, action, MODULE_IMMUNIZATIONS)
 
@@ -175,22 +172,15 @@ def _doses(action, labels_of, patient_id, consultation_id, user_id, ip_address):
 
 
 def epi_doses_recorded(patient_id, consultation_id, user_id, ip_address=None):
-    return _doses(ACTION_EPI_DOSES_RECORDED, lambda d: dose_label(d[0], d[1]),
-                  patient_id, consultation_id, user_id, ip_address)
+    return _doses(ACTION_EPI_DOSES_RECORDED, patient_id, consultation_id, user_id, ip_address)
 
 
 def reported_doses_recorded(patient_id, consultation_id, user_id, ip_address=None):
-    def label(d):
-        when = display_date(d[2]) if d[2] else "date not known"
-        return f"{dose_label(d[0], d[1])} ({when})"
-    return _doses(ACTION_REPORTED_DOSES_RECORDED, label,
-                  patient_id, consultation_id, user_id, ip_address)
+    return _doses(ACTION_REPORTED_DOSES_RECORDED, patient_id, consultation_id, user_id, ip_address)
 
 
 def other_vaccinations_recorded(patient_id, consultation_id, user_id, ip_address=None):
-    return _doses(ACTION_OTHER_VACCINATIONS_RECORDED,
-                  lambda e: vaccination_label(e["vaccine_name"], e["dose_number"]),
-                  patient_id, consultation_id, user_id, ip_address)
+    return _doses(ACTION_OTHER_VACCINATIONS_RECORDED, patient_id, consultation_id, user_id, ip_address)
 
 
 # --- Medicine Inventory ----------------------------------------------------------

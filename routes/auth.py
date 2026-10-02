@@ -18,6 +18,9 @@ from models.audit import (
 from models.settings import maintenance_mode
 from models.users import get_user_by_id, get_user_by_username, needs_password_change
 from routes.account_views import my_account_context, process_password_change
+from utils.login_throttle import (
+    THROTTLED_KEY, THROTTLED_MESSAGE, clear as clear_failures, is_throttled, record_failure,
+)
 from utils.roles import normalize_role
 from utils.security import (
     INVALID_CREDENTIALS_KEY,
@@ -206,6 +209,8 @@ def _refuse_maintenance():
 LOGIN_FORM_MESSAGES = {
     INVALID_CREDENTIALS_KEY: INVALID_CREDENTIALS_MESSAGE,
     MAINTENANCE_SIGN_IN_KEY: MAINTENANCE_SIGN_IN_MESSAGE,
+    # Five failures in five minutes (utils/login_throttle.py). Same text for everyone.
+    THROTTLED_KEY: THROTTLED_MESSAGE,
     # The two session limits (utils/security.py). Safe for anyone to summon:
     # they name no account and state a rule that is the same for everyone.
     SESSION_IDLE_KEY: SESSION_IDLE_MESSAGE,
@@ -227,6 +232,11 @@ def login():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
+
+        # After repeated failures the form is closed for a short time, before any
+        # account is looked up, so the answer is the same for every username.
+        if is_throttled(username, request.remote_addr):
+            return redirect(url_for("auth.login", error=THROTTLED_KEY))
 
         user = get_user_by_username(username)
 
@@ -253,6 +263,7 @@ def login():
             # card says "Access revoked", and until this branch existed the
             # application did not keep that promise.
             _log_blocked_sign_in(user, ip_address, password_verified)
+            record_failure(username, ip_address)
             return _refuse()
 
         # MAINTENANCE MODE, CHECKED AFTER THE PASSWORD AND AFTER DEACTIVATION.
@@ -300,6 +311,7 @@ def login():
             return _refuse_maintenance()
 
         if user is not None and password_verified:
+            clear_failures(username, ip_address)
             session.clear()
             session["user_id"] = user["id"]
             session["username"] = user["username"]
@@ -344,6 +356,7 @@ def login():
         # Everything below this point is a refusal: either the username matched
         # no account, or it matched an active one and the password did not.
         _log_refused_sign_in(user, ip_address)
+        record_failure(username, ip_address)
         return _refuse()
 
     return render_template("login.html", error=error)

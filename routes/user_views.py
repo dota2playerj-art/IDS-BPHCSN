@@ -226,7 +226,7 @@ def accessible_screens(role):
 
 # THIS USED TO BE ITS OWN COPY OF THE RULE, AND IT DISAGREED WITH THE OTHER TWO.
 # It skipped no honorifics at all, so the roster drew "KA" for the account the
-# header and the audit trail both drew "AA" for -- one person, two answers, on
+# header and the audit trail both drew "JD" for -- one person, two answers, on
 # screens an administrator reads side by side. It had disagreed before the
 # persona was corrected too ("DR" here against "JR" there); the correction only
 # made it visible. The rule is now utils/names.py, once, for all three.

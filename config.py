@@ -38,6 +38,10 @@ _OLD_FALLBACK_KEY = "ids-bphcsn-dev-secret"
 # happens. It is on only when IDS_DEBUG is exactly 1. Anything else is off.
 DEBUG = os.environ.get("IDS_DEBUG", "").strip() == "1"
 
+# The session cookie is not sent with a request that another site starts.
+SESSION_COOKIE_SAMESITE = "Lax"
+SESSION_COOKIE_HTTPONLY = True
+
 DATABASE = os.path.join(BASE_DIR, "app.db")
 SCHEMA = os.path.join(BASE_DIR, "schema.sql")
 

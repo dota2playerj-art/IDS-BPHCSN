@@ -291,7 +291,7 @@ def _log_revoked_session(user, ip_address):
         details=(
             f'Session ended for account "{user["username"]}" '
             f'({user["full_name"]}, {user["role"]}), from '
-            f'{ip_address or "an address the request did not carry"}; the '
+            f'{ip_address or "an address the request did not carry"}; '
             "the account was deactivated, so the session was ended"
         ),
         ip_address=ip_address,
@@ -330,7 +330,7 @@ def _log_self_ended_session(user, ip_address):
         details=(
             f'Session ended for account "{user["username"]}" '
             f'({user["full_name"]}, {user["role"]}), from '
-            f'{ip_address or "an address the request did not carry"}; the '
+            f'{ip_address or "an address the request did not carry"}; '
             "the account holder deactivated their own account, so the session was ended"
         ),
         ip_address=ip_address,
@@ -444,7 +444,7 @@ def _signed_in_account():
     # ROUTE IN THE APPLICATION.
     #
     # This is the reason the feature is four lines rather than a project. There
-    # are 95 guarded routes and this function is the only way any of them is
+    # are 87 guarded routes and this function is the only way any of them is
     # reached, so the switch covers all of them by construction -- not because
     # somebody remembered to decorate them, and not by a list that a route added
     # next month could be left off. A new route inherits the restriction by

@@ -16,7 +16,7 @@ _PARENTHETICAL = re.compile(r"\([^)]*\)")
 
 
 def initials(name, empty=""):
-    """'Kagawad Antonio Acido' -> 'AA'. Titles skipped so the circle reads as a person.
+    """'Kagawad Juan Dela Cruz' -> 'JD'. Titles skipped so the circle reads as a person.
 
     `empty` is what comes back when the name is blank, or is nothing but
     titles. It is a parameter rather than a fixed string because the three

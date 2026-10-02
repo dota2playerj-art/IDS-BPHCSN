@@ -146,7 +146,7 @@ def inject_role_context():
         context = {
             # The line under the name in the profile chip. It names the person
             # holding the role, not the role itself: the Administrator of this
-            # system is Antonio Acido, a Kagawad chairing the barangay's Health
+            # system is a Kagawad chairing the barangay's Health
             # Committee. The SYSTEM role is still "Admin"/"Administrator" --
             # that spelling lives in models/users.py ROLE_CHOICES, is what
             # role_required() and every guard compare against, and is what User

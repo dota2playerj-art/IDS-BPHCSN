@@ -105,10 +105,11 @@ CREATE TABLE consultations (
     -- system that guessed would be wrong in both directions. The clinician
     -- decides and this column holds the decision.
     --
-    -- It seals the two doctor-only fields, diagnosis and treatment_plan, and
-    -- nothing else: the visit date, chief complaint, vitals, doses and dispensing
-    -- stay legible to Health Center Staff, who still take the intake and still
-    -- hand the medicine over. See models/consultations.py DOCTOR_ONLY_FIELDS.
+    -- It seals every free-text field (diagnosis, treatment plan, chief complaint and
+    -- remarks) and the check-in reason, stored
+    -- encrypted. The visit date, vitals, doses and dispensing stay legible to
+    -- Health Center Staff, who still take the intake and still hand the medicine
+    -- over. See models/consultations.py SEALED_FIELDS.
     --
     -- restricted_by / restricted_at say who sealed it and when, so the profile
     -- can print that beside the placeholder without a per-row search of the audit

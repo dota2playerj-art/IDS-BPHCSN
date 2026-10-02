@@ -525,21 +525,6 @@ def get_appointment_by_id(appointment_id):
     return _to_queue_entry(row) if row else None
 
 
-def count_active_consultations():
-    """How many appointments are In Consultation anywhere in the system.
-
-    The invariant this whole module exists to hold is that this is 0 or 1. Kept
-    as a plain count over the raw table -- no join, no date filter -- so it can
-    be trusted as the check on that invariant rather than reporting only what the
-    queue screen happens to render.
-    """
-    with db_connection() as conn:
-        count = conn.execute(
-            "SELECT COUNT(*) FROM appointments WHERE status = ?", (IN_CONSULTATION,)
-        ).fetchone()[0]
-    return count
-
-
 def get_active_consultation():
     """The appointment currently In Consultation, or None.
 
@@ -1191,16 +1176,6 @@ def get_earlier_waiting():
         entry["checked_in_date"] = _as_date(entry["appointment_date"])
         entries.append(entry)
     return attach_leave_flags(entries)
-
-
-def parse_iso_date(value):
-    """'2026-08-20' -> date, or None if it is absent or malformed."""
-    if not value:
-        return None
-    try:
-        return datetime.strptime(str(value).strip()[:10], "%Y-%m-%d").date()
-    except ValueError:
-        return None
 
 
 def get_appointment_day_summary(start_date, end_date):

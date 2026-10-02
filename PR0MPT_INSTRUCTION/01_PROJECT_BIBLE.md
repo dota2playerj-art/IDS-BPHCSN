@@ -530,7 +530,13 @@ identify a person (RA 10173, minimum necessary).
 
 **Masked numbers (Task 5d).** On every SMS screen, export and JSON response, for every role, a phone
 number shows its last four digits only ("•••• ••• 1234"). Recipient counts and delivery results stay.
-Full numbers stay only where the system sends messages.
+Full numbers stay only where the system sends messages. The mask works on every common Philippine format
+(09…, +639…, 639…, with spaces, dashes, dots or brackets), including inside audit entries.
+
+**Recipients (final fixes).** The Administrator and the Barangay Official see recipient counts only on every
+SMS screen, for every audience: total, sent and failed per broadcast, and a count per audience. They see no
+recipient name. The Doctor and Health Center Staff see names with masked numbers. The rule is in the data
+builder (`get_broadcast_recipients()`), not in the template.
 
 **Small counts everywhere (2026-10-02, Task 5e).** The rule covers any count tied to a health service
 or condition: "Appointments by service requested" folds rows of 1 to 4 into "Other (each fewer than

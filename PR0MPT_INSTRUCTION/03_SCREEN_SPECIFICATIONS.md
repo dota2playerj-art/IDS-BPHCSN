@@ -117,29 +117,24 @@ Sidebar
 
 Header
 
-Dashboard Cards
+Counts: Total Registered Patients, Today's Appointments, Active Inventory Items, Low Stock Items,
+SMS Messages Sent, Monthly Consultations, and Waiting for the Doctor (a count, no names)
 
-Recent Consultations
+Monthly Analytics
 
-Today's Appointments
+Medicine Inventory
 
-Medicine Inventory Summary
+Immunization Follow-up (counts)
 
-Quick Actions
+SMS Broadcast (counts only)
 
-Notifications
-
-Activity Timeline
-
-System Status
-
-Reports Preview
+System Activity
 
 Actions
 
 Open any module.
 
-View notifications.
+Send an SMS broadcast.
 
 Generate reports.
 
@@ -522,6 +517,13 @@ Health Workers
 
 Entire Barangay
 
+Who sees whom (final fixes, 2026-10-02). The Doctor and Health Center Staff see the recipients of the
+most recent broadcast by name, with each mobile number masked to its last four digits ("•••• ••• 1234").
+The Administrator and the Barangay Official see recipient counts only, for every audience: total, sent
+and failed per broadcast, and a count per audience. They see no recipient name and no number. This is
+decided on the server, in `get_broadcast_recipients()`, not in the template. The system receives no
+delivery reports, so no message is ever marked delivered.
+
 ---
 
 # SCREEN 10
@@ -658,31 +660,32 @@ Purpose
 
 Configure the system.
 
-Sections
+Sections (as built)
 
-General Settings
+General Settings (the health center's name and address, and its opening and closing times; saved)
 
-Health Center Information
+SMS (one line: "SMS mode: Live" or "SMS mode: Simulated")
 
-SMS Settings
+Security Settings (read-only: what is enforced and what is recorded)
 
-Backup
+Password Policy (read-only)
 
-Restore
+Backup & Restore (Download Backup; restoring is done with `restore_backup.py`, and the screen says so)
 
-Security
+System Maintenance (the maintenance switch)
 
-Account
+About System
 
 Buttons
 
-Save
+Save (General Settings)
 
-Reset
+Download Backup
 
-Backup Database
+Turn maintenance mode on or off
 
-Restore Database
+There is no Restore button, no Reset, and no SMS gateway form. Restoring replaces every record, so it is
+done on the health-center PC with `restore_backup.py`, which checks the file first.
 
 Security pane (updated 2026-09-29)
 
@@ -708,15 +711,21 @@ text.
 
 Widgets
 
-Today's Patients
+Waiting for the Doctor (the Doctor's list; a count for Health Center Staff)
 
-Appointments
+Today's Appointment List (the Patient Queue)
 
-Medicine Requests
+Recent Patient Registrations
 
-Recent Consultations
+Medicine Stock Alerts
 
-Notifications
+Immunization Follow-up
+
+Notifications panel (a notice that per-user notifications are not recorded; it shows no alerts)
+
+Calendar
+
+Quick Statistics
 
 Quick Actions
 
@@ -740,21 +749,29 @@ View community health information.
 
 Widgets
 
-Health Announcements
+Community Health Overview
 
-Community Reports
+Community Announcement Feed (the SMS broadcasts sent)
 
-Vaccination Campaigns
+Upcoming Health Events
 
-Upcoming Programs
+Vaccination Campaign Schedule
 
-Statistics
+Health Programme Membership
+
+Recent Reports
+
+Broadcast Send Summary (counts only)
+
+Monthly Community Statistics
+
+Notifications panel (a notice that per-user notifications are not recorded; it shows no alerts)
 
 Quick Actions
 
 View Reports
 
-View Notifications
+View Notification History (the SMS broadcast history)
 
 No access to
 
@@ -1435,10 +1452,10 @@ of resetting it. One comparator serves both (`static/js/table-sort.js`); each sc
 its own column list. The order in force is named on the Sort button, on the chosen option, and in
 the line beside the table, all three written from one state.
 
-the Patient Queue's Sort stays disabled, and its reason changed from "not implemented" to
-what actually stops it: the queue is already in the order that answers who may be brought in next
-— in consultation, then waiting, then not yet arrived, then resolved — and re-sorting it would
-discard the one thing that list is for. See the `sort` reason in `utils/unavailable.py`.
+the Patient Queue has no Sort button. The queue is already in the order that answers who may be
+brought in next — in consultation, then waiting, then not yet arrived, then resolved — and
+re-sorting it would discard the one thing that list is for. The button was removed in the final
+fixes rather than left disabled.
 
 **Paging.**
 
@@ -1452,8 +1469,8 @@ route writes to it". That has not been true since 3 September 2026.
 
 - **General Settings is stored and read back.** The health center's name, barangay, municipality,
   province and the clinic's opening and closing times are written to the `settings` table and
-  consumed by the SMS composer, all three export modules, the booking slot generator and every
-  template header. Saving a new opening time changes the slots the booking dialog offers.
+  consumed by the SMS composer, all three export modules and every template header. The opening
+  and closing times are shown on the screens and letterheads; there is no booking dialog.
 - **Maintenance Mode is live.** An Administrator can close the system to Health Center Staff and
   Barangay Officials, who are shown a 503 maintenance page and keep their sessions. Administrator
   access is structurally unaffected, so there is no self-lockout.
@@ -1462,13 +1479,12 @@ route writes to it". That has not been true since 3 September 2026.
 - **Download Backup is real** and serves a verified copy of the database, encrypted as one
   `.idsbackup` file since Task 5c; `restore_backup.py` opens it at the health-center PC.
 
-What is still disabled, each inside its own fieldset stating its own reason: **Restore** —
-deliberately the harder half, because a restore replaces every record with no way to undo it and
-doing it safely means stopping the application first, which a screen inside that application
-cannot do; the **SMS gateway** controls, where the integration in `utils/sms.py` is real and
-finished and what is absent is a configured `SEMAPHORE_API_KEY`; and the **scheduled-backup**
-controls, because nothing in this system runs a timed job. User Preferences, Notification Settings
-and Clear Cache were removed outright rather than left disabled.
+Nothing on Settings is disabled any more (Task 7). **Restore** is not a button: a restore replaces
+every record with no way to undo it, and doing it safely means stopping the application first, which a
+screen inside that application cannot do. It is `restore_backup.py` on the health-center PC, and the
+screen says so in one line. The **SMS gateway** form is gone: the line "SMS mode: Live" or "SMS mode:
+Simulated" says whether `SEMAPHORE_API_KEY` is set in `.env`. The scheduled-backup, Health Center
+Information, User Preferences, Notification Settings and Clear Cache controls were removed outright.
 
 **Screen 19 — Notifications.** Removed in Task 7: it was rendered with no data. Recorded activity lives on
 Screen 12, and community messages on Screen 09.

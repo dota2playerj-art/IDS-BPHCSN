@@ -1234,7 +1234,7 @@ def set_consultation_restriction(consultation_id, restricted, user_id, role=None
     THE THREE COLUMNS ARE WRITTEN AS A SET, ALWAYS.
     Lifting a restriction clears restricted_by and restricted_at rather than
     leaving them behind as a fossil of the last seal. A row saying "not
-    restricted, sealed by Antonio Acido on the 3rd" is a record making two claims
+    restricted, sealed by the Doctor on the 3rd" is a record making two claims
     at once, and the profile would have to choose which to print. The migration
     asserts the three agree, on every run.
 

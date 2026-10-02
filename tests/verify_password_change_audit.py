@@ -100,7 +100,7 @@ with app.test_client() as c:
 
     d = e["details"]
     ck("details name the account", '"admin"' in d)
-    ck("details name the person", "Kagawad Antonio Acido" in d)
+    ck("details name the person", "Kagawad Juan Dela Cruz" in d)
     ck("details name the role", "Admin" in d)
     ck("details say nothing was written", "nothing was written" in d)
     # The detail panel splits this column on "; " -- see

@@ -78,7 +78,7 @@ one Flask process and one SQLite database file as the single source of truth.
 ## Client-side Software
 - Windows 10/11 or Android (mobile browser access)
 - Chrome / Edge / Safari (latest)
-- Bootstrap 5.3 via CDN
+- Bootstrap 5.3, vendored under `static/` (no CDN)
 - Vanilla JavaScript (no jQuery; nothing is loaded from a CDN)
 
 ## Admin-side Hardware

@@ -45,6 +45,8 @@ def no_store(response):
     if request.endpoint != "static":
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
         response.headers["Pragma"] = "no-cache"
+    # No other site may put a page of this system inside a frame.
+    response.headers["X-Frame-Options"] = "DENY"
     return response
 
 

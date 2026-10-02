@@ -56,7 +56,7 @@ docs/verification/**/*.gif
 docs/verification/**/*.webp
 
 # --- Secrets ----------------------------------------------------------------
-# config.py reads SECRET_KEY from the environment and falls back to a dev value.
+# config.py reads SECRET_KEY from the environment and refuses to start without one.
 # A real key belongs in a .env that never leaves the machine.
 .env
 *.env

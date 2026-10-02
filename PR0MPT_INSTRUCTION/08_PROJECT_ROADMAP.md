@@ -69,13 +69,12 @@ data — Patient Records, Medicine Inventory, Patient Queue with Community Notif
 and Reports & Analytics. Each was exercised end to end on 4 September 2026 by driving the real
 forms over HTTP against the live database: a patient registered, edited and reopened; a dispense
 moved stock across its threshold and the low-stock alert reacted on every surface that reports it;
-a patient booked, checked in, consulted and written up with dispensing and immunisation in one
+a patient checked in, consulted and written up with dispensing and immunisation in one
 save; a broadcast sent to a computed audience with per-recipient rows.
 
-Role-based access control is enforced across **90 guarded view functions** (93 routes) for all four roles with
-no gaps, confirmed by a 377-probe route × role matrix run under four identities — Administrator,
-Health Center Staff, Barangay Official and anonymous — with **zero leaks**. The database holds
-**13 tables with 19 indexes** and passes integrity and foreign-key checks.
+Role-based access control is enforced across **87 guarded view functions** (of 90; the other three are the home redirect, sign-in and sign-out; 93 routes) for all four roles with
+no gaps, confirmed by a route × role matrix run under every role and anonymous, signed in properly, with **zero leaks** (final audit, 2026-10-02). The database holds
+**14 tables with 19 indexes** and passes integrity and foreign-key checks.
 
 The remaining ~5% is concentrated in three places, none of which is a core objective:
 
@@ -86,8 +85,8 @@ The remaining ~5% is concentrated in three places, none of which is a core objec
   databases (the current count is in `PROJECT_STATUS.md`); `--quick` skips the slow demo-data suite.
 - **A short list of features named in the specifications is deliberately unbuilt**, each declared
   on the screen that would have carried it rather than rendered as a dead control: account lockout,
-  Remember Me, Restore, SMS draft and scheduling, and a configured SMS gateway key. These are open
-  scope decisions, not oversights. See "Features named in the specifications that are not built"
+  Remember Me, and SMS draft and scheduling. Restore is a script (`restore_backup.py`), and the SMS key is
+  set in `.env`. These are open scope decisions, not oversights. See "Features named in the specifications that are not built"
   below.
 
 Supporting infrastructure is complete and was driven end to end in the same pass. Account
@@ -96,12 +95,12 @@ last-Administrator guard holding on both deactivation and demotion, and counting
 can still sign in. Self-service password change is built, and a refused attempt is recorded in its
 own audit phrase. On Settings, **General Settings and Maintenance Mode are genuinely live**: the
 health center's name, barangay, municipality, province and clinic hours are written to the
-`settings` table and read back by the SMS composer, the export modules, the booking slot generator
+`settings` table and read back by the SMS composer, the export modules
 and every template header, and closing the system to non-Administrators works with no possibility
 of self-lockout. **Download Backup is built** and serves a real database file that opens and passes
-its own integrity check; **Restore is the one half that remains unbuilt**, and says so on itself,
-because restoring safely means stopping the application first — which is not something a screen
-inside that application can do.
+its own integrity check, as one encrypted `.idsbackup` file; **Restore is not a screen**: it is
+`restore_backup.py` on the health-center PC, and Settings says so, because restoring safely means
+stopping the application first — which is not something a screen inside that application can do.
 
 README.md exists and states how to run the system, the four roles and where the migrations are. The
 project is under version control on `master`.
@@ -125,7 +124,7 @@ to earn it back is to show the drift rather than erase it.
 |---|---|
 | "Approximately 70–75%." | ~95%. All four core objectives and all supporting infrastructure are built and were exercised end to end. |
 | "enforced across all 80 guarded routes" | 89 guarded endpoints, verified by a 377-probe route × role matrix with zero leaks. |
-| "The database holds 10 tables with 12 indexes" | 13 tables, 19 indexes. Integrity and foreign-key checks both clean. |
+| "The database holds 10 tables with 12 indexes" | 14 tables, 19 indexes. Integrity and foreign-key checks both clean. |
 | "Six screens are still presentation-only… User Management, Audit Logs, Settings, and four of the five Barangay Official extension screens." | One: Notifications. User Management and Audit Logs are fully live; Settings is live apart from the panes that declare themselves unbuilt; all Barangay Official screens take a real context from `routes/official_views.py`. |
 | "Two dashboards (Administrator, Health Center Staff) are partially wired… several statistic cards and activity tables are still mockup." | Both are data-driven, including the Continue Consultation shortcut and the immunisation due/overdue panels. |
 | "Phase 8 Documentation has not started; there is no README.md and the project is not yet under version control." | README.md exists. The project has been under Git since before this claim was written. |
@@ -208,7 +207,7 @@ but needed per the BO's sidebar in 09_IDS-BPHCSN_UI_Architecture_FROM-CLAUDE.md)
 
 ✓ Community Reports (BO-scoped)
 
-✓ Notifications (BO inbox)
+✓ Notifications (BO inbox) — removed in Task 7; SMS Notifications covers it
 
 Deliverables — added during development (not in the approved Proposal, not yet in
 03_SCREEN_SPECIFICATIONS.md)
@@ -247,7 +246,7 @@ Tasks
 
 ☑ Build Sidebar — role-scoped, built from `utils/context.py`, with a live low-stock badge
 
-☑ Build Header — shared `base.html` layout across all 22 screens
+☑ Build Header — shared `base.html` layout across all 21 screens
 
 ☑ Build Dashboard — three role dashboards built; Administrator and Staff are partially wired
   (see Phase 4), Barangay Official is still presentation-only
@@ -281,7 +280,7 @@ Tasks
   03_SCREEN_SPECIFICATIONS.md Screen 01 lists it; "Remember Me" is also still outstanding on that
   screen. "Show Password" IS built — `login.html` carries a working `aria-pressed` eye toggle.
 
-☑ Role Management — `login_required` and `role_required` decorators on all 89 guarded endpoints, verified
+☑ Role Management — `login_required` and `role_required` decorators on all 87 guarded endpoints, verified
   with no gaps for Admin, Health Staff, Barangay Official and anonymous visitors. The Health
   Staff read-only restriction on SMS is enforced structurally: no send endpoint exists in the
   staff blueprint at all.
@@ -340,7 +339,7 @@ Completed
 
 Tasks
 
-☑ Create SQLite Database — `schema.sql` plus 8 migration scripts. 10 tables, 12 named indexes.
+☑ Create SQLite Database — `schema.sql` plus 25 migration scripts (now in `migrations/`). 14 tables, 19 named indexes.
 
 ☑ Create Users Table — 3 seeded accounts, one per role, with a CHECK constraint on role
 
@@ -363,12 +362,12 @@ Tasks
   `sms_broadcasts`, `sms_broadcast_recipients`, `settings`. A sixth, `schedule_logs`, was created
   and has since been dropped by `migrations/migrate_drop_schedule_logs.py`: it was declared to back
   Community Announcements, that screen was retired as a feature that never existed, and nothing
-  else ever read the table. This is why the counts above read 10 tables and 12 indexes rather
-  than the 11 and 13 recorded earlier in this document's history.
+  else ever read the table. The counts in this document's history (10 or 11 tables) are older than the
+  current 14 tables and 19 indexes.
 
 ☑ Testing — `PRAGMA integrity_check` returns ok and `PRAGMA foreign_key_check` reports zero
   violations. A database built fresh from `schema.sql` was diffed against a fully-migrated one:
-  all 10 tables, all columns, all 12 indexes and all foreign keys match, with a single
+  all tables, all columns, all indexes and all foreign keys match, with a single
   deliberate, documented difference (`consultations.updated_at` is nullable on the migrated path,
   because SQLite will not accept a non-constant default in ADD COLUMN).
 
@@ -393,8 +392,8 @@ Completed
 
 Tasks
 
-☑ Connect UI — every screen but Notifications is wired to live data; the screens with write
-  paths all have working ones. Notifications is the single exception and has no table to read
+☑ Connect UI — every screen is wired to live data; the screens with write
+  paths all have working ones. (The Notifications placeholder had no table to read and was removed in Task 7.)
 
 ☑ Connect Backend — shared context builders in `routes/*_views.py` are used by both the Admin
   and Staff variants of each screen, so the two role surfaces cannot drift apart
@@ -405,12 +404,13 @@ Tasks
 ☑ Session Management — login, logout, session clearing, and a no-store cache header on every
   authenticated response
 
-☑ User Roles — verified across all 89 guarded endpoints under all four identities with zero gaps.
-  The application exposes 96 URL rules beyond static files, resolving to 92 endpoints; 89 of
-  those endpoints are guarded (86 under `role_required`, plus `/dashboard`, `/account` and
-  `/account/password` under `login_required`) and three are deliberately open (`/`, `/login`,
+☑ User Roles — verified across all 87 guarded endpoints under all four identities with zero gaps.
+  The application exposes 93 URL rules beyond static files, resolving to 90 endpoints; 87 of
+  those endpoints are guarded (83 under `role_required`, plus `/dashboard`, `/account`,
+  `/account/password` and the keep-alive under `login_required`) and three are deliberately open (`/`, `/login`,
   `/logout`). The sweep of 4 September 2026 probed every guarded route under each of the four
-  identities -- 377 checks -- and found no leak. Write routes were probed only from identities
+  identities -- 377 checks -- and found no leak; the final audit of 2 October 2026 repeated it for
+  all 93 rules, signed in properly. Write routes were probed only from identities
   that must be refused, so a passing guard was never given the chance to alter data.
 
 ☑ Wire the Audit Logs screen — done. Screen 12 reads the trail through `get_audit_logs()`,
@@ -565,7 +565,7 @@ Complete UI Design
 
 Status
 
-Completed — 22 screens (Service Schedule, the 22nd, added 2026-09-26)
+Completed — 21 screens (Service Schedule added 2026-09-26; the Notifications placeholder removed in Task 7)
 
 ---
 
@@ -596,7 +596,7 @@ Database Completed
 
 Status
 
-Completed — 10 tables, 12 indexes, 8 migrations, integrity and foreign-key checks passing
+Completed — 14 tables, 19 indexes, 25 migrations, integrity and foreign-key checks passing
 
 ---
 
@@ -813,14 +813,14 @@ Settings (Screen 13) is a partial case and is stated separately rather than coun
 the balance has shifted decisively since this was written. **General Settings is stored and read
 back**: the health center's name, barangay, municipality, province and the clinic's opening and
 closing times are written to the `settings` table by `admin.save_general_settings` and consumed by
-the SMS composer, all three export modules, the booking slot generator and every template header —
-saving a new opening time changes the slots the booking dialog offers on the next render.
+the SMS composer, all three export modules and every template header.
 **Maintenance Mode is live**, written by `admin.set_maintenance_mode` and read on every guarded
 request. The Password Policy pane, the sign-in figures and the database size are read from the
 running system and are not editable anywhere. **Download Backup is real** and serves a verified
-copy of the database. What remains disabled is Restore, the SMS gateway controls and the scheduling
-controls, each inside its own fieldset stating its own reason — so the claim that "nothing typed on
-that screen is stored" is no longer true of it, and has not been since 3 September 2026.
+copy of the database. Nothing on Settings is disabled any more (Task 7): Restore is
+`restore_backup.py`, the SMS gateway form is replaced by one "SMS mode" line, and the scheduling
+controls were removed — so the claim that "nothing typed on that screen is stored" is no longer
+true of it, and has not been since 3 September 2026.
 
 Every other screen is driven by real queries. The Barangay Official's screens — Health Programs,
 Vaccination Campaigns, Community Reports and the Official Dashboard — each take a context built in
@@ -854,16 +854,14 @@ Reports & Analytics about the same barangay.
   both). The queue is the one table that refuses, and it refuses by argument rather than for want
   of the control: its order is already a clinical answer — in consultation, then waiting, then
   not yet arrived, then resolved — and re-sorting it would discard the one thing that list is for.
-  This is the `sort` reason in `utils/unavailable.py`, now quoted by that one screen.
+  The queue has no Sort button; the disabled one was removed in the final fixes.
 - **Paging**. Every row the query returns is already on the page, so there is no second page; the
   `pagination` reason says so on the two screens that used to show page numbers.
-- **Restore** on Settings, and the **SMS gateway** controls on the same screen. Backup is no
-  longer in this list: Download Backup serves a real database file that opens and passes its own
-  integrity check. Restore is deliberately the harder half — a backup is a copy and risks nothing,
+- **Restore** on Settings. It is not a button, by design: a backup is a copy and risks nothing,
   while a restore replaces every record with no way to undo it, and doing that safely means
-  stopping the application first, which a screen inside that application cannot do. The SMS
-  integration itself is real — `utils/sms.py` posts to Semaphore and every send checks
-  `SEMAPHORE_API_KEY` — so what is missing there is a configured key, not the feature.
+  stopping the application first, which a screen inside that application cannot do. It is
+  `restore_backup.py`. The SMS integration is real — `utils/sms.py` posts to Semaphore and every
+  send checks `SEMAPHORE_API_KEY` — so what is missing there is a configured key, not the feature.
 
 ## Engineering practice
 
@@ -915,7 +913,7 @@ way it loses that trust is by being written once and never re-read while the sys
 | "The project is NOT under version control… there is no history and no rollback." | 27 commits on `master`, from the initial commit to `a8a1cfb`. |
 | "No README.md, although 04_DEVELOPMENT_GUIDE.md lists one." | `README.md` exists, and states how to run the system, the four roles, and the migration order. |
 | Nine screens listed as hard-coded or presentation-only. | One (Notifications). Settings is partly live. The other seven named are all data-driven. |
-| "User Management — the `users` table holds 3 accounts; the screen shows 7 fixed rows." | The screen lists the real roster and derives each role's permissions from the live `url_map`. Only the account *writes* are still disabled. |
+| "User Management — the `users` table holds 3 accounts; the screen shows 7 fixed rows." | The screen lists the real roster and derives each role's permissions from the live `url_map`. Add User, Edit, Reset Password and activate or deactivate all work. |
 | "Audit Logs — real entries are being written, but the screen does not read them yet." | Screen 12 reads the trail through `get_audit_logs()`, filters it by module, and exports it. |
 | "Settings — nothing reads or writes it." | Nothing *writes* it. The Security pane *reads* live sign-in counts from the audit trail. |
 | "Screen 10: Print, Export to Excel and Export to PDF… not built." | All three are built. Seven screens have real `.xlsx` and `.pdf` download routes — Patient Records, Medicine Inventory, Patient Queue, User Management, Audit Logs, Reports & Analytics and Community Reports; see `routes/roster_export.py`, `report_export.py` and `audit_export.py`. |

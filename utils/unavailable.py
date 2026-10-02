@@ -104,47 +104,9 @@ UNAVAILABLE = {
     # more, which is the only test that matters here.
 
     # ---- Table controls -----------------------------------------------------
-    # NARROWED, BECAUSE THE GENERAL CASE CLOSED AND ONE SPECIFIC CASE DID NOT.
-    # This is the arc "export" lived and the module docstring describes, happening
-    # again: the sentence was written when nothing in the project could sort, it
-    # was quoted by three screens, and two of them can sort now.
-    #
-    # Patient Records and Medicine Inventory have real Sort controls -- four
-    # columns each, over the rows already rendered, composing with the search box
-    # and the Advanced Filter rather than resetting them (static/js/table-sort.js,
-    # one comparator shared by both). So the old wording had gone false in every
-    # part at once: "column sorting is not implemented" is wrong, "the rows arrive
-    # in the order the query returns them" is wrong the moment somebody sorts,
-    # and "a menu that was never built" is wrong because the menu exists and those
-    # two screens open it.
-    #
-    # The third screen still quoting this is the Patient Queue, and what
-    # stops it is not the missing menu -- the menu is now sitting in a shared file
-    # it could load in an afternoon. What stops it is that its queue's order is
-    # already the answer to a question, and re-sorting it would throw that answer
-    # away. So the reason below stops describing an unbuilt feature and starts
-    # describing a screen, which is what it should have been about all along.
-    #
-    # It also names where sorting DOES work. A reader who has just used Sort on
-    # Patient Records and then finds it disabled here is owed the difference
-    # between the two screens, not a blanket claim they can already disprove.
-    #
-    # This once carved out an exception for the Upcoming Appointments panel, whose
-    # rows had no queue position and so were not covered by the argument below.
-    # That panel went with advance booking on 2026-09-05, and the carve-out went
-    # with it: this screen is one table now, and the reason covers all of it.
-    # SHORTENED. Nine clauses, six of them argument -- and it is a tooltip, so
-    # the argument was being made at a size nobody finishes reading. The reasons
-    # are the ones above and they stay above: the queue's order is the answer to
-    # "who may be brought in next", re-sorting it by name or booked time throws
-    # that answer away while still looking like a working queue, and a roster and
-    # a shelf sort usefully several ways where a queue sorts usefully one way.
-    # What the operator needs is that it cannot be sorted, what the order is, and
-    # where sorting does work.
-    "sort": (
-        "This queue cannot be sorted. It is ordered by who is in consultation, then waiting, then"
-        " done. Sort works on Patient Records and Medicine Inventory."
-    ),
+    # The Patient Queue had a disabled Sort button with a reason beside it. It was
+    # removed (final fixes): the queue's order answers "who may be brought in next",
+    # and a control that can never work is not on the screen, with or without a reason.
     "pagination": (
         "Paging is not implemented. Every row is already on this page, so there "
         "is no second page to turn to."

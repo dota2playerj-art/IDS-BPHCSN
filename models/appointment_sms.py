@@ -83,12 +83,6 @@ _HISTORY_SELECT = """
 """
 
 
-def get_appointment_sms_by_id(message_id):
-    with db_connection() as conn:
-        row = conn.execute(_HISTORY_SELECT + " WHERE m.id = ?", (message_id,)).fetchone()
-    return _to_message(row) if row else None
-
-
 def get_appointment_sms_history(limit=25):
     """Individual confirmations, newest first, with the sender's name resolved."""
     with db_connection() as conn:

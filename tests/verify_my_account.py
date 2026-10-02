@@ -104,7 +104,7 @@ ROLES = [
         "username": "admin",
         "old": _support.PASSWORDS["admin"],
         "new": "Tubig#Malinis4Lahat",
-        "full_name": "Kagawad Antonio Acido",
+        "full_name": "Kagawad Juan Dela Cruz",
         "role": "Admin",
         "role_label": "Administrator",
         "home": "/admin/dashboard",

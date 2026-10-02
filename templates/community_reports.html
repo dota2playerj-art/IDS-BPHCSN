@@ -248,8 +248,7 @@
           <span class="panel-sub" style="margin-left:8px;">
 {%- if window.custom %}Generated range &middot; {{ selection.type_label }}.
 {%- else %}Default window &middot; the last {{ window.months | length }} clinic months.{% endif %}
-            Consultations and registrations are counted inside it. Immunisation coverage is
-            not &mdash; it is a position on {{ window.end | display_date }}, not something counted across one.
+            Consultations and registrations are counted inside it.<br>Immunisation coverage is as of {{ window.end | display_date }}.
           </span>
         </div>
       </div>
@@ -446,7 +445,7 @@
     saying which it is would let a reader take the standing register for the
     period's illness. #}
           <div class="snapshot-note">
-            The chart above is the whole register as it stands today &mdash; {{ snapshot_note }}
+            The chart above is the whole register as it stands today.<br>{{ snapshot_note }}<br>
             What <em>was</em> recorded between {{ window.start | display_date }} and
             {{ window.end | display_date }} is listed beside it.
           </div>
@@ -623,7 +622,7 @@
     <div class="print-only print-foot">
       
       {{ selection.type_label }} &middot; {{ window.start | long_date }} to {{ window.end | long_date }}
-      &middot; generated from {{ health_center.name }} records by {{ system_short_name }}.
+      &middot; generated from {{ health_center.name }} records by {{ system_short_name }}.<br>
       Counted from stored records. Immunisation coverage is as of {{ window.end | long_date }}.
     
     </div>

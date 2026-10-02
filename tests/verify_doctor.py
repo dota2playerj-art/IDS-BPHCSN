@@ -749,7 +749,7 @@ check("admin can deactivate and reactivate", d1 == 0 and d2 == 1)
 before = snapshot()
 admin.post("/admin/user_management/status", data={"user_id": ADMIN_ID, "action": "deactivate"})
 admin.post("/admin/user_management/edit", data={"user_id": ADMIN_ID,
-           "full_name": "Kagawad Antonio Acido", "role": "Doctor"})
+           "full_name": "Kagawad Juan Dela Cruz", "role": "Doctor"})
 after_admin = q1("SELECT role, is_active FROM users WHERE id=?", (ADMIN_ID,))
 check("last-Administrator guard: cannot deactivate or demote (not even to Doctor)",
       tuple(after_admin) == ("Admin", 1)

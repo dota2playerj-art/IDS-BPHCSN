@@ -267,6 +267,157 @@ from migrations import migrate_mask_audit_phone_numbers as mig  # noqa: E402
 check("the old-entry migration finds numbers in the dashed formats too",
       all(mig._PH_MOBILE_IN_TEXT.search(f"Texted {n}.") for n in FORMATS))
 
+# ===========================================================================
+section("D4. THE SMALL ITEMS: L35 TO L44 AND M38")
+
+import inspect  # noqa: E402
+from html.parser import HTMLParser  # noqa: E402
+
+DASH = {"Administrator": (ADMIN_ID, "/admin/dashboard"), "Health Center Staff": (STAFF_ID, "/staff/dashboard"),
+        "Doctor": (DOCTOR_ID, "/staff/dashboard"), "Barangay Official": (OFFICIAL_ID, "/official/dashboard")}
+LIMIT = 160
+
+
+class _Rendered(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.long, self.skip = [], 0
+
+    def handle_starttag(self, tag, attrs):
+        if tag in ("script", "style"):
+            self.skip += 1
+        for k, v in attrs:
+            if k in ("title", "placeholder", "aria-label") and v and len(re.sub(r"\s+", " ", v).strip()) > LIMIT:
+                self.long.append((k, len(v)))
+
+    def handle_endtag(self, tag):
+        if tag in ("script", "style"):
+            self.skip -= 1
+
+    def handle_data(self, data):
+        text = re.sub(r"\s+", " ", data).strip()
+        if not self.skip and len(text) > LIMIT:
+            self.long.append(("text", len(text), text[:40]))
+
+
+def menu_pages(client, dash):
+    page = body(client.get(dash))
+    nav = page[page.index('class="sidebar-nav"'):]
+    nav = nav[:nav.index("</ul>")]
+    return [dash] + sorted(set(re.findall(r'href="(/[^"#?]*)"', nav)) - {dash})
+
+
+rendered_long, disabled_sort, page_counts = [], [], {}
+for label, (uid, dash) in DASH.items():
+    c = client_as(uid)
+    pages = menu_pages(c, dash)
+    page_counts[label] = len(pages)
+    for link in pages:
+        html_text = body(c.get(link))
+        parser = _Rendered()
+        parser.feed(html_text)
+        rendered_long += [(label, link) + item for item in parser.long]
+        for m in re.finditer(r"<button\b[^>]*\bdisabled\b[^>]*>.*?</button>", html_text, re.S):
+            if re.search(r"\bSort\b", m.group(0)):
+                disabled_sort.append((label, link))
+check("L35: no page has a disabled Sort button (the Patient Queue's is gone)", not disabled_sort, disabled_sort)
+check("L36: no rendered tooltip, note or sentence on any menu page, for any role, is over 160 characters "
+      f"({sum(page_counts.values())} pages measured)", not rendered_long, rendered_long[:5])
+
+from models import appointment_sms, appointments  # noqa: E402
+from routes import audit_entries  # noqa: E402
+
+check("L37: the three dead functions are gone",
+      not any(hasattr(appointments, n) for n in ("count_active_consultations", "parse_iso_date"))
+      and not hasattr(appointment_sms, "get_appointment_sms_by_id"))
+check("L37: the dose audit writer takes no unused label argument",
+      "labels_of" not in inspect.signature(audit_entries._doses).parameters)
+
+stale = {"schema.sql": ["the two doctor-only fields"], ".gitignore": ["falls back to a dev value"],
+         "utils/security.py": ["95 guarded"]}
+check("L39: the stale comments are corrected",
+      not [(f, t) for f, ts in stale.items() for t in ts if t in (REPO / f).read_text(encoding="utf-8")])
+doubled = []
+for pattern in ("routes/*.py", "models/*.py", "utils/*.py", "templates/*.html"):
+    for path in REPO.glob(pattern):
+        text_ = path.read_text(encoding="utf-8")
+        if re.search(r"\b(the)\s+\1\b", text_, re.I):
+            doubled.append(path.name)
+check("L40: no doubled 'the the' in the audit writer or anywhere in the code or templates", not doubled, doubled)
+
+# --- L41: the sign-in pause, the frame header and the cookie setting --------
+from utils import login_throttle  # noqa: E402
+
+login_throttle.reset_all()
+PW = _support.PASSWORDS
+
+
+def sign_in(username, password):
+    """(client, the redirect target, the sentence the login page then shows)."""
+    c = app.test_client()
+    r = c.post("/login", data={"username": username, "password": password})
+    where = r.headers.get("Location", "")
+    shown = body(c.get(where)) if "/login" in where else ""
+    return c, r, where, shown
+
+
+for _ in range(login_throttle.MAX_FAILURES):
+    sign_in("staff", "wrong-password")
+_, r, where, shown = sign_in("staff", PW["staff"])
+check("L41: after 5 wrong passwords the correct one is refused, with a short message, for 5 minutes",
+      "/login" in where and login_throttle.THROTTLED_MESSAGE in shown, (r.status_code, where))
+check("L41: the pause covers one username: another account still signs in",
+      "/login" not in sign_in("official", PW["official"])[2] and sign_in("official", PW["official"])[2] != "")
+for _ in range(login_throttle.MAX_FAILURES):
+    sign_in("nosuchperson", "x")
+check("L41: an unknown username gets the same pause and message, so it reveals nothing",
+      login_throttle.THROTTLED_MESSAGE in sign_in("nosuchperson", "x")[3])
+real_now = login_throttle._now
+login_throttle._now = lambda: real_now() + login_throttle.WINDOW_SECONDS + 1
+try:
+    after = sign_in("staff", PW["staff"])[2]
+finally:
+    login_throttle._now = real_now
+check("L41: the pause ends after 5 minutes", after and "/login" not in after, after)
+login_throttle.reset_all()
+for _ in range(login_throttle.MAX_FAILURES - 1):
+    sign_in("doctor", "wrong-password")
+sign_in("doctor", PW["doctor"])
+for _ in range(login_throttle.MAX_FAILURES - 1):
+    sign_in("doctor", "wrong-password")
+last = sign_in("doctor", PW["doctor"])[2]
+check("L41: a correct sign-in clears the count", last and "/login" not in last, last)
+login_throttle.reset_all()
+check("L41: X-Frame-Options is DENY on the login page and on a signed-in page",
+      app.test_client().get("/login").headers.get("X-Frame-Options") == "DENY"
+      and client_as(ADMIN_ID).get("/admin/dashboard").headers.get("X-Frame-Options") == "DENY")
+check("L41: the session cookie is SameSite=Lax",
+      "samesite=lax" in sign_in("admin", PW["admin"])[1].headers.get("Set-Cookie", "").lower())
+login_throttle.reset_all()
+
+# --- L43: no real person's name in code or fixtures --------------------------
+named = [str(p.relative_to(REPO)) for pattern in ("*.py", "*/*.py", "templates/*.html", "schema.sql")
+         for p in REPO.glob(pattern) if ".venv" not in p.parts
+         and "Acido" in p.read_text(encoding="utf-8", errors="replace")
+         and p.name not in ("verify_final_fixes.py", "verify_cleanup.py")]
+check("L43: the real Administrator's name is not in any test fixture, migration or code file", not named, named)
+
+# --- M38 and L42: the documents describe what exists ------------------------
+docs = {n: (REPO / "PR0MPT_INSTRUCTION" / n).read_text(encoding="utf-8") for n in (
+    "03_SCREEN_SPECIFICATIONS.md", "04_DEVELOPMENT_GUIDE.md", "08_PROJECT_ROADMAP.md",
+    "09_IDS-BPHCSN_UI_Architecture_FROM-CLAUDE.md")}
+joined = "\n".join(docs.values())
+OLD_CLAIMS = r"\b22 screens\b|\b13 tables\b|\bof 22\b|90 guarded view functions|Bootstrap 5\.3 via CDN"
+check("M38: no document says 22 screens, 13 tables, 90 guarded functions or Bootstrap via CDN as current",
+      not re.search(OLD_CLAIMS, joined), re.findall(OLD_CLAIMS, joined))
+check("M38: the removed Settings panes and 'still disabled' controls are not described as current",
+      not re.search(r"Health Center Information, SMS Settings|still disabled", joined))
+from utils.unavailable import UNAVAILABLE  # noqa: E402
+
+check("the bell's style rules and the Sort reason are gone from the code",
+      ".bell-btn" not in (REPO / "templates" / "base.html").read_text(encoding="utf-8")
+      and "sort" not in UNAVAILABLE)
+
 # ==== END ====
 passed = sum(1 for _, ok in results if ok)
 print("\n" + "=" * 78)

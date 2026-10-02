@@ -40,8 +40,8 @@ def last_audit(n=1):
     return rs
 
 # STALE-FIX (2026-09-25): the Administrator's name was written into this suite
-# as "Dr. Joshua Reyes". 1c3efc7 corrected the persona (Kagawad Antonio
-# Acido), so the literal both failed the "names the acting administrator"
+# as "Dr. Joshua Reyes". 1c3efc7 corrected the persona (a different
+# name), so the literal both failed the "names the acting administrator"
 # check and, in the "put it back" steps, renamed the account to the retired
 # persona. The name is read from the database under test instead.
 ADMIN_NAME = row(1)["full_name"]

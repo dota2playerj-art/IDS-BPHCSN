@@ -45,9 +45,8 @@ LOCAL_UNTRACKED = {
     # store and wrote nothing, which is why broadcasts are the answer. The reader
     # of this feed never saw that screen.
     "announcements": (
-        "Announcements are SMS broadcasts. This feed shows the messages this "
-        "barangay has published, and they are the same rows SMS Notifications "
-        "lists."
+        "Announcements are SMS broadcasts. This feed lists the same messages "
+        "as SMS Notifications."
     ),
     "delivery": (
         "Delivery is never confirmed. Sent and Failed count what was handed to "

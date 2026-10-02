@@ -1,4 +1,4 @@
-"""Migration: give the Administrator account its real persona.
+"""Migration: give the Administrator account a generic name.
 
 Run: python migrations/migrate_correct_admin_persona.py (project root). Safe to run twice.
 """
@@ -13,7 +13,7 @@ import config
 
 USERNAME = "admin"
 WRONG = "Dr. Joshua Reyes"
-RIGHT = "Kagawad Antonio Acido"
+RIGHT = "System Administrator"
 
 
 def snapshot(conn):

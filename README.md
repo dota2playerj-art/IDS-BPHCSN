@@ -65,6 +65,8 @@ Do these steps in order, once on each computer. Run them from the project folder
 
 If port 5001 is already in use, another copy of the app is running. Close it first.
 
+After 5 wrong passwords in a row for one username, sign-in is closed to that username for 5 minutes.
+
 The app runs entirely offline: Bootstrap, Chart.js and the Inter/Material fonts are vendored
 under `static/`, so no CDN is reached at any point. There is no jQuery; the scripts are plain
 JavaScript.
