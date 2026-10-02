@@ -340,7 +340,7 @@ for label, client in ROLES:
     home = client.get(DASH[label])
     html_text = body(home)
     nav = html_text[html_text.index('class="sidebar-nav"'):]
-    nav = nav[:nav.index("</ul>")]
+    nav = nav[:nav.index("</aside>")]
     links = sorted(set(re.findall(r'href="(/[^"#?]*)"', nav)))
     bad = []
     for link in links:

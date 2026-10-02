@@ -5,6 +5,8 @@ An independent, read-only audit of the code, the tests and the documents, done b
 ## Verdict
 
 **READY WITH FIXES.**
+
+**Update (final fixes, 2026-10-03): M36, M37, M38 and L35–L44 are fixed; 2294/2294 checks pass in 22 suites. Only H7 (outside the repo) and the pre-defense actions remain.**
 Every privacy and permission rule held under attack: 2245/2245 checks pass, all 7 break-it mutations were caught, and 40/40 adversarial checks found no leak of a clinical marker, sealed field or full phone number to any role, export, print or backup.
 Fix before the defense: H7 (plain copies of the old database in `../classcheck_backups`, outside the repo), M36 (README setup order), M37 (Official sees recipient names), and the docs drift in M38. None of these is a code-level leak of clinical data.
 

@@ -158,7 +158,10 @@ V["K"] = add_visit(15, "K", 0, "In Consultation", time="08:40")                 
 # A sealed visit whose diagnosis is not written yet: its complaint is stored encrypted.
 V["S"] = add_visit(16, "S", 2, WFD, consultation=True, restricted=True, time="12:00")
 V["L"] = add_visit(17, "L", 1, WFD, kind=FOLLOW, consultation=True, time="09:00")
-V["M"] = add_visit(18, "M", 0, WFD, kind=HTN, time="08:30")                     # today; no record found
+# Half an hour ago, never before midnight, so the wait is in the past whatever time the suite runs.
+M_TIME = max(datetime.now() - timedelta(minutes=30),
+             datetime.combine(date.today(), datetime.min.time())).strftime("%H:%M")
+V["M"] = add_visit(18, "M", 0, WFD, kind=HTN, time=M_TIME)                      # today; no record found
 from utils import sealed_crypto  # noqa: E402
 
 SEALED_MARK = "ZZSEALEDCOMPLAINTMARK"
@@ -216,7 +219,11 @@ check("visits from earlier days are marked, and today's are not",
 def plain_days(visit):
     """The wait as the page should say it: whole elapsed days, or hours and minutes."""
     days = (datetime.now() - visit["checked_in"]).days
-    return f"{days} day{'' if days == 1 else 's'}" if days >= 1 else None
+    if days >= 1:
+        return f"{days} day{'' if days == 1 else 's'}"
+    # Less than a day since a check-in "yesterday" (the suite ran before that visit's time of day).
+    hours = int((datetime.now() - visit["checked_in"]).total_seconds() // 3600)
+    return f"{hours} hour{'' if hours == 1 else 's'}"
 
 
 check("each row says how long it has waited, in plain words",

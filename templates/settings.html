@@ -419,8 +419,8 @@
 {%- endfor %}
 
               <div class="form-text-hint" style="margin-top:14px;">
-                The one-sentence version, which is the same sentence Add User prints above its password box and
-                the same one a refused password is given: &ldquo;{{ password_policy.rule_text }}&rdquo;
+                The same rule Add User shows above its password box, and the one a refused password is given:<br>
+                {% set _rule = password_policy.rule_text.split('. ', 1) %}&ldquo;{{ _rule[0] }}.<br>{{ _rule[1] }}&rdquo;
               </div>
             </div>
 

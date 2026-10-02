@@ -303,7 +303,7 @@ class _Rendered(HTMLParser):
 def menu_pages(client, dash):
     page = body(client.get(dash))
     nav = page[page.index('class="sidebar-nav"'):]
-    nav = nav[:nav.index("</ul>")]
+    nav = nav[:nav.index("</aside>")]
     return [dash] + sorted(set(re.findall(r'href="(/[^"#?]*)"', nav)) - {dash})
 
 
@@ -361,14 +361,14 @@ def sign_in(username, password):
     return c, r, where, shown
 
 
-for _ in range(login_throttle.MAX_FAILURES):
+for _ in range(5):
     sign_in("staff", "wrong-password")
 _, r, where, shown = sign_in("staff", PW["staff"])
 check("L41: after 5 wrong passwords the correct one is refused, with a short message, for 5 minutes",
       "/login" in where and login_throttle.THROTTLED_MESSAGE in shown, (r.status_code, where))
 check("L41: the pause covers one username: another account still signs in",
       "/login" not in sign_in("official", PW["official"])[2] and sign_in("official", PW["official"])[2] != "")
-for _ in range(login_throttle.MAX_FAILURES):
+for _ in range(5):
     sign_in("nosuchperson", "x")
 check("L41: an unknown username gets the same pause and message, so it reveals nothing",
       login_throttle.THROTTLED_MESSAGE in sign_in("nosuchperson", "x")[3])
@@ -380,10 +380,10 @@ finally:
     login_throttle._now = real_now
 check("L41: the pause ends after 5 minutes", after and "/login" not in after, after)
 login_throttle.reset_all()
-for _ in range(login_throttle.MAX_FAILURES - 1):
+for _ in range(4):
     sign_in("doctor", "wrong-password")
 sign_in("doctor", PW["doctor"])
-for _ in range(login_throttle.MAX_FAILURES - 1):
+for _ in range(4):
     sign_in("doctor", "wrong-password")
 last = sign_in("doctor", PW["doctor"])[2]
 check("L41: a correct sign-in clears the count", last and "/login" not in last, last)

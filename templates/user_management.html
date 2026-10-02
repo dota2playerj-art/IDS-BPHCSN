@@ -286,7 +286,7 @@
               administrator cannot be switched off. #}
           <div class="scope-note">
             <strong>Every account that can sign in is on this list, and it is managed from this screen.</strong>
-            Add User creates an account with a password you set. Nobody can look the password up later, so tell the new holder. Reset Password sets a new one.
+            Add User creates an account with a password you set.<br>Nobody can look the password up later, so tell the new holder. Reset Password sets a new one.<br>
             {% if active_admins == 1 %}One Administrator account can currently sign in, and
             it cannot be deactivated while it is the only one — see the note on its own
             panel.{% else %}{{ active_admins }} Administrator accounts can currently sign
@@ -655,7 +655,7 @@
 {%- if add_errors.password %}
                   <div class="field-error">{{ add_errors.password }}</div>
 {%- else %}
-                  <div class="form-text-hint">{{ password_rule }}</div>
+                  <div class="form-text-hint">{% set _rule = password_rule.split('. ', 1) %}{{ _rule[0] }}.<br>{{ _rule[1] }}</div>
                   <div class="form-text-hint"><strong>The user must change this password the first time they sign in.</strong></div>
 {%- endif %}
                 </div>
@@ -940,8 +940,8 @@
               ({{ user.username }}, {{ user.role }}).
             </p>
             <p style="font-size:13.5px; color:var(--text-muted); margin-bottom:14px;">
-              You are not asked for the current password: nobody can read it back. The account keeps its username, role and access; only the password changes, when you save.
-{%- if user.is_self %}
+              You are not asked for the current password: nobody can read it back.<br>The account keeps its username, role and access; only the password changes, when you save.
+{%- if user.is_self %}<br>
               This is the account you are signed in as: your current session stays open, but
               the new password is what you will need next time.
 {%- endif %}
@@ -979,7 +979,7 @@
 {%- if rerr.password %}
                   <div class="field-error">{{ rerr.password }}</div>
 {%- else %}
-                  <div class="form-text-hint">{{ password_rule }}</div>
+                  <div class="form-text-hint">{% set _rule = password_rule.split('. ', 1) %}{{ _rule[0] }}.<br>{{ _rule[1] }}</div>
                   <div class="form-text-hint"><strong>The user must change this password the first time they sign in.</strong></div>
 {%- endif %}
                 </div>
