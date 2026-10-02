@@ -181,7 +181,7 @@ none_written("saving the form with nothing changed writes nothing", start)
 section("3. THE PATIENT QUEUE: CHECK IN, START, COMPLETE")
 reason = "Masakit ang tiyan mula kahapon"
 start = mark()
-staff.post("/staff/appointment_scheduling/check-in", data={"patient_id": "2", "reason": reason, "service": "Consultation"})
+staff.post("/staff/appointment_scheduling/check-in", data={"patient_id": "2", "reason": reason, "service": "Immunization"})
 visit = latest_visit(2)
 one_entry("check-in writes one entry, without the visit reason", start,
           A.ACTION_PATIENT_CHECKED_IN, A.MODULE_APPOINTMENTS, STAFF_ID,
@@ -202,6 +202,7 @@ start = mark()
 staff.post("/staff/appointment_scheduling/start-consultation", data={"appointment_id": str(other)})
 none_written("starting while the room is busy is refused and writes nothing", start)
 start = mark()
+# Task 6c: this visit is an Immunization, which does not need the Doctor, so Mark Completed still works.
 staff.post("/staff/appointment_scheduling/complete-consultation", data={"appointment_id": str(visit)})
 one_entry("completing from the queue writes one entry", start, A.ACTION_CONSULTATION_COMPLETED,
           A.MODULE_APPOINTMENTS, STAFF_ID, f"{patient_ref(2)}, visit APT-{visit:05d}.")

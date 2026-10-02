@@ -376,8 +376,8 @@ check("Staff correct the service of a Waiting visit",
       == "Immunization")
 check("one short audit entry, in the words the task gave, and it names no patient",
       len(entries) == 1 and entries[0]["user_id"] == STAFF_ID
-      and entries[0]["details"] == f"Changed the service of visit APT-{fix:05d} from Consultation "
-                                   f"to Immunization." and NAMES["Q"] not in entries[0]["details"], entries)
+      and entries[0]["details"] == f"Corrected the service of visit APT-{fix:05d}."
+      and NAMES["Q"] not in entries[0]["details"], entries)
 r = doctor.post(CHANGE, data={"appointment_id": str(fix), "service": "Dental"})
 check("the Doctor can correct it too, and the entry names the Doctor",
       q1("SELECT appointment_type FROM appointments WHERE id = ?", (fix,))[0] == "Dental"
@@ -501,13 +501,83 @@ staff.post(f"/staff/consultation/record/{d}", data=INTAKE)
 doctor.post(f"/staff/consultation/edit/{consultation_of(d)[0]}", data=FULL)
 check("the Doctor may write a diagnosis on any visit; an immunization visit stays Completed",
       status_of(d) == "Completed")
-# The queue's own 'Mark Completed' (nothing written) still gives Completed.
+# Task 6c: 'Mark Completed' from the queue is refused for a service that needs the Doctor.
+COMPLETE = "/staff/appointment_scheduling/complete-consultation"
+SEND = "/staff/appointment_scheduling/send-to-doctor"
 e = new_visit(CONSULT, "closed")
-staff.post("/staff/appointment_scheduling/complete-consultation", data={"appointment_id": str(e)})
-check("'Mark Completed' from the queue, with nothing written, still gives Completed",
-      status_of(e) == "Completed" and e not in listed_now())
-check("the existing audit entry style for a completed visit is unchanged",
-      audits("Completed consultation")[-1]["details"].startswith(f"{NAMES['C']} (PAT-{PATIENT:03d}), visit APT-"))
+n_complete = len(audits("Completed consultation"))
+for who, client in (("Staff", staff), ("the Doctor", doctor)):
+    r = client.post(COMPLETE, data={"appointment_id": str(e)})
+    check(f"{who}: 'Mark Completed' on a Consultation visit with no diagnosis is refused on the server",
+          status_of(e) == "In Consultation"
+          and "This visit needs the Doctor first." in body(client.get("/staff/appointment_scheduling")))
+check("the refusal wrote no entry", len(audits("Completed consultation")) == n_complete)
+page = body(staff.get("/staff/appointment_scheduling"))
+check("the queue offers 'Send to the Doctor' there, not 'Mark Completed'",
+      "Send to the Doctor" in page and 'form="sendToDoctorForm"' in page
+      and f'form="completeConsultationForm" name="appointment_id" value="{e}"' not in page)
+before_sent = len(audits("Sent visit to the Doctor"))
+r = staff.post(SEND, data={"appointment_id": str(e)})
+sent = audits("Sent visit to the Doctor")
+check("'Send to the Doctor' sets Waiting for the Doctor, and the room is free",
+      status_of(e) == WFD and q1("SELECT COUNT(*) FROM appointments WHERE status = 'In Consultation'")[0] == 0
+      and e in listed_now())
+check("it writes one short entry: the visit only, no patient and no service",
+      len(sent) == before_sent + 1 and sent[-1]["user_id"] == STAFF_ID
+      and sent[-1]["details"] == f"Sent visit APT-{e:05d} to the Doctor.",
+      sent[-1:])
+n = len(audits("Sent visit to the Doctor"))
+staff.post(SEND, data={"appointment_id": str(e)})
+check("sending it a second time changes nothing and writes nothing",
+      status_of(e) == WFD and len(audits("Sent visit to the Doctor")) == n)
+# Every other way to Completed is refused for a visit waiting for the Doctor, without a diagnosis.
+for who, client in (("Staff", staff), ("the Doctor", doctor), ("the Administrator", admin),
+                    ("the Official", official)):
+    client.post(COMPLETE, data={"appointment_id": str(e)})
+check("Mark Completed, by Staff, the Doctor, the Administrator or the Official, cannot complete a visit "
+      "waiting for the Doctor", status_of(e) == WFD)
+doctor.post(f"/staff/consultation/record/{e}", data=FULL)
+check("the record route refuses a visit that is not In Consultation", status_of(e) == WFD)
+e_start = new_visit(CONSULT, "blank")
+staff.post(f"/staff/consultation/record/{e_start}", data=INTAKE)
+cid_e = consultation_of(e_start)[0]
+doctor.post(f"/staff/consultation/edit/{cid_e}", data=dict(FULL, diagnosis=""))
+check("the Doctor saving with a blank diagnosis does not complete it", status_of(e_start) == WFD)
+staff.post(f"/staff/consultation/edit/{cid_e}", data=FULL)
+check("Staff saving a diagnosis (refused on the server) does not complete it",
+      status_of(e_start) == WFD and not (consultation_of(e_start)[1] or "").strip())
+staff.post("/staff/appointment_scheduling/undo-left", data={"appointment_id": str(e_start)})
+check("'Undo left' on a visit that is not marked changes nothing", status_of(e_start) == WFD)
+staff.post("/staff/appointment_scheduling/mark-left", data={"appointment_id": str(e_start)})
+staff.post("/staff/appointment_scheduling/undo-left", data={"appointment_id": str(e_start)})
+check("a visit marked left from Waiting for the Doctor comes back to it, never to Completed",
+      status_of(e_start) == WFD)
+from models.appointments import complete_consultation  # noqa: E402
+
+with app.app_context():
+    check("complete_consultation() itself does not complete a visit waiting for the Doctor "
+          "(the rule is in the model, not the buttons)",
+          complete_consultation(e_start) == "not-in-consultation" and status_of(e_start) == WFD)
+run_sql("UPDATE appointments SET status = 'Completed' WHERE id IN (?, ?)", (e, e_start))
+# A service that does not need the Doctor still completes from the queue.
+g = new_visit("Dental", "closed dental")
+staff.post(COMPLETE, data={"appointment_id": str(g)})
+check("Mark Completed still works for a service that does not need the Doctor",
+      status_of(g) == "Completed")
+h = new_visit("Immunization", "send refused")
+staff.post(SEND, data={"appointment_id": str(h)})
+check("'Send to the Doctor' is refused for a service that does not need him",
+      status_of(h) == "In Consultation")
+page = body(staff.get("/staff/appointment_scheduling"))
+check("... and the queue offers 'Mark Completed' for it", f'form="completeConsultationForm" name="appointment_id" value="{h}"' in page)
+staff.post(COMPLETE, data={"appointment_id": str(h)})
+for who, client in (("Administrator", admin), ("Barangay Official", official)):
+    spare2 = add_visit(24, "N" + who[:1], 0, "In Consultation", time="17:00")[0]
+    client.post(SEND, data={"appointment_id": str(spare2)})
+    check(f"{who}: POST send-to-doctor is refused on the server", status_of(spare2) == "In Consultation")
+    run_sql("UPDATE appointments SET status = 'Completed' WHERE id = ?", (spare2,))
+check("the Administrator has no /admin/ route for it",
+      admin.post("/admin/appointment_scheduling/send-to-doctor", data={"appointment_id": "1"}).status_code == 404)
 # A stale or forged second save does nothing.
 f = new_visit(CONSULT, "stale")
 staff.post(f"/staff/consultation/record/{f}", data=INTAKE)
@@ -901,6 +971,69 @@ check("schema.sql accepts the new status, and the migration finds nothing to do 
       accepts and not m2.needs_work(fresh))
 fresh.close()
 shutil.rmtree(work2, ignore_errors=True)
+
+
+# ---------------------------------------------------------------------------
+section("12. NO AUDIT ENTRY NAMES A VISIT'S SERVICE (L32)")
+entries_all = [dict(r) for r in db().execute(
+    "SELECT action, details FROM audit_logs WHERE module = 'Appointment Scheduling'")]
+check("no entry of the Patient Queue names any service, whatever the action",
+      entries_all and not [e for e in entries_all if any(s in (e["details"] or "") for s in VISIT_SERVICES)],
+      [e for e in entries_all if any(s in (e["details"] or "") for s in VISIT_SERVICES)][:2])
+check("the correction entries all read 'Corrected the service of visit APT-nnnnn.', alone or with 'The "
+      "visit is now Completed.'",
+      all(re.fullmatch(r"Corrected the service of visit APT-\d{5}\.( The visit is now Completed\.)?", e["details"])
+          for e in entries_all if e["action"] == "Changed the service of a visit"))
+check("the entry for a visit completed by a service correction says so without naming the service",
+      any(e["details"].endswith("The visit is now Completed.") for e in entries_all
+          if e["action"] == "Changed the service of a visit"))
+
+# ---------------------------------------------------------------------------
+section("13. THE MIGRATION THAT REWORDS OLD ENTRIES (migrate_remove_service_names_from_audit.py)")
+import migrate_remove_service_names_from_audit as m3  # noqa: E402
+
+work3 = Path(tempfile.mkdtemp(prefix="idsaud_"))
+old3 = work3 / "old.db"
+con = sqlite3.connect(old3)
+con.executescript(SCHEMA)
+con.executescript("INSERT INTO users (username, password_hash, full_name, role, is_active) "
+                  "VALUES ('u','h','U','Admin',1);")
+rows3 = [
+    ("Changed the service of a visit", "Changed the service of visit APT-00081 from Consultation to Immunization."),
+    ("Changed the service of a visit", "Changed the service of visit APT-00082 from Prenatal Check-up to Consultation. "
+                                      "The visit is now Completed."),
+    ("Changed the service of a visit", "Corrected the service of visit APT-00083."),
+    ("Marked as left before being seen", "Name (PAT-005), visit APT-00081."),
+]
+for action, details in rows3:
+    con.execute("INSERT INTO audit_logs (user_id, action, module, details) VALUES (1, ?, 'Appointment Scheduling', ?)",
+                (action, details))
+con.commit()
+before3 = [tuple(r) for r in con.execute("SELECT id, user_id, action, module, ip_address, created_at FROM audit_logs")]
+con.close()
+res3 = m3.run(old3, backup_dir=work3 / "backups")
+con = sqlite3.connect(old3)
+texts = [r[0] for r in con.execute("SELECT details FROM audit_logs ORDER BY id")]
+check("it backs up first and rewords the two old entries, and only them",
+      res3["backup"] and Path(res3["backup"]).exists() and res3["reworded"] == 2 and not res3["problems"]
+      and texts[:4] == ["Corrected the service of visit APT-00081.",
+                        "Corrected the service of visit APT-00082. The visit is now Completed.",
+                        "Corrected the service of visit APT-00083.", "Name (PAT-005), visit APT-00081."], texts)
+check("who, when, the action and the module of every entry are unchanged",
+      [tuple(r) for r in con.execute("SELECT id, user_id, action, module, ip_address, created_at FROM audit_logs "
+                                     "WHERE id <= 4 ORDER BY id")] == before3)
+rec = con.execute("SELECT action, details FROM audit_logs WHERE id > 4").fetchall()
+check("it writes ONE record of itself, with the count, saying the script did it",
+      len(rec) == 1 and rec[0][0] == m3.ACTION and "2 earlier entries" in rec[0][1]
+      and "migration script" in rec[0][1] and not any(s in rec[0][1] for s in VISIT_SERVICES), rec)
+con.close()
+res3b = m3.run(old3, backup_dir=work3 / "backups")
+con = sqlite3.connect(old3)
+check("a second run does nothing: no backup, no change, no second record",
+      res3b["backup"] is None and res3b["reworded"] == 0 and len(list((work3 / "backups").iterdir())) == 1
+      and con.execute("SELECT COUNT(*) FROM audit_logs").fetchone()[0] == 5)
+con.close()
+shutil.rmtree(work3, ignore_errors=True)
 
 # ---------------------------------------------------------------------------
 passed = sum(1 for _, ok in results if ok)
