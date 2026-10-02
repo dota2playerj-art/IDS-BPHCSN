@@ -1178,6 +1178,10 @@ The Doctor, Health Center Staff and the Barangay Official are unchanged.
 - *Task 6c (2026-10-02).* No skipping the Doctor: for a service that needs him, the queue button is **Send to
   the Doctor** (status Waiting for the Doctor), and no route can set Completed without his diagnosis. No audit
   entry names a visit's service ("Corrected the service of visit APT-00081.").
+- *Task 6d (2026-10-03).* The Doctor can see every waiting patient: **See patient** on the Patient Queue and
+  on his dashboard list opens the saved record (intake done) or a new consultation for the visit (no
+  intake). One status x role mapping (`models/queue_actions.py`) decides every queue button and is checked on
+  the server. The queue legend and summary use only the five real statuses; no Walk-in tag.
 - *Stock accountability.* Dispensing writes no stock entry. Accountability comes from the stock
   levels and the dispensed totals in Reports. The Doctor and Health Center Staff hold the full
   dispensing records.

@@ -404,6 +404,21 @@ closed a visit with nothing written is **Send to the Doctor**. It sets Waiting f
 refuses Completed on such a visit without a diagnosis ("This visit needs the Doctor first."). Services that do
 not need him keep **Mark Completed**. Neither button is on the Administrator's queue.
 
+**What each role can do on a row (Task 6d, 2026-10-03).** One mapping, status by role, decides the buttons
+and the server's answer. Waiting: Staff and the Doctor can Start, mark Left before being seen, Change
+service. In Consultation: Staff and the Doctor can open the intake (Record Consultation), Send to the Doctor
+or Mark Completed (by service), mark Left, Change service. Waiting for the Doctor: the Doctor has **See
+patient**; Staff and the Doctor can mark Left and Change service. Completed: view only. Left before being
+seen: view only, plus Undo the same day. The Administrator only views. **See patient** opens the visit's
+consultation record when Staff did the intake, or a new consultation for the visit when they did not (the
+Doctor records vitals, complaint, diagnosis and treatment plan). Saving with a diagnosis makes the visit
+Completed.
+
+**Wording (Task 6d).** The colour legend lists the five statuses: Waiting, In Consultation, Waiting for the
+Doctor, Completed, Left before being seen, each with the colour of its badge; the calendar's dots use them.
+The summary line under the table uses the same five names. There is no Walk-in tag (every visit is a
+walk-in). The vaccine badge says what is overdue ("2 vaccines overdue") or due ("1 vaccine due").
+
 **Service at check-in (Task 6b).** The Check In dialog has a required **Service** list on both tabs
 (existing patient, new patient), with no default: Consultation, Follow-up Consultation, Hypertension /
 Diabetes Monitoring, Prenatal Check-up, Immunization, Dental. A row has a **Change service** button, with a
@@ -703,7 +718,8 @@ Dashboard for healthcare workers.
 
 **Waiting for the Doctor (Tasks 6 and 6b, 2026-10-02).** On the Doctor's dashboard, a list of every visit with
 the status Waiting for the Doctor, oldest first, across all days. Each row shows the patient's name and ID,
-the check-in date and time, the service, how long it has waited ("2 days"), and a button: Open consultation.
+the check-in date and time, the service, how long it has waited ("2 days"), and a button: See patient
+(the same one as on the Patient Queue: it opens the saved record, or a new consultation when there is none).
 A visit from an earlier day is marked "From an earlier day". Health Center Staff see one card, "Waiting for
 the Doctor: N", and no list. The Administrator's dashboard has the same card and no names. Immunization,
 prenatal and dental visits never get this status. A sealed visit is listed by name only and shows no sealed
