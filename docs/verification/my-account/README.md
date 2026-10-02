@@ -140,7 +140,7 @@ each of the three roles in turn.
 | Role | What was done, and what was seen |
 | --- | --- |
 | Health Center Staff | Clicked the profile circle: the menu now holds **My Account** above Logout. Opened it; the account details read *Health Center Staff / Health Center Staff / staff*. Submitted a **wrong current password** — the page came straight back with the red banner, the Current Password box outlined red and "That is not the password this account signs in with" beneath it, all three boxes empty. Submitted a **3-character new password with a mismatched confirmation** — both errors shown at once, banner counting 2 fields, and the submitted value confirmed absent from the live DOM. Then a real change, which redirected to My Account with the flash, still signed in. |
-| Administrator | Same menu item, own details *Kagawad Antonio Acido / Administrator / admin*. Real change made and flashed. Opened **Audit Logs** and read both self-change rows in the table: attributed to the holder, module **Authentication**, phrase **Changed own account password**. |
+| Administrator | Same menu item, own details *the Administrator (Health Committee Chair) / Administrator / admin*. Real change made and flashed. Opened **Audit Logs** and read both self-change rows in the table: attributed to the holder, module **Authentication**, phrase **Changed own account password**. |
 | Barangay Official | Same menu item, own details, real change made and flashed. |
 
 For each of the three: signed out, the **old** password was refused at the login

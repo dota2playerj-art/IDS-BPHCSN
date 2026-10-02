@@ -418,6 +418,24 @@ check("the bell's style rules and the Sort reason are gone from the code",
       ".bell-btn" not in (REPO / "templates" / "base.html").read_text(encoding="utf-8")
       and "sort" not in UNAVAILABLE)
 
+# ===========================================================================
+section("TWO SMALL FIXES: NO NOTIFICATIONS PANEL, NO REAL ADMINISTRATOR NAME IN docs/verification/")
+
+panels = []
+for label, (uid, dash) in DASH.items():
+    html_text = body(client_as(uid).get(dash))
+    if re.search(r'panel-title[^>]*>\s*Notifications\s*<', html_text) or "per-user notifications" in html_text.lower():
+        panels.append(label)
+check("no dashboard has a Notifications panel (Administrator, Staff, Doctor, Official)", not panels, panels)
+dash_src = " ".join((REPO / "templates" / n).read_text(encoding="utf-8")
+                    for n in ("staff_dashboard.html", "official_dashboard.html"))
+check("the panel's block and its notif-* styles are gone from both dashboard templates",
+      "NOTIFICATIONS PANEL" not in dash_src and "notif-" not in dash_src and "untracked.notifications" not in dash_src)
+named_docs = [str(p.relative_to(REPO)) for p in (REPO / "docs" / "verification").rglob("*")
+              if p.is_file() and p.suffix in (".md", ".txt", ".html", ".json")
+              and re.search(r"Acido|Antonio A", p.read_text(encoding="utf-8", errors="replace"))]
+check("the real Administrator's name is not in docs/verification/", not named_docs, named_docs)
+
 # ==== END ====
 passed = sum(1 for _, ok in results if ok)
 print("\n" + "=" * 78)

@@ -2,14 +2,14 @@
 
 Verification of the Administrator persona correction — "Dr. Joshua Reyes", a
 placeholder invented in `06_DESIGN_CONTENT_LIBRARY.md`, replaced by the person
-who actually holds the account: **Antonio Acido**, a Kagawad chairing the
+who actually holds the account: **the Administrator (Health Committee Chair)**, a Kagawad chairing the
 barangay's Health Committee.
 
 ## What changed, and what deliberately did not
 
 | | |
 | --- | --- |
-| Stored `users.full_name` | `Kagawad Antonio Acido` |
+| Stored `users.full_name` | `the Administrator (Health Committee Chair)` |
 | Profile chip / sidebar subtitle | `Kagawad, Health Committee` |
 | Avatar initials | `AA` |
 | **Username** | **`admin`, unchanged** |
@@ -97,7 +97,7 @@ is now counted rather than remembered — the script prints it on every run.
 Run against scratch copies before being run for real:
 
 - **Apply**, against `app.db.PRETASK_BACKUP_admin-persona_20260904_042833`:
-  `"Dr. Joshua Reyes" -> "Kagawad Antonio Acido"`, then VERIFICATION PASSED —
+  `"Dr. Joshua Reyes" -> "the Administrator (Health Committee Chair)"`, then VERIFICATION PASSED —
   username, role and `password_hash` unchanged, 506 audit entries untouched,
   every other column of all 4 accounts byte-for-byte unchanged.
 - **Idempotent re-run** on the same file: `already ... nothing to do`, same
@@ -120,7 +120,7 @@ before and after.
 2. `python app.py`, and sign in as `admin` with that computer's password — the
    credentials are unchanged by any of this.
 3. The header chip, the sidebar card, **User Management's roster**, Audit Logs
-   and My Account must all show `AA`, `Kagawad Antonio Acido`, and the system
+   and My Account must all show `AA`, `the Administrator (Health Committee Chair)`, and the system
    role `Admin` / `Administrator`. The chip's subtitle, and only it, reads
    `Kagawad, Health Committee`.
 4. Scroll Audit Logs back to entries written before the correction. They still

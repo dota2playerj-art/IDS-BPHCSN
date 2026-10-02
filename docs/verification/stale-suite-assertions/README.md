@@ -81,8 +81,7 @@ asserts that `Item on line 5` is absent, and it tests something again.
   touch the real database. They now compare that database with itself before the
   run, instead of with the literals 3 and 0.
 - **Persona (2 checks).** The audit entries were expected to name "Dr. Joshua
-  Reyes". **1c3efc7** corrected the Administrator's persona to Kagawad Antonio
-  Acido. The checks now read the acting account's name from the database.
+  Reyes". **1c3efc7** corrected the Administrator's persona to the Administrator (Health Committee Chair). The checks now read the acting account's name from the database.
 - **Password wording.** Expected `at least 3 of these four`. **3610e21** builds
   the sentence from `PASSWORD_CHARACTER_KINDS` and says `Use at least 3 of these
   4:`. The password `allsmallletters` is still refused under that rule.

@@ -146,7 +146,7 @@ queue — is in `retire-advance-booking/README.md`.
 ## admin-persona/
 
 Verification of the Administrator persona correction — the placeholder
-"Dr. Joshua Reyes" replaced by **Antonio Acido**, a Kagawad chairing the
+"Dr. Joshua Reyes" replaced by **the Administrator (Health Committee Chair)**, a Kagawad chairing the
 barangay's Health Committee — and of the two things the correction had left
 unfinished.
 
