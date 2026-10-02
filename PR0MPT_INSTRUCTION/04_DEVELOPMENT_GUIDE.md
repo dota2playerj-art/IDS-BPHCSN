@@ -55,7 +55,7 @@ The goal is to keep the project simple, maintainable, beginner-friendly, and ali
 
 Per the approved Capstone Proposal, IDS-BPHCSN follows a **Client-Server Architecture using a
 Star Topology**. A single centralized server (Flask application + SQLite database) handles all
-application logic and database operations. Client devices — Admin, Health Center Staff, and
+application logic and database operations. Client devices — Administrator, Doctor, Health Center Staff, and
 Barangay Official workstations, plus mobile browsers for client-side access — each connect
 individually to that central server, typically over a local Wi-Fi router.
 
@@ -68,7 +68,7 @@ one Flask process and one SQLite database file as the single source of truth.
 
 ## Admin-side Software
 - Windows 10/11
-- Python 3.11 with Flask 3.0
+- Python 3.11 or newer with Flask 3.1
 - SQLite (built-in)
 - Visual Studio Code 1.88+
 - Git/GitHub (latest)
@@ -79,7 +79,7 @@ one Flask process and one SQLite database file as the single source of truth.
 - Windows 10/11 or Android (mobile browser access)
 - Chrome / Edge / Safari (latest)
 - Bootstrap 5.3 via CDN
-- Vanilla JS / jQuery via CDN
+- Vanilla JavaScript (no jQuery; nothing is loaded from a CDN)
 
 ## Admin-side Hardware
 - Intel Core i5 / AMD Ryzen 5 or higher
@@ -203,10 +203,7 @@ Comments should clearly identify sections.
 
 # JavaScript Guidelines
 
-Vanilla JavaScript is the default. jQuery (via CDN, no local installation) is also explicitly
-approved per the Capstone Proposal's software specification and may be introduced where it
-genuinely simplifies development — it is not a scope exception. All UI screens built so far use
-Vanilla JS; this note only clarifies jQuery is an available option going forward.
+Vanilla JavaScript is the only scripting used. There is no jQuery, and no script is loaded from a CDN; Bootstrap and Chart.js are vendored under `static/`.
 
 Keep scripts modular.
 
@@ -377,6 +374,11 @@ SQL injection protection
 
 Escape user-generated content when displayed.
 
+Every form carries a CSRF token. A sealed consultation's free text is stored encrypted (AES-256-GCM, key in
+`.env`). Backups are encrypted `.idsbackup` files. Counts of fewer than 5 are folded or hidden for the
+Administrator and the Barangay Official, and phone numbers are masked on the screens that show them to those
+roles.
+
 ---
 
 # Error Handling
@@ -397,35 +399,23 @@ Recommended structure:
 
 project/
 
-app.py
+app.py, config.py, schema.sql
 
-templates/
+routes/        one blueprint per role, plus shared context builders
 
-login.html
+models/        all data access
 
-dashboard.html
+utils/         dates, roles, security, SMS, small counts, masking
 
-patients.html
+templates/     Jinja templates; base.html is the shared shell
 
-inventory.html
+static/        vendored CSS, JS and fonts
 
-appointments.html
+database/      connection and first-run set-up
 
-reports.html
+migrations/    one-time, idempotent schema migrations
 
-settings.html
-
-static/
-
-css/
-
-js/
-
-images/
-
-database/
-
-instance/
+tests/         automated suites (python tests/run_all.py)
 
 README.md
 
@@ -433,23 +423,26 @@ README.md
 
 # User Roles
 
-Administrator
+Administrator (a Kagawad)
 
-- Full access
+- Accounts, settings, Service Schedule, SMS broadcasts, inventory, Audit Logs and reports
+- Patients as demographics and counts only; the Patient Queue is read-only
+
+Doctor
+
+- Diagnosis and treatment plan, sealing a consultation, declaring a death
+- Everything Health Center Staff do on the clinical floor, and a list of visits Waiting for the Doctor
 
 Health Center Staff
 
-- Patient management
-- Appointments
-- Inventory
+- Check-in (choosing the service), intake, patient records, dispensing, inventory
 
 Barangay Official
 
-- Reports
-- Announcements
-- Notifications
+- Community reports and SMS broadcasts; no patient records
 
-Each role must only access authorized modules.
+Each role must only access authorized modules. The server enforces this on every route (`role_required`),
+not only in the menus. Clinical data is for the care team only: the Doctor and Health Center Staff.
 
 ---
 

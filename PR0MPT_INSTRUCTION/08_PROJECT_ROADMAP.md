@@ -4,7 +4,7 @@ Version: 1.1
 
 Status: Active Development
 
-Last reviewed: 5 September 2026 — the Current Project Status section was re-measured against the
+Last reviewed: 2 October 2026 (Task 7, final clean-up). The checks below are in `PROJECT_STATUS.md`; the 5 September 2026 review: the Current Project Status section was re-measured against the
 running system and the live database in a full verification pass (all four core objectives driven
 end to end, a 377-probe route × role matrix, and the complete account-management lifecycle). The
 21 August 2026 reconciliation of the Known Gaps section still stands. Every status below was
@@ -72,20 +72,18 @@ moved stock across its threshold and the low-stock alert reacted on every surfac
 a patient booked, checked in, consulted and written up with dispensing and immunisation in one
 save; a broadcast sent to a computed audience with per-recipient rows.
 
-Role-based access control is enforced across all **89 guarded endpoints** for all three roles with
+Role-based access control is enforced across **90 guarded view functions** (93 routes) for all four roles with
 no gaps, confirmed by a 377-probe route × role matrix run under four identities — Administrator,
 Health Center Staff, Barangay Official and anonymous — with **zero leaks**. The database holds
 **13 tables with 19 indexes** and passes integrity and foreign-key checks.
 
 The remaining ~5% is concentrated in three places, none of which is a core objective:
 
-- **One screen is presentation-only:** Notifications (Screen 19), which renders with no context
-  because there is no `notifications` table and nothing writes one. Every other screen in the
-  system is driven by real queries. User Management, Audit Logs, the Barangay Official screens and
+- **No screen is presentation-only any more.** The Notifications placeholder (Screen 19) was removed
+  in Task 7. Every screen in the system is driven by real queries. User Management, Audit Logs, the Barangay Official screens and
   both partially-wired dashboards named in the previous version of this section are all live.
-- **Phase 7 Testing has no committed artifacts.** Verification is real and substantial but is
-  written fresh each session and discarded, so nobody else can re-run it. Converting it to a
-  committed suite is a conversion, not a start from nothing.
+- **Phase 7 Testing is committed.** `python tests/run_all.py` runs the automated suites on fresh test
+  databases (the current count is in `PROJECT_STATUS.md`); `--quick` skips the slow demo-data suite.
 - **A short list of features named in the specifications is deliberately unbuilt**, each declared
   on the screen that would have carried it rather than rendered as a dead control: account lockout,
   Remember Me, Restore, SMS draft and scheduling, and a configured SMS gateway key. These are open
@@ -105,7 +103,7 @@ its own integrity check; **Restore is the one half that remains unbuilt**, and s
 because restoring safely means stopping the application first — which is not something a screen
 inside that application can do.
 
-README.md exists and states how to run the system, the three roles and the migration order. The
+README.md exists and states how to run the system, the four roles and where the migrations are. The
 project is under version control on `master`.
 
 Scope added since the approved Proposal
@@ -439,10 +437,8 @@ Not Started as a formal phase — ad-hoc verification has been performed and rec
 
 Testing Types
 
-☐ Functional Testing — **no automated test suite exists.** There is no `tests/` directory, no
-  `test_*.py` file, and no pytest or unittest dependency anywhere in the project. This is stated
-  plainly here because it is the kind of gap a reviewer should be told about rather than left to
-  discover.
+☑ Functional Testing — an automated suite is committed in `tests/`: `python tests/run_all.py` runs
+  every suite on its own fresh test database (counts in `PROJECT_STATUS.md`).
 
   What *has* been done is substantial and should not be mistaken for nothing. Verification is
   performed by driving the real application through Flask's test client — genuine GET and POST
@@ -453,10 +449,7 @@ Testing Types
   full 320-check route × role matrix, drove the mid-session deactivation case through its whole
   eight-step lifecycle, and confirmed all 26 export routes return valid `.xlsx` and `.pdf` files.
 
-  The distinction that matters: these checks are **scripted but not committed**. They are written
-  fresh each session, run once, and discarded, so they prove the system worked at that moment but
-  cannot be re-run on demand by someone else or in CI. Converting them into a committed suite is
-  the outstanding work, and it is a conversion rather than a start from nothing.
+  The earlier sweeps described above became the committed suites in `tests/`, so anyone can re-run them.
 
 ☐ UI Testing — not performed on real devices or across browsers
 
@@ -814,9 +807,7 @@ end of this section so the drift itself is on the record.
 
 ## Screens not backed by data
 
-**One.** Notifications (Screen 19) is rendered by `routes/official.py::notifications()` as
-`render_template('notifications.html')` with no context at all, and there is no `notifications`
-table for it to read. It is the only screen in the system in that position.
+**None.** Notifications (Screen 19), the one placeholder screen, was removed in Task 7.
 
 Settings (Screen 13) is a partial case and is stated separately rather than counted above, and
 the balance has shifted decisively since this was written. **General Settings is stored and read
@@ -901,9 +892,9 @@ were brought current on 21 August 2026, re-counted on 5 September 2026 after My 
 maintenance response page were added, and re-counted again on 26 September 2026 when the Service
 Schedule was built:
 
-- The system has **22 screens**. `templates/` holds 26 `.html` files; four are not screens —
-  `base.html` (the shared layout), the `_print.html` and `_chart_table.html` partials, and
-  `maintenance.html`, which is a **response page rather than a screen**: it has no route and
+- The system has **21 screens**. `templates/` holds 27 `.html` files; five are not screens —
+  `base.html` (the shared layout), the `_print.html` and `_chart_table.html` partials,
+  `session_expired.html`, and `maintenance.html`, which is a **response page rather than a screen**: it has no route and
   nothing navigates to it, because `utils/security.py` renders it with a 503 in place of the
   screen that was asked for.
 - **My Account is counted as a screen** — it has its own route, guard, context and a form that
@@ -922,7 +913,7 @@ way it loses that trust is by being written once and never re-read while the sys
 | Previous claim | Actual state on 21 August 2026 |
 |---|---|
 | "The project is NOT under version control… there is no history and no rollback." | 27 commits on `master`, from the initial commit to `a8a1cfb`. |
-| "No README.md, although 04_DEVELOPMENT_GUIDE.md lists one." | `README.md` exists, and states how to run the system, the three roles, and the migration order. |
+| "No README.md, although 04_DEVELOPMENT_GUIDE.md lists one." | `README.md` exists, and states how to run the system, the four roles, and the migration order. |
 | Nine screens listed as hard-coded or presentation-only. | One (Notifications). Settings is partly live. The other seven named are all data-driven. |
 | "User Management — the `users` table holds 3 accounts; the screen shows 7 fixed rows." | The screen lists the real roster and derives each role's permissions from the live `url_map`. Only the account *writes* are still disabled. |
 | "Audit Logs — real entries are being written, but the screen does not read them yet." | Screen 12 reads the trail through `get_audit_logs()`, filters it by module, and exports it. |

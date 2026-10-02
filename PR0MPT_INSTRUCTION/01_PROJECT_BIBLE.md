@@ -127,10 +127,10 @@ Responsibilities
 - Register patients
 - Record consultation intake (complaint, vital signs, vaccinations, dispensing) — not the
   diagnosis or treatment plan, which are the Doctor's
-- Manage appointments
+- Check patients in, choosing the service, and work the Patient Queue
 - Dispense medicines
 - Update inventory
-- View notifications
+- View SMS notifications
 - Change a patient's status between Active and Inactive (not Deceased, which is the Doctor's)
 
 ---
@@ -318,10 +318,11 @@ Login
 Administrator Dashboard
 
 ├── Dashboard
-├── Patient Records
+├── Patient Records (demographics only)
 ├── Medicine Inventory
-├── Patient Queue
-├── Community Notifications
+├── Patient Queue (read-only)
+├── Service Schedule
+├── SMS Notifications
 ├── Reports & Analytics
 ├── User Management
 ├── Audit Logs
@@ -331,9 +332,11 @@ Health Center Staff
 
 ├── Dashboard
 ├── Patient Records
-├── Appointments
+├── Register Patient
 ├── Medicine Inventory
-└── Notifications
+├── Patient Queue
+├── Service Schedule
+└── SMS Notifications
 
 Doctor (the Health Center Staff menu, served from the same screens, plus Reports & Analytics)
 
@@ -348,9 +351,12 @@ Doctor (the Health Center Staff menu, served from the same screens, plus Reports
 Barangay Official
 
 ├── Dashboard
+├── SMS Notifications
+├── Health Programs
+├── Service Schedule
+├── Vaccination Campaigns
 ├── Community Reports
-├── Announcements
-└── Notifications
+└── Reports & Analytics
 
 ---
 

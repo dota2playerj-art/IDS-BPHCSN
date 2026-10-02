@@ -10,11 +10,11 @@ Status: Screens 01–15 approved. Screens 16–20 specified from the built syste
 
 This document defines every screen of the IDS-BPHCSN system.
 
-The system has 22 screens.
+The system has 21 screens. Screen 19, Notifications, was a placeholder with no data and was removed in Task 7; its number is not reused.
 
 Screens 01 to 15 are the original approved specifications and are unchanged below. Screens 16 to 20 were built after this document was first written and are specified here for the first time. Screen 21, My Account, was built on 4 September 2026, and Screen 22, Service Schedule, on 26 September 2026; both are specified at the end.
 
-`templates/` holds 26 `.html` files. Twenty-two of them are the 22 screens, one file each. The other four are not screens, and are not screens for two different reasons:
+`templates/` holds 27 `.html` files. Twenty-two of them belong to the 21 screens (Patient Profile has a second file, `patient_profile_demographics.html`, the Administrator's demographics-only copy). The other five are not screens, and are not screens for two different reasons:
 
 - **`base.html`** is the shared layout — sidebar, header, content region — that every screen renders inside.
 - **`_print.html`** and **`_chart_table.html`** are partials, included by the screens that print and the screens that render a chart's underlying figures as a table.
@@ -904,31 +904,11 @@ Export Excel and Export PDF are both real (`routes/report_export.py`), and Print
 
 # SCREEN 19
 
-## Notifications
+## Notifications — removed
 
-Purpose
-
-Present a notification centre to the Barangay Official.
-
-Authorized Users
-
-- Barangay Official
-
-Components
-
-Notification List
-
-Category Filters
-
-Read/Unread States
-
-Implementation Status
-
-Presentation only. `routes/official.py::notifications()` renders the template with no context.
-
-There is no notifications table and nothing writes one, which is why the sidebar item for this screen carries no unread badge.
-
-The real, recorded community-notification mechanism is Screen 09 (SMS Notifications).
+This screen was a presentation-only placeholder: there is no notifications table and nothing writes one.
+It was removed in Task 7, with its route, menu item and header bell. The real, recorded community
+notification mechanism is Screen 09 (SMS Notifications). The number 19 is not reused.
 
 ---
 
@@ -1397,10 +1377,10 @@ a reconciliation section that under-reports the system is as misleading as one t
 it. Screens 01 to 20 above are left exactly as approved; this section records only where the built
 system differs from them.
 
-The system has **22 screens**. `templates/` holds 26 `.html` files, of which four are not screens:
-`base.html` (the shared layout), the `_print.html` and `_chart_table.html` partials, and
+The system has **21 screens**. `templates/` holds 27 `.html` files, of which five are not screens:
+`base.html` (the shared layout), the `_print.html` and `_chart_table.html` partials,
 `maintenance.html` — a response page rendered with a 503 in place of the screen that was asked for,
-with no route and nothing navigating to it. See the note under "Purpose" at the top of this
+with no route and nothing navigating to it — and `session_expired.html`, shown when a form token is refused. See the note under "Purpose" at the top of this
 document for why My Account counts as a screen and `maintenance.html` does not.
 
 ## Specified but not built
@@ -1490,11 +1470,8 @@ finished and what is absent is a configured `SEMAPHORE_API_KEY`; and the **sched
 controls, because nothing in this system runs a timed job. User Preferences, Notification Settings
 and Clear Cache were removed outright rather than left disabled.
 
-**Screen 19 — Notifications.**
-
-The one screen in the system rendered with no context at all
-(`render_template('notifications.html')`), because there is no `notifications` table. Nothing on
-it should be quoted as a system output. Recorded activity lives on Screen 12.
+**Screen 19 — Notifications.** Removed in Task 7: it was rendered with no data. Recorded activity lives on
+Screen 12, and community messages on Screen 09.
 
 ## Built since this specification was written
 

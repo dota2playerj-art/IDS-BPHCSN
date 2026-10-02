@@ -1,10 +1,33 @@
 # IDS-BPHCSN
 
 Integrated Digital System for Barangay Poblacion Health Center Services and
-Community Notifications. A Flask application covering patient records, medicine inventory,
-a daily patient queue and consultations, immunisation tracking, SMS broadcasts,
-reporting, and role-scoped dashboards for the Administrator, Health Center Staff
-and Barangay Official.
+Community Notifications. A Flask 3.1 application (SQLite, Bootstrap 5.3, vanilla JavaScript)
+covering patient records, medicine inventory, a daily patient queue and consultations,
+immunisation tracking, SMS broadcasts, reporting, and role-scoped dashboards for four
+roles: the Administrator, the Doctor, Health Center Staff and the Barangay Official.
+
+## What each role sees
+
+- **Health Center Staff** check patients in (choosing the service), take the intake, dispense
+  medicine and record vaccinations.
+- **The Doctor** writes the diagnosis and treatment plan, can seal a consultation, declares a death,
+  and has a list of visits **Waiting for the Doctor**.
+- **The Administrator** (a Kagawad) manages accounts, settings, the Service Schedule, SMS
+  broadcasts, inventory and reports. Patient data is demographics and counts only. The Patient Queue
+  is read-only.
+- **The Barangay Official** sees community reports and SMS broadcasts, and no patient records.
+
+Clinical data is for the care team only (the Doctor and Health Center Staff). Ranking rows with
+fewer than 5 are folded into "Other" for the Administrator and the Official, and phone numbers are
+masked on the screens that show them to roles outside the care team.
+
+## The visit flow
+
+A patient is checked in with a service chosen from a fixed list, then **Waiting**, **In Consultation**,
+and then **Waiting for the Doctor** (the intake is saved and the service needs a diagnosis) or
+**Completed** (immunization, prenatal and dental visits are finished by Staff). The Doctor's diagnosis
+completes a visit. A patient who goes home is marked **Left before being seen**, and it can be undone the
+same day. The flow is described in `PR0MPT_INSTRUCTION/01_PROJECT_BIBLE.md`.
 
 ## Running it
 
@@ -22,7 +45,11 @@ app will not start without them. Never commit `.env`.
 
 The app serves on <http://127.0.0.1:5001>. It runs entirely offline: Bootstrap,
 Chart.js and the Inter/Material fonts are vendored under `static/`, so no CDN is
-reached at any point.
+reached at any point. There is no jQuery; the scripts are plain JavaScript.
+
+SMS runs in one of two modes, shown in Settings and on SMS Notifications. Without a
+`SEMAPHORE_API_KEY` in `.env`, messages are saved but not sent ("Simulated"). With the key set, and the
+app restarted, they are sent through Semaphore ("Live").
 
 On a new install, the first run creates four accounts (`admin`, `staff`,
 `official`, `doctor`) with random passwords. It shows them once, in the
@@ -70,9 +97,9 @@ python seed_demo_data.py   # builds app.db with fictional demo data (see below)
 python app.py              # starts the app
 ```
 
-If the schema changes after a database already exists, the `migrations/migrate_*.py`
-scripts in the project root bring it up to date. Each one is idempotent — safe to
-re-run — and each verifies afterwards that no existing row moved.
+If the schema changes after a database already exists, the scripts in `migrations/` bring it
+up to date. Each one is idempotent — safe to re-run — and each verifies afterwards that no existing
+row moved. A new laptop does not need them: it builds the demo database instead.
 
 Because `app.db` is untracked, **a fresh clone starts with no data.** If the
 current demo dataset matters to you, copy `app.db` across by hand or restore it
