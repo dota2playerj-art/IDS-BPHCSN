@@ -1079,6 +1079,318 @@ check("saving it with a diagnosis completes the visit, and the record is linked 
 with app.app_context():
     check("... and it leaves the Doctor's list", bug not in listed_now())
 
+# The same visit, with an intake record: "See patient" opens that record.
+name_patient(24, "T6E")
+withrec = new_visit(CONSULT, "with intake", pid=24)
+staff.post(f"/staff/consultation/record/{withrec}", data=INTAKE)
+rec_id = consultation_of(withrec)[0]
+check("Task 6d set-up: Staff do the intake, then the visit is Waiting for the Doctor and has a record",
+      status_of(withrec) == WFD and rec_id)
+queue_row = row_of(body(doctor.get(QUEUE_URL)), f"APT-{withrec:05d}")
+dash_row = row_of(body(doctor.get(DASH_URL)), f"see-patient/{withrec}")
+check("the queue and the dashboard both offer the same 'See patient' link for it",
+      see_patient_href(queue_row) and see_patient_href(queue_row) == see_patient_href(dash_row)
+      and f"see-patient/{withrec}" in see_patient_href(queue_row), (queue_row[-300:], dash_row[-300:]))
+r = doctor.get(see_patient_href(queue_row))
+check("it opens that record, not a new consultation",
+      r.status_code == 302 and r.headers["Location"].endswith(f"/staff/consultation/edit/{rec_id}"),
+      r.headers.get("Location"))
+r = doctor.get(see_patient_href(queue_row), follow_redirects=True)
+check("the Doctor sees the saved intake and the diagnosis field",
+      r.status_code == 200 and 'name="diagnosis"' in body(r) and "flow intake" in body(r))
+doctor.post(f"/staff/consultation/edit/{rec_id}", data=FULL)
+check("saving the diagnosis completes the visit; there is still one record for it",
+      status_of(withrec) == "Completed" and consultation_of(withrec)[1] == "Flow diagnosis"
+      and q1("SELECT COUNT(*) FROM consultations WHERE appointment_id = ?", (withrec,))[0] == 1)
+check("the first visit's new record is linked to it and holds what the Doctor typed",
+      tuple(q1("SELECT chief_complaint, diagnosis FROM consultations WHERE appointment_id = ?", (bug,)))
+      == ("flow intake", "Flow diagnosis"))
+# Staff do not get the button, and the link is refused for them.
+name_patient(22, "T6F")
+staff_visit = new_visit(CONSULT, "staff view", pid=22)
+staff.post(SEND, data={"appointment_id": str(staff_visit)})
+check("Staff do not get 'See patient' on the queue", "See patient" not in
+      row_of(body(staff.get(QUEUE_URL)), f"APT-{staff_visit:05d}"))
+r = staff.get(f"/staff/appointment_scheduling/see-patient/{staff_visit}")
+check("... and the link is refused for them on the server",
+      r.status_code == 302 and r.headers["Location"].endswith("/staff/appointment_scheduling")
+      and status_of(staff_visit) == WFD)
+run_sql("UPDATE appointments SET status = 'Completed' WHERE id = ?", (staff_visit,))
+
+# ---------------------------------------------------------------------------
+section("15. EVERY STATUS x ROLE: THE QUEUE SHOWS EXACTLY THE MAPPING'S ACTIONS AND EACH ONE WORKS (Task 6d, D3)")
+from models.queue_actions import ACTIONS, QUEUE_ACTIONS, allowed_actions  # noqa: E402
+
+START_URL = "/staff/appointment_scheduling/start-consultation"
+CHANGE = "/staff/appointment_scheduling/change-service"
+PRENATAL = "Prenatal Check-up"
+WAIT, INCONS = "Waiting", "In Consultation"
+CARE = ("staff", "doctor")
+# The decided mapping, written out here on purpose: changing queue_actions.py changes the
+# product, so it must change this table too.
+DECIDED = {
+    WAIT: {"staff": {"start", "mark_left", "change_service"},
+           "doctor": {"start", "mark_left", "change_service"}},
+    INCONS: {"staff": {"open_intake", "send_to_doctor", "mark_completed", "mark_left", "change_service"},
+             "doctor": {"open_intake", "send_to_doctor", "mark_completed", "mark_left", "change_service"}},
+    WFD: {"staff": {"mark_left", "change_service"},
+          "doctor": {"see_patient", "mark_left", "change_service"}},
+    "Completed": {},
+    LEFT: {"staff": {"undo_left"}, "doctor": {"undo_left"}},
+}
+ALL_STATUSES = (WAIT, INCONS, WFD, "Completed", LEFT, "Scheduled", "Confirmed", "Cancelled", "No-show")
+mapping_diffs = [(st, role, allowed_actions(role, st), DECIDED.get(st, {}).get(role, set()))
+                 for st in ALL_STATUSES for role in ("staff", "doctor", "admin", "official")
+                 if set(allowed_actions(role, st)) != DECIDED.get(st, {}).get(role, set())]
+check("the mapping is the decided one for every status and role; the Administrator and the Official "
+      "have no action anywhere", not mapping_diffs and set(QUEUE_ACTIONS) == set(DECIDED), mapping_diffs[:4])
+
+# What the page should show, for the visit as built: a Consultation visit with no diagnosis,
+# a Left visit marked today, the room free.
+CASES = [
+    ("Waiting", dict(status=WAIT), DECIDED[WAIT]),
+    ("In Consultation (Consultation)", dict(status=INCONS),
+     {r: DECIDED[INCONS][r] - {"mark_completed"} for r in CARE}),
+    ("In Consultation (Dental)", dict(status=INCONS, kind="Dental"),
+     {r: DECIDED[INCONS][r] - {"send_to_doctor"} for r in CARE}),
+    ("Waiting for the Doctor, no intake", dict(status=WFD), DECIDED[WFD]),
+    ("Waiting for the Doctor, with intake", dict(status=WFD, intake=True), DECIDED[WFD]),
+    ("Completed", dict(status="Completed"), {}),
+    ("Left today", dict(status=LEFT, before=WAIT, left_day=0), DECIDED[LEFT]),
+    ("Left on an earlier day (undo is for the same day)", dict(status=LEFT, before=WAIT, left_day=1), {}),
+]
+MATRIX_PID = 21
+ROLE_CLIENTS = (("staff", staff, QUEUE_URL), ("doctor", doctor, QUEUE_URL),
+                ("admin", admin, "/admin/appointment_scheduling"), ("official", official, None))
+
+
+def build(spec, tag):
+    """One visit in the described state, with the room free. Returns (id, record id)."""
+    run_sql("UPDATE appointments SET status = 'Completed' WHERE status = 'In Consultation'")
+    visit_id, record = add_visit(MATRIX_PID, tag, 0, spec["status"], kind=spec.get("kind", CONSULT),
+                                 consultation=spec.get("intake"))
+    if spec["status"] == LEFT:
+        left_at = f"{(today - timedelta(days=spec['left_day'])).isoformat()} 07:00:00"
+        run_sql("UPDATE appointments SET status_before_left = ?, left_by = ?, left_at = ? WHERE id = ?",
+                (spec["before"], STAFF_ID, left_at, visit_id))
+    return visit_id, record
+
+
+def state_of(visit_id):
+    row = q1("SELECT status, appointment_type, "
+             "(SELECT COUNT(*) FROM consultations WHERE appointment_id = a.id) AS records "
+             "FROM appointments a WHERE id = ?", (visit_id,))
+    return tuple(row)
+
+
+def actions_in(row, visit_id):
+    """The actions a queue row offers, read off its markup."""
+    marks = {
+        "start": "Start Consultation",
+        "open_intake": f"/staff/consultation/record/{visit_id}",
+        "send_to_doctor": 'form="sendToDoctorForm"',
+        "mark_completed": 'form="completeConsultationForm"',
+        "see_patient": f"/see-patient/{visit_id}",
+        "mark_left": 'data-bs-target="#leftModal"',
+        "undo_left": 'form="undoLeftForm"',
+        "change_service": 'data-bs-target="#serviceModal"',
+    }
+    return {action for action, mark in marks.items() if mark in row}
+
+
+page_problems, case_n = [], 0
+for label, spec, expected in CASES:
+    visit_id, _ = build(spec, f"M{case_n}")
+    case_n += 1
+    for role, client, url in ROLE_CLIENTS:
+        if url is None:
+            r = client.get("/staff/appointment_scheduling")
+            if r.status_code != 302:
+                page_problems.append((label, role, "the Official reached the queue", r.status_code))
+            continue
+        row = row_of(body(client.get(url)), f"APT-{visit_id:05d}")
+        shown = actions_in(row, visit_id)
+        want = expected.get(role, set())
+        if not row or shown != want:
+            page_problems.append((label, role, sorted(shown), sorted(want)))
+check(f"the queue shows exactly the mapping's actions for all {len(CASES)} visit states x Staff, the Doctor "
+      "and the Administrator, and the Official has no queue", not page_problems, page_problems[:6])
+primary_visit = build(CASES[3][1], "MP")[0]
+check("... with the Doctor's 'See patient' as the filled (primary) button",
+      'class="btn-primary-teal"' in row_of(body(doctor.get(QUEUE_URL)), f"/see-patient/{primary_visit}"))
+
+
+def perform(action, client, visit_id):
+    data = {"appointment_id": str(visit_id)}
+    if action == "start":
+        return client.post(START_URL, data=data)
+    if action == "send_to_doctor":
+        return client.post(SEND, data=data)
+    if action == "mark_completed":
+        return client.post(COMPLETE, data=data)
+    if action == "mark_left":
+        return client.post(MARK, data=data)
+    if action == "undo_left":
+        return client.post(UNDO, data=data)
+    if action == "change_service":
+        return client.post(CHANGE, data=dict(data, service=PRENATAL))
+    if action == "see_patient":
+        return client.get(f"/staff/appointment_scheduling/see-patient/{visit_id}")
+    return client.get(f"/staff/consultation/record/{visit_id}")      # open_intake
+
+
+def worked(action, response, visit_id, before, spec, client):
+    """Whether the action did what it is for, on the visit built from `spec`."""
+    now_state = state_of(visit_id)
+    if action in ("open_intake", "see_patient"):
+        if now_state != before:
+            return False
+        if action == "see_patient":
+            where = response.headers.get("Location", "/")
+            follow = client.get(where, follow_redirects=True)
+            return (response.status_code == 302 and follow.status_code == 200
+                    and 'name="diagnosis"' in body(follow)
+                    and ("/consultation/edit/" in where) == bool(spec.get("intake")))
+        return response.status_code == 200 and 'name="chief_complaint"' in body(response)
+    goal = {"start": lambda s: s[0] == INCONS, "send_to_doctor": lambda s: s[0] == WFD,
+            "mark_completed": lambda s: s[0] == "Completed", "mark_left": lambda s: s[0] == LEFT,
+            "undo_left": lambda s: s[0] == WAIT, "change_service": lambda s: s[1] == PRENATAL}[action]
+    return response.status_code == 302 and goal(now_state)
+
+
+work_problems, runs = [], 0
+for label, spec, expected in CASES:
+    for role, client, _ in ROLE_CLIENTS:
+        for action in ACTIONS:
+            visit_id, record = build(spec, f"W{runs}")
+            runs += 1
+            before = state_of(visit_id)
+            response = perform(action, client, visit_id)
+            offered = action in expected.get(role, set())
+            if action == "open_intake":
+                # The record page is also where "See patient" lands when there is no record.
+                offered = offered or ("see_patient" in expected.get(role, set()) and not spec.get("intake"))
+            if offered:
+                if not worked(action, response, visit_id, before, spec, client):
+                    work_problems.append((label, role, action, "offered, but it did not work",
+                                          response.status_code, state_of(visit_id)))
+            elif state_of(visit_id) != before or (
+                    action in ("open_intake", "see_patient") and response.status_code == 200):
+                work_problems.append((label, role, action, "not offered, but it was accepted",
+                                      response.status_code, state_of(visit_id)))
+check(f"each action the queue shows works for that role, and every other one is refused with no change "
+      f"({runs} tries: {len(CASES)} states x 4 roles x {len(ACTIONS)} actions)", not work_problems,
+      work_problems[:6])
+run_sql("UPDATE appointments SET status = 'Completed' WHERE status = 'In Consultation'")
+# The model's own rules (the SQL behind the routes) agree with the mapping, not only the routes do.
+from models.appointments import change_visit_service, mark_left  # noqa: E402
+
+model_problems = []
+for label, spec, expected in CASES:
+    for name, call, action in (
+            ("mark_left", lambda v: mark_left(v, STAFF_ID), "mark_left"),
+            ("change_visit_service", lambda v: change_visit_service(v, PRENATAL), "change_service")):
+        visit_id, _ = build(spec, f"D{runs}")
+        runs += 1
+        with app.app_context():
+            outcome = call(visit_id)
+        accepted = outcome in ("marked", "changed", "changed-completed")
+        if accepted != (action in expected.get("staff", set())):
+            model_problems.append((label, name, outcome))
+check("the model's own rules for 'left before being seen' and 'change service' accept exactly the statuses "
+      "the mapping allows, called directly", not model_problems, model_problems)
+run_sql("UPDATE appointments SET status = 'Completed' WHERE status = 'In Consultation'")
+
+# ---------------------------------------------------------------------------
+section("16. THE LEGEND, THE SUMMARY LINE, THE OVERDUE BADGE AND THE WALK-IN TAG (Task 6d, D4)")
+from models.immunizations import get_immunization_status  # noqa: E402
+from models.patients import get_patient_by_id  # noqa: E402
+
+STATUS_NAMES = ["Waiting", "In Consultation", "Waiting for the Doctor", "Completed", LEFT]
+queue_pages = {"staff": body(staff.get(QUEUE_URL)), "doctor": body(doctor.get(QUEUE_URL)),
+               "admin": body(admin.get("/admin/appointment_scheduling"))}
+
+
+def legend_block(page):
+    return page.split('id="statusLegend"')[1].split("</div>\n        </div>")[0]
+
+
+def summary_text(page):
+    return re.sub(r"\s+", " ", flat(page.split('id="queueSummary"')[1].split("</div>")[0]))
+
+
+legends = {role: [re.sub(r"\s+", " ", flat(item)).strip()
+                  for item in re.findall(r'<div class="legend-item">(.*?)</div>', legend_block(page), re.S)]
+           for role, page in queue_pages.items()}
+check("the colour legend lists the five real statuses, in order, for every role",
+      all(items == STATUS_NAMES for items in legends.values()), legends)
+dots = re.findall(r'<span class="cal-dot (dot-[a-z-]+)"></span>[A-Za-z ]+</div>', legend_block(queue_pages["staff"]))
+check("... each with its own colour, and each colour is defined on the page",
+      len(dots) == 5 and len(set(dots)) == 5
+      and all(f".{d}{{background:" in queue_pages["staff"] for d in dots), dots)
+for role, page in queue_pages.items():
+    text = " ".join(legends[role]) + " " + summary_text(page)
+    check(f"{role}: no 'Scheduled', 'not yet arrived', 'Cancelled or missed' or 'ready to consult' in the "
+          "legend or the summary line",
+          not any(word.lower() in text.lower() for word in
+                  ("Scheduled", "not yet arrived", "Cancelled or missed", "Arrived /", "ready to consult")), text)
+    pairs = re.findall(r"([A-Z][A-Za-z ]+): (\d+)", summary_text(page))
+    counts_now = {st: q1("SELECT COUNT(*) FROM appointments WHERE date(appointment_date) = "
+                         "date('now', 'localtime') AND status = ?", (st,))[0] for st in STATUS_NAMES}
+    check(f"{role}: the summary line uses the five status names, in the legend's order, with today's counts",
+          [name for name, _ in pairs] == STATUS_NAMES and all(int(n) == counts_now[name] for name, n in pairs),
+          (summary_text(page), counts_now))
+check("the queue and the Staff dashboard have no Walk-in tag on any row (every visit is a walk-in)",
+      all('class="walkin-tag"' not in page and ">Walk-in</span>" not in page for page in queue_pages.values())
+      and ">Walk-in</span>" not in body(staff.get("/staff/dashboard")))
+# The overdue badge counts what its word says: a child with doses overdue AND due now.
+CHD = q1("SELECT MAX(id) + 1 FROM patients")[0]
+run_sql("INSERT INTO patients (id, patient_id, first_name, last_name, birth_date, sex, civil_status, "
+        "address, municipality, province, contact_number, status) VALUES (?, ?, 'Chd', 'Patient', "
+        "'2026-01-01', 'Female', 'Single', 'Purok 1', 'San Francisco', 'Surigao del Norte', "
+        "?, 'Active')", (CHD, f"PAT-{CHD:03d}", f"0900000{CHD:04d}"))
+name_patient(CHD, "Chd")
+found = {}
+with app.app_context():
+    for days in range(20, 700):
+        run_sql("UPDATE patients SET birth_date = ? WHERE id = ?", ((today - timedelta(days=days)).isoformat(), CHD))
+        st = get_immunization_status(get_patient_by_id(CHD))
+        key = ("both" if st["overdue_count"] and st["due_count"]
+               else "overdue" if st["overdue_count"] else "due" if st["due_count"] else None)
+        if key and key not in found:
+            found[key] = (days, st["overdue_count"], st["due_count"])
+check("set-up: ages exist with doses overdue and due now, with overdue only, and with due only",
+      {"both", "overdue", "due"} <= set(found), found)
+
+
+def badge_for(days):
+    run_sql("UPDATE patients SET birth_date = ? WHERE id = ?", ((today - timedelta(days=days)).isoformat(), CHD))
+    run_sql("UPDATE appointments SET status = 'Completed' WHERE patient_id = ?", (CHD,))
+    visit_id = add_visit(CHD, "Chd", 0, "Waiting")[0]
+    row = row_of(body(staff.get(QUEUE_URL)), f"APT-{visit_id:05d}")
+    run_sql("UPDATE appointments SET status = 'Completed' WHERE id = ?", (visit_id,))
+    m = re.search(r'<span class="immun-tag[^"]*"[^>]*>(?:<span[^>]*>[^<]*</span>)?([^<]*)</span>', row)
+    return (m.group(1).strip() if m else None), row
+
+
+def plural(n, word):
+    return f"{n} {word}{'' if n == 1 else 's'}"
+
+
+days, over, due = found["both"]
+text_both, row_both = badge_for(days)
+check("a child with doses overdue and due now: the badge says only how many vaccines are overdue "
+      f"('{plural(over, 'vaccine')} overdue'), not overdue plus due",
+      text_both == f"{plural(over, 'vaccine')} overdue" and due > 0 and "immun-overdue" in row_both,
+      (text_both, found["both"]))
+days, over, due = found["overdue"]
+text_over = badge_for(days)[0]
+check("only overdue doses: '<n> vaccines overdue'", text_over == f"{plural(over, 'vaccine')} overdue", text_over)
+days, over, due = found["due"]
+text_due, row_due = badge_for(days)
+check("only doses due now: it says 'due', not 'overdue'",
+      text_due == f"{plural(due, 'vaccine')} due" and "immun-overdue" not in row_due, text_due)
+
 # ---------------------------------------------------------------------------
 passed = sum(1 for _, ok in results if ok)
 print("\n" + "=" * 78)
