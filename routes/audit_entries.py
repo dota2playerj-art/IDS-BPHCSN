@@ -18,6 +18,7 @@ from models.audit import (
     ACTION_LEFT_BEFORE_SEEN,
     ACTION_LEFT_UNDONE,
     ACTION_SENT_TO_DOCTOR,
+    ACTION_VISIT_SENT,
     ACTION_SERVICE_CHANGED,
     ACTION_CONSULTATION_RECORDED,
     ACTION_CONSULTATION_STARTED,
@@ -303,13 +304,23 @@ def consultation_finished(appointment_id, user_id, ip_address=None):
 
 
 def visit_service_changed(appointment_id, user_id, ip_address=None):
-    """One short entry: the visit and the two services. It names no patient."""
+    """One short entry: the visit only. It names no patient and no service (Task 6c)."""
     write = _entry(user_id, ip_address, ACTION_SERVICE_CHANGED, MODULE_APPOINTMENTS)
 
     def audit(conn, old, new, now_completed):
         _, ref, _ = _visit(conn, appointment_id)
-        text = f"Changed the service of visit {ref} from {old} to {new}."
+        text = f"Corrected the service of visit {ref}."
         if now_completed:
             text += " The visit is now Completed."
         write(conn, text)
+    return audit
+
+
+def visit_sent_to_doctor(appointment_id, user_id, ip_address=None):
+    """One short entry: the visit only. It names no patient and no service."""
+    write = _entry(user_id, ip_address, ACTION_VISIT_SENT, MODULE_APPOINTMENTS)
+
+    def audit(conn):
+        _, ref, _ = _visit(conn, appointment_id)
+        write(conn, f"Sent visit {ref} to the Doctor.")
     return audit

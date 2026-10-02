@@ -555,6 +555,8 @@ ACTION_LEFT_UNDONE = "Undid left before being seen"
 # visit's service.
 ACTION_SENT_TO_DOCTOR = "Intake saved, waiting for the Doctor"
 ACTION_SERVICE_CHANGED = "Changed the service of a visit"
+# Task 6c: a visit that needs the Doctor is sent to him instead of being closed.
+ACTION_VISIT_SENT = "Sent visit to the Doctor"
 
 # Every action that means somebody was turned away at the login form. Grouped so
 # the Security Events figure counts refusals rather than one particular kind of

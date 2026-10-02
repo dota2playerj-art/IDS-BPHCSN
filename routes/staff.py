@@ -42,6 +42,7 @@ from routes.appointment_views import (
     process_complete_consultation,
     process_mark_left,
     process_new_patient_check_in,
+    process_send_to_doctor,
     process_start_consultation,
     process_undo_left,
 )
@@ -464,6 +465,16 @@ def staff_undo_left():
 @role_required(*CLINICAL_FLOOR_ROLES)
 def staff_complete_consultation():
     flash(process_complete_consultation(request.form, session.get("user_id"), request.remote_addr))
+    return redirect(url_for("staff.staff_appointment_scheduling"))
+
+
+# A visit whose service needs the Doctor is sent to him instead of being closed (Task 6c).
+# Same roles as Mark Completed; the rule is in models/appointments.py send_to_doctor().
+@staff_bp.route('/appointment_scheduling/send-to-doctor', methods=["POST"])
+@login_required
+@role_required(*CLINICAL_FLOOR_ROLES)
+def staff_send_to_doctor():
+    flash(process_send_to_doctor(request.form, session.get("user_id"), request.remote_addr))
     return redirect(url_for("staff.staff_appointment_scheduling"))
 
 

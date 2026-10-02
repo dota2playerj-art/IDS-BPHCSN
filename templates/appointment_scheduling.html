@@ -513,11 +513,19 @@
                title="Write up {{ queue_stats.active_name }}'s consultation and close the visit">
               <span class="material-symbols-outlined" style="font-size:16px;">edit_note</span>Record Consultation
             </a>
+{%- if queue_stats.active.needs_doctor %}
+            <button type="submit" form="sendToDoctorForm" name="appointment_id" value="{{ queue_stats.active.id }}"
+                    class="btn-outline-teal" style="padding:6px 12px; font-size:12.5px;"
+                    title="Send {{ queue_stats.active_name }}'s visit to the Doctor without recording a consultation">
+              <span class="material-symbols-outlined" style="font-size:16px;">send</span>Send to the Doctor
+            </button>
+{%- else %}
             <button type="submit" form="completeConsultationForm" name="appointment_id" value="{{ queue_stats.active.id }}"
                     class="btn-outline-teal" style="padding:6px 12px; font-size:12.5px;"
                     title="Close {{ queue_stats.active_name }}'s visit without recording a consultation{% if queue_stats.next_up_name %} — {{ queue_stats.next_up_name }} can then be started{% endif %}">
               <span class="material-symbols-outlined" style="font-size:16px;">check_circle</span>Mark Completed
             </button>
+{%- endif %}
 {%- endif %}
             <a href="{{ url_for(patient_profile_endpoint, patient_id=queue_stats.active.patient_id) }}"
                class="btn-outline-teal" style="padding:6px 12px; font-size:12.5px; text-decoration:none;"
@@ -725,11 +733,19 @@
                      title="Write up {{ patient_name }}'s consultation and complete the visit">
                     <span class="material-symbols-outlined" style="font-size:16px;">edit_note</span>Record Consultation
                   </a>
+{%- if entry.needs_doctor %}
+                  <button type="submit" form="sendToDoctorForm" name="appointment_id" value="{{ entry.id }}"
+                          class="btn-outline-teal" style="padding:6px 12px; font-size:12.5px;"
+                          title="Send {{ patient_name }}'s visit to the Doctor without recording a consultation{% if queue_stats.next_up_name %} — {{ queue_stats.next_up_name }} is next{% endif %}">
+                    <span class="material-symbols-outlined" style="font-size:16px;">send</span>Send to the Doctor
+                  </button>
+{%- else %}
                   <button type="submit" form="completeConsultationForm" name="appointment_id" value="{{ entry.id }}"
                           class="btn-outline-teal" style="padding:6px 12px; font-size:12.5px;"
                           title="Close {{ patient_name }}'s visit without recording a consultation{% if queue_stats.next_up_name %} — {{ queue_stats.next_up_name }} is next{% endif %}">
                     <span class="material-symbols-outlined" style="font-size:16px;">check_circle</span>Mark Completed
                   </button>
+{%- endif %}
 {%- endif %}
 {#- Left before being seen (Task 6). Offered where mark_left() would accept it, and
     the server decides again. A dialog asks first. #}
@@ -791,6 +807,7 @@
 {%- if care_team_view %}
       <form id="startConsultationForm" method="post" action="{{ url_for(start_consultation_endpoint) }}">{{ csrf_field() }}</form>
       <form id="completeConsultationForm" method="post" action="{{ url_for(complete_consultation_endpoint) }}">{{ csrf_field() }}</form>
+      <form id="sendToDoctorForm" method="post" action="{{ url_for(send_to_doctor_endpoint) }}">{{ csrf_field() }}</form>
       <form id="undoLeftForm" method="post" action="{{ url_for(undo_left_endpoint) }}">{{ csrf_field() }}</form>
 {%- endif %}
 

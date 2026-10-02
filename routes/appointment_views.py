@@ -21,6 +21,7 @@ from models.appointments import (
     get_queue_stats,
     get_todays_appointments,
     mark_left,
+    send_to_doctor,
     parse_month,
     queue_display_name,
     start_consultation,
@@ -33,7 +34,7 @@ from models.patients import get_all_patients, get_patient_by_id
 from models.service_schedule import get_entries as get_schedule_entries, services_on
 from routes.audit_entries import (
     consultation_completed, consultation_started, left_before_seen, left_undone,
-    patient_checked_in, visit_service_changed,
+    patient_checked_in, visit_sent_to_doctor, visit_service_changed,
 )
 from utils.dates import today
 from utils.roles import is_care_team
@@ -482,6 +483,27 @@ def process_change_service(form_data, user_id=None, ip_address=None):
             "A visit that is finished or marked as left cannot be changed.")
 
 
+def process_send_to_doctor(form_data, user_id=None, ip_address=None):
+    """Send the visit in progress to the Doctor. Returns the message to flash."""
+    raw_id = (form_data.get("appointment_id") or "").strip()
+    if not raw_id.isdigit():
+        return "Choose the consultation to send to the Doctor."
+    appointment_id = int(raw_id)
+    appointment = get_appointment_by_id(appointment_id)
+    if appointment is None:
+        return "That queue entry could not be found."
+    name = queue_display_name(appointment)
+    outcome = send_to_doctor(
+        appointment_id, audit=visit_sent_to_doctor(appointment_id, user_id, ip_address))
+    if outcome == "sent":
+        return f"{name}'s visit is now Waiting for the Doctor."
+    if outcome == "already":
+        return f"{name}'s visit is already Waiting for the Doctor."
+    if outcome == "not-needed":
+        return f"{name}'s visit does not need the Doctor. Use Mark Completed."
+    return f"{name} is marked {appointment['status']}, not In Consultation."
+
+
 def process_complete_consultation(form_data, user_id=None, ip_address=None):
     """Close the consultation in progress. Returns the message to flash.
 
@@ -503,6 +525,8 @@ def process_complete_consultation(form_data, user_id=None, ip_address=None):
         appointment_id, audit=consultation_completed(appointment_id, user_id, ip_address)
     )
 
+    if outcome == "needs-doctor":
+        return "This visit needs the Doctor first."
     if outcome == "already":
         return f"{name}'s consultation is already marked completed."
     if outcome == "missing":

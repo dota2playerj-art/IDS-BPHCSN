@@ -146,6 +146,8 @@ def _to_queue_entry(row):
     entry["is_waiting"] = entry["status"] == WAITING
     entry["is_in_consultation"] = entry["status"] == IN_CONSULTATION
     entry["in_queue"] = entry["status"] in QUEUE_STATUSES
+    # A visit of a service that needs the Doctor is sent to him, not closed (Task 6c).
+    entry["needs_doctor"] = needs_doctor(entry.get("appointment_type"))
     entry["walk_in"] = bool(entry.get("is_walkin"))
     # The reference the table's first column shows. appointments has no external
     # identifier column of its own, so it is composed from the row id -- stable,
@@ -783,11 +785,66 @@ def start_consultation(appointment_id, audit=None):
     return "busy"
 
 
+def _completion_blocked(conn, appointment_id):
+    """True when the visit needs the Doctor and has no diagnosis (Task 6c, D1).
+
+    THE ONE PLACE that decides it for the routes that close a visit. A visit of a
+    service in SERVICES_NEEDING_DOCTOR with no diagnosis is never Completed:
+    complete_consultation() (the queue's Mark Completed) refuses it and
+    send_to_doctor() sends it on. The other ways to Completed cannot reach it:
+    finish_intake() gives Waiting for the Doctor for exactly this case,
+    complete_after_diagnosis() requires a diagnosis in its SQL, change_visit_service()
+    sets Completed only for a service that does not need him, and undo_left() restores
+    a stored status that is only Waiting, In Consultation or Waiting for the Doctor.
+    """
+    row = conn.execute(
+        "SELECT a.appointment_type, "
+        "EXISTS (SELECT 1 FROM consultations c WHERE c.appointment_id = a.id "
+        "AND TRIM(COALESCE(c.diagnosis, '')) != '') AS diagnosed "
+        "FROM appointments a WHERE a.id = ?", (appointment_id,)).fetchone()
+    return bool(row) and needs_doctor(row["appointment_type"]) and not row["diagnosed"]
+
+
+def send_to_doctor(appointment_id, audit=None):
+    """Send the visit in progress to the Doctor. Returns the outcome:
+
+        "sent"                the visit is now Waiting for the Doctor
+        "already"             it was already Waiting for the Doctor
+        "not-needed"          its service does not need the Doctor, or it has a diagnosis
+        "not-in-consultation" it is not the visit currently in progress
+        "missing"             no such appointment
+
+    `audit(conn)` is called before the commit, only when the visit moved.
+    """
+    with db_connection() as conn:
+        row = conn.execute("SELECT status FROM appointments WHERE id = ?",
+                           (appointment_id,)).fetchone()
+        if row is None:
+            return "missing"
+        if row["status"] == WAITING_DOCTOR:
+            return "already"
+        if row["status"] != IN_CONSULTATION:
+            return "not-in-consultation"
+        if not _completion_blocked(conn, appointment_id):
+            return "not-needed"
+        cursor = conn.execute(
+            "UPDATE appointments SET status = ?, updated_at = CURRENT_TIMESTAMP "
+            "WHERE id = ? AND status = ?", (WAITING_DOCTOR, appointment_id, IN_CONSULTATION))
+        if cursor.rowcount != 1:
+            conn.rollback()
+            return "not-in-consultation"
+        if audit:
+            audit(conn)
+        conn.commit()
+    return "sent"
+
+
 def complete_consultation(appointment_id, audit=None):
     """Close the consultation in progress. Returns the outcome:
 
         "completed"           the visit is now Completed
         "already"             it was already Completed
+        "needs-doctor"        its service needs the Doctor and it has no diagnosis: refused
         "not-in-consultation" it is not the visit currently in progress
         "missing"             no such appointment
 
@@ -803,6 +860,11 @@ def complete_consultation(appointment_id, audit=None):
     `audit(conn)` is called before the commit, only when the visit completed.
     """
     with db_connection() as conn:
+        current = conn.execute("SELECT status FROM appointments WHERE id = ?",
+                               (appointment_id,)).fetchone()
+        if current and current["status"] == IN_CONSULTATION and _completion_blocked(
+                conn, appointment_id):
+            return "needs-doctor"
         cursor = conn.execute(
             """
         UPDATE appointments
@@ -890,7 +952,8 @@ def complete_after_diagnosis(appointment_id, audit=None):
     with db_connection() as conn:
         cursor = conn.execute(
             "UPDATE appointments SET status = ?, updated_at = CURRENT_TIMESTAMP "
-            "WHERE id = ? AND status = ?",
+            "WHERE id = ? AND status = ? AND EXISTS (SELECT 1 FROM consultations c "
+            "WHERE c.appointment_id = appointments.id AND TRIM(COALESCE(c.diagnosis, '')) != '')",
             (COMPLETED, appointment_id, WAITING_DOCTOR),
         )
         if cursor.rowcount == 1 and audit:
