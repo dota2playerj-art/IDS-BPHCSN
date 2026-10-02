@@ -310,8 +310,8 @@ check("with no Check In, Start, Record or Complete control, and no dialog behind
                                    "completeConsultationForm", "Record Consultation",
                                    "Start Consultation", "immun-tag")))
 sms = body(admin.get("/admin/sms_notifications"))
-check("SMS Notifications: he sees broadcast recipients by name, without numbers",
-      "Ana Cruz" in sms and CONTACT not in sms and not FIXTURE_NUMBER.search(sms)
+check("SMS Notifications: he sees recipient counts only, no name and no number (final fixes, M37)",
+      "Ana Cruz" not in sms and "Total" in sms and CONTACT not in sms and not FIXTURE_NUMBER.search(sms)
       and MK["sms_message"] not in sms)
 base = markup(body(admin.get("/admin/patient_records")))
 check("no Register Patient, Add Patient, Edit or Change Status control anywhere for him",

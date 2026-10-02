@@ -18,13 +18,14 @@ from models.broadcasts import (
     BROADCAST_CATEGORIES,
     audience_options,
     get_broadcast_history,
+    get_broadcast_recipient_counts,
     get_broadcast_recipients,
     get_broadcast_stats,
     resolve_recipients,
     send_broadcast,
     validate_broadcast_form,
 )
-from utils.roles import normalize_role
+from utils.roles import is_care_team, normalize_role
 from utils.security import get_current_user
 from utils.sms import (
     GSM_BASIC_CHARACTERS,
@@ -132,13 +133,16 @@ def sms_notifications_context(compose=None, errors=None):
         "broadcasts": history,
         "stats": get_broadcast_stats(history),
         "latest": latest,
+        # Names are for the care team. The Administrator and the Official read the
+        # counts instead, built here so no template decides it (final fixes, M37).
         "latest_recipients": (
-            get_broadcast_recipients(latest["id"], limit=DETAIL_RECIPIENT_LIMIT,
-                                     # No patient contact numbers for the
-                                     # Administrator (Task 5c).
-                                     with_numbers=role != "admin")
+            get_broadcast_recipients(latest["id"], role, limit=DETAIL_RECIPIENT_LIMIT)
             if latest else []
         ),
+        "latest_recipient_counts": (
+            get_broadcast_recipient_counts(latest["id"]) if latest else None
+        ),
+        "recipient_names_visible": is_care_team(role),
         "audience_options": audience_options(),
         "audiences_unavailable": AUDIENCE_NOT_AVAILABLE,
         "categories": BROADCAST_CATEGORIES,

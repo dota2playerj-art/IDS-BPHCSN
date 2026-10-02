@@ -9,6 +9,7 @@ community rather than of anyone's care.
 from database.connection import db_connection
 from models.consultations import PEDIATRIC_AGE_YEARS
 from models.patients import SENIOR_AGE, calculate_age
+from utils.roles import is_care_team
 from utils.dates import (
     day_start_utc,
     display_timestamp,
@@ -456,17 +457,18 @@ def get_broadcast_by_id(broadcast_id):
     return _to_broadcast(row) if row else None
 
 
-def get_broadcast_recipients(broadcast_id, limit=None, with_numbers=True):
+def get_broadcast_recipients(broadcast_id, viewer_role, limit=None):
     """Who one broadcast went to, and whether each message was accepted.
 
+    Names are for the care team only (the Doctor and Health Center Staff). The
+    Administrator and the Barangay Official get an empty list for every audience,
+    and read get_broadcast_recipient_counts() instead (final fixes, M37).
     The number is MASKED for every role (Task 5d, D3): the last four digits only.
     The full number stays in the table and in send_broadcast(), which is what
-    dials it. The gateway's own reply is not returned: no screen prints it, and a
-    reply can repeat the number.
-
-    `with_numbers` False leaves the number out altogether, for the Administrator,
-    who does not see patient contact numbers in any form (Task 5c).
+    dials it. The gateway's own reply is not returned.
     """
+    if not is_care_team(viewer_role):
+        return []
     columns = ("id, broadcast_id, patient_id, user_id, recipient_name, "
                "mobile_number, status, created_at")
     with db_connection() as conn:
@@ -482,12 +484,21 @@ def get_broadcast_recipients(broadcast_id, limit=None, with_numbers=True):
     recipients = []
     for row in rows:
         recipient = dict(row)
-        if with_numbers:
-            recipient["mobile_number"] = mask_phone(recipient["mobile_number"])
-        else:
-            del recipient["mobile_number"]
+        recipient["mobile_number"] = mask_phone(recipient["mobile_number"])
         recipients.append(recipient)
     return recipients
+
+
+def get_broadcast_recipient_counts(broadcast_id):
+    """How many recipients one broadcast had: total, sent and failed. No names."""
+    with db_connection() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) AS total, "
+            "COALESCE(SUM(status = 'Sent'), 0) AS sent, "
+            "COALESCE(SUM(status = 'Failed'), 0) AS failed "
+            "FROM sms_broadcast_recipients WHERE broadcast_id = ?", (broadcast_id,)
+        ).fetchone()
+    return {"total": row["total"], "sent": row["sent"], "failed": row["failed"]}
 
 
 def get_broadcast_stats(history=None, start=None, end=None, months=6):

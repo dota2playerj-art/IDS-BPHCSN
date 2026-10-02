@@ -577,13 +577,13 @@ ROLE_CLIENTS = (("Administrator", admin, "/admin/sms_notifications"),
 FULL = re.compile(r"(?<!\d)(?:\+?63|0)?912345000[1-4](?!\d)")
 for who, client, url in ROLE_CLIENTS:
     page = body(client.get(url))
-    check(f"{who}: SMS Notifications renders, with the recipient names and counts",
-          "ZZ Recipient One" in page or who == "Administrator" and "ZZ Recipient One" in page,
-          page[:200])
+    care = who in ("Doctor", "Health Center Staff")
+    check(f"{who}: SMS Notifications renders, with the recipient names only for the care team",
+          ("ZZ Recipient One" in page) == care and "Recipients" in page, page[:200])
     check(f"{who}: no full number on SMS Notifications", not FULL.search(page))
-    if who == "Administrator":
-        check("Administrator: the recipient list has names and results and no number at all",
-              "ZZ Recipient One" in page and "•••• •••" not in page)
+    if not care:
+        check(f"{who}: the recipient panel has counts only, no name and no number",
+              "ZZ Recipient" not in page and "•••• •••" not in page)
     else:
         check(f"{who}: the recipient list shows only the last four digits",
               MASKED["broadcast_one"] in page and MASKED["broadcast_two"] in page)
@@ -657,7 +657,7 @@ stored = [r[0] for r in db().execute(
     "SELECT mobile_number FROM sms_broadcast_recipients WHERE broadcast_id = ?", (newest,))]
 check("the stored recipient rows keep the full numbers, and match what was sent",
       sorted(stored) == sorted(sent_to) and all("•" not in n for n in stored))
-after = body(official.get("/official/sms_notifications"))
+after = body(staff.get("/staff/sms_notifications"))
 check("and the next page view of that broadcast shows only masked numbers",
       "•••• •••" in after and not FULL.search(after)
       and not any(n in after for n in stored))

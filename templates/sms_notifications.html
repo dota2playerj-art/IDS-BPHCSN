@@ -429,6 +429,13 @@
           </div>
 {% endif %}
 
+{% if latest_recipient_counts and not recipient_names_visible %}
+          <div class="section-label">Recipients</div>
+          <div class="detail-row"><div class="detail-label">Total</div><div class="detail-value">{{ latest_recipient_counts.total }}</div></div>
+          <div class="detail-row"><div class="detail-label">Sent</div><div class="detail-value">{{ latest_recipient_counts.sent }}</div></div>
+          <div class="detail-row"><div class="detail-label">Failed</div><div class="detail-value">{{ latest_recipient_counts.failed }}</div></div>
+          <div class="panel-note">Recipient names are shown to the Doctor and Health Center Staff only. This system receives no delivery reports, so no message is marked delivered.</div>
+{% endif %}
 {% if latest_recipients %}
           <div class="section-label">Recipients</div>
           <div class="recipient-list">
