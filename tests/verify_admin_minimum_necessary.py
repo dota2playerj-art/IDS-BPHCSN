@@ -176,8 +176,8 @@ run_sql("INSERT INTO medicine_dispensing (patient_id, consultation_id, inventory
         "medicine_name, unit, quantity_dispensed, date_dispensed, dispensed_by) "
         "VALUES (?, ?, 2, ?, 'capsule', 4, date('now','localtime'), ?)",
         (P, CID, MK["medicine_name"], STAFF_ID))
-run_sql("INSERT INTO immunizations (patient_id, vaccine_code, dose_number, source, "
-        "date_administered, administered_by, notes) VALUES (?, 'OPV', 1, 'administered', "
+run_sql("INSERT INTO immunizations (patient_id, vaccine_code, dose_number, evidence, "
+        "date_administered, administered_by, notes) VALUES (?, 'OPV', 1, 'given_here', "
         "date('now','localtime'), ?, ?)", (P_CHILD, STAFF_ID, MK["dose_notes"]))
 QUEUE_APPT = run_sql(
     "INSERT INTO appointments (patient_id, scheduled_by, appointment_date, status, "

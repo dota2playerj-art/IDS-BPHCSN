@@ -261,8 +261,8 @@ def build_fixture_database(path):
     birth = PATIENTS[16][3]
     for code in ("BCG", "HEPB"):
         conn.execute(
-            "INSERT INTO immunizations (patient_id, vaccine_code, dose_number, source, "
-            "date_administered, administered_by) VALUES (17, ?, 1, 'administered', ?, 2)",
+            "INSERT INTO immunizations (patient_id, vaccine_code, dose_number, evidence, "
+            "date_administered, administered_by) VALUES (17, ?, 1, 'given_here', ?, 2)",
             (code, birth),
         )
 

@@ -205,7 +205,7 @@ def get_immunizations_for_patient(patient_id):
         rows = conn.execute(
             """
         SELECT i.id, i.patient_id, i.consultation_id, i.vaccine_code, i.dose_number,
-               i.source, i.date_administered, i.administered_by, i.notes, i.created_at,
+               CASE i.evidence WHEN 'given_here' THEN 'administered' ELSE 'reported' END AS source, i.evidence, i.place_given, i.date_administered, i.administered_by, i.notes, i.created_at,
                u.full_name AS administered_by_name
         FROM immunizations i
         JOIN users u ON u.id = i.administered_by
@@ -224,7 +224,7 @@ def get_immunizations_for_consultation(consultation_id):
     with db_connection() as conn:
         rows = conn.execute(
             """
-        SELECT i.id, i.vaccine_code, i.dose_number, i.source, i.date_administered,
+        SELECT i.id, i.vaccine_code, i.dose_number, CASE i.evidence WHEN 'given_here' THEN 'administered' ELSE 'reported' END AS source, i.evidence, i.place_given, i.date_administered,
                i.notes, u.full_name AS administered_by_name
         FROM immunizations i
         JOIN users u ON u.id = i.administered_by
@@ -482,7 +482,7 @@ def _roster_statuses(on_date=None):
         rows = conn.execute(
             """
         SELECT i.id, i.patient_id, i.consultation_id, i.vaccine_code, i.dose_number,
-               i.source, i.date_administered, i.administered_by, i.notes, i.created_at,
+               CASE i.evidence WHEN 'given_here' THEN 'administered' ELSE 'reported' END AS source, i.evidence, i.place_given, i.date_administered, i.administered_by, i.notes, i.created_at,
                u.full_name AS administered_by_name
         FROM immunizations i
         JOIN users u ON u.id = i.administered_by
@@ -603,7 +603,8 @@ def get_immunization_coverage(on_date=None, start=None, end=None, months=6):
         by_source = {
             row[0]: row[1]
             for row in conn.execute(
-                "SELECT source, COUNT(*) FROM immunizations GROUP BY source"
+                "SELECT CASE evidence WHEN 'given_here' THEN 'administered' ELSE 'reported' END, "
+                "COUNT(*) FROM immunizations GROUP BY 1"
             )
         }
         doses_given = sum(by_source.values())
@@ -615,11 +616,11 @@ def get_immunization_coverage(on_date=None, start=None, end=None, months=6):
             """
         SELECT COUNT(*) AS doses,
                COUNT(DISTINCT patient_id) AS children,
-               SUM(CASE WHEN source = ? THEN 1 ELSE 0 END) AS reported
+               SUM(CASE WHEN evidence <> 'given_here' THEN 1 ELSE 0 END) AS reported
         FROM immunizations
         WHERE substr(date_administered, 1, 10) BETWEEN ? AND ?
         """,
-            (SOURCE_REPORTED, window["start"].isoformat(), window["end"].isoformat()),
+            (window["start"].isoformat(), window["end"].isoformat()),
         ).fetchone()
 
     scoped_reported = scoped["reported"] or 0
@@ -996,11 +997,11 @@ def record_immunizations(patient_id, dose_keys, administered_by, date_administer
                 """
             INSERT OR IGNORE INTO immunizations
                 (patient_id, consultation_id, vaccine_code, dose_number,
-                 source, date_administered, administered_by)
+                 evidence, date_administered, administered_by)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
                 (patient_id, consultation_id, code, dose_number,
-                 SOURCE_ADMINISTERED, day, administered_by),
+                 "given_here", day, administered_by),
             )
             if cursor.rowcount:
                 stored.append((code, dose_number))
@@ -1056,11 +1057,11 @@ def record_reported_immunizations(patient_id, entries, recorded_by,
                 """
             INSERT OR IGNORE INTO immunizations
                 (patient_id, consultation_id, vaccine_code, dose_number,
-                 source, date_administered, administered_by)
+                 evidence, date_administered, administered_by)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
                 (patient_id, consultation_id, entry["code"], entry["dose_number"],
-                 SOURCE_REPORTED, day, recorded_by),
+                 "card", day, recorded_by),
             )
             if cursor.rowcount:
                 stored.append((entry["code"], entry["dose_number"], day))
@@ -1085,7 +1086,7 @@ def get_immunization_by_id(record_id):
         row = conn.execute(
             """
         SELECT i.id, i.patient_id, i.consultation_id, i.vaccine_code, i.dose_number,
-               i.source, i.date_administered, i.administered_by, i.notes, i.created_at,
+               CASE i.evidence WHEN 'given_here' THEN 'administered' ELSE 'reported' END AS source, i.evidence, i.place_given, i.date_administered, i.administered_by, i.notes, i.created_at,
                u.full_name AS administered_by_name
         FROM immunizations i
         JOIN users u ON u.id = i.administered_by
@@ -1132,7 +1133,8 @@ def correct_immunization(record_id, vaccine_code, dose_number, date_administered
 
     with db_connection() as conn:
         row = conn.execute(
-            "SELECT patient_id, source FROM immunizations WHERE id = ?", (record_id,)
+            "SELECT patient_id, CASE evidence WHEN 'given_here' THEN 'administered' ELSE 'reported' END "
+            "AS source FROM immunizations WHERE id = ?", (record_id,)
         ).fetchone()
         if row is None:
             return "missing"

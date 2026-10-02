@@ -235,33 +235,34 @@ CREATE TABLE appointments (
 -- vaccine_code is the stable identity ('PENTA'), not the display name: renaming
 -- a vaccine on screen must not orphan the records already written against it.
 --
--- `source` says WHOSE dose this is a record of, and it exists because a child
--- vaccinated somewhere else was being called a defaulter here. It holds one of
--- two values and there is no third:
+-- `evidence` says what the record of this dose rests on (Task 9). The health center
+-- cannot know what happened at another hospital, so a dose that was not given here
+-- counts only when someone has seen it written down:
 --
---   'administered'  this health center gave it. Somebody here held the syringe,
---                   on date_administered, and administered_by names them.
---   'reported'      it was reported to us during a consultation as already
---                   given elsewhere -- another hospital, another barangay. The
---                   health center did not give it and does not claim to have.
+--   'given_here'     this health center gave it, during a consultation. Somebody
+--                    here held the syringe, on date_administered, and
+--                    administered_by names them. HL7 FHIR primarySource = true.
+--   'card'           given elsewhere, and the vaccination card or record book was
+--                    SEEN. Written, dated evidence. FHIR primarySource = false,
+--                    reportOrigin = "record".
+--   'parent_report'  the parent or guardian says it was given, and has no card.
+--                    FHIR primarySource = false, reportOrigin = "recall". It does
+--                    NOT count as given for completion or coverage, and it can be
+--                    upgraded to 'card' when the card is shown, or removed.
 --
--- That is the distinction HL7 FHIR draws with Immunization.primarySource. Both
--- count as Completed against the schedule, because the child is protected either
--- way; what the flag changes is what every screen SAYS about the dose. See
--- migrate_add_immunization_source.py for the case that produced it.
+-- The basis is the CDC General Best Practices: only written, dated records are
+-- accepted as evidence of vaccination, and without one the child is treated as
+-- unvaccinated. 'given_here' and 'card' count as given; 'parent_report' does not.
 --
--- date_administered is nullable, and the CHECK below is what makes that
--- one-sided. A dose this health center administered must still say when -- that
--- is a fact its own staff hold. A reported dose may not have one: a parent who
--- remembers their child had BCG at the hospital where they were born may not
--- remember the day, and stamping today's date on it to fill the column would be
--- inventing precision the record does not have.
+-- date_administered is nullable, and the CHECK below makes that one-sided: a dose
+-- given here must say when. A 'card' dose must have a date when it is recorded
+-- (models/immunizations.py enforces it), but rows migrated from the old "reported"
+-- doses may have none. A 'parent_report' date is optional. place_given is optional
+-- free text for a dose given elsewhere.
 --
--- A reported dose still requires a real consultation, but no column here says so
--- and none can: consultation_id must stay nullable because a deleted
--- consultation sets it NULL and the vaccination still happened. The rule lives
--- in models/immunizations.record_reported_immunizations(), which refuses to
--- write one without a consultation, and nothing else writes 'reported'.
+-- Only 'given_here' needs a consultation. Doses given elsewhere are recorded from
+-- the Immunization Record tab with no consultation; consultation_id is nullable
+-- for that, and because a deleted consultation sets it NULL.
 --
 -- UNIQUE (patient_id, vaccine_code, dose_number) is the clinically important
 -- constraint. A child cannot receive the same dose twice, and a schema that
@@ -278,13 +279,14 @@ CREATE TABLE immunizations (
     consultation_id INTEGER,
     vaccine_code TEXT NOT NULL,
     dose_number INTEGER NOT NULL,
-    source TEXT NOT NULL DEFAULT 'administered'
-        CHECK (source IN ('administered', 'reported')),
+    evidence TEXT NOT NULL DEFAULT 'given_here'
+        CHECK (evidence IN ('given_here', 'card', 'parent_report')),
     date_administered TEXT,
+    place_given TEXT,
     administered_by INTEGER NOT NULL,
     notes TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CHECK (source = 'reported' OR date_administered IS NOT NULL),
+    CHECK (evidence <> 'given_here' OR date_administered IS NOT NULL),
     UNIQUE (patient_id, vaccine_code, dose_number),
     FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
     FOREIGN KEY (consultation_id) REFERENCES consultations(id) ON DELETE SET NULL,
