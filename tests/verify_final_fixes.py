@@ -216,6 +216,57 @@ check("the command line says the same, and exits 1 without changing the file",
       main_refusal.returncode == 1 and "--replace" in main_refusal.stdout
       and existing.read_bytes() == b"", main_refusal.stdout)
 
+# ---------------------------------------------------------------------------
+section("3. EVERY COMMON PHILIPPINE NUMBER FORMAT IS MASKED (D3)")
+from utils.phone import MASK_PREFIX, mask_numbers_in_text, mask_phone  # noqa: E402
+from models.audit import log_action  # noqa: E402
+
+CORE = "9000001234"  # the same digits in every format below (fictional 0900000NNNN); last four 1234
+FORMATS = [
+    "09000001234", "+639000001234", "639000001234",
+    "0900 000 1234", "0900-000-1234", "0900.000.1234", "0900 000-1234",
+    "+63 900 000 1234", "+63-900-000-1234", "+63.900.000.1234", "63 900 000 1234",
+    "(0900) 000 1234", "(0900) 000-1234", "[0900] 000 1234", "(+63) 900 000 1234",
+    "+63 (900) 000-1234", "0900 - 000 . 1234", "09 00 00 01 23 4", "0900-000 1234",
+]
+bad_text, bad_phone = [], []
+for number in FORMATS:
+    masked = mask_numbers_in_text(f"Texted {number} about a visit.")
+    if masked != f"Texted {MASK_PREFIX} 1234 about a visit.":
+        bad_text.append((number, masked))
+    shown = mask_phone(number)
+    if shown != f"{MASK_PREFIX} 1234":
+        bad_phone.append((number, shown))
+check(f"mask_numbers_in_text masks all {len(FORMATS)} formats inside a sentence, to the last four digits",
+      not bad_text, bad_text[:4])
+check("mask_phone shows the last four digits and nothing else in every format", not bad_phone, bad_phone[:4])
+check("a bracket or space around the number stays tidy: '(0900 000 1234)' keeps its brackets",
+      mask_numbers_in_text("Call (0900 000 1234) now.") == f"Call ({MASK_PREFIX} 1234) now.")
+check("two numbers in different formats in one entry are both masked",
+      mask_numbers_in_text("From 0900-000-1234 to +63 900 000 4321.")
+      == f"From {MASK_PREFIX} 1234 to {MASK_PREFIX} 4321.")
+check("masking twice changes nothing", mask_numbers_in_text(mask_numbers_in_text("Texted 0900-000-1234."))
+      == f"Texted {MASK_PREFIX} 1234.")
+innocent = ["Consultation #1234 on 2026-09-05 09:12, 12 doses.", "from 2026-09-05 to 2026-09-12",
+            "Texted ref 12312348901 on 20260905.", "APT-00090 for PAT-0912 (visit 2026-09-05)"]
+check("dates, ids and other digits are left alone",
+      all(mask_numbers_in_text(t) == t for t in innocent),
+      [(t, mask_numbers_in_text(t)) for t in innocent if mask_numbers_in_text(t) != t])
+stored_bad = []
+for number in FORMATS:
+    entry_id = log_action(user_id=ADMIN_ID, action="Test entry", module="Testing",
+                          details=f"Texted {number} about a booking.", ip_address="127.0.0.1")
+    row = q("SELECT details FROM audit_logs WHERE id = ?", (entry_id,))[0]["details"] if entry_id else ""
+    if CORE in re.sub(r"\D", "", row) or "1234" not in row:
+        stored_bad.append((number, row))
+check("the audit writer stores no number in any of those formats, only its last four digits",
+      not stored_bad, stored_bad[:3])
+check("a number written with dashes no longer survives in an audit entry",
+      "0900-000-1234" not in " ".join(r["details"] for r in q("SELECT details FROM audit_logs")))
+from migrations import migrate_mask_audit_phone_numbers as mig  # noqa: E402
+check("the old-entry migration finds numbers in the dashed formats too",
+      all(mig._PH_MOBILE_IN_TEXT.search(f"Texted {n}.") for n in FORMATS))
+
 # ==== END ====
 passed = sum(1 for _, ok in results if ok)
 print("\n" + "=" * 78)

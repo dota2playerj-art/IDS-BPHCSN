@@ -43,10 +43,16 @@ def to_local_ph_mobile(number):
 # number is masked the same way on every page and file.
 MASK_PREFIX = "•••• •••"
 
-# A Philippine mobile number as written in free text: 09 and nine more digits, or
-# 639 and nine more digits, with or without a plus sign, and not part of a longer
-# run of digits.
-_PH_MOBILE_IN_TEXT = re.compile(r"(?<!\d)\+?(?:63|0)9\d{9}(?!\d)")
+# A Philippine mobile number as written in free text: 09 and nine more digits, +63 / 63
+# and 9 and nine more digits, with spaces, dashes, dots or brackets anywhere between
+# the digits ("0917-123-4567", "+63 917 123 4567", "(0917) 123 4567"), and not part
+# of a longer run of digits. The optional "open" group is a bracket just before the
+# number; it is dropped when the number closes a bracket that it did not open.
+_SEP = r"[\s.\-()\[\]]*"
+_PH_MOBILE_IN_TEXT = re.compile(
+    r"(?P<open>[(\[]?)(?P<num>(?<!\d)(?:\+" + _SEP + r")?(?:63|0)" + _SEP + r"9(?:" + _SEP
+    + r"\d){9}(?!\d))"
+)
 
 
 def mask_phone(number):
@@ -67,8 +73,17 @@ def mask_phone(number):
     return f"{MASK_PREFIX} {digits[-4:]}"
 
 
+def _mask_match(match):
+    number, opener = match.group("num"), match.group("open")
+    masked = mask_phone(number)
+    closers = number.count(")") + number.count("]")
+    openers = number.count("(") + number.count("[")
+    # "(0917) 123 4567": the number closes the bracket in front of it, so the bracket goes too.
+    return masked if closers > openers else opener + masked
+
+
 def mask_numbers_in_text(text):
     """Mask every mobile number written inside a longer text, such as an audit entry."""
     if not text:
         return text
-    return _PH_MOBILE_IN_TEXT.sub(lambda match: mask_phone(match.group(0)), text)
+    return _PH_MOBILE_IN_TEXT.sub(_mask_match, text)
