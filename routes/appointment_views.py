@@ -95,18 +95,19 @@ def appointment_scheduling_context(month=None):
         entries = attach_actions(attach_leave_flags(entries), role)
     immunization_alert = (get_immunization_alert() if care_team
                           else {"children": [], "child_count": 0,
-                                "overdue_child_count": 0})
+                                "no_record_child_count": 0})
     due_by_patient = {
         child["patient"]["id"]: child for child in immunization_alert["children"]
     }
     for entry in entries:
         child = due_by_patient.get(entry["patient_id"])
         entry["immunization_due"] = child is not None
-        entry["immunization_overdue"] = bool(child and child["overdue_count"])
-        # The badge says how many vaccines are overdue, or how many are due when none is
-        # overdue. It used to print overdue plus due-now under the word "overdue".
-        entry["immunization_overdue_count"] = child["overdue_count"] if child else 0
+        # The badge says how many vaccines have no record, or how many are due when
+        # none lacks a record, or how many only have a parent's word (Task 9).
+        entry["immunization_no_record"] = bool(child and child["no_record_count"])
+        entry["immunization_no_record_count"] = child["no_record_count"] if child else 0
         entry["immunization_due_count"] = child["due_count"] if child else 0
+        entry["immunization_parent_count"] = child["parent_report_count"] if child else 0
         entry["immunization_count"] = child["attention_count"] if child else 0
         entry["immunization_next"] = child["next_label"] if child else None
 
@@ -302,8 +303,9 @@ def _immunization_note(patient):
 
     Said at check-in rather than left for whoever opens the profile: the whole
     value of tracking defaulters is catching them while the parent is still at
-    the desk. A child who is overdue and walks in for a cough is the one chance
-    that month to give the dose, and it is missed if the information only appears
+    the desk. A child with no record of a dose who walks in for a cough is the one
+    chance that month to ask for the vaccination card (the dose may have been given
+    elsewhere) or to give the dose, and it is missed if the information only appears
     somewhere nobody has a reason to look.
     """
     if not patient:
@@ -316,10 +318,20 @@ def _immunization_note(patient):
     more = len(status["attention_items"]) - 3
     if more > 0:
         doses += f" and {more} more"
-    lead = "OVERDUE for" if status["overdue_count"] else "due for"
+    if status["no_record_count"]:
+        return (
+            f" IMMUNISATION: {patient['first_name']} has no record of {doses}. "
+            "Ask for the vaccination card. If the card shows the dose, record it as "
+            "given elsewhere."
+        )
+    if status["due_count"]:
+        return (
+            f" IMMUNISATION: {patient['first_name']} is due for {doses} — "
+            "record it during today's consultation."
+        )
     return (
-        f" IMMUNISATION: {patient['first_name']} is {lead} {doses} — "
-        "record it during today's consultation."
+        f" IMMUNISATION: the parent says {patient['first_name']} had {doses}, with no "
+        "card. Ask for the vaccination card."
     )
 
 

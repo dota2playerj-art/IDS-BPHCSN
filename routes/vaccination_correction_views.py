@@ -206,7 +206,7 @@ def _parse_epi(form_data, record, patient):
     # source is read from the row being corrected.
     date_text, date_error = _validate_date(
         form_data.get(DATE_FIELD), patient,
-        required=not record.get("reported"),
+        required=record.get("evidence") != "parent_report",
     )
     if date_error:
         errors[DATE_FIELD] = date_error
@@ -395,7 +395,7 @@ def _reopen(kind, record_id, record, form_data, errors, banner):
             # EPI row has a source; a general vaccination is always one the
             # health center gave and its date is always required.
             "reported": bool(record.get("reported")),
-            "source_label": record.get("source_label") or "",
+            "source_label": record.get("evidence_label") or "",
         },
     }
 

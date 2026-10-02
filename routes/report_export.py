@@ -355,10 +355,13 @@ def _summary_sheet(context, sections):
         # from, and "doses given" has to mean doses this health center gave.
         rows.append(("Immunisation doses given here",
                      coverage["window"]["doses_administered"], ranged))
-        rows.append(("Doses reported as given elsewhere",
-                     coverage["window"]["doses_reported"],
-                     f"{ranged}, by the date reported. Recorded at a consultation "
-                     "here; administered at another facility"))
+        rows.append(("Doses given elsewhere (card seen)",
+                     coverage["window"]["doses_elsewhere"],
+                     f"{ranged}, by the date on the card. Given at another facility; "
+                     "the vaccination card was seen here"))
+        rows.append(("Parent says given, no card",
+                     coverage["window"]["doses_parent_report"],
+                     f"{ranged}. Not counted as given"))
     if "inventory" in sections:
         inventory = context["inventory_report"]
         rows.append(("Inventory items in service", inventory["total_items"], standing))
@@ -737,10 +740,11 @@ def _vaccination(context):
             ("Children up to date (%)", coverage["up_to_date_pct"],
              "Against registered children, not against the barangay"),
             ("Children needing attention", coverage["needing_attention"],
-             f"Due or overdue a dose as of {closing}"),
-            ("Children overdue a dose", coverage["overdue_children"], f"As of {closing}"),
+             f"A dose due, with no record, or with only a parent's word, as of {closing}"),
+            ("Children with a dose with no record", coverage["no_record_children"],
+             f"As of {closing}. The dose may have been given elsewhere"),
             ("Children awaiting a first dose", coverage["awaiting_first_dose"],
-             "Due a dose and with nothing on record yet"),
+             "Needing attention and with no dose on record yet"),
         ], note=("Coverage is a judgement about a child made on one day, so it is "
                  f"reported as of the range's closing date, {closing}. There is no "
                  "such thing as a child being up to date \"during\" a period.")),
@@ -748,19 +752,22 @@ def _vaccination(context):
             ("Doses given here in this range",
              coverage["window"]["doses_administered"],
              f"{display_date(window['start'])} to {closing}"),
-            ("Doses reported as given elsewhere, in this range",
-             coverage["window"]["doses_reported"],
-             "Administered at another facility and reported to this health "
-             "center at a consultation. A dose whose date is not known appears "
-             "in no range"),
+            ("Doses given elsewhere (card seen), in this range",
+             coverage["window"]["doses_elsewhere"],
+             "Given at another facility; the vaccination card was seen here. A "
+             "dose whose date is not known appears in no range"),
+            ("Parent says given, no card, in this range",
+             coverage["window"]["doses_parent_report"],
+             "Not counted as given. Ask for the card"),
             ("Children dosed in this range", coverage["window"]["children_dosed"],
              "Distinct children"),
             ("Doses on record, all time", coverage["doses_given"],
              f"{coverage['doses_administered']} given here, "
-             f"{coverage['doses_reported']} reported as given elsewhere"),
+             f"{coverage['doses_elsewhere']} given elsewhere (card seen). "
+             f"Parent says given, no card: {coverage['doses_parent_report']}"),
             ("Patients with at least one dose", coverage["enrolled"],
              "The only reading of programme membership the data supports"),
-        ], note=("Coverage counts every dose a child has had, wherever it was given. "
+        ], note=("Coverage counts a dose when it was given here or its card was seen. "
                  "These dose counts are this health center's own work, so the two are never added together.")),
     ]
 
