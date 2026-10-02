@@ -676,7 +676,8 @@ def process_create_user(form_data, actor_id, ip_address=None):
         f'Account "{created["username"]}" created for {created["full_name"]} as '
         f'{created["role"]}. They can sign in now with the password you set. '
         "That password is not stored anywhere it can be read back — tell them "
-        "what it is; nobody, including you, can look it up later."
+        "what it is; nobody, including you, can look it up later. "
+        "The user must change this password the first time they sign in."
     )
 
 
@@ -1114,7 +1115,8 @@ def process_reset_password(form_data, actor_id, ip_address=None):
         f'{user["full_name"]}’s password has been reset. They sign in with the '
         f'new password from now on — the old one stopped working the moment you '
         "saved this. That password is not stored anywhere it can be read back — "
-        "tell them what it is; nobody, including you, can look it up later."
+        "tell them what it is; nobody, including you, can look it up later. "
+        "The user must change this password the first time they sign in."
     )
     if acting_on_self:
         message += (

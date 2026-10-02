@@ -300,8 +300,30 @@ def _log_refused_diagnosis(refused, patient, consultation_id, role, user_id,
     )
 
 
+def _recorded_and_sealed(recorded, sealed):
+    """One `audit(conn, new_id)` for a new record: the recorded entry and, if it was sealed
+    as it was written, the seal entry, in the same transaction."""
+    def audit(conn, new_id):
+        recorded(conn, new_id)
+        if sealed:
+            sealed(conn, new_id, "restricted")
+    return audit
+
+
+def _log_restriction_audit(patient, user_id, ip_address, visit_date=None, recorded_by_name=None):
+    """The `audit(conn, consultation_id, outcome)` callback for a seal or a lift.
+
+    It runs inside the transaction that moves the seal, so the entry commits with the
+    change and rolls back with it (Task 4's rule, applied to sealing in Task 7).
+    """
+    def audit(conn, consultation_id, outcome):
+        _log_restriction(outcome, consultation_id, patient, user_id, ip_address,
+                         visit_date=visit_date, recorded_by_name=recorded_by_name, conn=conn)
+    return audit
+
+
 def _log_restriction(outcome, consultation_id, patient, user_id, ip_address,
-                     visit_date=None, recorded_by_name=None):
+                     visit_date=None, recorded_by_name=None, conn=None):
     """Record that a consultation was sealed, or that a seal was lifted.
 
     `outcome` is set_consultation_restriction()'s own return, so this cannot
@@ -370,6 +392,7 @@ def _log_restriction(outcome, consultation_id, patient, user_id, ip_address,
         module=MODULE_CONFIDENTIALITY,
         details=details,
         ip_address=ip_address,
+        conn=conn,
     )
 
 
@@ -974,9 +997,10 @@ def process_record_consultation(appointment_id, form_data, user_id,
         values=values,
         age_context=age_context,
         appointment_id=appointment["id"],
-        audit=consultation_recorded(
-            patient["id"], context["visit_date"], user_id, ip_address
-        ),
+        audit=_recorded_and_sealed(
+            consultation_recorded(patient["id"], context["visit_date"], user_id, ip_address),
+            _log_restriction_audit(patient, user_id, ip_address, visit_date=context["visit_date"])
+            if restrict else None),
         # Sealed as it is written: the diagnosis and treatment plan are stored
         # encrypted from the start, in the same transaction (H4).
         sealed_by=user_id if restrict else None,
@@ -994,12 +1018,6 @@ def process_record_consultation(appointment_id, form_data, user_id,
     # set by create_consultation() above, with the record, so the diagnosis was
     # never stored as plain text. `restrict` is already False for any role that
     # may not diagnose, so this is unreachable for them twice over.
-    if restrict:
-        _log_restriction(
-            "restricted", consultation_id, patient, user_id, ip_address,
-            visit_date=context["visit_date"], recorded_by_name=None,
-        )
-
     # Dated to the visit, not to now: a consultation written up is a record of
     # that day, and the dose was given during it.
     given = record_immunizations(
@@ -1503,15 +1521,13 @@ def process_edit_consultation(consultation_id, form_data, user_id, ip_address=No
     restriction_outcome = None
     if may_diagnose:
         restriction_outcome = set_consultation_restriction(
-            consultation_id, restrict, user_id, role
+            consultation_id, restrict, user_id, role,
+            audit=_log_restriction_audit(
+                patient, user_id, ip_address, visit_date=before["consultation_date"],
+                recorded_by_name=before["recorded_by_name"]),
         )
         if restriction_outcome == "cannot_open":
             log_unopenable(patient, [consultation_id], "Lifting a restriction")
-        _log_restriction(
-            restriction_outcome, consultation_id, patient, user_id, ip_address,
-            visit_date=before["consultation_date"],
-            recorded_by_name=before["recorded_by_name"],
-        )
 
     # Immunisations are added the same way the clinical fields are corrected, and
     # audited the same way. They are not removed here: a dose already on file is
@@ -1733,7 +1749,10 @@ def process_consultation_restriction(form_data, user_id, ip_address=None):
         return None, "That patient record could not be found."
 
     outcome = set_consultation_restriction(
-        consultation_id, direction == RESTRICT_ON, user_id, current_role()
+        consultation_id, direction == RESTRICT_ON, user_id, current_role(),
+        audit=_log_restriction_audit(
+            patient, user_id, ip_address, visit_date=consultation["consultation_date"],
+            recorded_by_name=consultation["recorded_by_name"]),
     )
     if outcome == "cannot_open":
         log_unopenable(patient, [consultation_id], "Lifting a restriction")
@@ -1750,11 +1769,6 @@ def process_consultation_restriction(form_data, user_id, ip_address=None):
             "nothing has been written to the audit log."
         )
 
-    _log_restriction(
-        outcome, consultation_id, patient, user_id, ip_address,
-        visit_date=consultation["consultation_date"],
-        recorded_by_name=consultation["recorded_by_name"],
-    )
     return patient["id"], (
         _restriction_message(outcome, patient, consultation)
         + " The change has been recorded in the audit log."

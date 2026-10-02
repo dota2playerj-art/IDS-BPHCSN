@@ -1279,7 +1279,7 @@ def update_consultation(consultation_id, values, age_context):
     return affected
 
 
-def set_consultation_restriction(consultation_id, restricted, user_id, role=None):
+def set_consultation_restriction(consultation_id, restricted, user_id, role=None, audit=None):
     """Seal or unseal one consultation. Returns what actually happened.
 
     One of "missing", "unchanged", "restricted" or "lifted". The caller decides
@@ -1384,5 +1384,8 @@ def set_consultation_restriction(consultation_id, restricted, user_id, role=None
             "SET restricted_at = strftime('%Y-%m-%d %H:%M:%f', 'now') WHERE id = ?",
                 (consultation_id,),
             )
+        # The entry commits with the change, or neither does.
+        if audit:
+            audit(conn, consultation_id, "restricted" if flag else "lifted")
         conn.commit()
     return "restricted" if flag else "lifted"

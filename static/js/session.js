@@ -10,6 +10,8 @@
  * - At the idle limit it asks the server with a probe, which does not count as
  *   activity. The server ends the session and answers 401 with the login page
  *   address, and the script goes there.
+ * - If the server answers 503 (maintenance mode), the page reloads and shows the
+ *   maintenance screen at once.
  * - Every request carries the form token (static/js/csrf.js). If the server
  *   refuses the token (400), the script also goes to the login page.
  * - Nothing here touches the sign-in time, so the 12-hour limit cannot be
@@ -68,6 +70,12 @@
         if (response.status === 204) {
           serverTouch = Date.now();
           hideWarning();
+          return null;
+        }
+        // 503: the system was switched to maintenance. Reload, so the maintenance
+        // screen appears now and not at the next click.
+        if (response.status === 503) {
+          window.location.reload();
           return null;
         }
         // 401: the session ended. 400: the token was refused, which means the

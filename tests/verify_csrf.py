@@ -288,7 +288,13 @@ check("auth: own password change with the page's token works",
 section("6. SIGNING OUT IS A POST")
 c, _ = sign_in("staff")
 r = c.get("/logout")
-check("GET on the logout URL is not allowed", r.status_code == 405, r.status_code)
+# Task 7 (L16): an old bookmark gets no technical page: it goes to the person's own dashboard.
+check("GET on the logout URL redirects to the person's own dashboard, with no error page",
+      r.status_code == 302 and c.get("/logout", follow_redirects=True).request.path == "/staff/dashboard",
+      (r.status_code, location(r)))
+anonymous = app.test_client().get("/logout")
+check("an anonymous GET on the logout URL goes to the sign-in page, with no message",
+      anonymous.status_code == 302 and location(anonymous).endswith("/login"), anonymous.status_code)
 check("and it does not sign the user out",
       signed_in(c) and c.get("/staff/dashboard").status_code == 200)
 r = c.post("/logout")
