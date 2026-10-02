@@ -427,13 +427,14 @@ INTAKE = {"chief_complaint": "flow intake", "temperature": "37.0", "blood_pressu
 FULL = dict(INTAKE, diagnosis="Flow diagnosis", treatment_plan="Flow plan")
 
 
-def new_visit(service, tag):
+def new_visit(service, tag, pid=None):
     """Check the flow patient in through the real route, then start the consultation."""
+    pid = pid or PATIENT
     run_sql("UPDATE appointments SET status = 'Completed' WHERE status IN ('Waiting', 'In Consultation')"
-            " AND patient_id = ?", (PATIENT,))
-    staff.post(CHECK_IN, data={"patient_id": str(PATIENT), "reason": tag, "service": service})
+            " AND patient_id = ?", (pid,))
+    staff.post(CHECK_IN, data={"patient_id": str(pid), "reason": tag, "service": service})
     appointment = q1("SELECT id FROM appointments WHERE patient_id = ? ORDER BY id DESC LIMIT 1",
-                     (PATIENT,))[0]
+                     (pid,))[0]
     staff.post(START, data={"appointment_id": str(appointment)})
     return appointment
 
@@ -1028,6 +1029,49 @@ check("a second run does nothing: no backup, no change, no second record",
       and con.execute("SELECT COUNT(*) FROM audit_logs").fetchone()[0] == 5)
 con.close()
 shutil.rmtree(work3, ignore_errors=True)
+
+# ---------------------------------------------------------------------------
+section("14. THE DOCTOR CAN SEE EVERY WAITING PATIENT, WITH OR WITHOUT AN INTAKE (Task 6d)")
+QUEUE_URL, DASH_URL = "/staff/appointment_scheduling", "/staff/dashboard"
+
+
+def row_of(page, marker, start='<tr'):
+    """The table row on `page` that holds `marker` (an APT reference or a patient name)."""
+    for chunk in page.split(start)[1:]:
+        row = chunk.split("</tr>")[0]
+        if marker in row:
+            return row
+    return ""
+
+
+def see_patient_href(row):
+    """The href of the 'See patient' link in a row, or None."""
+    m = re.search(r'<a [^>]*href="([^"]+)"[^>]*>(?:(?!</a>).)*?See patient', row, re.S)
+    return m.group(1) if m else None
+
+
+# The bug: Staff send a Consultation visit to the Doctor with no intake.
+name_patient(25, "T6D")
+bug = new_visit(CONSULT, "no intake", pid=25)
+staff.post(SEND, data={"appointment_id": str(bug)})
+check("Task 6d set-up: Staff send a Consultation visit to the Doctor without an intake: it is "
+      "Waiting for the Doctor and has no consultation record",
+      status_of(bug) == WFD and consultation_of(bug) is None)
+queue_row = row_of(body(doctor.get(QUEUE_URL)), f"APT-{bug:05d}")
+check("the Doctor's Patient Queue offers 'See patient' on that row", "See patient" in queue_row, queue_row[-600:])
+dash_row = row_of(body(doctor.get(DASH_URL)), NAMES["T6D"])
+check("the Doctor's dashboard list offers 'See patient' on that row", "See patient" in dash_row, dash_row[-600:])
+href = see_patient_href(queue_row)
+r = doctor.get(href, follow_redirects=True) if href else None
+check("it opens a new consultation form for this visit (the Doctor sees the diagnosis field)",
+      r is not None and r.status_code == 200 and 'name="diagnosis"' in body(r)
+      and f"/consultation/record/{bug}" in (r.request.path or ""), href)
+r = doctor.post(f"/staff/consultation/record/{bug}", data=FULL)
+check("saving it with a diagnosis completes the visit, and the record is linked to it",
+      status_of(bug) == "Completed" and consultation_of(bug) is not None
+      and consultation_of(bug)[1] == "Flow diagnosis", status_of(bug))
+with app.app_context():
+    check("... and it leaves the Doctor's list", bug not in listed_now())
 
 # ---------------------------------------------------------------------------
 passed = sum(1 for _, ok in results if ok)
