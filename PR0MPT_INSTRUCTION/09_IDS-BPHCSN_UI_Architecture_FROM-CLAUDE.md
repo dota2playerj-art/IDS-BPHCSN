@@ -1177,6 +1177,9 @@ The Doctor, Health Center Staff and the Barangay Official are unchanged.
   finished visits only. Staff and the Doctor can correct a visit's service until it is finished. The
   Administrator's queue stays read-only and shows no service. Staff see "Still waiting from earlier days"
   (status Waiting only) so they can close old visits.
+- *Task 6c (2026-10-02).* No skipping the Doctor: for a service that needs him, the queue button is **Send to
+  the Doctor** (status Waiting for the Doctor), and no route can set Completed without his diagnosis. No audit
+  entry names a visit's service ("Corrected the service of visit APT-00081.").
 - *Stock accountability.* Dispensing writes no stock entry. Accountability comes from the stock
   levels and the dispensed totals in Reports. The Doctor and Health Center Staff hold the full
   dispensing records.

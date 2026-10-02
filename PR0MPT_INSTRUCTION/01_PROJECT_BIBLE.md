@@ -542,6 +542,9 @@ comes only on certain days, while Staff take the intake every day. A visit moves
 2. **Start.** *In Consultation*. One patient at a time.
 3. **Intake saved.** If the service needs a diagnosis (the first three) and none was written: *Waiting for
    the Doctor*. Otherwise: *Completed*. Prenatal, immunization and dental visits are finished by Staff.
+   A visit that needs the Doctor can never be Completed without his diagnosis, by any route: if the intake
+   is not written, the queue's button is **Send to the Doctor** (status *Waiting for the Doctor*, one short
+   audit entry), and the server refuses "Mark Completed" with "This visit needs the Doctor first."
 4. **Diagnosis saved by the Doctor.** *Completed*. If the Doctor records the whole consultation himself, with a
    diagnosis, it goes straight to *Completed*. He may write a diagnosis on any visit; it stays *Completed*.
 5. **Left before being seen.** Staff and the Doctor can set it, after a confirmation, on a visit that is
@@ -745,3 +748,8 @@ Version 3.1 (2026-10-02)
 
 Task 6b, the service chosen at check-in and the status Waiting for the Doctor. "Completed" now means
 finished. See "The visit flow" under "Clinical Data Is for the Care Team".
+
+Version 3.2 (2026-10-02)
+
+Task 6c, no skipping the Doctor: a visit that needs him cannot be Completed without a diagnosis, and no
+audit entry names a visit's service.

@@ -404,6 +404,11 @@ makes the visit *Waiting for the Doctor* when its service needs a diagnosis and 
 *Completed*. The Doctor's diagnosis makes it *Completed*. The Completed card counts finished visits only; the
 footer counts Waiting for the Doctor on its own.
 
+**Send to the Doctor (Task 6c).** On a visit In Consultation whose service needs the Doctor, the button that
+closed a visit with nothing written is **Send to the Doctor**. It sets Waiting for the Doctor. The server
+refuses Completed on such a visit without a diagnosis ("This visit needs the Doctor first."). Services that do
+not need him keep **Mark Completed**. Neither button is on the Administrator's queue.
+
 **Service at check-in (Task 6b).** The Check In dialog has a required **Service** list on both tabs
 (existing patient, new patient), with no default: Consultation, Follow-up Consultation, Hypertension /
 Diabetes Monitoring, Prenatal Check-up, Immunization, Dental. A row has a **Change service** button, with a
