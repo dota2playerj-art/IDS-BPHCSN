@@ -34,6 +34,13 @@ def _initials(name):
     return initials(name)
 
 
+def inject_system_name():
+    """The system's name for every template (config.SYSTEM_NAME)."""
+    import config
+
+    return {"system_name": config.SYSTEM_NAME, "system_short_name": config.SYSTEM_SHORT_NAME}
+
+
 def inject_role_context():
     user = get_current_user()
     if user:

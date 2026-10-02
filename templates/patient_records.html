@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% set active_nav = "patient_records" %}
-{% block title %}IDS-BPHCSN | Patient Records{% endblock %}
+{% block title %}{{ system_short_name }} | Patient Records{% endblock %}
 
 {% block styles %}
   .toolbar-search{min-width:320px; max-width:420px;}
@@ -176,7 +176,7 @@
     <div class="print-only print-head">
       <div>
         <div class="print-org-name">{{ health_center.name }}</div>
-        <div class="print-org-sub">Integrated Data System &mdash; IDS-BPHCSN</div>
+        <div class="print-org-sub">{{ system_name }} &mdash; {{ system_short_name }}</div>
       </div>
       <div class="print-doc">
         <div class="print-doc-title">Patient Records</div>

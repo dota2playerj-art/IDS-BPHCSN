@@ -57,6 +57,7 @@ that left that out would let a reader take the entries it holds for the whole of
 what the system does. Those reasons are looked up from audit_views.UNTRACKED, so
 the file and the screen state them in one wording.
 """
+import config
 from models.settings import health_center_name
 from routes.audit_views import PAGE_SIZE
 from routes.report_export import _download  # noqa: F401  (re-exported below)
@@ -125,14 +126,14 @@ def audit_document(context, produced_by=""):
     sheets, stem = _assemble(context, produced_by)
     stamped = now()
     exported = stamped.strftime("%B %d, %Y at %I:%M %p")
-    footer_left = f"IDS-BPHCSN · Exported {exported}"
+    footer_left = f"{config.SYSTEM_SHORT_NAME} · Exported {exported}"
     if produced_by:
         footer_left += f" by {produced_by}"
 
     payload = render(
         sheets,
         org=health_center_name(),
-        org_sub="Integrated Data System (IDS-BPHCSN)",
+        org_sub=f"{config.SYSTEM_NAME} ({config.SYSTEM_SHORT_NAME})",
         doc_title="Audit Logs — System Activity Trail",
         range_label=_scope_label(context),
         footer_left=footer_left,
@@ -160,7 +161,7 @@ def _assemble(context, produced_by):
     ]
 
     scope = context["selected_module"] or "All modules"
-    stem = f"IDS-BPHCSN Audit Logs {scope} {now().strftime('%Y-%m-%d')}"
+    stem = f"{config.SYSTEM_SHORT_NAME} Audit Logs {scope} {now().strftime('%Y-%m-%d')}"
     return sheets, stem
 
 
@@ -183,7 +184,7 @@ def _cover_sheet(context, produced_by):
         ("Entries in this file", total),
         ("Exported", stamped.strftime("%B %d, %Y at %I:%M %p")),
         ("Exported by", produced_by or "—"),
-        ("Source", f"{health_center_name()} records, via IDS-BPHCSN"),
+        ("Source", f"{health_center_name()} records, via {config.SYSTEM_SHORT_NAME}"),
     ]
 
     scope = [

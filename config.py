@@ -15,6 +15,12 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent
+
+# THE NAME OF THE SYSTEM. One place. Every screen, page title, printed report, Excel and
+# PDF header and the README read these two; nothing spells the name out for itself.
+SYSTEM_NAME = ("Integrated Digital System for Barangay Poblacion Health Center Services "
+               "and Community Notifications")
+SYSTEM_SHORT_NAME = "IDS-BPHCSN"
 load_dotenv(BASE_DIR / ".env")
 
 # Checked by secret_key_problem() when the app starts. There is no fallback:

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% set active_nav = "settings" %}
-{% block title %}IDS-BPHCSN | Settings{% endblock %}
+{% block title %}{{ system_short_name }} | Settings{% endblock %}
 
 {% block styles %}
   .page-desc{font-size:14px; color:var(--text-muted); margin-top:4px; max-width:640px;}
@@ -1076,7 +1076,7 @@
               <div class="section-title">About System</div>
               <div class="section-sub">Version and institution information</div>
 
-              <div class="about-item"><div class="about-label">System Name</div><div class="about-value">IDS-BPHCSN</div></div>
+              <div class="about-item"><div class="about-label">System Name</div><div class="about-value">{{ system_short_name }}</div></div>
               <div class="about-item"><div class="about-label">System Version</div><div class="about-value">1.0.0</div></div>
 {#- WAS "PostgreSQL 15.4", "Jul 01, 2026" and "DOH-Licensed" on these three
     rows. Each was wrong in its own way.

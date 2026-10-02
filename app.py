@@ -19,7 +19,7 @@ from flask import Flask, request
 import config
 from database import init_db
 from routes import register_blueprints
-from utils.context import inject_role_context
+from utils.context import inject_role_context, inject_system_name
 from utils.csrf import init_csrf
 from utils.dates import register_date_filters
 from utils.small_counts import register_small_count_helpers
@@ -53,12 +53,12 @@ def create_app():
     # cookie, so a missing or public key would let anyone sign in as anyone.
     problem = config.secret_key_problem(config.SECRET_KEY)
     if problem:
-        raise SystemExit("IDS-BPHCSN cannot start. " + problem)
+        raise SystemExit(f"{config.SYSTEM_SHORT_NAME} cannot start. " + problem)
     # Refuse to start without the key for sealed records, too. Without it the
     # Doctor could seal a record that nobody can ever open again.
     problem = sealed_key_problem(os.environ.get("SEALED_DATA_KEY", ""))
     if problem:
-        raise SystemExit("IDS-BPHCSN cannot start. " + problem)
+        raise SystemExit(f"{config.SYSTEM_SHORT_NAME} cannot start. " + problem)
 
     app = Flask(__name__)
     app.config.from_object(config)
@@ -69,6 +69,7 @@ def create_app():
     register_flat_endpoint_aliases(app)
 
     app.context_processor(inject_role_context)
+    app.context_processor(inject_system_name)
     register_date_filters(app)
     register_small_count_helpers(app)
     app.before_request(ensure_db_ready)

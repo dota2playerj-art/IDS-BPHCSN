@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% set active_nav = "community_reports" %}
-{% block title %}IDS-BPHCSN | Community Reports{% endblock %}
+{% block title %}{{ system_short_name }} | Community Reports{% endblock %}
 
 {% block styles %}
   .toolbar-search{min-width:280px; max-width:360px;}
@@ -128,7 +128,7 @@
     <div class="print-only print-head">
       <div>
         <div class="print-org-name">{{ health_center.name }}</div>
-        <div class="print-org-sub">Integrated Data System &mdash; IDS-BPHCSN</div>
+        <div class="print-org-sub">{{ system_name }} &mdash; {{ system_short_name }}</div>
       </div>
       <div class="print-doc">
         <div class="print-doc-title">{{ selection.type_label }}</div>
@@ -625,7 +625,7 @@
     of barangay figures is a page of numbers with no provenance. #}
     <div class="print-only print-foot">
       {{ selection.type_label }} &middot; {{ window.start | long_date }} to {{ window.end | long_date }}
-      &middot; generated from {{ health_center.name }} records by IDS-BPHCSN.
+      &middot; generated from {{ health_center.name }} records by {{ system_short_name }}.
       Figures are counted from stored consultations, registrations, appointments, immunisation
       doses and SMS broadcasts. Immunisation coverage is the position as of {{ window.end | long_date }}.
     </div>

@@ -100,6 +100,7 @@ still genuinely absent, not those writes.) Where the screen already holds the
 wording -- User Management's does -- it is quoted rather than rewritten, so the
 file and the screen say the same thing in the same words.
 """
+import config
 from models.consultations import RESTRICTED_PLACEHOLDER
 from models.settings import health_center_name
 from routes.report_export import _download  # noqa: F401  (re-exported below)
@@ -342,13 +343,13 @@ def _document(export, produced_by):
     does not.
     """
     stamped = now()
-    footer_left = f"IDS-BPHCSN · Exported {stamped.strftime('%B %d, %Y at %I:%M %p')}"
+    footer_left = f"{config.SYSTEM_SHORT_NAME} · Exported {stamped.strftime('%B %d, %Y at %I:%M %p')}"
     if produced_by:
         footer_left += f" by {produced_by}"
     payload = render(
         export["sheets"],
         org=health_center_name(),
-        org_sub="Integrated Data System (IDS-BPHCSN)",
+        org_sub=f"{config.SYSTEM_NAME} ({config.SYSTEM_SHORT_NAME})",
         doc_title=export["doc_title"],
         range_label=export["scope_label"],
         footer_left=footer_left,
@@ -411,7 +412,7 @@ def _cover_sheet(screen, subtitle, produced_by, detail, controls, index, intro,
         *detail,
         ("Exported", stamped.strftime("%B %d, %Y at %I:%M %p")),
         ("Exported by", produced_by or "—"),
-        ("Source", f"{health_center_name()} records, via IDS-BPHCSN"),
+        ("Source", f"{health_center_name()} records, via {config.SYSTEM_SHORT_NAME}"),
     ]
 
     blocks = [
@@ -444,8 +445,7 @@ def _cover_sheet(screen, subtitle, produced_by, detail, controls, index, intro,
             # rename the software, and rewriting this from a setting would
             # produce an expansion whose initials no longer spell the acronym
             # printed beside it.
-            "Integrated Data System for Barangay Poblacion Health Center "
-            "Networking (IDS-BPHCSN).\n" + intro
+            f"{config.SYSTEM_NAME} ({config.SYSTEM_SHORT_NAME}).\n" + intro
         ),
     )
 
@@ -467,7 +467,7 @@ def _untracked_sheet(rows, intro):
 
 def _stem(screen, scope):
     """The download's filename stem: system, screen, scope, and the day taken."""
-    return f"IDS-BPHCSN {screen} - {scope} - {today().isoformat()}"
+    return f"{config.SYSTEM_SHORT_NAME} {screen} - {scope} - {today().isoformat()}"
 
 
 def _count_label(count, singular, plural=None):
@@ -1419,7 +1419,7 @@ def _user_export(context, produced_by):
             ["Account Summary", "The figures the screen's stat cards show."],
         ],
         intro=(
-            "Every account that can sign in to IDS-BPHCSN, with the role and the "
+            f"Every account that can sign in to {config.SYSTEM_SHORT_NAME}, with the role and the "
             "access each one carries, taken off the system on "
             f"{now().strftime('%B %d, %Y')}. This file names accounts and their "
             "privileges; no password is in it, and none can be — this file never "

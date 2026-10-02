@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% set active_nav = "appointment_scheduling" if appointment else "patient_records" %}
-{% block title %}IDS-BPHCSN | {% if consultation %}Edit Consultation{% else %}Record Consultation{% endif %}{% endblock %}
+{% block title %}{{ system_short_name }} | {% if consultation %}Edit Consultation{% else %}Record Consultation{% endif %}{% endblock %}
 
 {% block styles %}
   .page-desc{font-size:14px; color:var(--text-muted); margin-top:4px; max-width:680px;}

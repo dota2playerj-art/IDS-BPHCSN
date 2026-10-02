@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>{% block title %}IDS-BPHCSN{% endblock %}</title>
+<title>{% block title %}{{ system_short_name }}{% endblock %}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 {#- The form token for requests sent from script (static/js/csrf.js). Forms
     carry their own copy through csrf_field(). See utils/csrf.py. #}
@@ -252,7 +252,7 @@
   <div class="sidebar-brand">
     <div class="logo-circle"><span class="material-symbols-outlined">health_metrics</span></div>
     <div class="brand-text">
-      <div class="name">IDS-BPHCSN</div>
+      <div class="name">{{ system_short_name }}</div>
       <div class="sub">Brgy. Poblacion HC</div>
     </div>
   </div>
@@ -508,7 +508,7 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
-          Are you sure you want to log out of IDS-BPHCSN?
+          Are you sure you want to log out of {{ system_short_name }}?
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>

@@ -61,6 +61,7 @@ sign-ins from the screen whose job it is to report them. The password rule is
 models/users.py's. The database size is models/backup.py's, measured off the
 file the backup would be taken from. Nothing is counted locally here.
 """
+import config
 import sqlite3
 
 from models.appointments import get_active_consultation
@@ -515,7 +516,7 @@ def backup_download_response(actor_id, ip_address=None):
     payload = encrypt_backup(create_backup_bytes())
     stamped = now()
     filename = safe_filename(
-        f"IDS-BPHCSN backup {stamped.strftime('%Y-%m-%d %H%M')}{BACKUP_EXTENSION}"
+        f"{config.SYSTEM_SHORT_NAME} backup {stamped.strftime('%Y-%m-%d %H%M')}{BACKUP_EXTENSION}"
     )
 
     log_backup_download(actor_id, len(payload), filename, ip_address)

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% set active_nav = "patient_records" if patient else "register_patient" %}
-{% block title %}IDS-BPHCSN | {% if patient %}Edit Patient{% else %}Register Patient{% endif %}{% endblock %}
+{% block title %}{{ system_short_name }} | {% if patient %}Edit Patient{% else %}Register Patient{% endif %}{% endblock %}
 
 {% block styles %}
   .page-desc{font-size:14px; color:var(--text-muted); margin-top:4px; max-width:640px;}

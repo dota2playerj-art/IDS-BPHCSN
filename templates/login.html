@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>IDS-BPHCSN | Sign In</title>
+<title>{{ system_short_name }} | Sign In</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <!-- login.html deliberately does not extend base.html, so it carries its own copy of the
      self-hosted asset links. Keep these in step with base.html. -->
@@ -262,7 +262,7 @@
       </div>
       <div>
         <div class="brand-eyebrow">{{ health_center.name }}</div>
-        <div class="brand-name">IDS-BPHCSN</div>
+        <div class="brand-name">{{ system_short_name }}</div>
       </div>
     </div>
 
@@ -306,7 +306,7 @@
 
     <div class="brand-footer">
       <hr class="brand-divider">
-      <div class="brand-footer-title">Integrated Digital System for Barangay Poblacion Health Center Services and Community Notifications</div>
+      <div class="brand-footer-title">{{ system_name }}</div>
       {#- The facility and where it stands, both read from the stored settings
           (models/settings.py) rather than typed here. The line above it is NOT:
           that is the system's own name, which the acronym IDS-BPHCSN beside the
@@ -342,7 +342,7 @@
           <div class="login-title">Sign In</div>
         </div>
 
-        <div class="login-desc">Sign in using your authorized account to access the IDS-BPHCSN healthcare management system.</div>
+        <div class="login-desc">Sign in using your authorized account to access {{ system_short_name }}.</div>
 
         {% set flashed = get_flashed_messages() %}
         {% if error %}
@@ -431,7 +431,7 @@
 
         <div class="login-card-footer">
           Version 1.0 &middot; &copy; 2026 {{ health_center.name }}<br>
-          Powered by <b>IDS-BPHCSN</b>
+          Powered by <b>{{ system_short_name }}</b>
         </div>
       </div>
 

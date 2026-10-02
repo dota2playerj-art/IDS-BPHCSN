@@ -24,7 +24,7 @@
     this page at all. One governs a button, the other governs the content; a
     template that used one for both would be a page deciding its own access. #}
 {% set can_restrict = restrict_consultation_endpoint is defined %}
-{% block title %}IDS-BPHCSN | Patient Profile{% endblock %}
+{% block title %}{{ system_short_name }} | Patient Profile{% endblock %}
 
 {% block styles %}
 
@@ -383,7 +383,7 @@
     <div class="print-only print-head">
       <div>
         <div class="print-org-name">{{ health_center.name }}</div>
-        <div class="print-org-sub">Integrated Data System &mdash; IDS-BPHCSN</div>
+        <div class="print-org-sub">{{ system_name }} &mdash; {{ system_short_name }}</div>
       </div>
       <div class="print-doc">
         <div class="print-doc-title">Patient Health Record</div>
@@ -1696,7 +1696,7 @@
 {%- endif %}
 
     <div class="print-only print-foot">
-      Printed from IDS-BPHCSN, {{ health_center.name }}. This is a copy of
+      Printed from {{ system_short_name }}, {{ health_center.name }}. This is a copy of
       {{ patient.full_name }}'s record ({{ patient.patient_id }}) as held at the time of printing;
       the system remains the record of authority.
     </div>

@@ -1,6 +1,6 @@
 ﻿{% extends "base.html" %}
 {% set active_nav = "reports_analytics" %}
-{% block title %}IDS-BPHCSN | Reports &amp; Analytics{% endblock %}
+{% block title %}{{ system_short_name }} | Reports &amp; Analytics{% endblock %}
 
 {% block styles %}
   .page-desc{font-size:14px; color:var(--text-muted); margin-top:4px; max-width:640px;}
@@ -142,7 +142,7 @@
     <div class="print-only print-head">
       <div>
         <div class="print-org-name">{{ health_center.name }}</div>
-        <div class="print-org-sub">Integrated Data System &mdash; IDS-BPHCSN</div>
+        <div class="print-org-sub">{{ system_name }} &mdash; {{ system_short_name }}</div>
       </div>
       <div class="print-doc">
         <div class="print-doc-title">{{ selection.type_label }}</div>
@@ -835,7 +835,7 @@
 
     <div class="print-only print-foot">
       {{ selection.type_label }} &middot; {{ window.start | long_date }} to {{ window.end | long_date }}
-      &middot; generated from {{ health_center.name }} records by IDS-BPHCSN.
+      &middot; generated from {{ health_center.name }} records by {{ system_short_name }}.
       Registrations, appointments, consultations and SMS activity are counted inside this range.
       Medicine stock, the roster breakdowns and the programme memberships are the position as of
       {{ report_date | long_date }} and are marked as such where they appear.

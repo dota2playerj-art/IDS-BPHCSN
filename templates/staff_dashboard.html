@@ -4,7 +4,7 @@
     Doctor from the one route (routes/staff.py says why the two share it). Only
     its name follows the role; every panel on it is the same for both. #}
 {% set dashboard_title = "Doctor Dashboard" if current_role == "doctor" else "Staff Dashboard" %}
-{% block title %}IDS-BPHCSN | {{ dashboard_title }}{% endblock %}
+{% block title %}{{ system_short_name }} | {{ dashboard_title }}{% endblock %}
 
 {% block styles %}
   .stat-card{

@@ -1,7 +1,7 @@
 # IDS-BPHCSN
 
-Integrated Database System for Barangay Poblacion Health Center Services and
-Notifications. A Flask application covering patient records, medicine inventory,
+Integrated Digital System for Barangay Poblacion Health Center Services and
+Community Notifications. A Flask application covering patient records, medicine inventory,
 a daily patient queue and consultations, immunisation tracking, SMS broadcasts,
 reporting, and role-scoped dashboards for the Administrator, Health Center Staff
 and Barangay Official.

@@ -62,6 +62,7 @@ workbook can see that delivery confirmation and programme enrolment are not
 recorded, in the same words the screen uses. (Dispensing history used to be on
 that list and is not any more -- it has a sheet of its own now.)
 """
+import config
 from io import BytesIO
 
 from flask import send_file
@@ -245,13 +246,13 @@ def _document(context, screen, produced_by):
     window = context["report_window"]
     stamped = now()
     exported = stamped.strftime("%B %d, %Y at %I:%M %p")
-    footer_left = f"IDS-BPHCSN · Exported {exported}"
+    footer_left = f"{config.SYSTEM_SHORT_NAME} · Exported {exported}"
     if produced_by:
         footer_left += f" by {produced_by}"
     payload = render(
         sheets,
         org=health_center_name(),
-        org_sub="Integrated Data System (IDS-BPHCSN)",
+        org_sub=f"{config.SYSTEM_NAME} ({config.SYSTEM_SHORT_NAME})",
         doc_title=f"{screen} — {selection['type_label']}",
         range_label=f"{long_date(window['start'])} to {long_date(window['end'])}",
         footer_left=footer_left,
@@ -289,7 +290,7 @@ def _assemble(context, screen, produced_by):
     sheets.append(_not_tracked_sheet(context, sections))
 
     stem = (
-        f"IDS-BPHCSN {screen} - {selection['type_label']} - "
+        f"{config.SYSTEM_SHORT_NAME} {screen} - {selection['type_label']} - "
         f"{window['start'].isoformat()} to {window['end'].isoformat()}"
     )
     return sheets, stem
@@ -331,7 +332,7 @@ def _cover_sheet(context, screen, sections, produced_by):
         ),
         ("Exported", stamped.strftime("%B %d, %Y at %I:%M %p")),
         ("Exported by", produced_by or "—"),
-        ("Source", f"{health_center_name()} records, via IDS-BPHCSN"),
+        ("Source", f"{health_center_name()} records, via {config.SYSTEM_SHORT_NAME}"),
     ]
 
     index = [
@@ -371,8 +372,7 @@ def _cover_sheet(context, screen, sections, produced_by):
             # rename the software, and rewriting this from a setting would
             # produce an expansion whose initials no longer spell the acronym
             # printed beside it.
-            "Integrated Data System for Barangay Poblacion Health Center "
-            "Networking (IDS-BPHCSN).\n"
+            f"{config.SYSTEM_NAME} ({config.SYSTEM_SHORT_NAME}).\n"
             + context["snapshot_note"]
             + "\nEvery sheet says, under its own heading, whether its figures "
             "were counted inside the range or describe the position today."
