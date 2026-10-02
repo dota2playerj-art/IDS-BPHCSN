@@ -243,10 +243,8 @@ UNTRACKED = {
     # names only the half that is still missing, and points at the screen that
     # holds the other half.
     "sms": (
-        "Delivery is not recorded. What is stored is what was handed to the SMS "
-        "gateway, and SMS Notifications counts sends and failures from it. "
-        "Nothing reports back that a handset received a message, so there is no "
-        "delivered figure to chart here."
+        "Delivery is not recorded. Nothing reports back that a phone received a message, so there"
+        " is no delivered figure."
     ),
     # THERE IS NO "dispensing" ENTRY ANY MORE, AND THAT IS THE POINT.
     # It said medicine dispensing is not recorded, that inventory_items holds a
@@ -264,27 +262,19 @@ UNTRACKED = {
     # Dispensed chart, and that dashboard's Medicine column on Recent
     # Consultations.
     "prenatal": (
-        "Prenatal enrolment is not recorded. Nothing marks a patient as pregnant "
-        "or stores an expected delivery date, so active cases, check-ups due and "
-        "expected deliveries cannot be counted. Prenatal Check-up appointments "
-        "are counted under Health Services Availed, which is a record of visits, "
-        "not of who is enrolled."
+        "Prenatal enrolment is not recorded. Prenatal Check-up visits are counted under Health "
+        "Services Availed."
     ),
     "programs": (
-        "Programme enrolment is not recorded. There is no table linking a "
-        "patient to a barangay health programme, so Family Planning, Nutrition "
-        "and TB DOTS have no source at all. The two figures shown beside this "
-        "note are the only programme memberships the data can actually "
-        "establish."
+        "Programme enrolment is not recorded. Only the two memberships shown beside this note can"
+        " be counted."
     ),
     # The last sentence went stale three times because it listed every kind of
     # entry (M6). It now names what the trail covers in general terms, and says
     # plainly that report exports are not part of it.
     "generated_reports": (
-        "Report exports are not recorded. Nothing is written down when a report "
-        "is printed or exported, so there is no history of generated reports to "
-        "list. Audit Logs records changes to patient, clinical, stock and account "
-        "records, sign-ins, settings and SMS broadcasts, but not report exports."
+        "Report exports are not recorded. Audit Logs records changes, sign-ins, settings and SMS "
+        "broadcasts, but not exports."
     ),
 }
 

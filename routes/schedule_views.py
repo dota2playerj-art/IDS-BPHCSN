@@ -172,7 +172,7 @@ def _actor_phrase(actor_id):
     actor = get_user_by_id(actor_id) if actor_id else None
     if actor is None:
         return "an administrator whose account row could not be read"
-    return f'{actor["full_name"]} ("{actor["username"]}", {actor["role"]})'
+    return actor["full_name"]
 
 
 def _audit_view(entry):
@@ -226,10 +226,7 @@ def process_add_entry(form_data, actor_id, ip_address=None):
         details=(
             f'Service schedule entry #{entry["id"]} added by '
             f"{_actor_phrase(actor_id)}; service: \"{entry['service']}\"; "
-            f'days: {entry["days_text"]}; {_note_clause(entry)}; it is shown to '
-            "every role on the Service Schedule and on the Patient Queue on the "
-            "days it runs, and it restricts nothing -- a patient can still be "
-            "checked in and seen on any day"
+            f'days: {entry["days_text"]}; {_note_clause(entry)}'
         ),
         ip_address=ip_address,
     )
@@ -287,7 +284,7 @@ def process_edit_entry(entry_id, form_data, actor_id, ip_address=None):
         ACTION_SCHEDULE_ENTRY_EDITED,
         module=MODULE_SERVICE_SCHEDULE,
         details=(
-            f'Service schedule entry #{entry_id} ("{after["service"]}") edited by '
+            f'Schedule entry #{entry_id} ("{after["service"]}") edited by '
             f"{_actor_phrase(actor_id)}. {count} field{'' if count == 1 else 's'} "
             f"changed — {summary}"
         ),
@@ -319,9 +316,7 @@ def process_delete_entry(entry_id, actor_id, ip_address=None):
         details=(
             f'Service schedule entry #{removed["id"]} deleted by '
             f"{_actor_phrase(actor_id)}; it said: service \"{removed['service']}\"; "
-            f'days: {removed["days_text"]}; {_note_clause(removed)}; it no longer '
-            "appears on the Service Schedule or the Patient Queue, and this entry "
-            "is the only record of what it said"
+            f'days: {removed["days_text"]}; {_note_clause(removed)}'
         ),
         ip_address=ip_address,
     )

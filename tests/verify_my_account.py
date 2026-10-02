@@ -379,13 +379,12 @@ for spec in ROLES:
     check(f"[{name}] entry names the person", spec["full_name"] in details)
     check(f"[{name}] entry names the stored role", spec["role"] in details)
     check(f"[{name}] entry says the holder did it themselves",
-          "changed the password on their own account" in details
-          and "not on their behalf" in details)
-    check(f"[{name}] entry says the current password was verified",
-          "verified against the stored hash" in details)
-    check(f"[{name}] entry distinguishes itself from an administrator's reset",
-          "an administrator replacing this account's password is a different entry"
-          in details)
+          "changed their own password" in details
+          and details.startswith(spec["full_name"]))
+    check(f"[{name}] entry says the old password stopped working",
+          "the old password stopped working" in details)
+    check(f"[{name}] entry is the account holder's own change, not an administrator's reset",
+          entry["action"] == ACTION_PASSWORD_CHANGED_SELF and "reset by" not in details)
     check(f"[{name}] entry carries NEITHER password",
           spec["old"] not in details and spec["new"] not in details)
     check(f"[{name}] no reset entry was written by a self-service change",
@@ -512,7 +511,7 @@ with flask_app.test_client() as client:
     check("[same] re-setting the current password is allowed", response.status_code == 302)
     landed = client.get("/account").get_data(as_text=True)
     check("[same] the flash says the credential is unchanged",
-          "it is the same password you were already using" in landed)
+          "It is the same as your current password" in landed)
 check("[same] the password still works", check_password_hash(
     user_row("staff")["password_hash"], same))
 entry = audit_rows(ACTION_PASSWORD_CHANGED_SELF, user_row("staff")["id"])[-1]
@@ -522,7 +521,7 @@ check("[same] a new entry was written",
 check("[same] the entry does NOT claim the old password stopped working",
       "the previous password stopped working" not in entry["details"])
 check("[same] the entry says the credential is unchanged",
-      "the credential itself is unchanged" in entry["details"])
+      "the new password was the same as the old one" in entry["details"])
 
 print("=" * 78)
 print("PART 7 -- no interference with the Administrator's Reset Password")

@@ -597,7 +597,7 @@ check("D5: no audit entry holds any chief complaint, note, check-in reason or ot
       not [d for d in details if any(t in d for t in FREE_TEXT)],
       [t for d in details for t in FREE_TEXT if t in d])
 edit_entry = q1("SELECT details FROM audit_logs WHERE action = 'Updated consultation record' "
-                "AND details LIKE ? ORDER BY id DESC", (f"Consultation #{CID_CTRL} %",))
+                "AND details LIKE ? ORDER BY id DESC", (f"Consultation #{CID_CTRL},%",))
 check("an edit entry names the field instead: Changed: Diagnosis",
       edit_entry is not None and "Changed: Diagnosis" in edit_entry[0],
       edit_entry[0] if edit_entry else None)

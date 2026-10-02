@@ -326,12 +326,12 @@ def _end_timed_out_session(user, action):
     """Write the audit entry, clear the session, and send the person to sign in."""
     ip_address = request.remote_addr if has_request_context() else None
     if action == ACTION_SESSION_IDLE_TIMEOUT:
-        reason = (f"there was no activity for {IDLE_TIMEOUT_MINUTES} minutes; "
-                  f"last activity at {_clock_time(session.get('last_active'))}")
+        reason = (f"no activity for {IDLE_TIMEOUT_MINUTES} minutes "
+                  f"(last at {_clock_time(session.get('last_active'))})")
         key = SESSION_IDLE_KEY
     else:
-        reason = (f"{ABSOLUTE_TIMEOUT_HOURS} hours had passed since sign-in; "
-                  f"signed in at {_clock_time(session.get('signed_in_at'))}")
+        reason = (f"{ABSOLUTE_TIMEOUT_HOURS} hours since sign-in "
+                  f"({_clock_time(session.get('signed_in_at'))})")
         key = SESSION_EXPIRED_KEY
     log_action(
         user_id=user["id"],
@@ -340,8 +340,7 @@ def _end_timed_out_session(user, action):
         details=(
             f'Session ended for account "{user["username"]}" '
             f'({user["full_name"]}, {user["role"]}), from '
-            f'{ip_address or "an address the request did not carry"}; {reason}; '
-            "the person must sign in again"
+            f'{ip_address or "an unknown address"}; {reason}'
         ),
         ip_address=ip_address,
     )
@@ -385,12 +384,7 @@ def _log_revoked_session(user, ip_address):
             f'Session ended for account "{user["username"]}" '
             f'({user["full_name"]}, {user["role"]}), from '
             f'{ip_address or "an address the request did not carry"}; the '
-            "account was deactivated after this session had already started, so "
-            "the session was cleared on its next guarded request rather than "
-            "being left to run until the holder signed out. The person was told "
-            "only that the credentials were invalid, the same wording the login "
-            "form gives, so nothing was revealed about the account's status. "
-            "Signing in again will be refused while the account stays deactivated"
+            "the account was deactivated, so the session was ended"
         ),
         ip_address=ip_address,
     )
@@ -429,13 +423,7 @@ def _log_self_ended_session(user, ip_address):
             f'Session ended for account "{user["username"]}" '
             f'({user["full_name"]}, {user["role"]}), from '
             f'{ip_address or "an address the request did not carry"}; the '
-            "account holder deactivated their own account from User Management, "
-            "so the session they did it from was ended in that same request. They "
-            "were told on the login form that they had deactivated their own "
-            "account and been signed out. That notice is carried only in this "
-            "browser's signed session and is never shown in answer to a sign-in "
-            "attempt. Signing in again will be refused while the account stays "
-            "deactivated"
+            "the account holder deactivated their own account, so the session was ended"
         ),
         ip_address=ip_address,
     )

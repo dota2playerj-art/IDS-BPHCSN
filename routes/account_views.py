@@ -266,17 +266,10 @@ def process_password_change(form_data, ip_address=None):
                 # renders as one unbroken bullet in the detail panel while every
                 # sign-in beside it reads as a short list.
                 details=(
-                    f'A password change was refused on account '
+                    f'Password change refused for '
                     f'"{user["username"]}" ({user["full_name"]}, '
-                    f'{user["role"]}), from {_address_phrase(ip_address)}; the '
-                    "current password typed on My Account to prove identity did "
-                    "not match the stored hash; nothing was written and the "
-                    "account signs in with exactly what it did before; this came "
-                    "from a session already signed in as this account, which a "
-                    "refused sign-in at the login form is not -- read on its own "
-                    "it says somebody holding this session does not know this "
-                    "account's password; the value supplied is not recorded "
-                    "anywhere, by design"
+                    f'{user["role"]}), from {_address_phrase(ip_address)}; '
+                    "wrong current password; nothing was written"
                 ),
                 ip_address=ip_address,
             )
@@ -325,55 +318,32 @@ def process_password_change(form_data, ip_address=None):
         ACTION_PASSWORD_CHANGED_SELF,
         module=MODULE_AUTH,
         details=(
-            f'{user["full_name"]} changed the password on their own account '
+            f'{user["full_name"]} changed their own password '
             f'"{user["username"]}" ({user["role"]}), from '
-            f"{_address_phrase(ip_address)}; the password the account was already "
-            "signing in with was typed on the form and verified against the "
-            "stored hash before anything was written, so this was done by the "
-            "account holder and not on their behalf -- an administrator "
-            "replacing this account's password is a different entry, which names "
-            "the administrator who did it"
+            f"{_address_phrase(ip_address)}"
             + (
-                "; the new password submitted was the same value the account was "
-                "already using, so the stored hash was replaced but the "
-                "credential itself is unchanged and the account signs in with "
-                "exactly what it did before"
+                "; the new password was the same as the old one"
                 if unchanged_value else
-                "; the previous password stopped working the moment this was "
-                "saved and the account signs in with the new one from now on"
+                "; the old password stopped working"
             )
             + (
-                "; this account had to set its own password before it could use "
-                "any other screen, and that requirement is now met and cleared"
+                "; first change done"
                 if forced else ""
             )
-            + "; the new value met the same strength rule a new account's "
-            "password must meet and is stored only as a salted hash -- neither "
-            "it nor the current password typed to prove identity is recorded "
-            "here, in this entry, or anywhere else in the system, by design; "
-            "nothing else about the account changed -- its username, name, role "
-            "and whether it may sign in are exactly as they were; the session "
-            "this was changed from stays open, because a Flask session names an "
-            "account rather than carrying its credential"
         ),
         ip_address=ip_address,
     )
 
     if unchanged_value:
         message = (
-            "Your password has been saved, and it is the same password you were "
-            "already using — the new one you typed matched your current one. "
-            "Nothing about signing in has changed. This system does not remember "
-            "previous passwords, so re-setting one is allowed; if you meant to "
-            "change it, do it again with a different new password."
+            "Your password was saved. It is the same as your current password, so "
+            "nothing has changed. If you meant to change it, type a different new "
+            "password."
         )
     else:
         message = (
-            "Your password has been changed. You sign in with the new one from "
-            "now on — the old one stopped working the moment you saved this. You "
-            "are still signed in on this device, and nothing else about your "
-            "account changed. The new password is not stored anywhere it can be "
-            "read back, so nobody, including the Administrator, can look it up "
-            "for you later."
+            "Your password has been changed. Use the new one from now on. You are "
+            "still signed in on this device. Nobody can look the new password up, "
+            "so keep it safe."
         )
     return True, None, message

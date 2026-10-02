@@ -272,9 +272,7 @@
               <button type="button" class="sort-option" role="menuitem" data-sort-key="expiry">Expiration Date<span class="dir"></span></button>
               <button type="button" class="sort-option" role="menuitem" data-sort-key="status">Status<span class="dir"></span></button>
               <div class="sort-menu-hint">
-                Choosing the column already in use reverses it. Sorting reorders the
-                whole shelf, so it keeps whatever the search box and Advanced Filter
-                are currently showing &mdash; including whether retired items are among them.
+                Choosing the column already in use reverses it. Sorting keeps the search and filters you have set.
               </div>
             </div>
           </div>
@@ -337,8 +335,7 @@
           <div class="col-12">
             <div style="font-size:12.5px; color:var(--text-muted); line-height:1.5;">
               Filters narrow the {{ items|length }} item{{ '' if items|length == 1 else 's' }} on this page
-              and combine with the search box. An item with no expiry date on file is not returned by an
-              expiry filter, since there is no date to compare.
+              and combine with the search box. Items with no expiry date are not returned by an expiry filter.
             </div>
           </div>
         </div>
@@ -588,8 +585,8 @@
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
-            <p style="margin-bottom:10px;">This changes the item's status only. Nothing is deleted &mdash; the stock figure, batch number and expiry date are kept, and the item stays in this table under the new status.</p>
-            <p style="margin-bottom:10px; font-size:13px; color:var(--text-muted);">A retired item is badged Retired here, left out of all four cards above, and left out of every low-stock figure in the system &mdash; the alert on this screen, both dashboards, the sidebar badge and Reports &amp; Analytics. Marking it Active again restores it everywhere.</p>
+            <p style="margin-bottom:10px;">This changes the item's status only. Nothing is deleted, and the item stays in this table under its new status.</p>
+            <p style="margin-bottom:10px; font-size:13px; color:var(--text-muted);">A retired item is badged Retired and left out of the cards and every low-stock figure. Marking it Active again restores it.</p>
             <p style="margin-bottom:0;">Mark <strong id="archiveMedicineTarget">this item</strong><span id="archiveMedicineCurrent"></span> as:</p>
           </div>
           <div class="modal-footer">

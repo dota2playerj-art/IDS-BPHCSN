@@ -65,21 +65,16 @@ LOCAL_UNTRACKED = {
     # barangay official can act on. The gap it named is unchanged -- there is no
     # residents table and no census import.
     "population": (
-        "Barangay population is not recorded. This system holds registered "
-        "patients only, so there is no barangay-wide figure to measure coverage "
-        "against. The immunisation and senior figures beside this note are "
-        "counted against the patient roster, and are labelled that way."
+        "Barangay population is not recorded. Coverage figures are counted "
+        "against registered patients only."
     ),
     "events": (
-        "Community health events are not recorded. Nothing here stores a "
-        "barangay event, its date or its venue, so an events list would have to "
-        "invent its own. Patient visits are recorded, but they belong to the "
-        "Patient Queue and are not this role's to read."
+        "Community health events are not recorded. Nothing here stores an "
+        "event, its date or its venue."
     ),
     "campaigns": (
-        "Vaccination campaigns are not recorded. Individual doses are -- see "
-        "Immunization Doses Recorded above -- but nothing groups them into a "
-        "named campaign with a target group, a date range or a coverage goal."
+        "Vaccination campaigns are not recorded. Individual doses are, but "
+        "nothing groups them into a named campaign."
     ),
     # The retired Community Announcements screen is project history: it had no
     # store and wrote nothing, which is why broadcasts are the answer. The reader
@@ -90,10 +85,8 @@ LOCAL_UNTRACKED = {
         "lists."
     ),
     "delivery": (
-        "Delivery is never confirmed. What is recorded is what was handed to the "
-        "gateway, which is where the Sent and Failed counts above come from. "
-        "Nothing reports back that a phone received a message, so there is no "
-        "delivered figure."
+        "Delivery is never confirmed. Sent and Failed count what was handed to "
+        "the gateway, not what a phone received."
     ),
     "notifications": (
         "Per-user notifications are not recorded. There is no notifications "
@@ -101,9 +94,7 @@ LOCAL_UNTRACKED = {
         "own alerts."
     ),
     "program_schedule": (
-        "Programme start and end dates are not recorded. Nothing here sets up a "
-        "programme, so a launch date, a closing date, a status and a target "
-        "headcount have nothing to come from. The two memberships below are "
+        "Programme dates are not recorded. The two memberships below are "
         "counted from the patient roster and the dose records."
     ),
     # The source file went; the rule it enforced is the sentence. Note this is
@@ -111,9 +102,8 @@ LOCAL_UNTRACKED = {
     # records any vaccine by name, but not against a schedule, so there is still
     # no coverage figure to report here.
     "non_epi_vaccines": (
-        "Only the DOH EPI infant schedule is counted here. COVID-19 boosters, "
-        "influenza, HPV and tetanus toxoid are not on that schedule, so there is "
-        "no coverage to report for them."
+        "Only the DOH EPI infant schedule is counted here. Other vaccines have "
+        "no coverage figure."
     ),
 }
 

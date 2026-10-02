@@ -606,18 +606,9 @@ def _log_withheld_consultations(patient, withheld, viewer_role):
         action=ACTION_RESTRICTED_WITHHELD,
         module=MODULE_CONFIDENTIALITY,
         details=(
-            f"Patient Profile for {patient['full_name']} "
-            f"({patient['patient_id']}) was rendered for an account holding the "
-            f"role {viewer_role or 'no role'}, which may not read a restricted "
-            f"consultation. {len(withheld)} consultation"
-            f"{'s were' if len(withheld) != 1 else ' was'} withheld — {visits}. "
-            f'Each showed "{RESTRICTED_PLACEHOLDER}" in place of its diagnosis '
-            "and treatment plan; the withheld text was not sent to the browser "
-            "at all, having been removed before the page was built. The visit "
-            "date, vital signs and immunisations on the same records were "
-            "shown as normal. Their chief complaint, additional notes and check-in "
-            "reason were withheld with them, and so were the medicine names for "
-            "any role outside the care team"
+            f"Profile of {patient['full_name']} ({patient['patient_id']}) opened "
+            f"by role {viewer_role or 'no role'}; {len(withheld)} restricted "
+            f"consultation{'s' if len(withheld) != 1 else ''} withheld: {visits}"
         ),
         ip_address=request.remote_addr,
     )

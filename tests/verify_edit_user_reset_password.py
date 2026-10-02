@@ -153,7 +153,7 @@ check("refusal returns 200 with the dialog, not a redirect", r.status_code == 20
 check("the Administrator's role is UNCHANGED in the database",
       row(1)["role"] == "Admin", row(1)["role"])
 check("the refusal explains the lockout",
-      "last Administrator account that can still sign in" in html)
+      "last Administrator who can sign in" in html)
 check("the dialog reopens on account 1",
       "getElementById('editUserModal1')" in html)
 check("no audit entry was written for the refusal",
@@ -177,7 +177,7 @@ check("name change on the last Admin is allowed",
 entry = last_audit(1)[0]
 check("that entry is the plain edit phrase, not a role change",
       entry["action"] == "Edited user account", entry["action"])
-check("it says the role is unchanged", "role is unchanged" in entry["details"])
+check("it does not claim a role change", "ROLE CHANGED" not in entry["details"])
 # put it back
 c.post("/admin/user_management/edit",
        data={"user_id": "1", "full_name": ADMIN_NAME, "role": "Admin"},
@@ -342,7 +342,7 @@ if newid:
     check("the NEW last Administrator is now the one refused",
           row(newid)["role"] == "Admin", row(newid)["role"])
     check("and the refusal explains the lockout",
-          "last Administrator account that can still sign in" in r.get_data(as_text=True))
+          "last Administrator who can sign in" in r.get_data(as_text=True))
     # restore
     c2.post("/admin/user_management/edit",
             data={"user_id": "1", "full_name": ADMIN_NAME, "role": "Admin"},

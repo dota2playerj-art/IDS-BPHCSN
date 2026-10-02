@@ -185,8 +185,7 @@ UNTRACKED = {
     # in" -- which is a fact about the account rather than a gap in the system,
     # and is why it is written in the template rather than kept here.
     "assignment": (
-        "Station and zone assignment is not stored. There is nowhere to record "
-        "it, so an account cannot be placed at the main health center, a purok "
+        "Station and zone assignment is not stored, so an account cannot be placed at a purok "
         "zone or the dispensary."
     ),
     # CORRECTED TWICE, AND THE SECOND TIME BECAUSE THE FIX MADE IT FALSE.
@@ -213,15 +212,11 @@ UNTRACKED = {
     # account is usable the moment it exists and there is no in-between state to
     # record.
     "invitations": (
-        "There is no invitation or activation flow, and no account is ever "
-        "waiting for one. The administrator sets the password when the account "
-        "is created, so it can be signed in to immediately; an account is either "
-        "allowed to sign in or deactivated, with nothing in between."
+        "There is no invitation flow. The administrator sets the password when the account is "
+        "created, and it can sign in at once."
     ),
     "contact": (
-        "An email address and a phone number can be held for an account, but "
-        "nothing in this system ever fills them in and both are empty for every "
-        "account. Contact details were never captured, so there is none to show."
+        "Email and phone are not stored for accounts. Contact details were never captured."
     ),
     # THERE IS NO "search" ENTRY ANY MORE, AND THAT IS THE POINT.
     # It said searching and filtering are not wired, and that three accounts on
@@ -566,9 +561,8 @@ STATUS_ACTIONS = (DEACTIVATE, REACTIVATE)
 # reached while a second active Administrator exists. "The same password" is
 # what reactivate_user() restores, because deactivation never touches the hash.
 SELF_DEACTIVATION_NOTICE = (
-    "You deactivated your own account, so you have been signed out. You cannot "
-    "sign back in until another Administrator reactivates it. Nothing was "
-    "deleted — reactivating it restores the same password."
+    "You deactivated your own account and have been signed out. Another "
+    "Administrator must reactivate it before you can sign in again."
 )
 
 # The fields Add User submits, read into one dict the model validates and the
@@ -610,7 +604,7 @@ def _account_phrase(user):
     One function, so the sentence a person reads and the sentence the trail keeps
     identify the account the same way. `user` is a row or a dict; both index.
     """
-    return f'"{user["username"]}" ({user["full_name"]}, {user["role"]})'
+    return f'"{user["username"]}" ({user["full_name"]})'
 
 
 def _actor_phrase(actor):
@@ -623,7 +617,7 @@ def _actor_phrase(actor):
     """
     if actor is None:
         return "an administrator whose account row could not be read"
-    return f'{actor["full_name"]} ("{actor["username"]}", {actor["role"]})'
+    return actor["full_name"]
 
 
 def process_create_user(form_data, actor_id, ip_address=None):
@@ -661,22 +655,14 @@ def process_create_user(form_data, actor_id, ip_address=None):
         module=MODULE_USERS,
         details=(
             f"Account {_account_phrase(created)} created by {_actor_phrase(actor)}"
-            "; the account is active and can sign in immediately, and the screens "
-            f'its role opens are those listed for {created["role"]} on User '
-            "Management; its password was set directly by the administrator at "
-            "creation and is stored only as a salted hash -- the value itself is "
-            "not recorded here, in this entry, or anywhere else in the system, by "
-            "design; no email address or phone number was captured, because this "
-            "form does not ask for either"
+            f'; role {created["role"]}; the password is not recorded'
         ),
         ip_address=ip_address,
     )
 
     return new_id, None, (
         f'Account "{created["username"]}" created for {created["full_name"]} as '
-        f'{created["role"]}. They can sign in now with the password you set. '
-        "That password is not stored anywhere it can be read back — tell them "
-        "what it is; nobody, including you, can look it up later. "
+        f'{created["role"]}. The password cannot be looked up later. '
         "The user must change this password the first time they sign in."
     )
 
@@ -726,13 +712,8 @@ def process_account_status(form_data, actor_id, ip_address=None):
                 # way round it; one who is told what would break does not.
                 return (
                     f'{user["full_name"]} cannot be deactivated: this is the last '
-                    "Administrator account that can still sign in. Only an "
-                    "Administrator can open User Management, so switching this one "
-                    "off would leave nobody able to create an account, restore "
-                    "one, or undo the change — the system could only be recovered "
-                    "by editing the database file by hand. Create or reactivate "
-                    "another Administrator first, and this account can then be "
-                    "deactivated.",
+                    "Administrator who can sign in. Create or reactivate another "
+                    "Administrator first.",
                     False,
                 )
             if refusal == ALREADY_IN_THAT_STATE:
@@ -746,16 +727,10 @@ def process_account_status(form_data, actor_id, ip_address=None):
             details=(
                 f"Account {phrase} deactivated by {_actor_phrase(actor)}"
                 + (
-                    "; the administrator deactivated their own account, and the "
-                    "session they did it from was ended in the same request"
+                    "; their own account, so their session ended"
                     if acting_on_self else ""
                 )
-                + "; the account is refused at the login form from now on even "
-                "when the password presented is correct, and a session it already "
-                "had open is ended on its next guarded request rather than being "
-                "left to run; nothing was deleted -- the account row, its stored "
-                "password hash and every record it created are unchanged, and "
-                "reactivating it restores the same credential; "
+                + "; sign-in is now refused; "
                 f"{count_active_admins()} Administrator account"
                 f"{'' if count_active_admins() == 1 else 's'} can still sign in"
             ),
@@ -772,10 +747,8 @@ def process_account_status(form_data, actor_id, ip_address=None):
             return SELF_DEACTIVATION_NOTICE, True
 
         return (
-            f'{user["full_name"]}’s account is deactivated. They are refused at '
-            "the login form from now on, even with the correct password, and any "
-            "session they already had open ends on their next click. Nothing was "
-            "deleted — reactivating the account restores the same password.",
+            f'{user["full_name"]}’s account is deactivated. They cannot sign in, '
+            "and any open session ends at their next click. Nothing was deleted.",
             False,
         )
 
@@ -791,9 +764,7 @@ def process_account_status(form_data, actor_id, ip_address=None):
         module=MODULE_USERS,
         details=(
             f"Account {phrase} reactivated by {_actor_phrase(actor)}"
-            "; it can sign in again from now on, using the password it held "
-            "before it was deactivated -- no new password was set and none was "
-            "needed, because deactivation never touched the stored hash; "
+            "; it keeps its old password; "
             f"{count_active_admins()} Administrator account"
             f"{'' if count_active_admins() == 1 else 's'} can now sign in"
         ),
@@ -801,10 +772,8 @@ def process_account_status(form_data, actor_id, ip_address=None):
     )
 
     return (
-        f'{user["full_name"]}’s account is active again. They can sign in with '
-        "the same password they had before it was deactivated — no new password "
-        "was set. If they have forgotten it, it still cannot be looked up, but "
-        "Reset Password on this screen sets them a new one.",
+        f'{user["full_name"]}’s account is active again, with its old password. '
+        "If they forgot it, use Reset Password.",
         False,
     )
 
@@ -955,15 +924,8 @@ def process_edit_user(form_data, actor_id, ip_address=None):
                 )},
                 banner=(
                     f'{user["full_name"]}’s role cannot be changed: this is the '
-                    "last Administrator account that can still sign in. Only an "
-                    "Administrator can open User Management, so moving this "
-                    "account to another role would leave nobody able to create "
-                    "an account, restore one, or undo the change — exactly the "
-                    "lockout that deactivating it is refused for, reached by a "
-                    "different button. The system could then only be recovered "
-                    "by editing the database file by hand. Create another "
-                    "Administrator first, and this account's role can then be "
-                    "changed."
+                    "last Administrator who can sign in. Create another "
+                    "Administrator first."
                 ),
             )), None
         return None, None, "That account could not be found."
@@ -984,26 +946,17 @@ def process_edit_user(form_data, actor_id, ip_address=None):
     # in `details` either way.
     if role_changed:
         role_sentence = (
-            f'; ROLE CHANGED: this account held {_role_phrase(before["role"])} '
-            f'("{before["role"]}") and now holds {_role_phrase(after["role"])} '
-            f'("{after["role"]}") — the screens it can open, and every record it '
-            "can reach, changed with it"
+            "; ROLE CHANGED"
             + (
-                "; the administrator changed their own role, so their own access "
-                "is what moved"
+                "; their own access moved"
                 if acting_on_self
                 else ""
             )
             + f'; {count_active_admins()} Administrator account'
-            f'{"" if count_active_admins() == 1 else "s"} can sign in after this '
-            "change"
+            f'{"" if count_active_admins() == 1 else "s"} can sign in'
         )
     else:
-        role_sentence = (
-            f'; the role is unchanged and remains {_role_phrase(after["role"])} '
-            f'("{after["role"]}"), so nothing about what this account can reach '
-            "has moved"
-        )
+        role_sentence = ""
 
     log_action(
         actor_id,
@@ -1013,10 +966,6 @@ def process_edit_user(form_data, actor_id, ip_address=None):
             f'Account "{after["username"]}" edited by {_actor_phrase(actor)}; '
             f"{summary}"
             + role_sentence
-            + f'; the username "{after["username"]}" is fixed for the life of the '
-            "account and was not changed -- it is what this trail attributes "
-            "every action to; the password was not touched by this edit and the "
-            "account signs in with the credential it already had"
         ),
         ip_address=ip_address,
     )
@@ -1024,10 +973,9 @@ def process_edit_user(form_data, actor_id, ip_address=None):
     message = f'{after["full_name"]}’s account has been updated. {summary}.'
     if role_changed:
         message += (
-            f' The role change takes effect immediately — "{after["username"]}" '
-            f"now reaches exactly the screens listed for "
-            f'{_role_phrase(after["role"])} on this page, and no others. The '
-            "change is recorded in the audit trail with both roles named."
+            f' The role change takes effect now: "{after["username"]}" can open '
+            f'only the screens listed for {_role_phrase(after["role"])}. It is '
+            "recorded in the audit trail."
         )
         if acting_on_self:
             message += (
@@ -1098,24 +1046,14 @@ def process_reset_password(form_data, actor_id, ip_address=None):
                 if acting_on_self
                 else ""
             )
-            + "; the previous password stopped working the moment this was saved "
-            "and the account signs in with the new one from now on; the new value "
-            "was set directly by the administrator, met the same strength rule a "
-            "new account's password must meet, and is stored only as a salted "
-            "hash -- the value itself is not recorded here, in this entry, or "
-            "anywhere else in the system, by design, so nobody including the "
-            "administrator who set it can look it up later; nothing else about "
-            "the account changed -- its username, name, role and whether it may "
-            "sign in are exactly as they were"
+            + "; old password stopped working; new value not recorded"
         ),
         ip_address=ip_address,
     )
 
     message = (
-        f'{user["full_name"]}’s password has been reset. They sign in with the '
-        f'new password from now on — the old one stopped working the moment you '
-        "saved this. That password is not stored anywhere it can be read back — "
-        "tell them what it is; nobody, including you, can look it up later. "
+        f'{user["full_name"]}’s password has been reset. The new password '
+        "cannot be looked up later. "
         "The user must change this password the first time they sign in."
     )
     if acting_on_self:

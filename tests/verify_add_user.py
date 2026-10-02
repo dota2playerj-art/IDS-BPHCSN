@@ -151,9 +151,9 @@ with app.test_client() as admin:
          {"confirm_password": "Ang-Bagong-Klinika-2027"},
          "do not match"),
         ("duplicate username, exact",
-         {"username": "staff"}, "is already taken by another account"),
+         {"username": "staff"}, "is already taken"),
         ("duplicate username, different capitals",
-         {"username": "STAFF"}, "is already taken by another account"),
+         {"username": "STAFF"}, "is already taken"),
     ]
     for label, over, expected in cases:
         r = add(**over)
@@ -232,7 +232,7 @@ with app.test_client() as admin:
     check("its details name the administrator who created it",
           entry and ADMIN_NAME in entry["details"], ADMIN_NAME)
     check("its details say the password was stored hashed",
-          entry and "salted hash" in entry["details"])
+          entry and "the password is not recorded" in entry["details"])
     check("THE PASSWORD IS NOWHERE IN THE AUDIT ENTRY",
           entry and NEW_PW not in entry["details"],
           "the plaintext password reached the audit trail")
@@ -316,10 +316,8 @@ with app.test_client() as admin:
                    follow_redirects=True)
     page = text_of(r)
     check("THE ATTEMPT TO DEACTIVATE THE LAST ADMINISTRATOR IS REFUSED",
-          "cannot be deactivated" in page and "last Administrator account" in page,
+          "cannot be deactivated" in page and "last Administrator who can sign in" in page,
           page[:200])
-    check("the refusal explains what would break",
-          "leave nobody able to create an account" in page)
     check("the refusal says how to get past it",
           "Create or reactivate another Administrator first" in page)
 
@@ -335,7 +333,7 @@ with app.test_client() as admin:
 
     r = admin.get("/admin/user_management")
     check("the Administrator's Deactivate button is disabled on the screen",
-          "last Administrator account that can still sign in" in text_of(r))
+          "last Administrator who can sign in" in text_of(r))
 
     # -----------------------------------------------------------------------
     # 6. Deactivating a NON-administrator succeeds
@@ -363,7 +361,7 @@ with app.test_client() as admin:
           entry and '"mdelacruz"' in entry["details"]
           and ADMIN_NAME in entry["details"])  # STALE-FIX: persona, see above
     check("its details say the stored password was not touched",
-          entry and "restores the same credential" in entry["details"])
+          entry and "sign-in is now refused" in entry["details"])
     check("its details report how many Administrators remain",
           entry and "Administrator account" in entry["details"]
           and "can still sign in" in entry["details"])
@@ -404,7 +402,7 @@ conn.close()
 check("the blocked sign-in was audited against the new account",
       blocked and blocked["user_id"] == NEW_ID)
 check("the entry records that the password presented was correct",
-      blocked and "this credential still works" in blocked["details"])
+      blocked and "the password was correct" in blocked["details"])
 check("the blocked entry does not carry the password",
       blocked and NEW_PW not in blocked["details"])
 
@@ -424,7 +422,7 @@ with app.test_client() as admin:
     page = text_of(r)
     check("the account is reactivated", "account is active again" in page, page[:200])
     check("the message says the old password still works",
-          "same password they had before" in page)
+          "with its old password" in page)
 
     conn = db()
     check("the flag is cleared in the database",
@@ -437,7 +435,7 @@ with app.test_client() as admin:
     check("the reactivation was audited", entry is not None)
     check("it is attributed to the acting administrator", entry and entry["user_id"] == 1)
     check("its details say no new password was set",
-        entry and "no new password was set" in entry["details"])
+        entry and "keeps its old password" in entry["details"])
 
     r = admin.post("/admin/user_management/status",
                    data={"user_id": str(NEW_ID), "action": "reactivate"},
@@ -497,9 +495,8 @@ with app.test_client() as admin:
     # properties the fix must keep: no ?error= on the redirect (anyone can type
     # that), no identity left in the session, and the notice shown once only.
     SELF_NOTICE = (
-        "You deactivated your own account, so you have been signed out. You cannot "
-        "sign back in until another Administrator reactivates it. Nothing was "
-        "deleted — reactivating it restores the same password."
+        "You deactivated your own account and have been signed out. Another "
+        "Administrator must reactivate it before you can sign in again."
     )
     r = admin.post("/admin/user_management/status",
                    data={"user_id": "1", "action": "deactivate"},
@@ -531,7 +528,7 @@ with app.test_client() as admin:
         "ORDER BY id DESC LIMIT 1").fetchone()[0]
     conn.close()
     check("the entry notes the administrator deactivated their own account",
-          "deactivated their own account" in entry)
+          "their own account" in entry)
 
     # The session is revoked on the next guarded request. (Since the DEFECT-FIX
     # above it was already cleared by the deactivating request; this still proves

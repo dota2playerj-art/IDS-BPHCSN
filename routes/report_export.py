@@ -475,11 +475,8 @@ def _not_tracked_sheet(context, sections):
                empty="Nothing in this report has an untracked figure.")],
         heading="Not Tracked",
         intro=(
-            "These are stated on the screens this report came from and are "
-            "carried into the export deliberately. A figure with no data source "
-            "reports its own absence rather than being filled with a plausible "
-            "number -- an invented one is worse than a blank, because it will be "
-            "read into an RHU or DOH submission and believed."),
+            "These gaps are stated on the screens and carried into the export. "
+            "A figure with no data is shown as absent, never filled in."),
     )
 
 
@@ -614,9 +611,7 @@ def _registrations(context):
     return [
         _trend_block("New patient registrations, by month", trend,
                      [("Registrations", "count")],
-                     note=("The first and last months are clipped to the range, so a "
-                           "part month is a part month here. The bars therefore sum to "
-                           "the range total below rather than to whole calendar months.")),
+                     note="The first and last months are clipped to the range, so the bars add up to the range total."),
         figures("Registration totals", rows),
     ]
 
@@ -655,10 +650,8 @@ def _diagnoses(context):
             "Most common diagnoses recorded in this range",
             consultations["window"]["top_diagnoses"], "label", "count",
             ("Diagnosis", "Consultations"),
-            note=("Ranked from this range's consultations only. Diagnosis is prose a "
-                  "health worker typed and is not coded against ICD or any other "
-                  "classification this system holds, so entries are grouped ignoring "
-                  "case and two spellings of one condition count separately."
+            note=("Ranked from this range's consultations. Diagnoses are typed text, so two "
+                  "spellings of one condition count separately."
                   + _ranking_note(consultations, "top_diagnoses", "diagnoses")),
             empty=_ranking_empty(consultations),
         ),
@@ -666,7 +659,8 @@ def _diagnoses(context):
             "Most common presenting complaints in this range",
             consultations["window"]["top_complaints"], "label", "count",
             ("Complaint", "Consultations"),
-            note=("Ranked from this range's consultations only."
+            note=(("Ranked from this range's consultations. Diagnoses are typed text, so two "
+                   "spellings of one condition count separately.")
                   + _ranking_note(consultations, "top_complaints", "complaints")),
             empty="No consultation was written up in this range.",
         ),
@@ -698,9 +692,9 @@ def _concerns(context):
     other_only = conditions["other_only"]
     other_only_shown = conditions["other_only_shown"]
     basis = (
-        "Counted from the registration form's own condition list. A patient with "
-        "two conditions is counted under each, so these do not sum to the "
-        f"{conditions['cohort_size']} patients on the register."
+        "Counted from the registration form's condition list. A patient with two "
+        "conditions is counted under each, so these do not add up to the "
+        f"{conditions['cohort_size']} patients."
     )
     if other_only:
         basis += (
@@ -829,12 +823,8 @@ def _vaccination(context):
              f"{coverage['doses_reported']} reported as given elsewhere"),
             ("Patients with at least one dose", coverage["enrolled"],
              "The only reading of programme membership the data supports"),
-        ], note=("The coverage figures above count every dose a child has had, "
-                 "wherever it was given -- a child vaccinated at another "
-                 "hospital is protected and is not behind the schedule. These "
-                 "dose counts are the health center's own activity, so the two "
-                 "kinds are reported separately and never summed into one "
-                 "\"doses given\".")),
+        ], note=("Coverage counts every dose a child has had, wherever it was given. "
+                 "These dose counts are this health center's own work, so the two are never added together.")),
     ]
 
 
@@ -978,9 +968,8 @@ def _dispensing(context):
               [[entry["medicine_name"], entry["units"], entry["unit"] or "",
                 entry["events"]]
                for entry in scoped["all_medicines"]],
-              note="Ranked by units dispensed inside the selected range, most "
-                   "first. Named as the dispensing records name them. An item "
-                   "renamed part way through a range appears under both names."
+              note="Ranked by units dispensed in the range, most first. An item renamed in the "
+                   "range appears under both names."
                    + (" Items dispensed at Restricted consultations are counted "
                       "under Confidential and not named."
                       if any(e.get("confidential") for e in scoped["all_medicines"])

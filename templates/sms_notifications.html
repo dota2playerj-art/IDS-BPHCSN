@@ -425,9 +425,7 @@
 {% if latest.is_simulated %}
           <div class="unavailable-note" style="margin-top:0;">
             <strong>This broadcast was not transmitted.</strong>
-            It was composed, addressed and recorded exactly as a live send would be, but
-            no key for the messaging service was set at the time, so nothing was
-            sent to it. Setting that key makes the next broadcast live.
+            It was recorded exactly as a live send would be, but no key was set, so nothing was sent. Setting the key makes the next broadcast live.
           </div>
 {% endif %}
 
@@ -498,9 +496,7 @@
             <div>
               <div class="detail-title">Individual appointment messages</div>
               <div class="detail-sub">
-                One message to one patient about their own booking, sent by hand when this
-                system still booked visits ahead. Advance booking was retired, so nothing
-                adds to this list &mdash; it is a closed record, kept because it happened.
+                One message to one patient about their own booking, sent when this system still booked ahead. Booking was retired, so this list is closed.
               </div>
             </div>
 {%- if appointment_sms %}
@@ -556,9 +552,7 @@
             </table>
           </div>
           <div class="panel-note">
-            &ldquo;Sent&rdquo; means the messaging service accepted the message. This system
-            receives no delivery reports, so no message here is ever marked delivered &mdash;
-            the same limit the broadcast history above states.
+            &ldquo;Sent&rdquo; means the messaging service accepted the message. No delivery reports are received, so nothing is marked delivered.
           </div>
 {% else %}
           <!-- Nothing is invented to fill this table; the history starts with the
@@ -569,9 +563,7 @@
             </div>
             <h5>No appointment messages sent yet</h5>
             <p>
-              No patient was ever texted about their own appointment from this system.
-              These messages were offered after a booking was made, moved or cancelled;
-              advance booking has been retired, so this list stays empty.
+              No patient was texted about their own appointment from this system. Booking has been retired, so this list stays empty.
             </p>
           </div>
 {% endif %}
@@ -608,11 +600,8 @@
                 <span id="counterSegments">0 segments</span>
               </div>
               <div class="form-text-hint" id="counterHint">
-                A GSM-7 message fits {{ sms_limits.gsm_single }} characters in one segment
-                ({{ sms_limits.gsm_concatenated }} per part once it is split). One character
-                outside that alphabet &mdash; an emoji, a curly quote, an ellipsis &mdash; puts the
-                whole message into UCS-2, where a segment holds only {{ sms_limits.unicode_single }}.
-                Each segment is one message credit per recipient.
+                A message fits {{ sms_limits.gsm_single }} characters in one segment ({{ sms_limits.gsm_concatenated }} per part once split).
+                An emoji or curly quote makes it UCS-2, with only {{ sms_limits.unicode_single }} per segment.
               </div>
 
               <div class="row g-3 mt-1">

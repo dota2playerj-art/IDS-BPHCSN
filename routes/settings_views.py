@@ -387,7 +387,7 @@ def process_general_settings(form_data, actor_id, ip_address=None):
 
     actor = get_user_by_id(actor_id) if actor_id else None
     actor_phrase = (
-        f'{actor["full_name"]} ("{actor["username"]}", {actor["role"]})'
+        actor["full_name"]
         if actor is not None else
         "an administrator whose account row could not be read"
     )
@@ -398,15 +398,6 @@ def process_general_settings(form_data, actor_id, ip_address=None):
         module=MODULE_SETTINGS,
         details=(
             f"General Settings saved by {actor_phrase}: {describe_changes(changed)}"
-            ". These six values are read by the rest of the system rather than "
-            "only displayed: the health center's name is the heading on every "
-            "PDF and Excel export and the first thing in every SMS the barangay "
-            "sends, the barangay, municipality and province make up the "
-            "address those exports and the sign-in page print, and the opening "
-            "and closing times are the hours the health center publishes as its "
-            "own. Messages already sent and files already downloaded are "
-            "unaffected; they carry the values that were in force when they "
-            "were produced"
         ),
         ip_address=ip_address,
     )
@@ -452,7 +443,7 @@ def log_backup_download(actor_id, size, filename, ip_address=None):
     """
     actor = get_user_by_id(actor_id) if actor_id else None
     actor_phrase = (
-        f'{actor["full_name"]} ("{actor["username"]}", {actor["role"]})'
+        actor["full_name"]
         if actor is not None else
         "an administrator whose account row could not be read"
     )
@@ -462,19 +453,8 @@ def log_backup_download(actor_id, size, filename, ip_address=None):
         ACTION_BACKUP_DOWNLOADED,
         module=MODULE_SETTINGS,
         details=(
-            f"{actor_phrase} downloaded a backup of the database as "
-            f'"{filename}" ({format_size(size)}). The file is a complete copy of '
-            "every record this system holds — every patient, consultation, "
-            "immunisation, appointment, stock movement, SMS broadcast, audit "
-            "entry and user account — taken with SQLite's own online backup "
-            "interface while the system was running, and checked with PRAGMA "
-            "integrity_check before it was sent. The file is encrypted with this "
-            "system's key and opens only with restore_backup.py on a computer "
-            "that has the key. Account passwords are in it "
-            "only as the salted hashes they are stored as; nothing in the file "
-            "reveals a password. The copy now exists outside this system and "
-            "cannot be recalled or tracked from here, which is why the download "
-            "is recorded even though it changed no record"
+            f'{actor_phrase} downloaded a backup ("{filename}", '
+            f"{format_size(size)}); a copy now exists outside this system"
         ),
         ip_address=ip_address,
     )
@@ -586,52 +566,38 @@ def process_maintenance_mode(form_data, actor_id, ip_address=None):
 
     actor = get_user_by_id(actor_id) if actor_id else None
     actor_phrase = (
-        f'{actor["full_name"]} ("{actor["username"]}", {actor["role"]})'
+        actor["full_name"]
         if actor is not None else
         "an administrator whose account row could not be read"
     )
 
     if enabling:
         consultation_note = (
-            f'; a consultation was in progress at the time -- '
+            f'; consultation in progress: '
             f'{active["first_name"]} {active["last_name"]} '
-            f'({active["patient_reference"]}), appointment '
-            f'{active["reference"]} -- and the staff member holding it cannot '
-            "write it up until the system is reopened, so the appointment stays "
-            "In Consultation and no other patient can be brought in meanwhile"
+            f'({active["patient_reference"]}), {active["reference"]}'
             if active is not None else
-            "; no consultation was in progress at the time"
+            "; no consultation in progress"
         )
         log_action(
             actor_id,
             ACTION_MAINTENANCE_ENABLED,
             module=MODULE_SETTINGS,
             details=(
-                f"Maintenance mode turned ON by {actor_phrase}. Doctor, Health "
-                "Center Staff and Barangay Official accounts are refused on every "
-                "screen and at the sign-in form for as long as it stays on, and "
-                "are shown a page saying the system is temporarily closed rather "
-                "than being signed out — their sessions are left intact, so they "
-                "resume where they were when it is turned off. Administrator "
-                "access is unaffected, which is what guarantees the system can "
-                "be reopened. Nothing is recorded when a blocked person is "
-                "turned away; this entry and the matching one that reopens the "
-                f"system are the whole record of the window{consultation_note}"
+                f"Maintenance mode turned ON by {actor_phrase}; only "
+                f"Administrators can use the system{consultation_note}"
             ),
             ip_address=ip_address,
         )
         if active is not None:
             return (
-                "Maintenance mode is ON. Only Administrators can use the system "
-                f'now. Note that {active["first_name"]} {active["last_name"]} is '
-                "still In Consultation — the staff member with them cannot "
-                "complete that record until you turn this off."
+                "Maintenance mode is ON. Only Administrators can use the system. "
+                f'{active["first_name"]} {active["last_name"]} is still In '
+                "Consultation, and cannot be completed until you turn this off."
             )
         return (
-            "Maintenance mode is ON. Only Administrators can use the system now. "
-            "Everyone else sees a page saying it is temporarily closed; they stay "
-            "signed in and resume where they were when you turn it off. Your own "
-            "access is unaffected."
+            "Maintenance mode is ON. Only Administrators can use the system. "
+            "Everyone else sees a closed page and stays signed in."
         )
 
     log_action(
@@ -639,17 +605,12 @@ def process_maintenance_mode(form_data, actor_id, ip_address=None):
         ACTION_MAINTENANCE_DISABLED,
         module=MODULE_SETTINGS,
         details=(
-            f"Maintenance mode turned OFF by {actor_phrase}. Doctor, Health Center "
-            "Staff and Barangay Official accounts can sign in and use every screen "
-            "their role admits them to again, with immediate effect: the check "
-            "runs on each request rather than at sign-in, so anyone who was "
-            "sitting on the maintenance page is back at work on their next "
-            "click without signing in again"
+            f"Maintenance mode turned OFF by {actor_phrase}; every role can use the "
+            "system again"
         ),
         ip_address=ip_address,
     )
     return (
-        "Maintenance mode is OFF. Doctors, Health Center Staff and Barangay Officials can "
-        "use the system again — anyone still holding the maintenance page is back "
-        "at work on their next click, without signing in again."
+        "Maintenance mode is OFF. Doctors, Health Center Staff and Barangay Officials can use the"
+        " system again."
     )

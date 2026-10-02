@@ -318,9 +318,7 @@
         </div>
         <div class="st-body">Walk-ins for anything else are checked in and seen as usual.</div>
 {%- elif st.total == 0 %}
-        <div class="st-body">No service days have been entered yet, so this cannot say what runs
-          today. The Administrator enters them on the Service Schedule once the health center
-          confirms them. Patients are checked in and seen as they arrive either way.</div>
+        <div class="st-body">No service days have been entered yet. The Administrator enters them on the Service Schedule. Patients are seen as they arrive either way.</div>
 {%- else %}
         <div class="st-body">Nothing on the service schedule runs on this {{ st.date.strftime('%A') }}.
           Patients are checked in and seen as usual.</div>

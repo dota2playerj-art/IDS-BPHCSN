@@ -422,10 +422,9 @@ KEPT = [
     "Tick what was given today",
     "Other Vaccinations on",
     "dose number only where the vaccine has one",
-    "comes off Medicine Inventory immediately",
-    "Dispensing History on",
-    "One line per item with the whole amount given",
-    "refused outright if the amount is more than the shelf holds",
+    "comes off Medicine Inventory at once",
+    "Dispensing History",
+    "refused if the shelf holds less",
     "the item has expired",
 ]
 for phrase in KEPT:

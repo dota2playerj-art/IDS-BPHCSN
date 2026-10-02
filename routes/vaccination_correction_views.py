@@ -361,9 +361,8 @@ KINDS = {
         ),
         "submitted_label": _epi_corrected_label,
         "duplicate": (
-            "{patient} already has {label} recorded. One patient cannot hold the "
-            "same dose of the same vaccine twice — correct that record instead, "
-            "or choose a different dose."
+            "{patient} already has {label} recorded. Correct that record, or choose a different "
+            "dose."
         ),
         # The field the duplicate message tells the operator to change.
         "duplicate_field": VACCINE_FIELD,
@@ -379,9 +378,8 @@ KINDS = {
         ),
         "submitted_label": _general_corrected_label,
         "duplicate": (
-            "{patient} already has {label} recorded on that date. The same "
-            "vaccine, to the same patient, on the same day is one event — "
-            "correct that record instead, or check the date."
+            "{patient} already has {label} recorded on that date. Correct that record, or check "
+            "the date."
         ),
         "duplicate_field": DATE_FIELD,
     },
@@ -606,8 +604,7 @@ def process_vaccination_correction(form_data, user_id, ip_address=None):
     )
     details = (
         f"{spec['noun']} #{record_id} for {patient['full_name']} "
-        f"({patient['patient_id']}), originally recorded by "
-        f"{before_record['administered_by_name']}{anchor}. {len(changed)} field"
+        f"({patient['patient_id']}){anchor}. {len(changed)} field"
         f"{'s' if len(changed) != 1 else ''} corrected — {summary}"
     )
     log_action(

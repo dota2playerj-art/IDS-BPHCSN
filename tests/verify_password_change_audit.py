@@ -108,13 +108,13 @@ with app.test_client() as c:
     # entry renders as one unbroken bullet beside sign-ins that read as lists.
     from routes.audit_views import _split_details
     lead, changes, notes = _split_details(d)
-    ck("parses into a lead and several notes", bool(lead) and len(notes) >= 4)
+    ck("parses into a lead and several notes", bool(lead) and len(notes) >= 2)
     ck("no clause is mistaken for a field change", changes == [])
     ck("the lead names the account", '"admin"' in lead)
     ck("no note holds a password",
        not any(WRONG in n or NEWPW in n for n in notes))
-    ck("details say the value is not recorded",
-       "the value supplied is not recorded anywhere, by design" in d)
+    ck("details say the current password was wrong",
+       "wrong current password" in d)
 
     # ---- THE PROHIBITION ------------------------------------------------
     for probe in (WRONG, NEWPW, _support.PASSWORDS["admin"]):

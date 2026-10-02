@@ -143,13 +143,7 @@
          replaced by the note below, which states what this screen actually is. -->
     <div class="scope-note">
       <strong>Some of this screen is live, and each pane says which it is.</strong>
-      <strong style="display:inline; font-weight:600;">General Settings</strong> is saved and read
-      back — the health center's name, where it stands and the hours it keeps are stored here and
-      used by the rest of the system. Password Policy, the sign-in figures under
-      Security Settings, the database rows under Backup &amp; Restore and About System are read from
-      what this system actually does, on every load, and are not editable anywhere.
-      Every remaining field is a control for a feature this system does not have. Each one says so on
-      itself when you hover it, and the pane it sits in says what is missing.
+      <strong style="display:inline; font-weight:600;">General Settings</strong> is saved and used across the system. The other panes are read from what the system does.
     </div>
     <!-- SETTINGS PANEL -->
     <div class="panel-card">
@@ -285,10 +279,8 @@
               </div>
               <div class="form-text-hint" style="margin-top:8px;">
                 Currently {{ general.opening_label }} to {{ general.closing_label }}.
-                These are the hours the health center publishes as its own &mdash; they appear on exports and
-                printed records. Patients are seen in the order they arrive, so nothing is booked against
-                them and no visit is refused for falling outside them. The day must still be at least
-                30 minutes long.
+                These hours appear on exports and printed records. They do not limit visits. The day must be at least 30 minutes long.
+              
               </div>
 
               <div class="pane-actions">
@@ -297,7 +289,7 @@
 {%- if general.saved_at %}
                   Last saved {{ general.saved_at }}{% if general.saved_by %} by {{ general.saved_by }}{% endif %}.
 {%- else %}
-                  <span title="No row has been written to the settings table yet. The values above are the defaults in models/settings.py &mdash; the same values the application used as constants before this screen could store anything.">Never saved; these are the system&#39;s defaults.</span>
+                  <span title="No settings have been saved yet. The values above are the defaults.">Never saved; these are the system&#39;s defaults.</span>
 {%- endif %}
                 </div>
                 <button type="submit" class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">save</span>Save General Settings</button>
@@ -314,8 +306,7 @@
                 <div><span class="gw-title">{{ sms_mode }}</span></div>
               </div>
               <div class="scope-note">
-                The provider is Semaphore. Its key is read from the server (SEMAPHORE_API_KEY), not from this screen.
-                Every broadcast is recorded in SMS Notifications either way.
+                The provider is Semaphore. Its key is read from the server (SEMAPHORE_API_KEY). Every broadcast is recorded either way.
               </div>
             </div>
 
@@ -335,14 +326,14 @@
               <div class="fact-row">
                 <div>
                   <div class="fact-label">Every screen checks the role that opens it</div>
-                  <div class="fact-desc">Not only the sidebar: each route carries its own guard, so a link typed by hand into the address bar is refused the same way a hidden menu item would have been. User Management lists what each role may open, read off those same guards.</div>
+                  <div class="fact-desc">Each route has its own guard, so a link typed by hand is refused too. User Management lists what each role may open.</div>
                 </div>
                 <div class="fact-value" style="color:#15803D;">Enforced</div>
               </div>
               <div class="fact-row">
                 <div>
                   <div class="fact-label">A deactivated account loses its session at the next click</div>
-                  <div class="fact-desc">The account is re-read on every guarded request rather than only at sign-in, so switching an account off on User Management ends the session its holder is already using instead of waiting for them to log out.</div>
+                  <div class="fact-desc">The account is checked on every request, so switching it off ends a session already in use.</div>
                 </div>
                 <div class="fact-value" style="color:#15803D;">Enforced</div>
               </div>
@@ -382,12 +373,7 @@
                 {%- endif %}
               </div>
                             <div class="form-text-hint" style="margin-top:10px;">
-                A refused sign-in records the account, the time and the address.
-                The password is never recorded.
-                An attempt on a username that does not exist is not recorded at all.
-                Signing out is not recorded either, so these are sign-in counts, not sessions.
-                A deactivated account is refused even when the password is correct,
-                and the entry says so.
+                A refused sign-in records the account, the time and the address, never the password. Signing out is not recorded.
               </div>
             </div>
 
@@ -398,9 +384,8 @@
 
               <div class="scope-note" style="margin-top:0;">
                 <strong>This is a display, not a setting.</strong>
-                Nothing on this pane can be changed here or anywhere else in the system &mdash; the rule is
-                part of how the application works, and it is shown here read from the code that enforces it
-                rather than described separately. It applies on
+                Nothing on this pane can be changed. The rule is read from the code that enforces it. It applies on
+                
                 <a href="{{ url_for('admin.user_management') }}">User Management</a>, to both Add User and Reset Password.
               </div>
 
@@ -429,14 +414,14 @@
               <div class="fact-row">
                 <div>
                   <div class="fact-label">Must not contain the username or the person&#39;s name</div>
-                  <div class="fact-desc">Checked without regard to capitals, against the username and against each part of the full name of {{ password_policy.min_banned_word }} letters or more. Shorter parts are skipped: banning a two-letter particle would refuse ordinary words for containing it.</div>
+                  <div class="fact-desc">Checked without regard to capitals, against the username and each part of the full name of {{ password_policy.min_banned_word }} letters or more.</div>
                 </div>
                 <div class="fact-value">Enforced</div>
               </div>
               <div class="fact-row">
                 <div>
                   <div class="fact-label">Must not be a commonly-guessed password</div>
-                  <div class="fact-desc">Compared after lower-casing and after stripping digits and punctuation off the end, so &ldquo;password2026&rdquo; is refused by the same entry as the bare word. The list is short and is not pretending otherwise &mdash; a real deployment would check against a downloaded corpus of the most common few hundred thousand.</div>
+                  <div class="fact-desc">Compared after lower-casing and removing digits and punctuation from the end, so &ldquo;password2026&rdquo; is refused too. The list is short.</div>
                 </div>
                 <div class="fact-value">{{ password_policy.blocklist_size }} entries</div>
               </div>
@@ -470,10 +455,7 @@
 
               <div class="scope-note" style="margin-top:0;">
                 <strong>Download Backup takes a real copy, right now.</strong>
-                It uses SQLite&#39;s own backup interface rather than copying the file, so it is safe to press
-                while other people are using the system, and the copy is checked before it is sent.
-                What you get is one file containing every record this system holds. Keep it somewhere safe:
-                it holds patient records, and this system cannot track it once it leaves.
+                It is safe to press while others use the system, and the copy is checked before it is sent. Keep it safe: it holds patient records.
               </div>
               <div class="scope-note">
                 <span class="material-symbols-outlined" style="font-size:16px; vertical-align:-3px;">lock</span>
@@ -493,7 +475,7 @@
 {%- if backup.last_at %}
                 <div class="backup-value">{{ backup.last_at }}{% if backup.last_by %} <span style="color:var(--text-muted); font-weight:400;">&middot; {{ backup.last_by }}</span>{% endif %}</div>
 {%- else %}
-                <div class="backup-value" style="color:var(--text-muted);" title="No download has been recorded. Copies made by hand outside the application are not visible to this system, so this row is only about backups taken from this button.">None yet</div>
+                <div class="backup-value" style="color:var(--text-muted);" title="No download has been recorded. Copies made by hand are not visible to this system.">None yet</div>
 {%- endif %}
               </div>
               <div class="backup-row">
@@ -503,7 +485,7 @@
 
               <div class="d-flex gap-2 flex-wrap" style="margin-top:20px;">
                 <a class="btn-primary-teal" href="{{ url_for('admin.download_backup') }}" download
-                   title="Take a copy of the database now and download it. Safe to press while the system is in use — the copy is made through SQLite's own backup interface and checked before it is sent. The download is recorded in Audit Logs.">
+                   title="Take a copy of the database now and download it. Safe while the system is in use. The download is recorded in Audit Logs.">
                   <span class="material-symbols-outlined" style="font-size:18px;">download</span>Download Backup
                 </a>
               </div>
@@ -519,10 +501,7 @@
                 <div>
                   <div class="toggle-row-label">Maintenance Mode</div>
                   <div class="toggle-row-desc" style="max-width:560px;">
-                    Temporarily restrict access to Administrators only. Doctors, Health Center Staff
-                    and Barangay Officials are shown a page saying the system is briefly closed &mdash;
-                    they stay signed in and resume where they were when it is turned off.
-                    Your own access is never affected.
+                    Restrict access to Administrators only. Others see a closed page, stay signed in, and resume when you turn it off.
                   </div>
                 </div>
 {%- if maintenance.on %}
@@ -538,10 +517,7 @@
                 <div>
                   <strong>A consultation is in progress right now</strong>
                   {{ maintenance.in_consultation }}{% if maintenance.in_consultation_reference %} ({{ maintenance.in_consultation_reference }}){% endif %}
-                  is In Consultation. Turning maintenance mode on stops the staff member with them
-                  from writing that visit up until you turn it off, and no other patient can be
-                  brought in meanwhile. Nothing is lost either way &mdash; the record stays open
-                  and can be completed as soon as the system reopens.
+                  is In Consultation. Turning maintenance on stops that visit being written up until you turn it off. Nothing is lost.
                 </div>
               </div>
 {%- endif %}

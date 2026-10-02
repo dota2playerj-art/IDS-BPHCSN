@@ -609,11 +609,8 @@
             <span class="material-symbols-outlined">lock</span>
             <div>
               <strong>{{ withheld_count }} of these consultation{{ 's' if consultations|length != 1 else '' }} {{ 'are' if withheld_count != 1 else 'is' }} Restricted</strong>
-              The Doctor has marked {{ 'them' if withheld_count != 1 else 'it' }} as holding sensitive medical
-              information, so its diagnosis, treatment plan, chief complaint, additional notes and
-              check-in reason are not shown to your role and are not part of this page. The date,
-              the vital signs and any vaccinations given for {{ 'those visits' if withheld_count != 1 else 'that visit' }}
-              are shown in full.
+              The Doctor has marked {{ 'them' if withheld_count != 1 else 'it' }} as sensitive, so its written text is not shown to your role.
+              The date, vital signs and vaccinations for {{ 'those visits' if withheld_count != 1 else 'that visit' }} are shown in full.
 {%- if not may_see_sealed_medicines %} The names of medicines dispensed at {{ 'those visits' if withheld_count != 1 else 'that visit' }} are not shown either.{% endif %}
               This view has been recorded in the audit log.
             </div>
@@ -840,19 +837,13 @@
 {%- if may_view_restricted %}
                             <strong>This consultation is Restricted</strong>
                             You are seeing it in full. Health Center Staff, BHWs and the Administrator see
-                            &ldquo;{{ restricted_placeholder }}&rdquo; where the chief complaint, diagnosis,
-                            treatment plan and additional notes are above. The vital signs and doses on this
-                            panel are visible to them.
+                            &ldquo;{{ restricted_placeholder }}&rdquo; in place of the written text, but can see the vital signs and doses.
 {%- if consultation.restricted_by_name %}
                             Marked by {{ consultation.restricted_by_name }}{% if consultation.restricted_at %} on {{ consultation.restricted_at | display_date }}{% endif %}.
 {%- endif %}
 {%- else %}
                             <strong>The written text of this visit is restricted</strong>
-                            The Doctor has marked this consultation as holding sensitive medical
-                            information, so its chief complaint, diagnosis, treatment plan and additional
-                            notes are withheld from your role and are not part of this page. The vital signs
-                            and any doses given here are the complete record. Ask the Doctor if you need the
-                            assessment itself.
+                            The Doctor has marked this consultation as sensitive, so its written text is not shown to your role. The vital signs and doses are shown.
 {%- endif %}
                           </div>
                         </div>
@@ -950,10 +941,7 @@
             </table>
           </div>
           <div style="font-size:12px; color:var(--text-muted); margin-top:16px; padding-top:12px; border-top:1px dashed var(--border-color);">
-            Every line was recorded during a consultation and came off Medicine Inventory
-            &mdash; medicine given to the patient, and supplies or equipment used during the
-            visit. This is what actually left the shelf, not a prescription &mdash; there is
-            no course or refill date here.
+            Each line was recorded at a consultation and came off Medicine Inventory: medicine, supplies or equipment used. It is what left the shelf, not a prescription.
           </div>
 {%- else %}
           <div class="empty-state">
@@ -1309,8 +1297,7 @@
             </div>
 {%- else %}
             <div style="border-radius:12px; border:1px dashed var(--border-color); background:var(--bg); color:var(--text-muted); padding:16px; font-size:13px;">
-              None on file. A vaccination given outside the EPI schedule &mdash; a tetanus booster,
-              a flu shot, a rabies course &mdash; is recorded on the consultation form and appears here.
+              None on file. A vaccination outside the EPI schedule, such as a tetanus booster, is recorded on the consultation form and appears here.
             </div>
 {%- endif %}
           </div>
@@ -1320,7 +1307,7 @@
               <span class="material-symbols-outlined" style="font-size:30px; color:var(--teal-dark);">vaccines</span>
             </div>
             <h5>No vaccination record</h5>
-            <p>The DOH Expanded Program on Immunization schedule covers children under {{ immunization.pediatric_age_years }}, and this patient has no doses from it on file. No other vaccinations have been recorded either. Anything given during a consultation appears here.</p>
+            <p>The DOH EPI schedule covers children under {{ immunization.pediatric_age_years }}, and this patient has no doses on file. Anything given at a consultation appears here.</p>
           </div>
 {%- endif %}
         </div>
@@ -1384,10 +1371,7 @@
                           </div>
                         </div>
                         <div style="font-size:12px; color:var(--text-muted); margin-top:14px; padding-top:12px; border-top:1px dashed var(--border-color);">
-                          Written when the patient checked in — or, on an older row, when the visit was
-                          booked, back when this system booked ahead. No screen edits a note afterwards,
-                          so this panel is read only. What happened at the visit is on Consultation
-                          History.
+                          Written when the patient checked in (or, on an older row, when the visit was booked). It cannot be edited. What happened is in Consultation History.
                         </div>
                       </div>
                     </div>
@@ -1567,7 +1551,7 @@
                 <div class="field-hint" id="correctDateHint"
                      data-hint-required="The day the vaccine was actually administered. It cannot be in the future or before {{ patient.first_name }} was born."
                      data-hint-optional="This dose is recorded as given elsewhere, so the date belongs to another facility's records. Leave it blank if it is not known — it cannot be in the future or before {{ patient.first_name }} was born.">
-{%- if reported_now %}This dose is recorded as given elsewhere, so the date belongs to another facility's records. Leave it blank if it is not known — it cannot be in the future or before {{ patient.first_name }} was born.
+{%- if reported_now %}This dose was given elsewhere, so the date belongs to another facility. Leave it blank if unknown. It cannot be in the future or before {{ patient.first_name }} was born.
 {%- else %}The day the vaccine was actually administered. It cannot be in the future or before {{ patient.first_name }} was born.{% endif %}
                 </div>
 {%- endif %}
@@ -1634,19 +1618,14 @@
 
               <div id="restrictOnBody">
                 <p style="margin-bottom:10px; font-size:13.5px;">
-                  Everything written on this visit &mdash; the chief complaint, diagnosis, treatment
-                  plan, additional notes and the reason given at check-in &mdash; will be encrypted and
-                  withheld from every other role: Health Center Staff, BHWs and the Administrator. They
-                  will see &ldquo;{{ restricted_placeholder }}&rdquo; in their place &mdash; not a
-                  blank, so nobody reads the record as never having been written up. The Administrator
-                  will not see the names of medicines dispensed at this visit either.
+                  Everything written on this visit is encrypted and hidden from other roles, who see
+                  &ldquo;{{ restricted_placeholder }}&rdquo; instead. The Administrator also cannot see medicine names.
                 </p>
 {#- The half a clinician most needs to be sure of before using this. A seal that
     also broke dispensing would be a seal nobody dared set, and the whole design
     rests on it not doing that. #}
                 <p style="margin-bottom:10px; font-size:13.5px;">
-                  The date, the vital signs and any vaccinations given stay visible to them. Health
-                  Center Staff still see what was dispensed, so handing over medicine is unaffected.
+                  The date, vital signs and vaccinations stay visible. Health Center Staff still see what was dispensed.
                 </p>
                 <p style="margin-bottom:16px; font-size:13.5px;">
                   Nothing is deleted or changed &mdash; the record keeps exactly what it says, and you
@@ -1656,9 +1635,7 @@
 
               <div id="restrictOffBody" style="display:none;">
                 <p style="margin-bottom:10px; font-size:13.5px;">
-                  The written text of this visit will become legible again to Health Center Staff,
-                  BHWs and the Administrator, and views of it will no longer be recorded as
-                  withheld.
+                  The written text of this visit will be readable again by Health Center Staff, BHWs and the Administrator.
                 </p>
                 <p style="margin-bottom:16px; font-size:13.5px;">
                   The record itself is unchanged either way &mdash; this only decides who may read it.
@@ -1669,10 +1646,7 @@
                 <span class="material-symbols-outlined" style="font-size:18px; margin-top:1px;">history</span>
                 <div>
                   <strong style="display:block; margin-bottom:2px;">This will be logged</strong>
-                  The audit trail will record your name, the time, and which consultation was
-                  affected. The diagnosis itself is deliberately not written into that entry.
-                  Every view this restriction withholds from another role is logged too. That
-                  entry cannot be edited or removed.
+                  The audit trail records your name, the time and the consultation, never the diagnosis. Views this restriction withholds are logged too.
                 </div>
               </div>
             </div>

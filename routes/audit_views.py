@@ -168,15 +168,8 @@ UNTRACKED = {
     # at an account that exists -- which is every attempt that could ever have
     # succeeded.
     "login_scope": (
-        "Both figures count rows in the trail below. "
-        "A refused sign-in records the account, the time and the address. "
-        "The password is never recorded. "
-        "An attempt on a username that does not exist is not recorded at all. "
-        "Signing out is not recorded either, so these are sign-in counts, not "
-        "sessions. "
-        "A deactivated account is refused even when the password is correct, and "
-        "the entry says so -- those refusals are counted here too. "
-        "Nothing locks an account: a rising count is for someone to notice."
+        "Both figures count refused sign-ins on accounts that exist. The "
+        "password is never recorded. Signing out is not recorded."
     ),
     "filters": (
         "The module filter above is the only one that works. Filtering by user, "

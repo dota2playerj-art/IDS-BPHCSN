@@ -183,10 +183,11 @@
           <div class="panel-title" style="font-size:15px;">Senior Citizen Programme</div>
           <div class="panel-sub mb-2">Membership is derived, not enrolled</div>
           <div class="panel-sub" style="line-height:1.6;">
+            
             {{ patient_report.senior_count }} of the {{ patient_report.total }} registered patients
-            {{ 'is' if patient_report.senior_count == 1 else 'are' }} aged {{ senior_age }} or above,
-            counted from their birthdates. Nothing records a senior signing up for a programme,
-            so this is who qualifies, not who enrolled.
+            {{ 'is' if patient_report.senior_count == 1 else 'are' }} aged {{ senior_age }} or above, counted from birthdates.
+            This is who qualifies, not who enrolled.
+          
           </div>
           <a href="{{ url_for(reports_analytics_endpoint) }}" class="panel-link" style="margin-top:12px;">Reports &amp; Analytics<span class="material-symbols-outlined" style="font-size:15px;">chevron_right</span></a>
         </div>

@@ -277,9 +277,7 @@
 {%- endif %}
               <button type="button" class="sort-option" role="menuitem" data-sort-key="status">Status<span class="dir"></span></button>
               <div class="sort-menu-hint">
-                Choosing the column already in use reverses it. Sorting reorders the
-                whole roster, so it keeps whatever the search box and Advanced Filter
-                are currently showing.
+                Choosing the column already in use reverses it. Sorting keeps the search and filters you have set.
               </div>
             </div>
           </div>
@@ -371,9 +369,7 @@
           <div class="col-12">
             <div style="font-size:12.5px; color:var(--text-muted); line-height:1.5;">
               Filters narrow the {{ patients|length }} record{{ '' if patients|length == 1 else 's' }} on
-              this page and combine with the search box. Purok and registration date are not offered:
-              address is stored as one free-text line with no purok in it, and registration date is not
-              one of the columns on this table.
+              this page and combine with the search box. Purok is not offered: address is one free-text line.
             </div>
           </div>
         </div>

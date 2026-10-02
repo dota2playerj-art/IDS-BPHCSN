@@ -259,8 +259,6 @@ def process_archive_medicine(form_data, user_id=None, ip_address=None):
             "again."
         )
     return (
-        f"{item['name']} retired and marked Inactive. Nothing was deleted — its "
-        "stock figure, batch number and expiry date are unchanged, and it is "
-        "left out of the stat cards, the low-stock alert and the dashboards "
-        "until it is marked Active again."
+        f"{item['name']} retired and marked Inactive. Nothing was deleted. It is "
+        "left out of the counts and alerts until it is marked Active again."
     )

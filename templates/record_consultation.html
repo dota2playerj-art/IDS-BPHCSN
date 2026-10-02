@@ -209,7 +209,7 @@
     <div class="eyebrow">{{ health_center.name }}</div>
     <div class="page-title">{% if consultation %}Edit Consultation{% else %}Record Consultation{% endif %}</div>
     {%- if consultation %}
-    <div class="page-desc">Correct what was written about this visit. The patient and the visit date cannot be changed — every other change is saved to the audit log with your name against it.</div>
+    <div class="page-desc">Correct what was written about this visit. The patient and the visit date cannot be changed. Every change is audited.</div>
     {%- else %}
     <div class="page-desc">Write up what happened during this visit. Saving marks the patient's queue entry Completed and frees the clinician for whoever is next. Fields marked with <span style="color:var(--danger);">*</span> are required.</div>
     {%- endif %}
@@ -577,11 +577,7 @@
         <div class="cohort-note">
           Doses ticked <strong style="display:inline;">Given today</strong> are recorded against this
           consultation and dated {{ visit_date | display_date }}, with your name as the person who gave them.
-          Doses ticked <strong style="display:inline;">Given elsewhere</strong> are recorded as reported to
-          you at this visit — another hospital, another barangay — and are never shown as given here.
-          Both stop the child counting as overdue for that dose; only one of them claims this health
-          center administered it, so a dose cannot be ticked in both columns.
-          A dose already on file cannot be changed or removed here, whichever visit recorded it.
+          Doses ticked <strong style="display:inline;">Given elsewhere</strong> are recorded as reported at this visit and never shown as given here. Both stop the dose counting as overdue. A dose already on file cannot be changed here.
 {%- if consultation %}
           You can still add a dose that was missed. Every addition is written to the audit log.
 {%- endif %}
@@ -698,9 +694,8 @@
     reasoning that belonged in this comment rather than under the form. Every
     rule it stated is still stated. #}
         <div class="cohort-note">
-          Tick what was given today. Ticked doses are dated {{ visit_date | display_date }},
-          appear under Other Vaccinations on {{ patient.first_name }}'s profile, and need a
-          dose number only where the vaccine has one &mdash; a rabies course, say.
+          Tick what was given today. Doses are dated {{ visit_date | display_date }} and appear under Other Vaccinations on
+          {{ patient.first_name }}'s profile. Add a dose number only where the vaccine has one.
 {%- if age_context.is_infant %}
           Under {{ infant_age_years }} year old, so this list shows only the vaccines
           {{ patient.first_name }} can be given at this age &mdash; anything else that was
@@ -871,10 +866,7 @@
     shelf. Every condition is named, because "nothing can be dispensed" with a
     stocked store behind it reads as the feature being broken. #}
         <div class="dispense-empty">
-          Nothing can be dispensed at this visit. Medicine, supplies and equipment are all
-          offered here, but each one must be active, unexpired and in stock &mdash; and
-          nothing on the shelf currently is. Restock or correct an expiry date on
-          Medicine Inventory to fill it.
+          Nothing can be dispensed at this visit: no item is active, unexpired and in stock. Restock or correct an expiry date on Medicine Inventory.
         </div>
 {%- endif %}
 
@@ -885,11 +877,8 @@
     which is where someone asking "why" is; the operator at the form is asking
     "what happens if I type this". #}
         <div class="cohort-note">
-          Each line comes off Medicine Inventory immediately, is dated
-          {{ visit_date | display_date }}, and appears under Dispensing History on
-          {{ patient.first_name }}'s profile. One line per item with the whole amount
-          given; a line is refused outright if the amount is more than the shelf holds or
-          the item has expired.
+          Each line comes off Medicine Inventory at once and appears in {{ patient.first_name }}'s Dispensing History.
+          It is refused if the shelf holds less or the item has expired.
 {%- if consultation %}
           Anything already dispensed at this visit cannot be removed here.
 {%- endif %}
@@ -943,11 +932,7 @@
           <span class="material-symbols-outlined">stethoscope</span>
           <div>
             <strong>Diagnosis and treatment plan are recorded by the Doctor</strong>
-            Deciding what a patient has and what to do about it is a licensed act, so those
-            two fields are not part of this form for your role. Record the complaint, the
-            measurements, any vaccinations given and anything dispensed, and save &mdash; the
-            record is complete for what you are recording. The Doctor adds the
-            assessment to this same visit afterwards.
+            The diagnosis and treatment plan are for the Doctor, so they are not on this form for your role. Record the rest and save; the Doctor adds them.
           </div>
         </div>
 {%- endif %}
@@ -1026,16 +1011,7 @@
     sure of before they use it: sealing a record must not stop the health worker
     at the counter handing over the medicine on it. #}
           <div class="form-text-hint" style="margin-top:6px;">
-            Everything written on this visit &mdash; the chief complaint, diagnosis,
-            treatment plan and additional notes, and the reason given at check-in &mdash;
-            is then encrypted and withheld from every other role &mdash; Health Center
-            Staff, BHWs and the Administrator &mdash; who see
-            &ldquo;{{ restricted_placeholder }}&rdquo; in their place. The date, the vital
-            signs and any vaccinations stay visible to them, and Health Center Staff still
-            see what was dispensed. Use it for anything you judge sensitive; HIV status,
-            and the fact that a person was tested for it, are privileged medical
-            information under RA 11166 Section 44, and they are not the only such case. Setting or lifting this is recorded in the audit log, as is every
-            view it withholds.
+            Everything written on this visit is encrypted and hidden from other roles. Use it for sensitive information, such as HIV status (RA 11166 Section 44).
           </div>
         </div>
 {%- endif %}

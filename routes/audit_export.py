@@ -190,15 +190,13 @@ def _cover_sheet(context, produced_by):
     scope = [
         [
             "Every entry, not one page of them",
-            f"Audit Logs shows the {PAGE_SIZE} most recent entries at a time. This "
-            f"file holds all {total} matching the module filter above, so it is the "
-            "complete record rather than the page that was on screen.",
+            f"Audit Logs shows {PAGE_SIZE} entries at a time. This file holds all "
+            f"{total} entries that match the module filter.",
         ],
         [
             "A search typed on the screen was not applied",
-            "The search box on Audit Logs narrows rows in the browser, so the "
-            "server is never told what was typed. This file is filtered by module "
-            "only. If it should cover less, set the module filter and export again.",
+            "The search box works in the browser only. This file is filtered by "
+            "module only. To cover less, set the module filter and export again.",
         ],
     ]
 
@@ -273,10 +271,8 @@ def _trail_sheet(context):
                 "What each entry recorded",
                 DETAIL_COLUMNS,
                 details,
-                note=("The # column is the entry's number in the table above. What "
-                      "each entry recorded is written here in full, exactly as it "
-                      "is stored — nothing is shortened, because this column "
-                      "is the record of what actually changed."),
+                note=("The # column is the entry's number in the table above. Each "
+                      "entry is written here in full, as stored."),
                 empty="No activity has been recorded for this module.",
             ),
         ],
@@ -318,11 +314,8 @@ def _untracked_sheet(context):
             empty="Everything this screen can show is in this file.",
         )],
         intro=(
-            "The entries in this file are complete for what the system records: "
-            "changes to patient, clinical, stock and account records, the Patient "
-            "Queue, sign-ins, settings and SMS broadcasts. It does not record the "
-            "following, so their absence from the trail is not evidence that they "
-            "did not happen."
+            "This file holds everything the system records. The things below are "
+            "not recorded, so their absence does not mean they did not happen."
         ),
     )
 

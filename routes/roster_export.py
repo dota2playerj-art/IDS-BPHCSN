@@ -112,19 +112,15 @@ from utils.workbook import XLSX_MIMETYPE, build, figures, safe_filename, sheet, 
 # applied. One sentence, one file, four screens -- see the module docstring for
 # why it is not four sentences.
 FILTER_SCOPE_NOTE = (
-    "This file holds the complete list. The search box and filter controls on the "
-    "screen narrow rows inside the browser, so the server is never told what was "
-    "typed or chosen and a download cannot honour them. Print has the same limit "
-    "and resolves it the same way. If the file should "
-    "cover less, narrow it after opening it: that is what a spreadsheet is for."
+    "This file holds the complete list. The search box and filters work in the browser only, so "
+    "this download cannot follow them. Narrow it in the spreadsheet."
 )
 
 # What "not tracked" means on these four screens, as opposed to on a report.
 # Stated once at the head of every Not Tracked sheet.
 UNTRACKED_INTRO = (
-    "None of the following is a gap in this file. They are things nothing in the "
-    "system records, so no export could contain them, and their absence here is "
-    "not evidence that they did not happen."
+    "None of these is a gap in this file. The system does not record them, so no export can "
+    "contain them."
 )
 
 # Screen 03. Registration, edits and status changes to a patient are recorded in
@@ -133,21 +129,16 @@ UNTRACKED_INTRO = (
 PATIENT_UNTRACKED = (
     (
         "Prenatal enrolment",
-        "Nothing marks a patient as pregnant or stores an expected delivery "
-        "date. The Prenatal Patients card on the screen reports its own absence "
-        "for the same reason, and there is no column for it here.",
+        "Pregnancy is not recorded, so this file has no prenatal column.",
     ),
     (
         "Purok or zone",
-        "Address is stored as one free-text line with no purok in it, so the "
-        "roster cannot be grouped or filtered by area -- on the screen or in this "
-        "file. Address is reproduced here exactly as it is stored.",
+        "Address is one free-text line, so the roster cannot be grouped by area. It is shown as "
+        "stored.",
     ),
     (
         "That this export happened",
-        "Nothing writes a row when a file is exported, so there is no history of "
-        "downloads. The cover sheet names who took this copy off the system and "
-        "when, and that name is the only record of it that exists.",
+        "Exports are not recorded. The cover sheet names who took this copy and when.",
     ),
 )
 
@@ -174,12 +165,8 @@ PATIENT_UNTRACKED = (
 INVENTORY_UNTRACKED = (
     (
         "Stock movement, in this file",
-        "Stock dispensed at a consultation is recorded -- see Items Dispensed on "
-        "Reports & Analytics, which reports units issued over a date range. This "
-        "file is not that report: the Current Stock column is the shelf as it "
-        "stands today, with no movement column beside it. Restocking is not "
-        "recorded as a movement at all; an item's stock figure is raised by "
-        "editing it through Add / Edit Medicine, which overwrites the number.",
+        "Dispensing is recorded; see Items Dispensed on Reports & Analytics. This file shows the "
+        "shelf as it is today, with no movement column.",
     ),
     (
         "Batch history",
@@ -189,9 +176,7 @@ INVENTORY_UNTRACKED = (
     ),
     (
         "That this export happened",
-        "Nothing writes a row when a file is exported, so there is no history of "
-        "downloads. The cover sheet names who took this copy off the system and "
-        "when, and that name is the only record of it that exists.",
+        "Exports are not recorded. The cover sheet names who took this copy and when.",
     ),
 )
 
@@ -207,23 +192,13 @@ INVENTORY_UNTRACKED = (
 # writes this row used to say nothing recorded are recorded now.
 APPOINTMENT_UNTRACKED = (
     (
-        "That a patient left before being seen",
-        "There is no status for it. Somebody who checks in and goes home stays "
-        "Waiting on the queue, and Mark Completed is not the answer -- that "
-        "records that the visit happened. Any such row in this file reads as a "
-        "patient still in the building.",
-    ),
-    (
         "How long anybody waited",
-        "Arrival time is stored when a patient is checked in, and the moment a "
-        "consultation starts is not, so the queue can say who is waiting but "
-        "nothing can say how long they waited before being seen.",
+        "Arrival time is stored, but the time a consultation starts is not, so waiting time "
+        "cannot be counted.",
     ),
     (
         "That this export happened",
-        "Nothing writes a row when a file is exported, so there is no history of "
-        "downloads. The cover sheet names who took this copy off the system and "
-        "when, and that name is the only record of it that exists.",
+        "Exports are not recorded. The cover sheet names who took this copy and when.",
     ),
 )
 
@@ -517,9 +492,8 @@ PATIENT_COLUMNS = (
 # same thing about them -- the argument _cover_sheet() makes about the scope
 # note, applied to the columns underneath it.
 PATIENT_ROW_NOTE = (
-    "Sorted by surname, A–Z, the order the Patient Records table states in its "
-    "footer. Age is the age today, computed from the stored birth date; Last "
-    "Visit is the most recent recorded consultation, not a stored field."
+    "Sorted by surname, A to Z. Age is the age today. Last Visit is the most recent recorded "
+    "consultation."
 )
 
 
@@ -537,9 +511,8 @@ DEMOGRAPHIC_COLUMNS = (
 )
 
 DEMOGRAPHIC_ROW_NOTE = (
-    "Sorted by surname, A–Z. Age is the age today, computed from the stored "
-    "birth date. Demographics only: clinical details and contact numbers are "
-    "shown only to the Doctor and Health Center Staff."
+    "Sorted by surname, A to Z. Demographics only: clinical details and contact numbers are for "
+    "the Doctor and Health Center Staff."
 )
 
 
@@ -566,10 +539,8 @@ def _patient_table(context):
 def _roster_scope(context, care_team_text):
     """The Not Tracked sheet's opening sentence, true for the file it is in."""
     if context.get("demographics_only"):
-        return ("This file holds demographics only: patient ID, name, age, sex, "
-                "address, status and registration date. Clinical details and "
-                "contact numbers are shown only to the Doctor and Health Center "
-                "Staff. The following are not stored at all.")
+        return ("This file holds demographics only. Clinical details and contact numbers are for "
+                "the Doctor and Health Center Staff. The items below are not stored.")
     return care_team_text
 
 
@@ -620,9 +591,8 @@ def _patient_export(context, produced_by):
         heading="Patient Roster",
         intro=(
             f"{_count_label(total, 'patient')} on the register as of "
-            f"{long_date(today())}. Every registered patient is here whatever "
-            "their status — Inactive and Deceased records are listed under that "
-            "status rather than left out, exactly as the screen lists them."
+            f"{long_date(today())}. Inactive and Deceased records are listed "
+            "under that status."
         ),
     )
 
@@ -643,9 +613,7 @@ def _patient_export(context, produced_by):
                 ("Prenatal patients", None,
                  "Not tracked — see the Not Tracked sheet"),
             ],
-            note=("Counted over the whole register, not over any narrowing done "
-                  "on the screen. These are the same figures the four cards above "
-                  "the table show, read from the same call."),
+            note=("Counted over the whole register, not over any filter on the screen."),
         )],
         heading="Roster Summary",
     )
@@ -674,11 +642,8 @@ def _patient_export(context, produced_by):
 
     notes = _untracked_sheet(
         PATIENT_UNTRACKED,
-        _roster_scope(context, "The roster is complete for what the system stores "
-                      "about a patient's identity, contact and status. It is not a "
-                      "medical record — a patient's consultations, immunisations and "
-                      "appointments are on their own profile screen — and the "
-                      "following are not stored at all."),
+        _roster_scope(context, "The roster holds identity, contact and status. It is not a "
+                               "medical record. The items below are not stored."),
     )
 
     return _assemble(
@@ -726,13 +691,8 @@ def _patient_export(context, produced_by):
 SELECTION_UNTRACKED = (
     (
         "Why these records were selected",
-        "The selection was made by ticking rows on Patient Records and nothing "
-        "stores "
-        "it. There is no saved cohort, no shared list and no reason field behind "
-        "it, so this file is a snapshot of one operator's choice at one moment "
-        "and cannot be reproduced from the system afterwards. If the grounds "
-        "matter -- follow-up due, a campaign, a barangay request -- they have to "
-        "be written down beside the file.",
+        "The selection was made by ticking rows, and nothing stores it. If the reason matters, "
+        "write it down beside the file.",
     ),
     *PATIENT_UNTRACKED,
 )
@@ -777,9 +737,7 @@ def _patient_selection_export(context, produced_by):
         intro=(
             f"{_count_label(total, 'patient')} selected from the "
             f"{_count_label(registered, 'patient')} on the register, as of "
-            f"{long_date(today())}. These are the records that were ticked on "
-            "Patient Records and no others; a patient missing from this list was not "
-            "selected, rather than filtered out."
+            f"{long_date(today())}. Only the records ticked on Patient Records."
         ),
     )
 
@@ -796,20 +754,14 @@ def _patient_selection_export(context, produced_by):
 
     controls = [[
         "It is a selection, so no filter applies to it",
-        "The search box and the Advanced Filter panel decide which rows are on "
-        "screen to be ticked, and this file is the ticked rows. Whatever was "
-        "typed or chosen before the selection was made is therefore already "
-        "reflected in it; it is neither applied again here nor recorded "
-        "anywhere, so this file cannot say what was on screen at the time.",
+        "The search box and filters decide which rows can be ticked. This file is the ticked "
+        "rows, and it cannot say what was on screen.",
     ]]
     if missing:
         controls.append([
             "Some selected records were not found",
-            f"{requested} records were selected and {total} were found, so "
-            f"{missing} could not be included: the register has no row for them. "
-            "Retiring a patient does not do this -- an Inactive or Deceased "
-            "record is still on the roster and would still be in this file -- so "
-            "reload Patient Records and select again if the full set is needed.",
+            f"{requested} records were selected and {total} were found. "
+            f"{missing} could not be included. Reload Patient Records and select again.",
         ])
 
     cover = _cover_sheet(
@@ -819,13 +771,8 @@ def _patient_selection_export(context, produced_by):
         detail=detail,
         scope=(
             "A selection, not the register",
-            "This file holds only the patient records that were ticked on Patient "
-            "Records before Export was pressed. It is NOT the full roster -- the "
-            "toolbar's own Export Excel and Export PDF are, and they download "
-            "every registered patient. It is not the result of a saved search "
-            "either: the selection was made by hand, one row at a time, and "
-            "nothing stores it, so this file cannot be regenerated by re-running "
-            "anything. The count above is the whole of what is here.",
+            "This file holds only the records ticked on Patient Records. It is not the full "
+            "roster: Export Excel and Export PDF are.",
         ),
         controls=controls,
         index=[
@@ -841,12 +788,9 @@ def _patient_selection_export(context, produced_by):
 
     notes = _untracked_sheet(
         SELECTION_UNTRACKED,
-        _roster_scope(context, "These records are complete for what the system "
-                      "stores about a patient's identity, contact and status -- the "
-                      "same eight columns the full roster export carries. They are "
-                      "not medical records: a patient's consultations, immunisations "
-                      "and appointments are on their own profile screen. The "
-                      "following are not stored at all."),
+        _roster_scope(context, "These records hold identity, contact and status, as in the full "
+                               "roster. They are not medical records. The items below are not "
+                               "stored."),
     )
 
     return _assemble(
@@ -918,16 +862,8 @@ def _inventory_export(context, produced_by):
             f"Every item on the shelf — {_count_label(total, 'item')}",
             INVENTORY_COLUMNS,
             rows,
-            note=("Sorted by medicine name, A–Z, the order the Medicine Inventory table "
-                  "states in its own footer. Status is what the screen's badge "
-                  "shows: the item's lifecycle status where it has been retired, "
-                  "and its stock condition otherwise. Stock condition is always "
-                  "the stock condition, so a retired item still reports whether "
-                  "it is short or expired — which is why the two columns read the "
-                  "same on every item that is still in service. They are kept "
-                  "apart rather than merged because a column that means one thing "
-                  "on every row can be sorted and filtered, and one that changes "
-                  "meaning halfway down cannot."),
+            note=("Sorted by medicine name, A to Z. Status shows a retired item's status, or its "
+                  "stock condition."),
             empty="The inventory holds nothing.",
         )],
         heading="Medicine Inventory",
@@ -936,11 +872,8 @@ def _inventory_export(context, produced_by):
             f"{long_date(today())}"
             + (f", of which {retired} {'is' if retired == 1 else 'are'} retired."
                if retired else ".")
-            + " Retired items are listed here rather than left out, under that "
-            "status, exactly as the screen lists them — but they are counted in "
-            "none of the figures on the next sheet, because an item nobody is "
-            "restocking is not short of stock in any sense that asks somebody to "
-            "reorder it."
+            + " Retired items are listed under that status. They are not counted "
+            "in the figures on the next sheet."
         ),
     )
 
@@ -967,11 +900,7 @@ def _inventory_export(context, produced_by):
                  f"On the shelf and past their expiry date on "
                  f"{display_date(today())}"),
             ],
-            note=("The position today, over the whole shelf, not over any "
-                  "narrowing done on the screen. These are the same figures the "
-                  "four cards above the table show, read from the same call — and "
-                  "the same low-stock count the sidebar badge and both dashboards "
-                  "report."),
+            note=("The position today, over the whole shelf, not over any filter on the screen."),
         )],
         heading="Stock Summary",
     )
@@ -1003,12 +932,8 @@ def _inventory_export(context, produced_by):
 
     notes = _untracked_sheet(
         INVENTORY_UNTRACKED,
-        "The list is complete for what the screen shows about an item as it stands "
-        "today. Eight further stored fields — item code, brand name, date received, "
-        "batch number, manufacturer, unit cost, storage location and notes — appear "
-        "nowhere except the Add / Edit Medicine form, and so are not in this file "
-        "either: it holds the columns the screen holds. The following are not "
-        "stored at all.",
+        "This list holds the columns the screen shows. The other stored fields appear only on the"
+        " Add / Edit Medicine form. The items below are not stored.",
     )
 
     return _assemble(
@@ -1117,12 +1042,8 @@ def _appointment_export(context, produced_by):
             f"{display_date(queue_date)} — {_count_label(len(queue), 'patient')}",
             queue_columns,
             queue_rows,
-            note=("In arrival order, patients in consultation first — the order "
-                  "the screen states above its table. The # column is the place in "
-                  "the waiting line, and is blank for anyone already seen or not "
-                  "yet arrived. Status is what the screen's badge prints, so the "
-                  "patient who may be brought in now reads 'Ready' rather than "
-                  "'Waiting'."),
+            note=("In arrival order, patients in consultation first. The # column is the place in"
+                  " the waiting line."),
             empty="Nobody has checked in today.",
         )],
         heading=f"Today's Queue — {long_date(queue_date)}",
@@ -1156,18 +1077,13 @@ def _appointment_export(context, produced_by):
             f"{_count_label(calendar['month_total'], 'appointment')}",
             CALENDAR_COLUMNS,
             calendar_rows,
-            note=("One row per day that had a visit; days with nothing on them "
-                  "are left out rather than listed as zeroes. The four count "
-                  "columns are the buckets the screen's calendar legend uses, and "
-                  "they add up to the day's total."),
+            note=("One row per day that had a visit. The count columns add up to the day's total."),
             empty=f"Nothing was recorded in {calendar['label']}.",
         )],
         heading=f"Calendar — {calendar['label']}",
         intro=(
-            "The month the screen's calendar panel was showing when this file was "
-            "taken, day by day. This is the one part of the file a control on the "
-            "screen does change: the calendar's month arrows are a real "
-            "server-side parameter, so the month exported is the month displayed."
+            "The month the calendar was showing, day by day. The month exported is the month "
+            "displayed."
         ),
     )
 
@@ -1222,10 +1138,7 @@ def _appointment_export(context, produced_by):
             ],
             [
                 "The one control that was carried",
-                "The calendar's month. It is a real server-side parameter — the "
-                "screen's arrows submit it as ?month= and this export reads the "
-                "same one — so the Calendar sheet holds the month that was on "
-                "screen rather than always the current one.",
+                "The calendar's month. The Calendar sheet holds the month that was on screen.",
             ],
         ],
         index=[
@@ -1242,10 +1155,7 @@ def _appointment_export(context, produced_by):
 
     notes = _untracked_sheet(
         APPOINTMENT_UNTRACKED,
-        "Both lists are complete for what the system stores about a visit as it "
-        "stands. An appointment row is overwritten in place as it moves through "
-        "its statuses, so what this file holds is where every visit stands now. "
-        "The following are not stored at all.",
+        "Both lists hold every visit as it stands now. The items below are not stored.",
     )
 
     return _assemble(
@@ -1316,14 +1226,8 @@ def _user_export(context, produced_by):
             f"Every account that can sign in — {_count_label(total, 'account')}",
             USER_COLUMNS,
             rows,
-            note=("Ordered by role then name, the order the screen lists them in. "
-                  "Contact is blank for every account because nothing in the "
-                  "application writes the email or phone column. Last Login is the "
-                  "most recent successful sign-in in the audit trail, not a stored "
-                  "column — an account with none has never been signed into, and "
-                  "says so rather than showing a date. Both timestamps are "
-                  "clinic-local, converted from the stored UTC the same way every "
-                  "screen converts them."),
+            note=("Ordered by role, then name. Contact is blank because the system does not "
+                  "record it. Last Login comes from the audit trail."),
             empty="No accounts exist.",
         )],
         heading="System Accounts",
@@ -1331,11 +1235,7 @@ def _user_export(context, produced_by):
             f"{_count_label(total, 'account')} — {context['active_users']} active, "
             f"{context['inactive_users']} deactivated — across "
             f"{_count_label(context['roles_represented'], 'role')}. This is the "
-            "complete list: the accounts are set up by the system itself, one for "
-            "each role the database allows, and nothing on the screen creates "
-            "another. A deactivated account is refused at the login form even when "
-            "the password presented is correct, and the refusal is recorded in the "
-            "audit trail."
+            "complete list. A deactivated account cannot sign in."
         ),
     )
 
@@ -1351,17 +1251,14 @@ def _user_export(context, produced_by):
             "Which screens each account's role can open",
             ACCESS_COLUMNS,
             access_rows,
-            note=("Read at export time from the access rule each screen enforces, "
-                  "so this is the access rule that is enforced rather than a "
-                  "description of it kept in step by hand. An account appears once "
-                  "per screen its role admits it to."),
+            note=("Read from the access rule each screen enforces. An account appears once for "
+                  "each screen its role can open."),
             empty="No screen is role-restricted.",
         )],
         heading="Access By Account",
         intro=(
-            "The permissions panel on the right of User Management, for every account at "
-            "once. A screen absent from an account's rows is a screen that "
-            "account's role is refused."
+            "The permissions panel of User Management, for every account. A screen not listed is "
+            "refused for that role."
         ),
     )
 
@@ -1381,9 +1278,7 @@ def _user_export(context, produced_by):
                  f"{context['accounts_ever_signed_in']} of {total} have ever "
                  "signed in. Counted from the audit trail"),
             ],
-            note=("The same figures the four cards above the table show, read from "
-                  "the same source. The sign-in counts are the rows the Audit Logs "
-                  "Login Events card counts, so the two cannot disagree."),
+            note=("The same figures as the four cards above the table."),
         )],
         heading="Account Summary",
     )
@@ -1404,11 +1299,8 @@ def _user_export(context, produced_by):
         # that goes false the first time somebody uses the feature.
         controls=[[
             "There is nothing on this screen to narrow",
-            "User Management has no search box and no filter panel — every "
-            f"account is on one page ({_count_label(total, 'account')} today), so "
-            "there is nothing to narrow, and the screen says so. This "
-            "file is the complete roster for the same reason the screen is: it is "
-            "all there is.",
+            f"Every account is on one page ({_count_label(total, 'account')} today), "
+            "so this file is the complete roster.",
         ]],
         index=[
             ["System Accounts",
@@ -1417,11 +1309,8 @@ def _user_export(context, produced_by):
             ["Account Summary", "The figures the screen's stat cards show."],
         ],
         intro=(
-            f"Every account that can sign in to {config.SYSTEM_SHORT_NAME}, with the role and the "
-            "access each one carries, taken off the system on "
-            f"{now().strftime('%B %d, %Y')}. This file names accounts and their "
-            "privileges; no password is in it, and none can be — this file never "
-            "reads one."
+            f"Every account that can sign in to {config.SYSTEM_SHORT_NAME}, with its role and "
+            f"access, taken on {now().strftime('%B %d, %Y')}. No password is in this file."
         ),
     )
 
@@ -1432,14 +1321,9 @@ def _user_export(context, produced_by):
             if key in untracked
         ] + [[
             "That this export happened",
-            "Nothing writes a row when a file is exported, so there is no history "
-            "of downloads — not even of this one, which lists every account on the "
-            "system. The cover sheet names who took it off and when, and that name "
-            "is the only record of it that exists.",
+            "Exports are not recorded. The cover sheet names who took this copy and when.",
         ]],
-        "The roster is complete for everything held about an account. The reasons "
-        "below are the screen's own, quoted word for word so this file and "
-        "User Management state them in one wording.",
+        "The roster is complete. The reasons below are the screen's own words.",
     )
 
     return _assemble(

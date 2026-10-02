@@ -205,10 +205,9 @@ def _log_blocked_sign_in(user, ip_address, password_verified):
         return None
 
     credential = (
-        "the password supplied was correct, so this credential still works and "
-        "only the account's deactivation stopped it"
+        "the password was correct"
         if password_verified else
-        "the password supplied was also wrong"
+        "the password was also wrong"
     )
     return log_action(
         user_id=user["id"],
@@ -217,12 +216,8 @@ def _log_blocked_sign_in(user, ip_address, password_verified):
         details=(
             f'Sign-in blocked for account "{user["username"]}" '
             f'({user["full_name"]}, {user["role"]}), from '
-            f'{_address_phrase(ip_address)}; the account is marked deactivated, '
-            f'so no session was started -- {credential}. The person at the form '
-            "was told only that the credentials were invalid, the same wording a "
-            "wrong password receives, so the refusal reveals nothing about the "
-            "account's status. The value supplied is not recorded anywhere, by "
-            "design"
+            f'{_address_phrase(ip_address)}; the account is deactivated; '
+            f'{credential}'
         ),
         ip_address=ip_address,
     )
@@ -253,9 +248,7 @@ def _log_refused_sign_in(user, ip_address):
         details=(
             f'Sign-in refused for account "{user["username"]}" '
             f'({user["full_name"]}, {user["role"]}), from '
-            f'{_address_phrase(ip_address)}; the password supplied did not match '
-            "the stored hash, and no session was started. The value supplied is "
-            "not recorded anywhere, by design"
+            f'{_address_phrase(ip_address)}; the password was wrong'
         ),
         ip_address=ip_address,
     )

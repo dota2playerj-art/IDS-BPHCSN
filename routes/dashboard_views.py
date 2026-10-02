@@ -74,15 +74,12 @@ UNTRACKED = {
     # *not* claim -- supplies and equipment leaving the store are still not
     # recorded anywhere.
     "notifications": (
-        "Per-user notifications are not recorded. There is no notifications "
-        "table and nothing writes one, so this panel would have to invent its "
-        "own alerts. The live alerts on this page -- low stock and immunisation "
-        "follow-up -- are the real ones."
+        "Per-user notifications are not recorded. The alerts on this page, low "
+        "stock and immunisation follow-up, are the real ones."
     ),
     "staff_activity": (
-        "Per-staff totals are not shown here. Audit Logs records who registered, "
-        "checked in, recorded, dispensed or changed stock, but this dashboard "
-        "does not add them up per person."
+        "Per-staff totals are not shown here. Audit Logs records who did each "
+        "action."
     ),
     # THERE IS NO "consultation_status" ENTRY ANY MORE, AND THAT IS THE POINT.
     # It said a consultation has no status of its own and pointed at the visit

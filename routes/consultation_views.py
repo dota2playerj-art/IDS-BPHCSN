@@ -281,20 +281,9 @@ def _log_refused_diagnosis(refused, patient, consultation_id, role, user_id,
         action=ACTION_DIAGNOSIS_REFUSED,
         module=MODULE_CONFIDENTIALITY,
         details=(
-            f"A submission for {anchor} for {patient['full_name']} "
-            f"({patient['patient_id']}) carried {len(refused)} field"
-            f"{'s' if len(refused) != 1 else ''} the submitting account's role "
-            f"({role or 'no role'}) may not write — {names}. The value"
-            f"{'s were' if len(refused) != 1 else ' was'} discarded before "
-            "validation and nothing was stored from "
-            f"{'them' if len(refused) != 1 else 'it'}; the rest of the "
-            "submission was saved normally. Diagnosis and treatment planning are "
-            "restricted to the Doctor, who is the licensed clinician, so "
-            "these fields are not rendered for this role at all — a submission "
-            "carrying them did not come from the form as it is drawn. The "
-            "submitted text is deliberately not recorded here: it is an "
-            "unlicensed judgement about a named patient and this trail is "
-            "readable and exportable"
+            f"{anchor.capitalize()}, {patient['full_name']} "
+            f"({patient['patient_id']}): role {role or 'no role'} may not write "
+            f"{names}; discarded, the rest was saved"
         ),
         ip_address=ip_address,
     )
@@ -353,37 +342,22 @@ def _log_restriction(outcome, consultation_id, patient, user_id, ip_address,
         return None
 
     visit = f", visit of {display_date(visit_date)}" if visit_date else ""
-    author = f", recorded by {recorded_by_name}" if recorded_by_name else ""
     subject = (
         f"Consultation #{consultation_id} for {patient['full_name']} "
-        f"({patient['patient_id']}){visit}{author}."
+        f"({patient['patient_id']}){visit}."
     )
 
     if outcome == "restricted":
         action = ACTION_CONSULTATION_RESTRICTED
         details = (
-            f"{subject} Marked Restricted. Its chief complaint, diagnosis, "
-            "treatment plan, additional notes and check-in reason are now "
-            "encrypted and withheld from every role but Doctor, the "
-            "Administrator included; the visit date, vital signs and "
-            "immunisations on the same record stay legible. Health Center Staff "
-            "still see the medicine dispensed, and the Administrator does not. "
-            "Anyone else who opens this patient's profile "
-            "is shown a "
-            "placeholder naming the restriction rather than an empty field, and "
-            "each such view is recorded. The condition itself is deliberately "
-            "not named in this entry"
+            f"{subject} Marked Restricted: its text is encrypted and only the "
+            "Doctor can read it"
         )
     else:
         action = ACTION_CONSULTATION_UNRESTRICTED
         details = (
-            f"{subject} Restriction lifted. Its chief complaint, diagnosis, "
-            "treatment plan, additional notes and check-in reason are "
-            "legible again to every role that can open the patient's profile, "
-            "including Health Center Staff and the Administrator, and views of it "
-            "are no longer "
-            "recorded as withheld. The record is unchanged — nothing about what "
-            "the consultation says was edited by this, only who may read it"
+            f"{subject} Restriction lifted: every role that can open the "
+            "profile can read it again"
         )
 
     return log_action(
@@ -1618,10 +1592,9 @@ def process_edit_consultation(consultation_id, form_data, user_id, ip_address=No
     # must say which record was touched, whose it is, and what moved -- without
     # anyone having to open the consultation to find out.
     details = (
-        f"Consultation #{consultation_id} for {patient['full_name']} "
+        f"Consultation #{consultation_id}, {patient['full_name']} "
         f"({patient['patient_id']}), visit of "
-        f"{display_date(before['consultation_date'])}, originally recorded by "
-        f"{before['recorded_by_name']}. {len(changed)} field"
+        f"{display_date(before['consultation_date'])}. {len(changed)} field"
         f"{'s' if len(changed) != 1 else ''} changed — {summary}"
     )
     log_action(

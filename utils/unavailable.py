@@ -321,10 +321,8 @@ UNAVAILABLE = {
     # What the operator needs is that it cannot be sorted, what the order is, and
     # where sorting does work.
     "sort": (
-        "This queue cannot be sorted. Its order is who is in consultation, then "
-        "who is waiting, then who has not arrived, then everyone already seen or "
-        "cancelled -- and arrival time within each. Sort works on Patient Records "
-        "and Medicine Inventory."
+        "This queue cannot be sorted. It is ordered by who is in consultation, then waiting, then"
+        " done. Sort works on Patient Records and Medicine Inventory."
     ),
     "pagination": (
         "Paging is not implemented. Every row is already on this page, so there "
@@ -370,12 +368,8 @@ UNAVAILABLE = {
     # the sentence points at where the days are kept, which stays true whether
     # the schedule is empty or full, and says nothing about what they are.
     "advance_booking": (
-        "Appointments cannot be booked for a future day, and that is deliberate "
-        "rather than unfinished. This health center sees patients in the order "
-        "they arrive, so a visit is recorded when the person is at the desk -- "
-        "use Check In Patient. Which services run on which days is kept on the "
-        "Service Schedule, entered by the Administrator from what the health "
-        "center confirms."
+        "Visits cannot be booked ahead, by design. Patients are seen in the order they arrive: "
+        "use Check In Patient."
     ),
 
     # "queue_exit" WAS HERE: a patient who left before being seen could not be closed. Staff

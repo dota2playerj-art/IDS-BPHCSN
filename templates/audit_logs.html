@@ -175,7 +175,7 @@
           presented -- so they are called out rather than folded silently into a
           total that would read as ordinary mistyping. #}
       <div class="col-md-3 col-sm-6">
-        <div class="stat-card" title="Sign-ins refused against an account that exists — a credential that did not match, or an account that has been deactivated. The password supplied is never recorded. {{ untracked.login_scope }}">
+        <div class="stat-card" title="Sign-ins refused on an account that exists: a wrong password or a deactivated account. {{ untracked.login_scope }}">
           <div class="stat-icon" style="background:#FEE2E2;"><span class="material-symbols-outlined" style="color:var(--danger);">gpp_maybe</span></div>
           <div class="stat-value"{% if stats.refused_logins %} style="color:var(--danger);"{% endif %}>{{ stats.refused_logins }}</div>
           <div class="stat-label">Security Events</div>

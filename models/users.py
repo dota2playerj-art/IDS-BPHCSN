@@ -650,9 +650,8 @@ def password_policy():
             ),
             (
                 "The three original seeded demo accounts were never checked against this",
-                "This rule governs passwords set from now on. A stored hash "
-                "cannot be re-validated, because the password is not recoverable "
-                "from it -- which is the entire reason it is stored that way.",
+                "This rule applies to passwords set from now on. A stored password cannot be "
+                "checked again.",
             ),
         ],
     }
@@ -738,10 +737,8 @@ def validate_new_user_form(values):
             )
         elif username_taken(username):
             errors["username"] = (
-                f'The username "{username}" is already taken by another account. '
-                "Choose a different one. Usernames are compared without regard to "
-                "capitals, so a different capitalisation of the same word counts "
-                "as the same username."
+                f'The username "{username}" is already taken. Choose a different '
+                "one. Capital letters do not make a different username."
             )
 
     role = (values.get("role") or "").strip()

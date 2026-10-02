@@ -227,9 +227,7 @@ def _sent_message(broadcast):
     # recorded, it simply has not been transmitted yet.
     if broadcast["delivery_mode"] == SIMULATED:
         message += (
-            " SIMULATED SEND — no key is set for the messaging service, so "
-            "this broadcast was recorded in full but no message left the system. "
-            "It becomes a live send as soon as that key is set."
+            " Simulated send: no key is set, so the message was recorded but not sent."
         )
     return message
 
@@ -269,15 +267,9 @@ def process_send_broadcast(form_data, user_id, ip_address=None):
             f"({broadcast['recipient_count']} recipients, "
             f"{broadcast['sent_count']} sent, {broadcast['failed_count']} failed); "
             f"{metrics['length']} characters, {metrics['segments']} "
-            f"{metrics['encoding']} segment"
-            f"{'' if metrics['segments'] == 1 else 's'} per recipient; "
-            f"delivery mode {broadcast['delivery_mode']}"
-            + (
-                " (recorded only, nothing transmitted)"
-                if broadcast["delivery_mode"] == SIMULATED else ""
-            )
-            + f'; category {broadcast["category"] or "none"}; '
-            f'message: "{broadcast["message"]}"'
+            f"segment{'' if metrics['segments'] == 1 else 's'}; "
+            f"{broadcast['delivery_mode']}; "
+            f'category {broadcast["category"] or "none"}'
         ),
         ip_address=ip_address,
     )

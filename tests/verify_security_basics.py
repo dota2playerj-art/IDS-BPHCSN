@@ -276,7 +276,7 @@ check("the flag is cleared after the change",
 entry = q1("SELECT action, details FROM audit_logs WHERE id > ? AND action = "
            "'Changed own account password'", (mark,))
 check("the change is audited, and says the requirement is met",
-      entry is not None and "requirement is now met and cleared" in entry["details"]
+      entry is not None and "first change done" in entry["details"]
       and OWN not in entry["details"] and FIRST not in entry["details"])
 check("after the change, the dashboard opens", u.get("/staff/dashboard").status_code == 200)
 

@@ -145,7 +145,7 @@ for role, account in ACCOUNTS.items():
         qp = visible(text(q))
         check(f"{role}: Patient Queue shows the empty services strip",
               q.status_code == 200 and "Services today" in qp
-              and "No service days have been entered yet, so this cannot say what runs today" in qp, qp[:600])
+              and "No service days have been entered yet. The Administrator enters them on the Service Schedule" in qp, qp[:600])
 
 admin_page = text(admin.get("/admin/service_schedule"))
 check("Admin: empty screen still offers the Add form", 'action="/admin/service_schedule/add"' in admin_page)
@@ -266,7 +266,7 @@ check("each is 'Added service schedule entry' under 'Service Schedule', by the A
 imm = [a for a in added if '"Immunization"' in a["details"]][0]["details"]
 check("the add entry names the service, the days, the note and the actor",
       "days: 2nd and 4th Wednesday of the month" in imm and 'note: "Rotates between barangays"' in imm
-      and ADMIN["full_name"] in imm and "restricts nothing" in imm, imm)
+      and ADMIN["full_name"] in imm, imm)
 
 # ===========================================================================
 section("4. Edit: saved, audited field by field; unchanged saves write nothing")

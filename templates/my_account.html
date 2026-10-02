@@ -68,7 +68,7 @@
 {% block content %}
     <div class="eyebrow">{{ health_center.name }}</div>
     <div class="page-title">My Account</div>
-    <div class="page-desc">Your own account, and the one thing on it you can change yourself. Everything here is about the account you are signed in as — it cannot show or alter anybody else's.</div>
+    <div class="page-desc">Your own account, and the one thing on it you can change yourself.</div>
 
 {%- if must_change %}
     {#- Shown while users.must_change_password is set. utils/security.py keeps
@@ -85,9 +85,7 @@
     <div class="panel-card">
       <div class="section-title">Account Details</div>
       <div class="section-sub">
-        What this system holds about your account, read from the account itself each time this page
-        is opened. These three are shown rather than offered as boxes because none of them is yours
-        to change here — each row says who can.
+        What this system holds about your account. You cannot change these here; each row says who can.
       </div>
 
 {%- if account %}
@@ -95,9 +93,7 @@
         <div>
           <div class="fact-label">Full name</div>
           <div class="fact-desc">
-            The name shown beside your work everywhere in this system. Only an Administrator can
-            correct it, from User Management — because the audit trail attributes actions to it, and
-            a name the person it describes can rewrite is not a name a record can be trusted to.
+            The name shown beside your work. Only an Administrator can correct it, from User Management, because the audit trail uses it.
           </div>
         </div>
         <div class="fact-value">{{ account.full_name }}</div>
@@ -116,9 +112,7 @@
         <div>
           <div class="fact-label">Username</div>
           <div class="fact-desc">
-            What you sign in with. Fixed for the life of the account and changeable by nobody,
-            including an Administrator — it is what every entry in the audit trail is attributed to,
-            so renaming it would leave the record describing somebody who no longer exists.
+            What you sign in with. It is fixed for the life of the account, because the audit trail attributes every entry to it.
           </div>
         </div>
         <div class="fact-value">{{ account.username }}</div>
@@ -141,10 +135,7 @@
     <div class="panel-card">
       <div class="section-title">Change Password</div>
       <div class="section-sub">
-        Set your own password, without going through an Administrator. You are asked for the one you
-        use now because that is the only thing that proves it is you at the keyboard and not somebody
-        who found this machine still signed in — an Administrator's reset cannot ask for it, and this
-        will not proceed without it.
+        Set your own password. You are asked for your current one to prove it is you at the keyboard.
       </div>
 
 {%- if change_errors %}
@@ -153,9 +144,7 @@
         <div>
           <strong>Your password was not changed</strong>
           Correct the {{ change_errors|length }} highlighted field{{ '' if change_errors|length == 1 else 's' }} below.
-          All three boxes have been cleared and need retyping, so a password is never written back
-          into the page. Nothing about your account has changed, and you are still signed in with the
-          password you had before.
+          All three boxes were cleared and need retyping. Your account has not changed.
         </div>
       </div>
 {%- endif %}
@@ -167,10 +156,8 @@
             <div class="rule-box">
               <strong>The new password must meet these rules:</strong>
               {{ password_rule }}
-              Exactly the rule an Administrator's reset and a new account must meet — one check
-              serves all three, so this cannot set a password the rest of the system would refuse.
-              Once saved it is stored only as a hash: it cannot be shown or looked up afterwards, by
-              you or by anyone else, so make sure you will remember it.
+              The same rule applies to resets and new accounts. The password is stored as a hash and cannot be looked up, so remember it.
+            
             </div>
           </div>
 

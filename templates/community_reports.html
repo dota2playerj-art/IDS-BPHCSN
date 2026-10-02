@@ -159,9 +159,7 @@
 
     <div class="scope-note no-print">
       <strong>Every figure on this screen is read from stored records.</strong>
-      Two things on it have no source and say so where they sit: how many reports have been
-      generated, and coverage measured against the whole barangay rather than against
-      registered patients.
+      Two figures have no source and say so: how many reports were generated, and coverage against the whole barangay.
     </div>
 
 {%- if selection.errors %}
@@ -238,7 +236,7 @@
             <button type="button" class="btn-outline-teal" onclick="window.print()"
                     title="Print this report — the sidebar, header and controls drop out, the charts print as data tables, and the range above goes on the letterhead"><span class="material-symbols-outlined" style="font-size:18px;">print</span>Print</button>
             <a class="btn-outline-teal" href="{{ pdf_url }}" download
-               title="Download this report as a PDF — the same figures over the same range, a section per panel with every chart's numbers as a table, on the health center's letterhead"><span class="material-symbols-outlined" style="font-size:18px;">picture_as_pdf</span>Export PDF</a>
+               title="Download this report as a PDF: the same figures, with every chart's numbers as a table"><span class="material-symbols-outlined" style="font-size:18px;">picture_as_pdf</span>Export PDF</a>
             <a class="btn-outline-teal" href="{{ excel_url }}" download
                title="Download this report as an Excel workbook — the same figures over the same range, one sheet per section, with every chart's numbers as rows"><span class="material-symbols-outlined" style="font-size:18px;">description</span>Export Excel</a>
           </div>
@@ -437,8 +435,7 @@
           </div>
 {%- else %}
           <div class="empty-note">
-            No patient has a recorded chronic condition yet. The registration form's four
-            conditions are counted here as they are entered; nothing is inferred from a consultation.
+            No patient has a recorded chronic condition yet. The four conditions on the registration form are counted as entered.
           </div>
 {%- endif %}
 {#- The honest half of this panel. "Top health concerns" over a date range has
@@ -624,10 +621,11 @@
 {#- The sheet says what produced it and over what. Without this a printed page
     of barangay figures is a page of numbers with no provenance. #}
     <div class="print-only print-foot">
+      
       {{ selection.type_label }} &middot; {{ window.start | long_date }} to {{ window.end | long_date }}
       &middot; generated from {{ health_center.name }} records by {{ system_short_name }}.
-      Figures are counted from stored consultations, registrations, appointments, immunisation
-      doses and SMS broadcasts. Immunisation coverage is the position as of {{ window.end | long_date }}.
+      Counted from stored records. Immunisation coverage is as of {{ window.end | long_date }}.
+    
     </div>
 {% endblock %}
 

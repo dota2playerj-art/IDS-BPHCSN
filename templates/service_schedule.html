@@ -109,9 +109,7 @@
 {% block content %}
     <div class="eyebrow">{{ health_center.name }}</div>
     <div class="page-title">Service Schedule</div>
-    <div class="page-desc">Which services the health center runs on which days.
-      Patients are still seen in the order they walk in, whatever the day. This
-      schedule says what is on. It does not turn anybody away.</div>
+    <div class="page-desc">Which services run on which days. Patients are still seen in the order they walk in, whatever the day.</div>
 
     <div class="row g-4 mt-1">
       <div class="{{ 'col-lg-8' if panel else 'col-12' }}">
@@ -330,9 +328,7 @@
 {%- if errors.weeks %}
               <div class="field-error">{{ errors.weeks }}</div>
 {%- endif %}
-              <div class="form-text-hint">Leave these blank if it runs every week. For a service held only on
-                some weeks, tick them: Wednesday with the 2nd and 4th means the 2nd and 4th Wednesday of
-                every month.</div>
+              <div class="form-text-hint">Leave these blank if it runs every week. Wednesday with the 2nd and 4th means the 2nd and 4th Wednesday of every month.</div>
             </div>
 
             <div class="mb-3">
@@ -360,9 +356,6 @@
     </div>
 
     <div class="scope-note mt-2">
-      <strong>This schedule is information, not a rule.</strong> Nothing here stops a
-      patient from being checked in or seen on a day their service is not listed.
-      A walk-in who is unwell is seen whatever the day. It is not connected to SMS,
-      so changing it texts nobody.
+      <strong>This schedule is information, not a rule.</strong> Nothing here stops a patient being checked in or seen on a day their service is not listed. It sends no SMS.
     </div>
 {% endblock %}

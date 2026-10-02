@@ -227,7 +227,7 @@
             <a class="btn-outline-teal" href="{{ excel_url }}" download
                title="Download this report as an Excel workbook — the same figures over the same range, one sheet per section, with every chart's numbers as rows"><span class="material-symbols-outlined" style="font-size:18px;">description</span>Export to Excel</a>
             <a class="btn-outline-teal" href="{{ pdf_url }}" download
-               title="Download this report as a PDF — the same figures over the same range, a section per panel with every chart's numbers as a table, on the health center's letterhead"><span class="material-symbols-outlined" style="font-size:18px;">picture_as_pdf</span>Export to PDF</a>
+               title="Download this report as a PDF: the same figures, with every chart's numbers as a table"><span class="material-symbols-outlined" style="font-size:18px;">picture_as_pdf</span>Export to PDF</a>
           </div>
         </div>
         <div class="col-12">
@@ -237,9 +237,7 @@
           <span class="panel-sub" style="margin-left:8px;">
 {%- if window.custom %}Generated range &middot; {{ selection.type_label }}.
 {%- else %}Default window &middot; the last {{ trend_months }} clinic months.{% endif %}
-            Registrations, appointments, consultations and SMS are counted inside it.
-            Medicine stock, the roster breakdowns and the programme memberships are not &mdash;
-            each is a position on a day, not something counted across one.
+            Registrations, appointments, consultations and SMS are counted inside the range. Stock, roster breakdowns and programme memberships are the position on one day.
           </span>
         </div>
       </div>
@@ -425,7 +423,7 @@
     number per item and nothing snapshots it -- so "what the shelf held in March"
     remains unanswerable and this panel answers today. Where the medicine went is
     on the Most Dispensed Items panel below, which is ranged. #}
-          <div class="snapshot-note">{{ snapshot_note }} Dispensing is recorded and is reported over the selected range under Most Dispensed Items. The stock level at a past date is not stored, so this panel shows the shelf as it stands today.</div>
+          <div class="snapshot-note">{{ snapshot_note }} Dispensing over a range is under Most Dispensed Items. The stock level at a past date is not stored, so this panel shows the shelf as it is today.</div>
         </div>
       </div>
       <div class="col-lg-6">
@@ -494,7 +492,7 @@
 {#- Ranked by units, with the issue count printed beside it, because the two are
     different supply questions: forty patients given ten tablets each and two
     patients given two hundred are not the same shelf problem. #}
-          <div class="snapshot-note">Ranked by units dispensed inside the selected range, most first. Named as the dispensing records name them. An item renamed part way through a range appears under both names.{% if disp.top_medicines | selectattr('confidential') | list %} Items dispensed at Restricted consultations are counted under Confidential and not named.{% endif %}{{ small_count_note(disp.top_medicines) }}</div>
+          <div class="snapshot-note">Ranked by units dispensed in the range, most first. An item renamed in the range appears under both names.{% if disp.top_medicines | selectattr('confidential') | list %} Items dispensed at Restricted consultations are counted under Confidential and not named.{% endif %}{{ small_count_note(disp.top_medicines) }}</div>
         </div>
       </div>
       <div class="col-lg-5">
@@ -833,11 +831,12 @@
     </div>
 
     <div class="print-only print-foot">
+      
       {{ selection.type_label }} &middot; {{ window.start | long_date }} to {{ window.end | long_date }}
       &middot; generated from {{ health_center.name }} records by {{ system_short_name }}.
-      Registrations, appointments, consultations and SMS activity are counted inside this range.
-      Medicine stock, the roster breakdowns and the programme memberships are the position as of
-      {{ report_date | long_date }} and are marked as such where they appear.
+      Activity is counted in this range. Stock, rosters and programme memberships
+      are the position as of {{ report_date | long_date }}.
+    
     </div>
 
 {% endblock %}
