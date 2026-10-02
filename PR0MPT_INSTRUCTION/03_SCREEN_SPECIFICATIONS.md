@@ -419,6 +419,11 @@ Doctor, Completed, Left before being seen, each with the colour of its badge; th
 The summary line under the table uses the same five names. There is no Walk-in tag (every visit is a
 walk-in). The vaccine badge says what is overdue ("2 vaccines overdue") or due ("1 vaccine due").
 
+**Change service never completes a visit (Task 6e).** If a visit that is Waiting for the Doctor is changed
+to a service that does not need him, it goes to In Consultation, so the service is recorded first (refused
+while another patient is in consultation). A service that needs him keeps today's status. The first Waiting
+patient's badge reads **Next in line** (a display label; the stored status is Waiting).
+
 **Service at check-in (Task 6b).** The Check In dialog has a required **Service** list on both tabs
 (existing patient, new patient), with no default: Consultation, Follow-up Consultation, Hypertension /
 Diabetes Monitoring, Prenatal Check-up, Immunization, Dental. A row has a **Change service** button, with a

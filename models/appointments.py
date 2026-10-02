@@ -69,7 +69,7 @@ QUEUE_STATUSES = (WAITING, IN_CONSULTATION)
 #
 # This is the same reasoning _STATUS_RANK below already rests on: queue position
 # is a presentation rule, not a column.
-READY_LABEL = "Ready to Consult"
+READY_LABEL = "Next in line"
 READY_BADGE_CLASS = "badge-ready"
 
 # Checking in is only meaningful for a visit that has not already been resolved.
@@ -372,7 +372,7 @@ def _apply_queue_flow(entries, active=None):
         entry["is_ready"] = room_free and index == 0
 
     for entry in entries:
-        # "Ready to Consult" replaces the stored "Waiting" only for display. The
+        # "Next in line" replaces the stored "Waiting" only for display. The
         # row is still Waiting in the database -- see READY_LABEL.
         entry["display_status"] = READY_LABEL if entry["is_ready"] else entry["status"]
         entry["display_badge_class"] = (
@@ -623,7 +623,7 @@ def check_in_patient(patient_id, reason, user_id, on_date=None, audit=None, *, s
     one, so the flag keeps saying whether there was a prior booking.
 
     Both paths store WAITING, including when the clinician is free and the
-    patient can go straight in. "Ready to Consult" is not stored -- the queue
+    patient can go straight in. "Next in line" is not stored -- the queue
     derives it in _apply_queue_flow(), so a patient who arrives to an empty room
     is shown as ready without ever being written as Waiting-and-then-something-
     else, and cannot be left stranded on a stale ready flag if someone else is

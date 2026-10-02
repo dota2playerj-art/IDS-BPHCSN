@@ -1182,6 +1182,8 @@ The Doctor, Health Center Staff and the Barangay Official are unchanged.
   on his dashboard list opens the saved record (intake done) or a new consultation for the visit (no
   intake). One status x role mapping (`models/queue_actions.py`) decides every queue button and is checked on
   the server. The queue legend and summary use only the five real statuses; no Walk-in tag.
+- *Task 6e (2026-10-03).* A service correction never completes a visit: Waiting for the Doctor changed to
+  a service that needs no Doctor goes to In Consultation. The "Ready to Consult" badge is now "Next in line".
 - *Stock accountability.* Dispensing writes no stock entry. Accountability comes from the stock
   levels and the dispensed totals in Reports. The Doctor and Health Center Staff hold the full
   dispensing records.

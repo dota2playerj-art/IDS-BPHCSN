@@ -1443,6 +1443,19 @@ with app.app_context():
 check("the model itself does it too, called directly",
       outcome == "changed-in-consultation" and status_of(v) == "In Consultation", outcome)
 run_sql("UPDATE appointments SET status = 'Completed' WHERE id = ?", (v,))
+# The badge.
+run_sql("UPDATE appointments SET status = 'Completed' WHERE status IN ('Waiting', 'In Consultation')")
+first, _ = build(dict(status="Waiting"), "Bnext")
+second, _ = add_visit(MATRIX_PID, "Bnext2", 0, "Waiting", time="23:00")
+queue_html = body(staff.get(QUEUE_URL))
+badges = re.findall(r'<span class="badge-status [^"]*">([^<]+)</span>', queue_html)
+check("the first Waiting patient's badge reads 'Next in line'; the second reads 'Waiting'",
+      "Next in line" in row_of(queue_html, f"APT-{first:05d}")
+      and ">Waiting<" in row_of(queue_html, f"APT-{second:05d}")
+      and "Ready to Consult" not in queue_html, badges)
+check("every badge on the queue is one of the five statuses or 'Next in line'",
+      set(badges) <= set(STATUS_NAMES) | {"Next in line"}, set(badges))
+run_sql("UPDATE appointments SET status = 'Completed' WHERE id IN (?, ?)", (first, second))
 
 # ---------------------------------------------------------------------------
 passed = sum(1 for _, ok in results if ok)
