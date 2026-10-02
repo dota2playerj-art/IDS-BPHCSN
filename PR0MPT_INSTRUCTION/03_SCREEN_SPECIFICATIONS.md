@@ -399,6 +399,18 @@ Expiration date required.
 
 ## Patient Queue
 
+**Left before being seen (Task 6, 2026-10-02).** A new status for a patient who checked in and went home.
+Health Center Staff and the Doctor have a button on the row. It opens a dialog: "Mark this patient as left
+before being seen?" The button is offered when the visit is Waiting, In Consultation, or has intake and no
+diagnosis. It is refused on a visit with a diagnosis, and on one that is finished. The entry records who and
+when and writes one audit entry ("Name (PAT-005), visit APT-00081."). **Undo** is on the row the same day and
+puts the visit back to its previous status; it is refused on a later day, and refused while another patient is
+in consultation if the visit was In Consultation. The Administrator's queue is read-only: no button, and the
+server refuses his POST. The table footer counts these visits.
+
+Under the table, Staff and the Doctor see **Still waiting from earlier days**: visits still Waiting from a
+day that has gone, oldest first, with a button to close them. Nothing closes a visit automatically.
+
 Purpose
 
 Work today's queue: record who has arrived, in the order they arrived, and see
@@ -668,6 +680,14 @@ It holds no controls. It states the rule in one read-only line: "Users are signe
 Purpose
 
 Dashboard for healthcare workers.
+
+**Waiting for the Doctor (Task 6, 2026-10-02).** On the Doctor's dashboard, a list of every visit that needs a
+diagnosis and does not have one, oldest first, across all days. Each row shows the patient's name and ID, the
+check-in date and time, the service, how long it has waited ("2 days"), and a button: Open consultation (the
+intake is saved), or Open Patient Queue (the patient is still Waiting). A visit from an earlier day is marked
+"From an earlier day". Health Center Staff see one card, "Waiting for the Doctor: N", and no list. The
+Administrator's dashboard has the same card and no names. Immunization and prenatal visits are not listed.
+A sealed visit is listed by name only and shows no sealed text.
 
 Widgets
 

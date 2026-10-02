@@ -533,6 +533,22 @@ patients with only free-text conditions, or Prenatal Check-up visits) reads "Few
 to 4. Zero stays "0". Audit entries never store a whole phone number: they are written masked, and
 `migrate_mask_audit_phone_numbers.py` masked the old ones.
 
+**The Doctor's list, and Left before being seen (2026-10-02, Task 6).** The Doctor comes only on
+certain days, while Staff take the intake every day. So the Doctor's dashboard has a list,
+**Waiting for the Doctor**: every visit that needs a diagnosis and has none, oldest first, across all
+days, with how long it has waited. Visits from earlier days are marked. Health Center Staff and the
+Administrator see the count only ("Waiting for the Doctor: N"), with no names. One function decides, so the
+three agree. Which services need a diagnosis is one named constant (`SERVICES_NEEDING_DOCTOR`).
+Immunization, prenatal check-ups and dental visits are not on the list. Today every new visit is a
+"Walk-in Consultation", so every visit without a diagnosis is listed.
+
+A patient who checks in and goes home can now be closed: **Left before being seen**. Staff and the Doctor set
+it from the Patient Queue, after a confirmation, on a visit that is Waiting, In Consultation, or has intake
+and no diagnosis. It is refused on a visit with a diagnosis. It is recorded (who and when) and audited, and
+can be undone the same day. The Administrator's queue stays read-only. Visits still Waiting from earlier
+days are shown to Staff under "Still waiting from earlier days"; nothing closes them automatically.
+Queue reports count it as its own status.
+
 **Stock accountability.** Dispensing writes no stock entry, because an entry per issue would tie a
 medicine to a visit time. Accountability comes from the stock levels and from the dispensed totals
 in Reports & Analytics. The Doctor and Health Center Staff hold the full dispensing records.
@@ -708,3 +724,7 @@ Version 2.9 (2026-10-02)
 Task 5d, small counts and masked numbers. Ranking rows with fewer than 5 fold into "Other" for the
 Administrator and the Barangay Official. Phone numbers show their last four digits on SMS screens.
 Stock accountability is stated correctly. See "Clinical Data Is for the Care Team".
+
+Version 3.0 (2026-10-02)
+
+Task 6, the Doctor's list and Left before being seen. See "Clinical Data Is for the Care Team".
