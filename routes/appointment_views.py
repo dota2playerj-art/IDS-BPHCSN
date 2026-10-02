@@ -8,6 +8,7 @@ each keeps its own role_required guard and its own redirect target.
 This mirrors routes/patient_views.py and routes/inventory_views.py exactly.
 """
 from models.appointments import (
+    attach_actions,
     attach_leave_flags,
     attach_visit_reasons,
     change_visit_service,
@@ -27,10 +28,14 @@ from models.appointments import (
     start_consultation,
     undo_left,
 )
-from models.consultations import RESTRICTED_PLACEHOLDER
+from models.consultations import RESTRICTED_PLACEHOLDER, get_consultation_for_appointment
 from models.doctor_worklist import VISIT_SERVICES, clean_service
 from models.immunizations import get_immunization_alert, get_immunization_status
 from models.patients import get_all_patients, get_patient_by_id
+from models.queue_actions import (
+    CHANGE_SERVICE, MARK_COMPLETED, MARK_LEFT, SEE_PATIENT, SEND_TO_DOCTOR, START, UNDO_LEFT,
+    action_allowed,
+)
 from models.service_schedule import get_entries as get_schedule_entries, services_on
 from routes.audit_entries import (
     consultation_completed, consultation_started, left_before_seen, left_undone,
@@ -85,7 +90,7 @@ def appointment_scheduling_context(month=None):
     # days (Task 6). Only the care team gets either: the Administrator's queue is
     # read-only and the server refuses his POST anyway.
     if care_team:
-        entries = attach_leave_flags(entries)
+        entries = attach_actions(attach_leave_flags(entries), role)
     immunization_alert = (get_immunization_alert() if care_team
                           else {"children": [], "child_count": 0,
                                 "overdue_child_count": 0})
@@ -182,6 +187,19 @@ def _services_today(reference):
         "services": services_on(reference, entries),
         "total": len(entries),
     }
+
+
+def _refused(appointment, action):
+    """None when the signed-in role may do `action` on this visit's status, else the sentence.
+
+    The server's own check of the one status x role mapping the queue's buttons are drawn
+    from (models/queue_actions.py, Task 6d). Whatever the page showed, a forged or stale
+    POST gets the same answer.
+    """
+    if action_allowed(current_role(), appointment["status"], action):
+        return None
+    return (f"{queue_display_name(appointment)}'s visit is marked {appointment['status']}, "
+            "so this cannot be done now.")
 
 
 def process_check_in(form_data, user_id, ip_address=None):
@@ -360,6 +378,9 @@ def process_start_consultation(form_data, user_id=None, ip_address=None):
         return "That queue entry could not be found."
 
     name = queue_display_name(appointment)
+    refusal = _refused(appointment, START)
+    if refusal:
+        return refusal
     outcome = start_consultation(
         appointment_id, audit=consultation_started(appointment_id, user_id, ip_address)
     )
@@ -401,6 +422,9 @@ def process_mark_left(form_data, user_id=None, ip_address=None):
     if appointment is None:
         return "That queue entry could not be found."
     name = queue_display_name(appointment)
+    refusal = _refused(appointment, MARK_LEFT)
+    if refusal:
+        return refusal
     outcome = mark_left(
         appointment_id, user_id, audit=left_before_seen(appointment_id, user_id, ip_address))
     if outcome == "marked":
@@ -422,6 +446,9 @@ def process_undo_left(form_data, user_id=None, ip_address=None):
     if appointment is None:
         return "That queue entry could not be found."
     name = queue_display_name(appointment)
+    refusal = _refused(appointment, UNDO_LEFT)
+    if refusal:
+        return refusal
     outcome = undo_left(appointment_id, audit=left_undone(appointment_id, user_id, ip_address))
     if outcome == "undone":
         return f"{name} is back to {appointment['status_before_left']}."
@@ -449,6 +476,9 @@ def process_change_service(form_data, user_id=None, ip_address=None):
     if appointment is None:
         return "That queue entry could not be found."
     name = queue_display_name(appointment)
+    refusal = _refused(appointment, CHANGE_SERVICE)
+    if refusal:
+        return refusal
     outcome = change_visit_service(
         appointment_id, form_data.get("service"),
         audit=visit_service_changed(appointment_id, user_id, ip_address),
@@ -476,6 +506,9 @@ def process_send_to_doctor(form_data, user_id=None, ip_address=None):
     if appointment is None:
         return "That queue entry could not be found."
     name = queue_display_name(appointment)
+    refusal = _refused(appointment, SEND_TO_DOCTOR)
+    if refusal:
+        return refusal
     outcome = send_to_doctor(
         appointment_id, audit=visit_sent_to_doctor(appointment_id, user_id, ip_address))
     if outcome == "sent":
@@ -485,6 +518,28 @@ def process_send_to_doctor(form_data, user_id=None, ip_address=None):
     if outcome == "not-needed":
         return f"{name}'s visit does not need the Doctor. Use Mark Completed."
     return f"{name} is marked {appointment['status']}, not In Consultation."
+
+
+def see_patient_target(appointment_id):
+    """Where "See patient" goes for one visit: (page, id, message).
+
+    page is "edit" (the visit already has a consultation record, so the Doctor opens it
+    to add the diagnosis and treatment plan; id is the record's), "record" (no record
+    exists, so the Doctor opens a new consultation for the visit; id is the visit's), or
+    None with the message to flash. The queue and the Doctor's dashboard both link here,
+    so they open the same thing, and the rule is the mapping's: only the Doctor, only
+    for a visit that is Waiting for the Doctor.
+    """
+    appointment = get_appointment_by_id(appointment_id)
+    if appointment is None:
+        return None, None, "That queue entry could not be found."
+    refusal = _refused(appointment, SEE_PATIENT)
+    if refusal:
+        return None, None, refusal
+    existing = get_consultation_for_appointment(appointment_id)
+    if existing:
+        return "edit", existing["id"], None
+    return "record", appointment_id, None
 
 
 def process_complete_consultation(form_data, user_id=None, ip_address=None):
@@ -504,6 +559,9 @@ def process_complete_consultation(form_data, user_id=None, ip_address=None):
         return "That queue entry could not be found."
 
     name = queue_display_name(appointment)
+    refusal = _refused(appointment, MARK_COMPLETED)
+    if refusal:
+        return refusal
     outcome = complete_consultation(
         appointment_id, audit=consultation_completed(appointment_id, user_id, ip_address)
     )

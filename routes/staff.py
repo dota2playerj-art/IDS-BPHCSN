@@ -19,6 +19,7 @@ from routes.appointment_views import (
     process_send_to_doctor,
     process_start_consultation,
     process_undo_left,
+    see_patient_target,
 )
 from routes.broadcast_views import sms_notifications_context
 from routes.consultation_views import (
@@ -449,6 +450,23 @@ def staff_complete_consultation():
 @role_required(*CLINICAL_FLOOR_ROLES)
 def staff_send_to_doctor():
     flash(process_send_to_doctor(request.form, session.get("user_id"), request.remote_addr))
+    return redirect(url_for("staff.staff_appointment_scheduling"))
+
+
+# "See patient" (Task 6d): the one link the Patient Queue and the Doctor's dashboard use
+# for a visit that is Waiting for the Doctor. It opens the visit's consultation record when
+# the intake was done, or a new consultation for the visit when it was not. Only the Doctor
+# is let through (models/queue_actions.py); the page it lands on checks again.
+@staff_bp.route('/appointment_scheduling/see-patient/<int:appointment_id>')
+@login_required
+@role_required(*CLINICAL_FLOOR_ROLES)
+def staff_see_patient(appointment_id):
+    page, target_id, message = see_patient_target(appointment_id)
+    if page == "edit":
+        return redirect(url_for("staff.staff_edit_consultation", consultation_id=target_id))
+    if page == "record":
+        return redirect(url_for("staff.staff_record_consultation", appointment_id=target_id))
+    flash(message)
     return redirect(url_for("staff.staff_appointment_scheduling"))
 
 

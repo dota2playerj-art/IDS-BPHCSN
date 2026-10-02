@@ -7,7 +7,6 @@ cannot drift apart; the routes stay thin and each keeps its own role_required
 guard and its own redirect target.
 """
 from models.appointments import (
-    IN_CONSULTATION,
     complete_after_diagnosis,
     finish_intake,
     get_appointment_by_id,
@@ -94,7 +93,8 @@ from models.immunizations import (
 )
 from models.patients import get_patient_by_id
 from routes.sealed_access import log_unopenable
-from models.doctor_worklist import has_diagnosis
+from models.doctor_worklist import WAITING_FOR_DOCTOR as WAITING_DOCTOR, has_diagnosis
+from models.queue_actions import RECORD_ACTION_BY_STATUS, action_allowed
 from routes.audit_entries import (
     consultation_completed,
     consultation_finished,
@@ -782,10 +782,19 @@ def record_consultation_context(appointment_id):
             "profile's Consultation History to make changes."
         )
 
-    if appointment["status"] != IN_CONSULTATION:
+    # Which visits may be written up, and by whom, is the queue's one mapping (Task 6d):
+    # Staff and the Doctor take the intake of the visit In Consultation, and the Doctor
+    # sees a visit that is Waiting for the Doctor, with or without an intake record.
+    action = RECORD_ACTION_BY_STATUS.get(appointment["status"])
+    if action is None:
         return None, (
             f"{name} is marked {appointment['status']}, not In Consultation. "
             "Start the consultation from the queue before recording it."
+        )
+    if not action_allowed(current_role(), appointment["status"], action):
+        return None, (
+            f"{name}'s visit is marked {appointment['status']}. "
+            "Only the Doctor can see a patient who is waiting for the Doctor."
         )
 
     patient = get_patient_by_id(appointment["patient_id"])
@@ -997,10 +1006,19 @@ def process_record_consultation(appointment_id, form_data, user_id,
     # himself with a diagnosis). It goes through the queue's own guarded transition, so
     # the one-patient-at-a-time invariant still applies and the clinician is freed for
     # whoever is next either way.
-    outcome = finish_intake(
-        appointment["id"], has_diagnosis(values.get("diagnosis")),
-        audit=consultation_finished(appointment["id"], user_id, ip_address),
-    )
+    if appointment["status"] == WAITING_DOCTOR:
+        # The Doctor saw a patient sent to him with no intake (Task 6d): this record is
+        # the intake and the diagnosis together, so the visit is finished through the
+        # same guarded step the Doctor's later diagnosis uses.
+        outcome = "completed" if complete_after_diagnosis(
+            appointment["id"],
+            audit=consultation_completed(appointment["id"], user_id, ip_address),
+        ) else "waiting-for-doctor"
+    else:
+        outcome = finish_intake(
+            appointment["id"], has_diagnosis(values.get("diagnosis")),
+            audit=consultation_finished(appointment["id"], user_id, ip_address),
+        )
 
     message = (
         f"Consultation recorded for {patient['full_name']} "

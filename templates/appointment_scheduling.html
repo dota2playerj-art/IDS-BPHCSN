@@ -697,7 +697,9 @@
               <td>
                 <div class="d-flex justify-content-end gap-1 align-items-center">
 {%- if care_team_view %}
-{%- if entry.can_start %}
+{#- Every button below is drawn from entry.shown: the one status x role mapping in
+    models/queue_actions.py (Task 6d), less what makes no sense for this visit now. #}
+{%- if 'start' in entry.shown and entry.can_start %}
                   <!-- This moves the patient into the room, and is offered only
                        while the room is empty. Recording what happened in the
                        consultation is a later pass. The one who arrived first
@@ -708,7 +710,7 @@
                           title="{% if entry.is_ready %}Start consultation for {{ patient_name }} — first in line{% else %}Start consultation for {{ patient_name }} out of turn{% endif %}">
                     <span class="material-symbols-outlined" style="font-size:16px;">play_arrow</span>Start Consultation
                   </button>
-{%- elif entry.is_waiting %}
+{%- elif 'start' in entry.shown %}
                   <!-- Someone else is with the clinician. Shown disabled rather
                        than hidden so the row explains why it cannot start. The
                        server refuses this too -- see start_consultation(). -->
@@ -716,7 +718,7 @@
                           title="{{ queue_stats.active_name }} is in consultation. Only one patient is seen at a time — complete that consultation first.">
                     <span class="material-symbols-outlined" style="font-size:16px;">lock_clock</span>Start Consultation
                   </button>
-{%- elif entry.can_complete %}
+{%- elif 'open_intake' in entry.shown %}
                   <!-- Writing up the visit is the action that belongs here: it
                        records what happened and completes the queue entry in one
                        save. Mark Completed stays beside it, de-emphasised, for
@@ -728,13 +730,13 @@
                      title="Write up {{ patient_name }}'s consultation and complete the visit">
                     <span class="material-symbols-outlined" style="font-size:16px;">edit_note</span>Record Consultation
                   </a>
-{%- if entry.needs_doctor %}
+{%- if 'send_to_doctor' in entry.shown %}
                   <button type="submit" form="sendToDoctorForm" name="appointment_id" value="{{ entry.id }}"
                           class="btn-outline-teal" style="padding:6px 12px; font-size:12.5px;"
                           title="Send {{ patient_name }}'s visit to the Doctor without recording a consultation{% if queue_stats.next_up_name %} — {{ queue_stats.next_up_name }} is next{% endif %}">
                     <span class="material-symbols-outlined" style="font-size:16px;">send</span>Send to the Doctor
                   </button>
-{%- else %}
+{%- elif 'mark_completed' in entry.shown %}
                   <button type="submit" form="completeConsultationForm" name="appointment_id" value="{{ entry.id }}"
                           class="btn-outline-teal" style="padding:6px 12px; font-size:12.5px;"
                           title="Close {{ patient_name }}'s visit without recording a consultation{% if queue_stats.next_up_name %} — {{ queue_stats.next_up_name }} is next{% endif %}">
@@ -742,9 +744,18 @@
                   </button>
 {%- endif %}
 {%- endif %}
+{#- The Doctor sees a visit that is Waiting for the Doctor, whether or not Staff did the
+    intake (Task 6d). One link: it opens the saved record, or a new consultation. #}
+{%- if 'see_patient' in entry.shown %}
+                  <a href="{{ url_for(see_patient_endpoint, appointment_id=entry.id) }}"
+                     class="btn-primary-teal" style="padding:6px 12px; font-size:12.5px; text-decoration:none;"
+                     title="See {{ patient_name }}: open the consultation and write the diagnosis and treatment plan">
+                    <span class="material-symbols-outlined" style="font-size:16px;">stethoscope</span>See patient
+                  </a>
+{%- endif %}
 {#- Left before being seen (Task 6). Offered where mark_left() would accept it, and
     the server decides again. A dialog asks first. #}
-{%- if entry.can_leave %}
+{%- if 'mark_left' in entry.shown %}
                   <button type="button" class="btn-outline-teal" style="padding:6px 12px; font-size:12.5px;"
                           data-bs-toggle="modal" data-bs-target="#leftModal"
                           data-appointment="{{ entry.id }}" data-name="{{ patient_name }}"
@@ -752,14 +763,14 @@
                     <span class="material-symbols-outlined" style="font-size:16px;">directions_walk</span>Left before being seen
                   </button>
 {%- endif %}
-{%- if entry.can_undo_left %}
+{%- if 'undo_left' in entry.shown %}
                   <button type="submit" form="undoLeftForm" name="appointment_id" value="{{ entry.id }}"
                           class="btn-outline-teal" style="padding:6px 12px; font-size:12.5px;"
                           title="Put {{ patient_name }} back to {{ entry.status_before_left }}. Today only.">
                     <span class="material-symbols-outlined" style="font-size:16px;">undo</span>Undo
                   </button>
 {%- endif %}
-{%- if entry.can_change_service %}
+{%- if 'change_service' in entry.shown %}
                   <button type="button" class="btn-outline-teal" style="padding:6px 12px; font-size:12.5px;"
                           data-bs-toggle="modal" data-bs-target="#serviceModal"
                           data-appointment="{{ entry.id }}" data-name="{{ patient_name }}"

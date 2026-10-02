@@ -494,8 +494,9 @@ GET_SCREENS = {r.endpoint for r in app.url_map.iter_rules()
                and not SKIP.search(r.rule)}
 ROLE_BLUEPRINTS = {"admin": {"admin", "auth"}, "staff": {"staff", "auth"},
                    "doctor": {"staff", "auth"}, "official": {"official", "auth"}}
-# In the staff blueprint, but for the Doctor only (routes/staff.py).
-DOCTOR_ONLY = {"staff.staff_reports_analytics"}
+# In the staff blueprint, but linked for the Doctor only (routes/staff.py; the queue's
+# "See patient" link is drawn for the Doctor alone, Task 6d).
+DOCTOR_ONLY = {"staff.staff_reports_analytics", "staff.staff_see_patient"}
 # Screens with no link to them, by design: the login page and the redirects.
 NOT_LINKED = {"auth.login", "auth.index", "auth.dashboard"}
 screens_seen = set()
@@ -525,6 +526,11 @@ r = setup_staff.post("/staff/appointment_scheduling/start-consultation", data={
     "csrf_token": page_token(setup_staff, "/staff/appointment_scheduling")})
 check("setup: a consultation is started from the Patient Queue",
       q("SELECT status FROM appointments WHERE id = ?", (waiting,))[0][0] == "In Consultation")
+
+# The Doctor's "See patient" link (Task 6d) appears only for a visit waiting for him.
+run_sql("INSERT INTO appointments (patient_id, scheduled_by, appointment_type, appointment_date, "
+        "status, is_walkin, checked_in_at) VALUES (?, 2, 'Consultation', date('now', 'localtime'), "
+        "'Waiting for the Doctor', 1, datetime('now', 'localtime'))", (free,))
 
 seen_endpoints, crawl_problems = set(), []
 for role in ("admin", "staff", "doctor", "official"):

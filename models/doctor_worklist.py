@@ -111,10 +111,9 @@ def get_waiting_for_doctor():
 
     Each row: id, reference (APT-00081), patient_id, patient_reference (PAT-005),
     name, service, checked_in (a datetime), appointment_date, waiting (plain text),
-    from_earlier_day, status, consultation_id, and `action`: where the button goes.
-
-    * "edit"   the intake exists: open it to write the diagnosis
-    * "queue"  no intake record can be found: open the Patient Queue
+    from_earlier_day, status, consultation_id (None when Staff did no intake), and
+    `action`: always "see_patient" (Task 6d). One button for every visit, with or without an
+    intake record: it opens the record when there is one, a new consultation when not.
 
     For the Doctor only. The dashboard builder calls this for the Doctor and
     count_waiting_for_doctor() for everyone else.
@@ -133,7 +132,6 @@ def get_waiting_for_doctor():
     visits = []
     for row in rows:
         since = _checked_in(row)
-        action = "edit" if row["consultation_id"] else "queue"
         visits.append({
             "id": row["id"],
             "reference": f"APT-{row['id']:05d}",
@@ -147,7 +145,7 @@ def get_waiting_for_doctor():
             "from_earlier_day": (row["appointment_date"] or "")[:10] < day,
             "status": row["status"],
             "consultation_id": row["consultation_id"],
-            "action": action,
+            "action": "see_patient",
         })
     visits.sort(key=lambda v: (v["checked_in"] or datetime.max, v["id"]))
     return visits

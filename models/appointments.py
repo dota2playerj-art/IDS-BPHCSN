@@ -15,6 +15,10 @@ from models.doctor_worklist import (
     VISIT_SERVICES, WAITING_FOR_DOCTOR, clean_service, has_diagnosis, needs_doctor,
     waiting_text,
 )
+from models.queue_actions import (
+    CHANGE_SERVICE, MARK_COMPLETED, MARK_LEFT, SEND_TO_DOCTOR, START, UNDO_LEFT,
+    allowed_actions, statuses_allowing,
+)
 from utils.dates import now, recent_months, resolve_range, today
 from utils.roles import is_care_team
 from utils.small_counts import fold_small_counts, shown_count
@@ -43,10 +47,11 @@ WAITING_DOCTOR = WAITING_FOR_DOCTOR
 # by Staff or the Doctor from the queue, undone the same day. It is not "No-show"
 # (never came) and not "Cancelled" (a booking withdrawn): they were here.
 LEFT = "Left before being seen"
-# The statuses a visit can be marked as left from. See leave_allowed().
-LEAVABLE_STATUSES = (WAITING, IN_CONSULTATION, WAITING_DOCTOR)
-# The statuses a visit's service can still be corrected in (Task 6b, D2).
-CORRECTABLE_STATUSES = (WAITING, IN_CONSULTATION, WAITING_DOCTOR)
+# The statuses a visit can be marked as left from, and the statuses its service can still
+# be corrected in (Task 6b, D2). Both are read off the one status x role mapping in
+# models/queue_actions.py (Task 6d), so the SQL rules and the buttons cannot disagree.
+LEAVABLE_STATUSES = statuses_allowing(MARK_LEFT)
+CORRECTABLE_STATUSES = statuses_allowing(CHANGE_SERVICE)
 QUEUE_STATUSES = (WAITING, IN_CONSULTATION)
 
 # The label the queue prints for the one patient who may be brought in right now.
@@ -1143,10 +1148,36 @@ def attach_leave_flags(entries):
         entry["can_leave"] = leave_allowed(
             entry["status"], consultation["diagnosis"] if consultation else None,
         )
-        entry["can_change_service"] = entry["status"] in CORRECTABLE_STATUSES
         entry["can_undo_left"] = (
             entry["status"] == LEFT and (entry.get("left_at") or "")[:10] == day
             and entry.get("status_before_left") in LEAVABLE_STATUSES
+        )
+    return entries
+
+
+def attach_actions(entries, role):
+    """Add `actions` and `shown` to queue rows, for the buttons (Task 6d, D3).
+
+    `actions` is the mapping's answer for this role and the row's status
+    (models/queue_actions.py). `shown` is what the row offers: those actions, less the
+    ones that make no sense for this one visit right now -- a service that needs the
+    Doctor is sent to him and not completed, one that does not is completed and not
+    sent, a visit with a diagnosis cannot be marked as left, and Undo is for the day it
+    was set. Start is always shown when allowed; `can_start` says whether the room is
+    free. The template draws exactly `shown`. Needs attach_leave_flags() first.
+    """
+    entries = list(entries)
+    for entry in entries:
+        actions = allowed_actions(role, entry["status"])
+        entry["actions"] = actions
+        entry["shown"] = tuple(
+            action for action in actions
+            if not (
+                (action == SEND_TO_DOCTOR and not entry["needs_doctor"])
+                or (action == MARK_COMPLETED and entry["needs_doctor"])
+                or (action == MARK_LEFT and not entry["can_leave"])
+                or (action == UNDO_LEFT and not entry["can_undo_left"])
+            )
         )
     return entries
 

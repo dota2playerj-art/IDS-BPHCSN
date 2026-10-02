@@ -198,7 +198,7 @@
       <div class="d-flex align-items-center justify-content-between mb-2">
         <div>
           <div class="panel-title">Waiting for the Doctor</div>
-          <div class="panel-sub">Visits whose intake is saved and that need a diagnosis. Oldest first.</div>
+          <div class="panel-sub">Visits that need a diagnosis. With an intake or without one. Oldest first.</div>
         </div>
         <span class="badge-status badge-waiting">{{ waiting_for_doctor_count }}</span>
       </div>
@@ -223,11 +223,7 @@
               <td>{{ visit.service }}</td>
               <td>{{ visit.waiting }}</td>
               <td style="text-align:right;">
-{%- if visit.action == 'edit' %}
-                <a href="{{ url_for(edit_consultation_endpoint, consultation_id=visit.consultation_id) }}" class="btn-primary-teal" style="padding:6px 12px; font-size:12.5px; text-decoration:none;" title="Open {{ visit.name }}'s consultation to write the diagnosis"><span class="material-symbols-outlined" style="font-size:16px;">edit_note</span>Open consultation</a>
-{%- else %}
-                <a href="{{ url_for(appointment_scheduling_endpoint) }}" class="btn-outline-teal" style="padding:6px 12px; font-size:12.5px; text-decoration:none;" title="{{ visit.name }} is still waiting. Start the consultation from the Patient Queue."><span class="material-symbols-outlined" style="font-size:16px;">calendar_month</span>Open Patient Queue</a>
-{%- endif %}
+                <a href="{{ url_for(see_patient_endpoint, appointment_id=visit.id) }}" class="btn-primary-teal" style="padding:6px 12px; font-size:12.5px; text-decoration:none;" title="See {{ visit.name }}: {{ 'open the saved intake and write the diagnosis' if visit.consultation_id else 'record the whole consultation' }}"><span class="material-symbols-outlined" style="font-size:16px;">stethoscope</span>See patient</a>
               </td>
             </tr>
 {%- endfor %}

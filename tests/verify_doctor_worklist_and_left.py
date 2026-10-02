@@ -233,8 +233,9 @@ check("each row says how long it has waited, in plain words",
 check("each row carries the name, patient ID and the chosen service",
       by_id[ids["D"]]["name"] == NAMES["D"] and by_id[ids["D"]]["patient_reference"] == "PAT-008"
       and by_id[ids["L"]]["service"] == FOLLOW and by_id[ids["M"]]["service"] == HTN)
-check("the button opens the intake to edit, or goes to the queue when no intake is found",
-      by_id[ids["D"]]["action"] == "edit" and by_id[ids["M"]]["action"] == "queue")
+check("every row has the same action, 'see patient', with or without an intake record (Task 6d)",
+      all(v["action"] == "see_patient" for v in by_id.values())
+      and by_id[ids["D"]]["consultation_id"] and by_id[ids["M"]]["consultation_id"] is None)
 
 # ---------------------------------------------------------------------------
 section("3. THE DOCTOR'S LIST, THE STAFF COUNT AND THE ADMINISTRATOR'S COUNT AGREE")
@@ -244,10 +245,11 @@ admin_page = body(admin.get("/admin/dashboard"))
 card = re.compile(r"Waiting for the Doctor: (\d+)")
 staff_n = card.search(flat(staff_page))
 admin_n = card.search(flat(admin_page))
-check("the Doctor's dashboard has the list, with every visit's patient and an Open button",
+check("the Doctor's dashboard has the list, with every visit's patient and a 'See patient' button",
       'id="waitingForDoctor"' in doctor_page
       and all(NAMES[t] in doctor_page for t in ("D", "S", "L", "M"))
-      and doctor_page.count("Open consultation") >= 3 and "Open Patient Queue" in doctor_page)
+      and doctor_page.count("See patient") >= 4 and "Open Patient Queue" not in doctor_page
+      and "Open consultation" not in doctor_page)
 doctor_list = doctor_page.split('id="waitingForDoctor"')[1].split("</table>")[0]
 check("a visit that is only Waiting, or In Consultation, is not on the Doctor's list "
       "(it is on the queue)", not any(NAMES[t] in doctor_list for t in ("A", "B", "K")))
@@ -531,8 +533,12 @@ for who, client in (("Staff", staff), ("the Doctor", doctor), ("the Administrato
     client.post(COMPLETE, data={"appointment_id": str(e)})
 check("Mark Completed, by Staff, the Doctor, the Administrator or the Official, cannot complete a visit "
       "waiting for the Doctor", status_of(e) == WFD)
-doctor.post(f"/staff/consultation/record/{e}", data=FULL)
-check("the record route refuses a visit that is not In Consultation", status_of(e) == WFD)
+staff.post(f"/staff/consultation/record/{e}", data=FULL)
+check("the record route refuses Staff for a visit waiting for the Doctor (only the Doctor sees him; "
+      "Task 6d)", status_of(e) == WFD and consultation_of(e) is None)
+for who, client in (("the Administrator", admin), ("the Official", official)):
+    client.post(f"/staff/consultation/record/{e}", data=FULL)
+check("... and the Administrator and the Official", status_of(e) == WFD and consultation_of(e) is None)
 e_start = new_visit(CONSULT, "blank")
 staff.post(f"/staff/consultation/record/{e_start}", data=INTAKE)
 cid_e = consultation_of(e_start)[0]
