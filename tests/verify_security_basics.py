@@ -63,7 +63,7 @@ def location(response):
 
 def fake_phone(n):
     """A test-only mobile number in the 09XXXXXXXXX shape. Not anyone's number."""
-    return "0917" + f"{9000000 + n:07d}"
+    return "0900000" + f"{9000 + n:04d}"
 
 
 # A clock the whole application reads (utils.security.now_ts).

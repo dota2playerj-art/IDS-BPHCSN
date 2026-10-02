@@ -141,7 +141,7 @@ CONTACT, EMERGENCY_CONTACT = "09007775311", "09007775322"
 VITALS = {"blood_pressure": "211/137", "weight": "77.77", "temperature": "41.3"}
 # Markers that are values rather than words. Checked as they would print.
 VITAL_MARKS = ("211/137", "77.77 kg", "41.3 °C")
-FIXTURE_NUMBER = re.compile(r"0917\d{7}")
+FIXTURE_NUMBER = re.compile(r"0900000\d{4}")
 
 run_sql("UPDATE patients SET contact_number = ?, emergency_contact_name = ?, "
         "emergency_contact_number = ?, medical_conditions = ?, allergies = ?, "

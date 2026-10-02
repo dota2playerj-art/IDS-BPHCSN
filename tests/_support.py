@@ -214,7 +214,7 @@ def build_fixture_database(path):
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (patient_id, f"PAT-{patient_id:03d}", first, last, birth, sex,
              "Single", "Purok 1, Barangay Poblacion", "San Francisco",
-             "Surigao del Norte", f"0917{patient_id:07d}", status),
+             "Surigao del Norte", f"0900000{patient_id:04d}", status),
         )
 
     for code, name, category, unit, stock, threshold, expiry in INVENTORY:

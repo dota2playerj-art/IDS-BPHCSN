@@ -135,13 +135,7 @@
 
     <div style="height:16px;"></div>
 
-    <!-- The two alerts that used to sit here were mockup examples: one reported
-         an SMS gateway connection failure and the other announced "Settings
-         saved successfully — your changes have been applied system-wide". Both
-         asserted an event that had not happened and could not happen, the
-         second one describing a save this screen cannot perform. They are
-         replaced by the note below, which states what this screen actually is. -->
-    <div class="scope-note">
+        <div class="scope-note">
       <strong>Some of this screen is live, and each pane says which it is.</strong>
       <strong style="display:inline; font-weight:600;">General Settings</strong> is saved and used across the system. The other panes are read from what the system does.
     </div>
@@ -163,25 +157,7 @@
         </div>
 
         <div class="col-lg-9">
-          <!-- THE ONE DISABLED FIELDSET THAT USED TO WRAP EVERY PANE IS NOW ONE
-               PER PANE, AND IT HAD TO MOVE.
-
-               The reasoning behind wrapping all ten at once still stands and is
-               unchanged: a fieldset disables its whole subtree natively, so no
-               control inside it can be missed and none can be added later that
-               is live by accident. What changed is that one pane -- General
-               Settings -- now saves, and a live form cannot sit inside a
-               disabled fieldset. A fieldset around a subset of the panes is not
-               an option either: Bootstrap shows and hides tab panes with
-               `.tab-content > .tab-pane`, so a pane that is not a direct child
-               of this div stops being shown at all.
-
-               So each pane that has nothing live in it opens its own
-               `<fieldset class="unavailable-form" disabled>` immediately inside
-               itself, and the guarantee is per pane rather than per screen. The
-               panes with no control at all -- Password Policy, About System --
-               have no fieldset, because there is nothing in them to disable. -->
-          <div class="settings-body tab-content">
+                    <div class="settings-body tab-content">
 
             <!-- GENERAL SETTINGS -->
             <div class="tab-pane fade{% if active_pane == 'pane-general' %} show active{% endif %}" id="pane-general">

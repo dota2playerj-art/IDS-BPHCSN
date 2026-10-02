@@ -59,8 +59,8 @@ their own password the first time they sign in.
 ## Running the tests
 
 ```
-python tests/run_all.py            # every suite
-python tests/run_all.py --quick    # skips the slow demo-data suite (about 3 minutes less)
+python tests/run_all.py            # every suite (about 5 minutes)
+python tests/run_all.py --quick    # skips the slow demo-data suite (about 3 minutes)
 ```
 
 Use `--quick` while you work, and run the full suite before you push.
