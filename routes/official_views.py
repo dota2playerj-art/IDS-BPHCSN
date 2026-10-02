@@ -52,11 +52,6 @@ LOCAL_UNTRACKED = {
         "Delivery is never confirmed. Sent and Failed count what was handed to "
         "the gateway, not what a phone received."
     ),
-    "notifications": (
-        "Per-user notifications are not recorded. There is no notifications "
-        "table and nothing writes one, so this panel would have to invent its "
-        "own alerts."
-    ),
     "program_schedule": (
         "Programme dates are not recorded. The two memberships below are "
         "counted from the patient roster and the dose records."

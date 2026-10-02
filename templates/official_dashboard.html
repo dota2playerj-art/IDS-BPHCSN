@@ -90,11 +90,6 @@
   .progress-track{height:8px; border-radius:999px; background:#E5E7EB; overflow:hidden;}
   .progress-fill{height:100%; border-radius:999px; background:var(--teal);}
 
-  .notif-item{display:flex; gap:11px; padding:11px 0; border-bottom:1px solid var(--border-color);}
-  .notif-item:last-child{border-bottom:none;}
-  .notif-dot{width:8px;height:8px;border-radius:50%; background:var(--teal); margin-top:6px; flex-shrink:0;}
-  .notif-text{font-size:12.5px; color:var(--text-dark);}
-  .notif-time{font-size:11px; color:var(--text-muted); margin-top:2px;}
 
   /* MINI CALENDAR */
   .mini-cal-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;}
@@ -417,18 +412,6 @@
           </div>
         </div>
 
-        <!-- NOTIFICATIONS PANEL -->
-        <div class="panel-card mb-0">
-          <div class="panel-title" style="font-size:15px;">Notifications</div>
-          <div class="panel-sub mb-2">Not tracked</div>
-{#- Four invented alerts sat here, three of them quoting figures that do not
-    exist (68% coverage in Purok 3, 3,214 residents reached, 22 failed sends). #}
-          <div class="panel-sub" style="line-height:1.55;">{{ untracked.notifications }}</div>
-          <div class="panel-sub" style="margin-top:10px;">
-            The live figures on this page &mdash; broadcasts sent, immunisation coverage and
-            senior registrations &mdash; are the real ones.
-          </div>
-        </div>
 
       </div>
     </div>

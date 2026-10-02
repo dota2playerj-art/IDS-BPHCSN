@@ -721,8 +721,6 @@ Medicine Stock Alerts
 
 Immunization Follow-up
 
-Notifications panel (a notice that per-user notifications are not recorded; it shows no alerts)
-
 Calendar
 
 Quick Statistics
@@ -764,8 +762,6 @@ Recent Reports
 Broadcast Send Summary (counts only)
 
 Monthly Community Statistics
-
-Notifications panel (a notice that per-user notifications are not recorded; it shows no alerts)
 
 Quick Actions
 

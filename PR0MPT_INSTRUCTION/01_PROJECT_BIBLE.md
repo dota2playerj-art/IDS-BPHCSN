@@ -533,6 +533,8 @@ number shows its last four digits only ("•••• ••• 1234"). Recipien
 Full numbers stay only where the system sends messages. The mask works on every common Philippine format
 (09…, +639…, 639…, with spaces, dashes, dots or brackets), including inside audit entries.
 
+**No placeholder panels (final fixes).** The "Notifications" panel on the Staff and Official dashboards, which only said none are recorded, is removed. SMS Notifications is the one notification screen.
+
 **Recipients (final fixes).** The Administrator and the Barangay Official see recipient counts only on every
 SMS screen, for every audience: total, sent and failed per broadcast, and a count per audience. They see no
 recipient name. The Doctor and Health Center Staff see names with masked numbers. The rule is in the data

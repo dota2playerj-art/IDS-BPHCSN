@@ -69,11 +69,6 @@
   .alert-title{font-size:13px; font-weight:600; color:var(--text-dark);}
   .alert-sub{font-size:11.5px; color:var(--text-muted);}
 
-  .notif-item{display:flex; gap:11px; padding:11px 0; border-bottom:1px solid var(--border-color);}
-  .notif-item:last-child{border-bottom:none;}
-  .notif-dot{width:8px;height:8px;border-radius:50%; background:var(--teal); margin-top:6px; flex-shrink:0;}
-  .notif-text{font-size:12.5px; color:var(--text-dark);}
-  .notif-time{font-size:11px; color:var(--text-muted); margin-top:2px;}
 
   /* MINI CALENDAR */
   .mini-cal-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;}
@@ -450,14 +445,6 @@
           </div>
         </div>
 
-        <!-- NOTIFICATIONS PANEL -->
-        <div class="panel-card">
-          <div class="panel-title" style="font-size:15px;">Notifications</div>
-          <div class="panel-sub mb-2">Not yet tracked</div>
-{#- Four invented alerts used to sit here. Rather than fabricate replacements,
-    the panel states why it is empty, the way Screen 10's untracked KPIs do. #}
-          <div class="panel-sub" style="line-height:1.55;">{{ untracked.notifications }}</div>
-        </div>
 
         <!-- CALENDAR WIDGET -->
         <div class="panel-card">

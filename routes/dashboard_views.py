@@ -54,10 +54,6 @@ UNTRACKED = {
     # matching note in routes/report_views.UNTRACKED for what its removal does
     # *not* claim -- supplies and equipment leaving the store are still not
     # recorded anywhere.
-    "notifications": (
-        "Per-user notifications are not recorded. The alerts on this page, low "
-        "stock and immunisation follow-up, are the real ones."
-    ),
     "staff_activity": (
         "Per-staff totals are not shown here. Audit Logs records who did each "
         "action."
