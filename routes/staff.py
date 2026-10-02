@@ -73,6 +73,11 @@ from routes.report_export import analytics_pdf, analytics_workbook
 from routes.report_views import reports_analytics_context
 from routes.schedule_views import service_schedule_request
 from routes.sealed_access import log_unopenable
+from routes.dose_evidence_views import (
+    process_change_elsewhere,
+    process_record_elsewhere,
+    process_remove_elsewhere,
+)
 from routes.vaccination_correction_views import process_vaccination_correction
 from utils.security import login_required, role_required
 
@@ -225,6 +230,54 @@ def staff_correct_vaccination(patient_id):
         patient_id=corrected_for or patient_id,
         tab="vaccine",
     ))
+
+
+# Doses given elsewhere, recorded WITH THEIR EVIDENCE and with no consultation (Task 9, D3,
+# D5): a card that was seen, or a parent's word. Changing or removing such a record is the
+# same pair. Staff and the Doctor only (no /admin/ copy, no Official copy); the rules are in
+# models/immunizations.py and routes/dose_evidence_views.py. A failed save redisplays the
+# dialog with what was typed, as the correction route does.
+@staff_bp.route('/patient_profile/<int:patient_id>/dose-elsewhere', methods=["POST"])
+@login_required
+@role_required(*CLINICAL_FLOOR_ROLES)
+def staff_record_dose_elsewhere(patient_id):
+    done_for, reopen, message = process_record_elsewhere(
+        patient_id, request.form, session.get("user_id"), ip_address=request.remote_addr)
+    if reopen:
+        context = patient_profile_context(done_for or patient_id)
+        if context is not None:
+            context["elsewhere_state"] = reopen
+            return render_template('patient_profile.html', **context)
+    flash(message)
+    return redirect(url_for("staff.staff_patient_profile",
+                            patient_id=done_for or patient_id, tab="vaccine"))
+
+
+@staff_bp.route('/patient_profile/<int:patient_id>/dose-elsewhere/change', methods=["POST"])
+@login_required
+@role_required(*CLINICAL_FLOOR_ROLES)
+def staff_change_dose_elsewhere(patient_id):
+    done_for, reopen, message = process_change_elsewhere(
+        request.form, session.get("user_id"), ip_address=request.remote_addr)
+    if reopen:
+        context = patient_profile_context(done_for or patient_id)
+        if context is not None:
+            context["elsewhere_state"] = reopen
+            return render_template('patient_profile.html', **context)
+    flash(message)
+    return redirect(url_for("staff.staff_patient_profile",
+                            patient_id=done_for or patient_id, tab="vaccine"))
+
+
+@staff_bp.route('/patient_profile/<int:patient_id>/dose-elsewhere/remove', methods=["POST"])
+@login_required
+@role_required(*CLINICAL_FLOOR_ROLES)
+def staff_remove_dose_elsewhere(patient_id):
+    done_for, message = process_remove_elsewhere(
+        request.form, session.get("user_id"), ip_address=request.remote_addr)
+    flash(message)
+    return redirect(url_for("staff.staff_patient_profile",
+                            patient_id=done_for or patient_id, tab="vaccine"))
 
 
 # Sealing one consultation as Restricted, or lifting a seal. POST only, like

@@ -115,8 +115,11 @@
     a count of what this health center administered. #}
           <div class="stat-trend" style="color:var(--text-muted);">
             {{ immunization_coverage.enrolled }} patient{{ '' if immunization_coverage.enrolled == 1 else 's' }} with at least one dose
-{%- if immunization_coverage.doses_reported %}
-            <span style="display:block;">{{ immunization_coverage.doses_administered }} given here &middot; {{ immunization_coverage.doses_reported }} reported as given elsewhere</span>
+{%- if immunization_coverage.doses_elsewhere %}
+            <span style="display:block;">{{ immunization_coverage.doses_administered }} given here &middot; {{ immunization_coverage.doses_elsewhere }} given elsewhere (card seen)</span>
+{%- endif %}
+{%- if immunization_coverage.doses_parent_report %}
+            <span style="display:block;">Parent says given, no card: {{ immunization_coverage.doses_parent_report }}</span>
 {%- endif %}
           </div>
         </div>
@@ -149,7 +152,7 @@
           <div class="stat-value">{{ immunization_coverage.needing_attention }}</div>
           <div class="stat-label">Children Behind Schedule</div>
           <div class="stat-trend" style="color:var(--text-muted);">
-            {{ immunization_coverage.overdue_children }} overdue past the {{ grace_period_days }}-day grace period
+            {{ immunization_coverage.no_record_children }} with a dose with no record, {{ grace_period_days }} days after it was due
           </div>
         </div>
       </div>
@@ -185,7 +188,12 @@
       <div class="panel-sub mb-3">
         Each scheduled dose across the {{ dose_coverage.eligible_children }} registered
         child{{ '' if dose_coverage.eligible_children == 1 else 'ren' }} the infant schedule still applies to.
-        A dose counts as overdue once it is more than {{ grace_period_days }} days past due.
+      </div>
+      <div class="panel-sub mb-3">
+        A dose reads No record when nothing is on file {{ grace_period_days }} days after it was due.
+      </div>
+      <div class="panel-sub mb-3">
+        It may have been given elsewhere. Only doses given here, or seen on a card, count as given.
       </div>
 
       <div style="overflow-x:auto;">
@@ -197,12 +205,13 @@
               <th>Due At</th>
 {#- "Given" counts every child who has had the dose, wherever they had it --
     that is what coverage means and it is the figure the percentage is built
-    from. "Of which reported" says how many of those came from somewhere else,
-    so the column beside it can be read as coverage without being read as this
-    health center's output. #}
+    from. "Given elsewhere" says how many of those were seen on a card from somewhere
+    else, so the column can be read as coverage without being read as this health
+    center's output. "Parent says given" is NOT in Given: nobody saw it written down. #}
               <th class="num">Given</th>
-              <th class="num">Of Which Reported</th>
-              <th class="num">Overdue</th>
+              <th class="num">Given Elsewhere (Card)</th>
+              <th class="num">Parent Says Given</th>
+              <th class="num">No Record</th>
               <th class="num">Due Now</th>
               <th class="num">Not Yet Due</th>
               <th class="num">Coverage</th>
@@ -215,8 +224,9 @@
               <td style="color:var(--text-muted);">{{ dose.protects }}</td>
               <td><span class="timing-pill">{{ dose.timing }}</span></td>
               <td class="num{% if not dose.given %} count-zero{% endif %}">{{ dose.given }}</td>
-              <td class="num{% if not dose.reported %} count-zero{% endif %}"{% if dose.reported %} title="Given elsewhere and reported to this health center at a consultation"{% endif %}>{{ dose.reported }}</td>
-              <td class="num{% if not dose.overdue %} count-zero{% endif %}"{% if dose.overdue %} style="color:var(--danger); font-weight:600;"{% endif %}>{{ dose.overdue }}</td>
+              <td class="num{% if not dose.elsewhere %} count-zero{% endif %}"{% if dose.elsewhere %} title="Given elsewhere; the vaccination card was seen here"{% endif %}>{{ dose.elsewhere }}</td>
+              <td class="num{% if not dose.parent_report %} count-zero{% endif %}"{% if dose.parent_report %} title="The parent says it was given and has no card. Not counted as given"{% endif %}>{{ dose.parent_report }}</td>
+              <td class="num{% if not dose.no_record %} count-zero{% endif %}"{% if dose.no_record %} style="color:var(--danger); font-weight:600;"{% endif %}>{{ dose.no_record }}</td>
               <td class="num{% if not dose.due_now %} count-zero{% endif %}"{% if dose.due_now %} style="color:var(--warning); font-weight:600;"{% endif %}>{{ dose.due_now }}</td>
               <td class="num{% if not dose.upcoming %} count-zero{% endif %}">{{ dose.upcoming }}</td>
 {%- if dose.coverage_pct is not none %}
@@ -235,11 +245,14 @@
         {{ dose_coverage.total_given }} of {{ dose_coverage.total_scheduled }} scheduled doses given across
         {{ dose_coverage.doses | length }} scheduled doses &times; {{ dose_coverage.eligible_children }}
         child{{ '' if dose_coverage.eligible_children == 1 else 'ren' }} &middot;
-{%- if dose_coverage.total_reported %}
+{%- if dose_coverage.total_elsewhere %}
         {{ dose_coverage.total_administered }} given at this health center and
-        {{ dose_coverage.total_reported }} reported as given elsewhere &middot;
+        {{ dose_coverage.total_elsewhere }} given elsewhere (card seen) &middot;
 {%- endif %}
-        {{ dose_coverage.total_overdue }} overdue, {{ dose_coverage.total_due_now }} due now.
+{%- if dose_coverage.total_parent_report %}
+        Parent says given, no card: {{ dose_coverage.total_parent_report }} (not counted) &middot;
+{%- endif %}
+        {{ dose_coverage.total_no_record }} with no record, {{ dose_coverage.total_due_now }} due now.
 {%- else %}
         No registered patient is young enough for the DOH infant schedule, so there is nothing to
         count against it. The dose rows above show the schedule itself.

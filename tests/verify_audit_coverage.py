@@ -296,7 +296,8 @@ v17 = latest_visit(17)
 doctor.post("/staff/appointment_scheduling/start-consultation", data={"appointment_id": str(v17)})
 start = mark()
 r = doctor.post(f"/staff/consultation/record/{v17}", data=dict(
-    consult, weight="6", immunizations=["PENTA:1"], immunizations_elsewhere=["OPV:1"]))
+    consult, weight="6", immunizations=["PENTA:1"], immunizations_elsewhere=["OPV:1"],
+    elsewhere_proof_OPV_1="card", elsewhere_date_OPV_1=today().isoformat()))
 c17 = q("SELECT id FROM consultations WHERE appointment_id = ?", (v17,))
 c17 = c17[0][0] if c17 else 0
 got = {r["action"]: r for r in since(start)}

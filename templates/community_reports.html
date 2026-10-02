@@ -365,8 +365,11 @@
           <div class="stat-trend" style="color:var(--text-muted);">
             {{ window.start | display_date }} &ndash; {{ window.end | display_date }} &middot;
             to {{ immunization_coverage.window.children_dosed }} child{{ '' if immunization_coverage.window.children_dosed == 1 else 'ren' }}
-{%- if immunization_coverage.window.doses_reported %}
-            <span style="display:block;">plus {{ immunization_coverage.window.doses_reported }} dated in this range but reported as given elsewhere</span>
+{%- if immunization_coverage.window.doses_elsewhere %}
+            <span style="display:block;">plus {{ immunization_coverage.window.doses_elsewhere }} dated in this range and given elsewhere (card seen)</span>
+{%- endif %}
+{%- if immunization_coverage.window.doses_parent_report %}
+            <span style="display:block;">Parent says given, no card: {{ immunization_coverage.window.doses_parent_report }}</span>
 {%- endif %}
           </div>
         </div>

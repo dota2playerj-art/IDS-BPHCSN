@@ -80,7 +80,7 @@ def appointment_scheduling_context(month=None):
     role = current_role()
     entries = attach_visit_reasons(entries, role, queue_view=True)
 
-    # Which children in today's queue are due or overdue for a dose. Read once
+    # Which children in today's queue have a dose due or with no record. Read once
     # for the whole roster rather than per row -- get_immunization_alert() reads
     # every dose in one query -- and matched onto the queue by patient id, so the
     # badge on a row and the count on the dashboard are the same calculation.

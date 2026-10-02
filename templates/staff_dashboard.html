@@ -163,11 +163,11 @@
            card beside it, reading from get_immunization_alert(). -->
       <div class="col-xl col-md-4 col-sm-6">
         <div class="stat-card">
-          <div class="stat-icon" style="background:{{ '#FEE2E2' if immunization_alert.overdue_child_count else '#DBEAFE' }};"><span class="material-symbols-outlined" style="color:{{ 'var(--danger)' if immunization_alert.overdue_child_count else 'var(--info)' }};">vaccines</span></div>
+          <div class="stat-icon" style="background:{{ '#FEE2E2' if immunization_alert.no_record_child_count else '#DBEAFE' }};"><span class="material-symbols-outlined" style="color:{{ 'var(--danger)' if immunization_alert.no_record_child_count else 'var(--info)' }};">vaccines</span></div>
           <div class="stat-value">{{ immunization_alert.child_count }}</div>
           <div class="stat-label">Children Due for Immunization</div>
-          {%- if immunization_alert.overdue_child_count %}
-          <div class="stat-trend" style="color:var(--danger);">{{ immunization_alert.overdue_child_count }} overdue &middot; {{ immunization_alert.due_dose_count }} dose{{ '' if immunization_alert.due_dose_count == 1 else 's' }} outstanding</div>
+          {%- if immunization_alert.no_record_child_count %}
+          <div class="stat-trend" style="color:var(--danger);">{{ immunization_alert.no_record_child_count }} with no record &middot; {{ immunization_alert.due_dose_count }} dose{{ '' if immunization_alert.due_dose_count == 1 else 's' }} to follow up</div>
           {%- elif immunization_alert.child_count %}
           <div class="stat-trend" style="color:var(--warning);">{{ immunization_alert.due_dose_count }} dose{{ '' if immunization_alert.due_dose_count == 1 else 's' }} due</div>
           {%- else %}
@@ -426,9 +426,9 @@
           <div class="panel-sub mb-2">{{ immunization_alert.child_count }} child{{ "ren" if immunization_alert.child_count != 1 else "" }} with a dose outstanding</div>
           <div>
 {%- for child in immunization_alert.children %}
-{%- set overdue = child.overdue_count > 0 %}
+{%- set no_record = child.no_record_count > 0 %}
             <div class="alert-row">
-              <div class="alert-icon" style="background:{{ '#FEE2E2' if overdue else '#FEF3C7' }};"><span class="material-symbols-outlined" style="color:{{ 'var(--danger)' if overdue else 'var(--warning)' }}; font-size:18px;">vaccines</span></div>
+              <div class="alert-icon" style="background:{{ '#FEE2E2' if no_record else '#FEF3C7' }};"><span class="material-symbols-outlined" style="color:{{ 'var(--danger)' if no_record else 'var(--warning)' }}; font-size:18px;">vaccines</span></div>
               <div>
                 <div class="alert-title"><a href="{{ url_for(patient_profile_endpoint, patient_id=child.patient.id) }}" style="color:inherit; text-decoration:none;">{{ child.patient.full_name }}</a></div>
                 <div class="alert-sub">{{ child.patient.age or 'age unknown' }} &middot; {{ child.next_label }}{% if child.attention_count > 1 %} and {{ child.attention_count - 1 }} more{% endif %} &middot; {{ child.next_status | lower }}</div>

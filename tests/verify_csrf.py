@@ -470,6 +470,12 @@ class Forms(HTMLParser):
                           "action": attrs.get("action") or "", "tokens": [],
                           "formactions": []}
             self.forms.append(self._form)
+            # A form whose action a script switches between several URLs names them in
+            # data-*-url attributes (the dose-given-elsewhere dialog, Task 9). They are
+            # POST targets of this form, so they count as reached when the form is.
+            for name, value in attrs.items():
+                if name.startswith("data-") and name.endswith("-url") and value.startswith("/"):
+                    self._form["formactions"].append(value)
         if self._form is not None and tag == "input" and attrs.get("name") == "csrf_token":
             self._form["tokens"].append(attrs.get("value", ""))
         if (self._form is not None and tag == "button"

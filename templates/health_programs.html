@@ -166,9 +166,12 @@
     the patient has had -- and the clause names how many this health center did
     not give, so the figure cannot be read as its own workload. #}
             {{ immunization_coverage.doses_given }} dose{{ '' if immunization_coverage.doses_given == 1 else 's' }} recorded
-{%- if immunization_coverage.doses_reported %}
+{%- if immunization_coverage.doses_elsewhere or immunization_coverage.doses_parent_report %}
             ({{ immunization_coverage.doses_administered }} given here,
-            {{ immunization_coverage.doses_reported }} reported as given elsewhere).
+            {{ immunization_coverage.doses_elsewhere }} given elsewhere with a card seen).
+{%- if immunization_coverage.doses_parent_report %}
+            Parent says given, no card: {{ immunization_coverage.doses_parent_report }}, not counted.
+{%- endif %}
 {%- else %}
             here.
 {%- endif %}

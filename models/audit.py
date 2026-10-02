@@ -127,7 +127,7 @@ ACTION_CONSULTATION_UPDATED = "Updated consultation record"
 # SEPARATE FROM ACTION_LOGIN_FAILED. Both sentences are about a vaccination
 # record, and collapsing them would lose the distinction that decides what a
 # reader does next. An EPI dose is graded against the national schedule: moving
-# its date moves whether a child reads as Due Now or Overdue on every screen that
+# its date moves whether a child reads as Due Now or No record on every screen that
 # counts them. A vaccination outside that schedule is graded against nothing, so
 # correcting one changes a history and no status anywhere. An administrator
 # asking "did a correction change who is showing as a defaulter?" needs those two
@@ -514,6 +514,13 @@ ACTION_CONSULTATION_RECORDED = "Recorded consultation"
 ACTION_EPI_DOSES_RECORDED = "Recorded EPI immunisation doses"
 ACTION_REPORTED_DOSES_RECORDED = "Recorded doses given elsewhere"
 ACTION_OTHER_VACCINATIONS_RECORDED = "Recorded other vaccinations"
+# Doses given elsewhere, recorded from the Immunization Record tab with no consultation
+# (Task 9). A card that was seen, a parent's word, and what can be done to either.
+ACTION_ELSEWHERE_DOSE_RECORDED = "Recorded a dose given elsewhere"
+ACTION_PARENT_REPORT_RECORDED = "Recorded a parent report of a dose"
+ACTION_PARENT_REPORT_UPGRADED = "Upgraded a parent report to a card record"
+ACTION_ELSEWHERE_DOSE_CHANGED = "Changed a dose record given elsewhere"
+ACTION_ELSEWHERE_DOSE_REMOVED = "Removed a dose record given elsewhere"
 # Medicine Inventory. Dispensing moves stock, so it is filed here. An edit that
 # moved the stock figure is "Adjusted stock quantity", the more serious fact.
 ACTION_MEDICINE_DISPENSED = "Dispensed medicine"

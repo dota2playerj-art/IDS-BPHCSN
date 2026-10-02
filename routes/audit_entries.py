@@ -36,6 +36,11 @@ from models.audit import (
     ACTION_PATIENT_STATUS_CHANGED,
     ACTION_PATIENT_UPDATED,
     ACTION_REPORTED_DOSES_RECORDED,
+    ACTION_ELSEWHERE_DOSE_CHANGED,
+    ACTION_ELSEWHERE_DOSE_RECORDED,
+    ACTION_ELSEWHERE_DOSE_REMOVED,
+    ACTION_PARENT_REPORT_RECORDED,
+    ACTION_PARENT_REPORT_UPGRADED,
     ACTION_STOCK_ADJUSTED,
     MODULE_APPOINTMENTS,
     MODULE_CONSULTATIONS,
@@ -177,6 +182,47 @@ def epi_doses_recorded(patient_id, consultation_id, user_id, ip_address=None):
 
 def reported_doses_recorded(patient_id, consultation_id, user_id, ip_address=None):
     return _doses(ACTION_REPORTED_DOSES_RECORDED, patient_id, consultation_id, user_id, ip_address)
+
+
+def elsewhere_dose_recorded(patient_id, user_id, ip_address=None):
+    """One dose given elsewhere, recorded outside a consultation. Never which vaccine.
+
+    `audit(conn, outcome)`: a new card record, a new parent report, or a parent report
+    upgraded to a card record, each with its own action and wording (Task 9, D6).
+    """
+    card = _entry(user_id, ip_address, ACTION_ELSEWHERE_DOSE_RECORDED, MODULE_IMMUNIZATIONS)
+    parent = _entry(user_id, ip_address, ACTION_PARENT_REPORT_RECORDED, MODULE_IMMUNIZATIONS)
+    upgraded = _entry(user_id, ip_address, ACTION_PARENT_REPORT_UPGRADED, MODULE_IMMUNIZATIONS)
+
+    def audit(conn, outcome, evidence="card"):
+        who = _patient(conn, patient_id)
+        if outcome == "upgraded":
+            upgraded(conn, f"Upgraded a parent report to a card record for {who}.")
+        elif evidence == "parent_report":
+            parent(conn, f"Recorded a parent report of 1 dose for {who}.")
+        else:
+            card(conn, f"Recorded 1 dose given elsewhere for {who}.")
+    return audit
+
+
+def elsewhere_dose_changed(patient_id, user_id, ip_address=None):
+    """A card or parent's-report record changed. `audit(conn, outcome)`."""
+    changed = _entry(user_id, ip_address, ACTION_ELSEWHERE_DOSE_CHANGED, MODULE_IMMUNIZATIONS)
+    upgraded = _entry(user_id, ip_address, ACTION_PARENT_REPORT_UPGRADED, MODULE_IMMUNIZATIONS)
+
+    def audit(conn, outcome):
+        who = _patient(conn, patient_id)
+        if outcome == "upgraded":
+            upgraded(conn, f"Upgraded a parent report to a card record for {who}.")
+        else:
+            changed(conn, f"Changed 1 dose record given elsewhere for {who}.")
+    return audit
+
+
+def elsewhere_dose_removed(patient_id, user_id, ip_address=None):
+    write = _entry(user_id, ip_address, ACTION_ELSEWHERE_DOSE_REMOVED, MODULE_IMMUNIZATIONS)
+    return lambda conn: write(
+        conn, f"Removed 1 dose record given elsewhere for {_patient(conn, patient_id)}.")
 
 
 def other_vaccinations_recorded(patient_id, consultation_id, user_id, ip_address=None):

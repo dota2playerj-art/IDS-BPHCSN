@@ -466,11 +466,14 @@
         </div>
 
 {%- if immunization.attention_items %}
-        <div class="alert-ids {% if immunization.overdue_count %}alert-warning-ids{% else %}alert-info-ids{% endif %}" style="margin-bottom:18px;">
-          <span class="material-symbols-outlined">{% if immunization.overdue_count %}warning{% else %}event_available{% endif %}</span>
+        <div class="alert-ids {% if immunization.no_record_count %}alert-warning-ids{% else %}alert-info-ids{% endif %}" style="margin-bottom:18px;">
+          <span class="material-symbols-outlined">{% if immunization.no_record_count %}warning{% else %}event_available{% endif %}</span>
           <div>
-            <strong>{{ immunization.attention_count }} dose{{ '' if immunization.attention_count == 1 else 's' }} outstanding for {{ patient.first_name }}</strong>
+            <strong>{% if immunization.no_record_count %}{{ immunization.no_record_count }} dose{{ ' has' if immunization.no_record_count == 1 else 's have' }} no record here for {{ patient.first_name }}{% else %}{{ immunization.attention_count }} dose{{ '' if immunization.attention_count == 1 else 's' }} to follow up for {{ patient.first_name }}{% endif %}</strong>
             {% for item in immunization.attention_items %}{{ item.label }} ({{ item.status | lower }}{% if item.due_date %}, due {{ item.due_date | display_date }}{% endif %}){{ "; " if not loop.last else "" }}{% endfor %}.
+{%- if immunization.no_record_count or immunization.parent_report_count %}
+            Ask for the child's vaccination card. If the card shows the dose, tick Given elsewhere and choose the card.
+{%- endif %}
           </div>
         </div>
 {%- endif %}
@@ -484,7 +487,7 @@
                      A dose the child had at another hospital or in another
                      barangay is not a dose this health center gave, and until
                      this column existed the only way to stop the schedule
-                     calling such a child Overdue was to tick the box on the
+                     calling such a child's dose missing was to tick the box on the
                      left — filing somebody else's vaccination as this health
                      center's own work, on today's date, under this operator's
                      name. Two columns rather than one control with two meanings,
@@ -511,7 +514,7 @@
                        doses recorded at this very visit, which is what makes the
                        form add-only. -->
                   <span class="material-symbols-outlined" style="font-size:19px; color:{{ '#B45309' if item.reported else 'var(--success)' }};"
-                        title="{% if item.reported %}{{ item.source_label }} ({% if item.date_known %}{{ item.date_administered | display_date }}{% else %}{{ unknown_date_text | lower }}{% endif %}){% else %}Recorded on {{ item.date_administered | display_date }}{% endif %} — a dose on file cannot be removed from this form">{{ 'history' if item.reported else 'task_alt' }}</span>
+                        title="{% if item.reported %}{{ item.evidence_label }} ({% if item.date_known %}{{ item.date_administered | display_date }}{% else %}{{ unknown_date_text | lower }}{% endif %}){% else %}Recorded on {{ item.date_administered | display_date }}{% endif %} — a dose on file cannot be removed from this form">{{ 'history' if item.reported else 'task_alt' }}</span>
 {%- else %}
                   <input type="checkbox" class="form-check-input dose-today" name="{{ immunization_field }}"
                          value="{{ item.key }}" id="dose{{ loop.index }}"{% if item.checked %} checked{% endif %}
@@ -531,15 +534,25 @@
                   <label class="elsewhere-tick">
                     <input type="checkbox" class="form-check-input dose-elsewhere" name="{{ immunization_elsewhere_field }}"
                            value="{{ item.key }}" id="elsewhere{{ loop.index }}"{% if item.reported_checked %} checked{% endif %}
-                           data-pair="{{ item.key }}" data-date-field="{{ item.reported_date_field }}"
+                           data-pair="{{ item.key }}" data-date-field="{{ item.reported_date_field }}" data-proof-field="{{ item.reported_proof_field }}"
                            aria-label="Record {{ item.label }} as previously given elsewhere">
                     <span>Given elsewhere</span>
                   </label>
                   <input type="date" class="form-control elsewhere-date{% if errors.get(item.reported_date_field) %} is-invalid{% endif %}"
                          name="{{ item.reported_date_field }}" id="{{ item.reported_date_field }}"
                          value="{{ item.reported_date_value }}" max="{{ visit_date }}"
-                         aria-label="Date {{ item.label }} was given elsewhere, if known">
-                  <div class="elsewhere-hint">Date if known — leave blank if not</div>
+                         aria-label="Date {{ item.label }} was given elsewhere">
+                  <select class="form-select elsewhere-proof{% if errors.get(item.reported_proof_field) %} is-invalid{% endif %}"
+                          name="{{ item.reported_proof_field }}" id="{{ item.reported_proof_field }}"
+                          aria-label="How do you know {{ item.label }} was given elsewhere?" style="font-size:12.5px; padding:5px 8px; max-width:230px; margin-top:4px;">
+                    <option value="">How do you know?</option>
+                    <option value="card"{% if item.reported_proof_value == 'card' %} selected{% endif %}>I saw the card</option>
+                    <option value="parent_report"{% if item.reported_proof_value == 'parent_report' %} selected{% endif %}>Parent says so, no card</option>
+                  </select>
+                  <div class="elsewhere-hint">Date: required if you saw the card</div>
+{%- if errors.get(item.reported_proof_field) %}
+                  <div class="invalid-feedback d-block">{{ errors.get(item.reported_proof_field) }}</div>
+{%- endif %}
 {%- if errors.get(item.reported_date_field) %}
                   <div class="invalid-feedback d-block">{{ errors.get(item.reported_date_field) }}</div>
 {%- endif %}
@@ -555,7 +568,7 @@
     and a dose given somewhere else, and putting the badge after the date would
     let a hurried reader take the first thing in the cell for the whole answer. #}
 {%- if item.reported %}
-                  <span class="badge-source badge-reported">{{ item.source_short_label }}</span>
+                  <span class="badge-source badge-reported">{{ item.evidence_short_label }}</span>
                   <span style="display:block; margin-top:3px;">{% if item.date_known %}{{ item.date_administered | display_date }}{% else %}{{ unknown_date_text }}{% endif %}{% if item.given_here %} &middot; reported at this visit{% endif %}</span>
 {%- elif item.given_here %}Recorded at this visit{% if item.date_administered %} &middot; {{ item.date_administered | display_date }}{% endif %}
 {%- elif item.given %}{{ item.date_administered | display_date }}{% if item.administered_by_name %} &middot; {{ item.administered_by_name }}{% endif %}
@@ -577,7 +590,7 @@
         <div class="cohort-note">
           Doses ticked <strong style="display:inline;">Given today</strong> are recorded against this
           consultation and dated {{ visit_date | display_date }}, with your name as the person who gave them.
-          Doses ticked <strong style="display:inline;">Given elsewhere</strong> are recorded as reported at this visit and never shown as given here. Both stop the dose counting as overdue. A dose already on file cannot be changed here.
+          Doses ticked <strong style="display:inline;">Given elsewhere</strong> need proof. A card you saw counts as given. A parent's word alone does not. A dose already on file cannot be changed here.
 {%- if consultation %}
           You can still add a dose that was missed. Every addition is written to the audit log.
 {%- endif %}
@@ -595,7 +608,7 @@
            anyone else — an adult's hepatitis B dose, a traveller's rabies course,
            a senior's flu shot — had nowhere in this system to be written down at
            all. That is what this records, and it records nothing else: no due
-           date, no status, no overdue. There is no single official adult
+           date, no status, no missing-dose flag. There is no single official adult
            immunisation schedule in the Philippines to measure against, so a
            status here would be invented rather than clinical.
 
@@ -690,7 +703,7 @@
 
 {#- Kept to the rules an operator has to act on. The version this replaces
     argued its own design back at the reader -- why an invented dose number is
-    worse than a blank, why nothing here is graded due or overdue -- which is
+    worse than a blank, why nothing here is graded due or missing -- which is
     reasoning that belonged in this comment rather than under the form. Every
     rule it stated is still stated. #}
         <div class="cohort-note">
@@ -1199,10 +1212,12 @@
       // models.immunizations.reported_date_field(). Spelling it in JavaScript
       // would be a second copy of a name the parser actually reads.
       var dateBox = document.getElementById(elsewhere.getAttribute('data-date-field'));
+      var proofBox = document.getElementById(elsewhere.getAttribute('data-proof-field'));
 
       function onChange(changed){
         if(changed === today && today.checked){ elsewhere.checked = false; }
         if(changed === elsewhere && elsewhere.checked){ today.checked = false; }
+        if(proofBox){ proofBox.disabled = !elsewhere.checked; if(!elsewhere.checked){ proofBox.value = ''; } }
         if(!dateBox){ return; }
         dateBox.disabled = !elsewhere.checked;
         // Cleared rather than merely greyed, but ONLY on a click. A disabled
@@ -1221,6 +1236,7 @@
       // message pointing at a field that no longer holds anything. So a date box
       // with something in it stays live whatever its tick says; only an empty
       // one starts disabled.
+      if(proofBox){ proofBox.disabled = !elsewhere.checked && !proofBox.value; }
       if(dateBox){ dateBox.disabled = !elsewhere.checked && !dateBox.value; }
     });
   })();

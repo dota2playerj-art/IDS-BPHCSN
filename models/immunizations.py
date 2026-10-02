@@ -328,11 +328,10 @@ def get_immunization_status(patient, on_date=None, records=None):
         schedule        one entry per scheduled dose, in schedule order, each
                         carrying its status, badge class, administered detail and
                         -- where a dose is on file -- where that dose came from
-        attention_items the Overdue and Due Now entries, most urgent first
+        attention_items the No record, Due Now and parent-report entries, most urgent first
         extra_records   doses on file that the current schedule does not list
-        counts          completed / due_now / overdue / upcoming / total, plus
-                        how many of the completed ones were reported rather than
-                        given here
+        counts          given / given here / given elsewhere / parent report /
+                        due_now / no_record / upcoming / total
         next_due        the soonest dose not yet given, or None
         summary         one line a screen can print without composing it itself
 
@@ -605,7 +604,8 @@ def get_immunization_alert(limit=None, on_date=None):
         "children": children if limit is None else children[:limit],
         "child_count": len(children),
         "no_record_child_count": sum(1 for child in children if child["no_record_count"]),
-        "due_dose_count": sum(child["due_count"] for child in children),
+        # Doses to follow up across those children: no record, due now, or only a parent's word.
+        "due_dose_count": sum(child["attention_count"] for child in children),
         "no_record_dose_count": sum(child["no_record_count"] for child in children),
         "patient_ids": {child["patient"]["id"] for child in children},
         # The two figures a coverage percentage is built from. up_to_date is the
@@ -734,7 +734,7 @@ def get_dose_coverage(on_date=None):
     What *is* stored is every dose given to every child, and the DOH schedule
     says which doses each child should have had by now. So the real unit here is
     the scheduled dose, not the campaign: for each of the EPI schedule's entries,
-    how many of the eligible children have had it, and how many are overdue, due
+    how many of the eligible children have had it, and how many have no record, are due
     now or not yet due. That is a coverage report a barangay can act on, and
     every figure in it traces to a row in `immunizations`.
 
@@ -1188,8 +1188,8 @@ def record_elsewhere_dose(patient_id, code, dose_number, evidence, date_given, p
         "already-given"  the dose already counts as given (here, or a card): refused
         "invalid"        not a dose of the schedule, bad evidence, or a card with no date
 
-    `audit(conn, outcome)` is called before the commit when something was written.
-    The caller has already validated the date against the patient; this re-checks only
+    `audit(conn, outcome, evidence)` is called before the commit when something was
+    written. The caller has already validated the date against the patient; this re-checks only
     what the table's rules need.
     """
     day = date_given.isoformat() if hasattr(date_given, "isoformat") else (date_given or None)
@@ -1226,7 +1226,7 @@ def record_elsewhere_dose(patient_id, code, dose_number, evidence, date_given, p
                 (EVIDENCE_CARD, day, place, recorded_by, existing["id"], EVIDENCE_PARENT))
             outcome = "upgraded"
         if audit:
-            audit(conn, outcome)
+            audit(conn, outcome, evidence)
         conn.commit()
     return outcome
 

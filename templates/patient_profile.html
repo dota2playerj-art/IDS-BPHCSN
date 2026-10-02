@@ -516,7 +516,7 @@
     the tab having to be opened first -- the point of tracking defaulters is that
     nobody has to go looking. #}
 {%- if immunization and immunization.needs_attention %}
-            <span class="badge-status {{ 'badge-cancelled' if immunization.overdue_count else 'badge-waiting' }}" style="margin-left:6px; font-size:11px; padding:2px 8px;">{{ immunization.attention_count }}</span>
+            <span class="badge-status {{ 'badge-cancelled' if immunization.no_record_count else 'badge-waiting' }}" style="margin-left:6px; font-size:11px; padding:2px 8px;">{{ immunization.attention_count }}</span>
 {%- endif %}
           </button>
         </li>
@@ -771,7 +771,7 @@
                             <span class="material-symbols-outlined" style="font-size:15px; vertical-align:-2px; color:{{ '#B45309' if dose.reported else 'var(--teal-dark)' }};">{{ 'history' if dose.reported else 'vaccines' }}</span>
                             {{ dose.label }}
 {%- if dose.reported %}
-                            <span class="badge-source badge-reported">{{ dose.source_short_label }}</span>
+                            <span class="badge-source badge-reported">{{ dose.evidence_short_label }}</span>
                             <span style="color:var(--text-muted);">&middot; {% if dose.date_known %}{{ dose.date_administered | display_date }}{% else %}{{ immunization_unknown_date_text | lower }}{% endif %} &middot; recorded by {{ dose.administered_by_name }}</span>
 {%- else %}
                             <span style="color:var(--text-muted);">&middot; {{ dose.date_administered | display_date }} &middot; by {{ dose.administered_by_name }}</span>
@@ -987,9 +987,12 @@
             </div>
 {%- if immunization.applicable %}
             <div class="d-flex gap-2 flex-wrap">
-              <span class="badge-status badge-completed">{{ immunization.completed_count }} completed</span>
-{%- if immunization.overdue_count %}
-              <span class="badge-status badge-cancelled">{{ immunization.overdue_count }} overdue</span>
+              <span class="badge-status badge-completed">{{ immunization.completed_count }} given</span>
+{%- if immunization.no_record_count %}
+              <span class="badge-status badge-cancelled">{{ immunization.no_record_count }} no record</span>
+{%- endif %}
+{%- if immunization.parent_report_count %}
+              <span class="badge-status badge-waiting">{{ immunization.parent_report_count }} parent says given</span>
 {%- endif %}
 {%- if immunization.due_count %}
               <span class="badge-status badge-waiting">{{ immunization.due_count }} due now</span>
@@ -1002,11 +1005,18 @@
 {%- if immunization.attention_items %}
           <!-- Same amber/red split the Medicine Stock Alerts panel uses: red once
                it is past the grace period, amber while it is merely due. -->
-          <div style="border-radius:12px; border:1px solid {{ '#FECACA' if immunization.overdue_count else '#FDE68A' }}; background:{{ '#FEF2F2' if immunization.overdue_count else '#FFFBEB' }}; color:{{ '#B91C1C' if immunization.overdue_count else '#92400E' }}; padding:14px 16px; font-size:13.5px; display:flex; gap:12px; align-items:flex-start; margin-bottom:18px;">
-            <span class="material-symbols-outlined" style="font-size:20px; margin-top:1px;">{{ 'warning' if immunization.overdue_count else 'event_available' }}</span>
+          <div style="border-radius:12px; border:1px solid {{ '#FECACA' if immunization.no_record_count else '#FDE68A' }}; background:{{ '#FEF2F2' if immunization.no_record_count else '#FFFBEB' }}; color:{{ '#B91C1C' if immunization.no_record_count else '#92400E' }}; padding:14px 16px; font-size:13.5px; display:flex; gap:12px; align-items:flex-start; margin-bottom:18px;">
+            <span class="material-symbols-outlined" style="font-size:20px; margin-top:1px;">{{ 'warning' if immunization.no_record_count else 'event_available' }}</span>
             <div>
-              <strong style="display:block; margin-bottom:2px;">{{ immunization.attention_count }} dose{{ '' if immunization.attention_count == 1 else 's' }} outstanding</strong>
+{%- if immunization.no_record_count %}
+              <strong style="display:block; margin-bottom:2px;">{{ immunization.no_record_count }} dose{{ ' has' if immunization.no_record_count == 1 else 's have' }} no record here</strong>
+{%- else %}
+              <strong style="display:block; margin-bottom:2px;">{{ immunization.attention_count }} dose{{ '' if immunization.attention_count == 1 else 's' }} to follow up</strong>
+{%- endif %}
               {% for item in immunization.attention_items %}{{ item.label }} ({{ item.status | lower }}{% if item.due_date %}, due {{ item.due_date | display_date }}{% endif %}){{ "; " if not loop.last else "" }}{% endfor %}.
+{%- if immunization.no_record_count or immunization.parent_report_count %}
+              Ask for the child's vaccination card. If the card shows the dose, record it as given elsewhere.
+{%- endif %}
 {#- The line under the list used to read "Record these during the child's next
     consultation" on every render, which is wrong on the one render where it
     matters most: if the child is with a clinician right now, the next
@@ -1069,8 +1079,8 @@
                   <td style="color:var(--text-muted); font-size:12.5px;">{{ item.timing }}</td>
                   <td>{{ item.due_date | display_date if item.due_date else '—' }}</td>
 {#- THREE CELLS SAY WHERE A DOSE CAME FROM, AND THAT IS DELIBERATE REDUNDANCY.
-    A dose reported as given elsewhere counts as Completed, which is correct --
-    the child is protected and must stop showing as Overdue. The risk that
+    A dose given elsewhere counts as given ONLY when its card was seen --
+    then the child is protected and must stop showing as No record. The risk that
     creates is that a reader scanning the Status column sees the same green badge
     for a dose this health center gave and one it did not, and takes the record
     to be saying more than it says. So the date says whether it is even known,
@@ -1090,8 +1100,8 @@
                   </td>
                   <td>
                     <span class="badge-status {{ item.badge_class }}">{{ item.status }}</span>
-{%- if item.reported %}
-                    <span class="badge-source badge-reported" style="margin-top:4px;">{{ item.source_short_label }}</span>
+{%- if item.reported and item.place_given %}
+                    <span style="display:block; margin-top:4px; font-size:11.5px; color:var(--text-muted);">{{ item.place_given }}</span>
 {%- endif %}
                   </td>
 {%- if can_correct %}
@@ -1102,20 +1112,35 @@
     suggest a vaccination could be created from here. It cannot: doses are
     recorded during a consultation, and this path only puts right what that
     path already wrote. #}
-{%- if item.given %}
-                    <button type="button" class="action-icon" title="Correct this record — {{ item.label }}, {% if item.reported %}{{ item.source_label | lower }}{% if item.date_known %} on {{ item.date_administered | display_date }}{% else %}, {{ immunization_unknown_date_text | lower }}{% endif %}{% else %}given {{ item.date_administered | display_date }}{% endif %}"
+{%- if record_elsewhere_endpoint is defined and item.reported %}
+                    <button type="button" class="action-icon" title="Change or remove this record — {{ item.label }}, {{ item.evidence_label | lower }}"
+                            data-bs-toggle="modal" data-bs-target="#elsewhereModal"
+                            data-mode="change" data-record-id="{{ item.record_id }}" data-label="{{ item.label }}"
+                            data-dose-key="{{ item.key }}" data-evidence="{{ item.evidence }}"
+                            data-date="{{ item.date_administered or '' }}" data-place="{{ item.place_given or '' }}"><span class="material-symbols-outlined" style="font-size:18px;">edit</span></button>
+{%- endif %}
+{%- if record_elsewhere_endpoint is defined and item.can_record_elsewhere %}
+                    <button type="button" class="btn-outline-teal" style="padding:5px 10px; font-size:12px; white-space:nowrap;"
+                            title="Record {{ item.label }} as given elsewhere. Ask for the vaccination card first."
+                            data-bs-toggle="modal" data-bs-target="#elsewhereModal"
+                            data-mode="record" data-label="{{ item.label }}" data-dose-key="{{ item.key }}">
+                      <span class="material-symbols-outlined" style="font-size:15px;">history_edu</span>Record dose given elsewhere</button>
+{%- endif %}
+{%- if item.given and not item.reported %}
+                    <button type="button" class="action-icon" title="Correct this record — {{ item.label }}, {% if item.reported %}{{ item.evidence_label | lower }}{% if item.date_known %} on {{ item.date_administered | display_date }}{% else %}, {{ immunization_unknown_date_text | lower }}{% endif %}{% else %}given {{ item.date_administered | display_date }}{% endif %}"
                             data-bs-toggle="modal" data-bs-target="#correctVaccinationModal"
                             data-kind="{{ correction.epi_kind }}"
                             data-record-id="{{ item.record_id }}"
                             data-label="{{ item.label }}"
                             data-vaccine="{{ item.code }}:{{ item.dose_number }}"
                             data-date="{{ item.date_administered or '' }}"
-                            data-source="{{ item.source }}"
-                            data-source-label="{{ item.source_label }}"
+                            data-source="{{ item.evidence }}"
+                            data-source-label="{{ item.evidence_label }}"
                             data-date-optional="{{ '1' if item.reported else '0' }}"
                             data-recorded-by="{{ item.administered_by_name or '' }}"><span class="material-symbols-outlined" style="font-size:18px;">edit</span></button>
-{%- elif item.needs_attention and immunization_next_step %}
-{#- A Due or Overdue row still has no action -- there is nothing recorded to
+{%- endif %}
+{%- if item.needs_attention and not item.given and immunization_next_step %}
+{#- A Due or No-record row still has no action beside the buttons above -- there is nothing recorded to
     correct, and a dose cannot be created from a static profile screen with no
     visit behind it. What it now has is the next step, which depends on whether
     the child is actually at the health center: a link to the visit being written
@@ -1136,8 +1161,6 @@
                     <span style="color:var(--text-muted); font-size:12px; white-space:nowrap;"
                           title="{{ immunization_next_step.detail }}">{{ immunization_next_step.label }}</span>
 {%- endif %}
-{%- else %}
-                    <span style="color:var(--text-muted); font-size:12px;">&mdash;</span>
 {%- endif %}
                   </td>
 {%- endif %}
@@ -1162,7 +1185,7 @@
                     <td style="font-weight:600;">
                       {{ record.label }}
 {%- if record.reported %}
-                      <span class="badge-source badge-reported" style="margin-top:4px;">{{ record.source_short_label }}</span>
+                      <span class="badge-source badge-reported" style="margin-top:4px;">{{ record.evidence_short_label }}</span>
 {%- endif %}
                     </td>
                     <td>
@@ -1182,17 +1205,25 @@
     vaccine to its list when the current schedule no longer carries it, so the
     date on a dose from a superseded schedule revision can be put right without
     the record being forced onto a pairing that would misname what was given. #}
-                      <button type="button" class="action-icon" title="Correct this record — {{ record.label }}, {% if record.reported %}{{ record.source_label | lower }}{% if record.date_known %} on {{ record.date_administered | display_date }}{% else %}, {{ immunization_unknown_date_text | lower }}{% endif %}{% else %}given {{ record.date_administered | display_date }}{% endif %}"
+{%- if record.reported and record_elsewhere_endpoint is defined %}
+                      <button type="button" class="action-icon" title="Change or remove this record — {{ record.label }}, {{ record.evidence_label | lower }}"
+                              data-bs-toggle="modal" data-bs-target="#elsewhereModal"
+                              data-mode="change" data-record-id="{{ record.id }}" data-label="{{ record.label }}"
+                              data-dose-key="{{ record.vaccine_code }}:{{ record.dose_number }}" data-evidence="{{ record.evidence }}"
+                              data-date="{{ record.date_administered or '' }}" data-place="{{ record.place_given or '' }}"><span class="material-symbols-outlined" style="font-size:18px;">edit</span></button>
+{%- else %}
+                      <button type="button" class="action-icon" title="Correct this record — {{ record.label }}, {% if record.reported %}{{ record.evidence_label | lower }}{% if record.date_known %} on {{ record.date_administered | display_date }}{% else %}, {{ immunization_unknown_date_text | lower }}{% endif %}{% else %}given {{ record.date_administered | display_date }}{% endif %}"
                               data-bs-toggle="modal" data-bs-target="#correctVaccinationModal"
                               data-kind="{{ correction.epi_kind }}"
                               data-record-id="{{ record.id }}"
                               data-label="{{ record.label }}"
                               data-vaccine="{{ record.vaccine_code }}:{{ record.dose_number }}"
                               data-date="{{ record.date_administered or '' }}"
-                              data-source="{{ record.source }}"
-                              data-source-label="{{ record.source_label }}"
+                              data-source="{{ record.evidence }}"
+                              data-source-label="{{ record.evidence_label }}"
                               data-date-optional="{{ '1' if record.reported else '0' }}"
                               data-recorded-by="{{ record.administered_by_name or '' }}"><span class="material-symbols-outlined" style="font-size:18px;">edit</span></button>
+{%- endif %}
                     </td>
 {%- endif %}
                   </tr>
@@ -1204,11 +1235,14 @@
 {%- endif %}
 
           <div style="font-size:12px; color:var(--text-muted); margin-top:16px; padding-top:12px; border-top:1px dashed var(--border-color);">
-            Doses are recorded during a consultation. A dose is <strong style="display:inline;">Due Now</strong> from its
-            recommended age and becomes <strong style="display:inline;">Overdue</strong> {{ immunization.grace_period_days }} days later.
+            <div>Doses given here are recorded during a consultation.</div>
+            <div>A dose given elsewhere counts when its vaccination card was seen. A parent's word alone does not count.</div>
+            <div>A dose is <strong style="display:inline;">Due Now</strong> from its recommended age.
+            With nothing on file {{ immunization.grace_period_days }} days later it reads
+            <strong style="display:inline;">No record</strong>. It may have been given elsewhere, so ask for the card.</div>
 {%- if not immunization.applicable %}
             {{ patient.first_name }} is past the under-{{ immunization.pediatric_age_years }} cohort the infant schedule covers,
-            so nothing here is flagged due or overdue; the history is shown as recorded.
+            so nothing here is flagged due or as having no record; the history is shown as recorded.
 {%- endif %}
           </div>
 {%- else %}
@@ -1292,7 +1326,7 @@
               </table>
             </div>
             <div style="font-size:12px; color:var(--text-muted); margin-top:16px; padding-top:12px; border-top:1px dashed var(--border-color);">
-              Recorded during a consultation, most recent first. Nothing here is due or overdue.
+              Recorded during a consultation, most recent first. Nothing here is due or missing.
               A blank dose number means the vaccine has no fixed dose count.
             </div>
 {%- else %}
@@ -1578,6 +1612,91 @@
     </div>
 {%- endif %}
 
+{#- RECORD A DOSE GIVEN ELSEWHERE, AND CHANGE OR REMOVE SUCH A RECORD (Task 9, D3, D5).
+
+    One dialog, filled in from the row's button, like the correction dialog above it.
+    Outside a consultation. The health center cannot know what happened at another
+    hospital, so the person recording must say how they know: the vaccination card or
+    record book was seen (written, dated evidence: it counts as given and needs a date), or
+    the parent says so and has no card (it does not count as given). Offered where the
+    endpoint exists, which is Staff and the Doctor only. The server checks every rule
+    again. #}
+{%- if record_elsewhere_endpoint is defined %}
+{%- set estate = elsewhere_state | default(none) %}
+{%- set eerr = estate.errors if estate else {} %}
+{%- set eform = estate.form if estate else {} %}
+    <div class="modal fade" id="elsewhereModal" tabindex="-1" aria-labelledby="elsewhereModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.12);">
+          <form method="post" id="elsewhereForm" novalidate
+                action="{{ url_for(change_elsewhere_endpoint if estate and estate.mode == 'change' else record_elsewhere_endpoint, patient_id=patient.id) }}"
+                data-record-url="{{ url_for(record_elsewhere_endpoint, patient_id=patient.id) }}"
+                data-change-url="{{ url_for(change_elsewhere_endpoint, patient_id=patient.id) }}">
+            {{ csrf_field() }}
+            <input type="hidden" name="{{ elsewhere.dose_field }}" id="elsewhereDose" value="{{ estate.dose_key if estate else '' }}">
+            <input type="hidden" name="{{ elsewhere.record_field }}" id="elsewhereRecord" value="{{ estate.record_id if estate and estate.record_id else '' }}">
+            <div class="modal-header">
+              <h5 class="modal-title" id="elsewhereModalLabel">{{ 'Change dose given elsewhere' if estate and estate.mode == 'change' else 'Record dose given elsewhere' }}</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+{%- if estate and estate.banner %}
+              <div class="correction-alert">
+                <span class="material-symbols-outlined" style="font-size:20px; margin-top:1px;">error</span>
+                <div><strong>This was not saved</strong> {{ estate.banner }}</div>
+              </div>
+{%- endif %}
+              <p id="elsewhereSubject" style="margin-bottom:14px; font-size:13.5px; color:var(--text-muted);">{% if estate %}{{ estate.label }} for {{ patient.first_name }}.{% endif %}</p>
+              <p style="margin-bottom:14px; font-size:13.5px;">Ask for {{ patient.first_name }}'s vaccination card or record book. Say how you know the dose was given.</p>
+              <div style="margin-bottom:16px;">
+                <div class="field-label">How do you know?</div>
+{%- for value, text in elsewhere.choices %}
+                <div class="form-check" style="margin-bottom:6px;">
+                  <input class="form-check-input elsewhere-proof" type="radio" name="{{ elsewhere.proof_field }}" id="elsewhereProof{{ loop.index }}" value="{{ value }}"{% if eform.get(elsewhere.proof_field) == value %} checked{% endif %}>
+                  <label class="form-check-label" for="elsewhereProof{{ loop.index }}">{{ text }}</label>
+                </div>
+{%- endfor %}
+{%- if eerr.get(elsewhere.proof_field) %}
+                <div class="field-error">{{ eerr.get(elsewhere.proof_field) }}</div>
+{%- endif %}
+              </div>
+              <div style="margin-bottom:16px;">
+                <label class="field-label" for="elsewhereDate">Date given <span id="elsewhereDateOptional" style="font-weight:500; color:var(--text-muted);">(required for a card)</span></label>
+                <input type="date" class="form-control{% if eerr.get(elsewhere.date_field) %} is-invalid{% endif %}" id="elsewhereDate" name="{{ elsewhere.date_field }}" max="{{ elsewhere.today }}" value="{{ eform.get(elsewhere.date_field, '') }}">
+{%- if eerr.get(elsewhere.date_field) %}
+                <div class="field-error">{{ eerr.get(elsewhere.date_field) }}</div>
+{%- else %}
+                <div class="field-hint">The date on the card. For the parent's word it can be left blank if not known. It cannot be in the future or before {{ patient.first_name }} was born.</div>
+{%- endif %}
+              </div>
+              <div style="margin-bottom:16px;">
+                <label class="field-label" for="elsewherePlace">Place given <span style="font-weight:500; color:var(--text-muted);">(optional)</span></label>
+                <input type="text" class="form-control" id="elsewherePlace" name="{{ elsewhere.place_field }}" maxlength="{{ elsewhere.max_place_length }}" autocomplete="off" value="{{ eform.get(elsewhere.place_field, '') }}">
+                <div class="field-hint">For example, the hospital or health center named on the card.</div>
+              </div>
+              <div class="audit-notice">
+                <span class="material-symbols-outlined" style="font-size:18px; margin-top:1px;">history</span>
+                <div>
+                  <strong style="display:block; margin-bottom:2px;">This will be logged</strong>
+                  The audit log records your name and the time. It does not name the vaccine.
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-outline-secondary" id="elsewhereRemove" formnovalidate formmethod="post"
+                      formaction="{{ url_for(remove_elsewhere_endpoint, patient_id=patient.id) }}"
+                      style="{% if not (estate and estate.mode == 'change') %}display:none;{% endif %} color:#B91C1C; border-color:#FECACA;">Remove this record</button>
+              <button type="submit" class="btn-primary-teal">
+                <span class="material-symbols-outlined" style="font-size:18px;">save</span>Save
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+{%- endif %}
+
 {#- THE RESTRICTED DIALOG.
 
     Behind a confirmation for the reason the correction dialog above it is: this
@@ -1827,6 +1946,48 @@
     });
   })();
 
+  // THE "DOSE GIVEN ELSEWHERE" DIALOG. Filled in from the row's button; the server
+  // re-checks every rule, so this only makes the dialog say what it will do.
+  (function(){
+    var modal = document.getElementById('elsewhereModal');
+    if(!modal){ return; }
+    var form = document.getElementById('elsewhereForm');
+    var title = document.getElementById('elsewhereModalLabel');
+    var subject = document.getElementById('elsewhereSubject');
+    var dose = document.getElementById('elsewhereDose');
+    var record = document.getElementById('elsewhereRecord');
+    var date = document.getElementById('elsewhereDate');
+    var place = document.getElementById('elsewherePlace');
+    var remove = document.getElementById('elsewhereRemove');
+    var optional = document.getElementById('elsewhereDateOptional');
+    var radios = modal.querySelectorAll('.elsewhere-proof');
+
+    function showDateRule(){
+      var card = false;
+      radios.forEach(function(r){ if(r.checked && r.value === 'card'){ card = true; } });
+      if(optional){ optional.textContent = card ? '(required for a card)' : '(optional for the parent\u2019s word)'; }
+    }
+    radios.forEach(function(r){ r.addEventListener('change', showDateRule); });
+
+    modal.addEventListener('show.bs.modal', function(event){
+      var button = event.relatedTarget;
+      if(!button){ showDateRule(); return; }
+      var change = button.dataset.mode === 'change';
+      form.action = change ? form.dataset.changeUrl : form.dataset.recordUrl;
+      title.textContent = change ? 'Change dose given elsewhere' : 'Record dose given elsewhere';
+      dose.value = button.dataset.doseKey || '';
+      record.value = change ? (button.dataset.recordId || '') : '';
+      date.value = button.dataset.date || '';
+      place.value = button.dataset.place || '';
+      radios.forEach(function(r){ r.checked = change && r.value === button.dataset.evidence; });
+      remove.style.display = change ? '' : 'none';
+      subject.textContent = (change ? 'Changing: ' : 'Recording: ') + (button.dataset.label || 'this dose')
+        + ' for {{ patient.first_name }}.';
+      showDateRule();
+    });
+    showDateRule();
+  })();
+
   // THE RESTRICTED DIALOG.
   //
   // Reads which visit and which direction off the button that opened it, exactly
@@ -1901,6 +2062,16 @@
     var pane = document.querySelector('#profileTabs [data-bs-target="#tab-vaccine"]');
     if (pane && bootstrap.Tab) { new bootstrap.Tab(pane).show(); }
     var dialog = document.getElementById('correctVaccinationModal');
+    if (dialog) { new bootstrap.Modal(dialog).show(); }
+  });
+{%- endif %}
+{%- if elsewhere_state %}
+  // THE ELSEWHERE DIALOG THE SERVER SENT BACK, with what was typed and the errors.
+  document.addEventListener('DOMContentLoaded', function(){
+    if (!window.bootstrap) { return; }
+    var pane = document.querySelector('#profileTabs [data-bs-target="#tab-vaccine"]');
+    if (pane && bootstrap.Tab) { new bootstrap.Tab(pane).show(); }
+    var dialog = document.getElementById('elsewhereModal');
     if (dialog) { new bootstrap.Modal(dialog).show(); }
   });
 {%- endif %}

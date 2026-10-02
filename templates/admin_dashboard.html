@@ -322,7 +322,7 @@
             <div class="panel-title" style="font-size:15px;">Immunization Follow-up</div>
             <div class="panel-sub mb-2">
               {{ immunization_alert.child_count }} child{{ "ren" if immunization_alert.child_count != 1 else "" }} due
-{%- if immunization_alert.overdue_child_count %} &middot; <span style="color:var(--danger); font-weight:600;">{{ immunization_alert.overdue_child_count }} overdue</span>{% endif %}
+{%- if immunization_alert.no_record_child_count %} &middot; <span style="color:var(--danger); font-weight:600;">{{ immunization_alert.no_record_child_count }} with no record</span>{% endif %}
             </div>
 {%- if not immunization_alert.child_count %}
             <div class="panel-sub">Every child under {{ pediatric_age_years }} is up to date with the DOH schedule.</div>

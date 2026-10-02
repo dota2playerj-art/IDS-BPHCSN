@@ -161,7 +161,7 @@
     background:#FEF3C7; color:#B45309; font-size:10.5px; font-weight:700; text-transform:uppercase;
     letter-spacing:0.03em; white-space:nowrap;
   }
-  .immun-tag.immun-overdue{background:#FEE2E2; color:#B91C1C;}
+  .immun-tag.immun-norecord{background:#FEE2E2; color:#B91C1C;}
   /* Start Consultation while somebody else is in the room. Kept visible rather
      than removed so the reason it cannot be pressed is on the screen, in its
      tooltip, next to the patient it refers to. */
@@ -672,16 +672,20 @@
               <td class="appt-id">{{ entry.reference }}</td>
               <td>
                 <div class="pat-name"><a href="{{ url_for(patient_profile_endpoint, patient_id=entry.patient_id) }}">{{ entry.first_name }}{% if entry.middle_name %} {{ entry.middle_name }}{% endif %} {{ entry.last_name }}</a>{% if entry.is_next_up and not entry.is_ready %}<span class="next-tag">Next</span>{% endif %}
-{#- A child in the building who is due or overdue for a dose. Put on the row
+{#- A child in the building who has a dose due, with no record, or with only a parent's word. Put on the row
     rather than left to the profile because this is the moment it can be acted
     on -- once the parent has gone home the information is worth much less. The
     count and the wording come from get_immunization_alert(), the same call the
     dashboard card reads. #}
 {%- if care_team_view and entry.immunization_due %}
-{%- set overdue_n = entry.immunization_overdue_count %}
-{%- set badge_n = overdue_n if entry.immunization_overdue else entry.immunization_due_count %}
-{%- set badge_word = 'overdue' if entry.immunization_overdue else 'due' %}
-<span class="immun-tag{% if entry.immunization_overdue %} immun-overdue{% endif %}" title="{{ badge_n }} vaccine{{ '' if badge_n == 1 else 's' }} {{ badge_word }}{% if entry.immunization_overdue and entry.immunization_due_count %}, {{ entry.immunization_due_count }} more due now{% endif %} — next: {{ entry.immunization_next }}"><span class="material-symbols-outlined" style="font-size:13px;">vaccines</span>{{ badge_n }} vaccine{{ '' if badge_n == 1 else 's' }} {{ badge_word }}</span>{% endif %}</div>
+{%- if entry.immunization_no_record %}
+{%- set badge_n, badge_text = entry.immunization_no_record_count, 'no record' %}
+{%- elif entry.immunization_due_count %}
+{%- set badge_n, badge_text = entry.immunization_due_count, 'due' %}
+{%- else %}
+{%- set badge_n, badge_text = entry.immunization_parent_count, 'parent says given' %}
+{%- endif %}
+<span class="immun-tag{% if entry.immunization_no_record %} immun-norecord{% endif %}" title="{{ badge_n }} vaccine{{ '' if badge_n == 1 else 's' }}: {{ badge_text }}{% if entry.immunization_no_record and entry.immunization_due_count %}, {{ entry.immunization_due_count }} more due now{% endif %} — next: {{ entry.immunization_next }}. Ask for the vaccination card."><span class="material-symbols-outlined" style="font-size:13px;">vaccines</span>{{ badge_n }} vaccine{{ '' if badge_n == 1 else 's' }}: {{ badge_text }}</span>{% endif %}</div>
                 <div class="po-meta">{{ entry.patient_reference }}</div>
               </td>
               <td>

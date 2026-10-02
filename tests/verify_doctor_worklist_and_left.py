@@ -1358,7 +1358,7 @@ for role, page in queue_pages.items():
 check("the queue and the Staff dashboard have no Walk-in tag on any row (every visit is a walk-in)",
       all('class="walkin-tag"' not in page and ">Walk-in</span>" not in page for page in queue_pages.values())
       and ">Walk-in</span>" not in body(staff.get("/staff/dashboard")))
-# The overdue badge counts what its word says: a child with doses overdue AND due now.
+# The no-record badge counts what its words say: a child with doses with no record AND due now.
 CHD = q1("SELECT MAX(id) + 1 FROM patients")[0]
 run_sql("INSERT INTO patients (id, patient_id, first_name, last_name, birth_date, sex, civil_status, "
         "address, municipality, province, contact_number, status) VALUES (?, ?, 'Chd', 'Patient', "
@@ -1370,12 +1370,12 @@ with app.app_context():
     for days in range(20, 700):
         run_sql("UPDATE patients SET birth_date = ? WHERE id = ?", ((today - timedelta(days=days)).isoformat(), CHD))
         st = get_immunization_status(get_patient_by_id(CHD))
-        key = ("both" if st["overdue_count"] and st["due_count"]
-               else "overdue" if st["overdue_count"] else "due" if st["due_count"] else None)
+        key = ("both" if st["no_record_count"] and st["due_count"]
+               else "no_record" if st["no_record_count"] else "due" if st["due_count"] else None)
         if key and key not in found:
-            found[key] = (days, st["overdue_count"], st["due_count"])
-check("set-up: ages exist with doses overdue and due now, with overdue only, and with due only",
-      {"both", "overdue", "due"} <= set(found), found)
+            found[key] = (days, st["no_record_count"], st["due_count"])
+check("set-up: ages exist with doses with no record and due now, with no record only, and with due only",
+      {"both", "no_record", "due"} <= set(found), found)
 
 
 def badge_for(days):
@@ -1394,17 +1394,17 @@ def plural(n, word):
 
 days, over, due = found["both"]
 text_both, row_both = badge_for(days)
-check("a child with doses overdue and due now: the badge says only how many vaccines are overdue "
-      f"('{plural(over, 'vaccine')} overdue'), not overdue plus due",
-      text_both == f"{plural(over, 'vaccine')} overdue" and due > 0 and "immun-overdue" in row_both,
+check("a child with doses with no record and due now: the badge says only how many vaccines have no "
+      f"record ('{plural(over, 'vaccine')}: no record'), not that number plus the due ones",
+      text_both == f"{plural(over, 'vaccine')}: no record" and due > 0 and "immun-norecord" in row_both,
       (text_both, found["both"]))
-days, over, due = found["overdue"]
+days, over, due = found["no_record"]
 text_over = badge_for(days)[0]
-check("only overdue doses: '<n> vaccines overdue'", text_over == f"{plural(over, 'vaccine')} overdue", text_over)
+check("only doses with no record: '<n> vaccines: no record'", text_over == f"{plural(over, 'vaccine')}: no record", text_over)
 days, over, due = found["due"]
 text_due, row_due = badge_for(days)
-check("only doses due now: it says 'due', not 'overdue'",
-      text_due == f"{plural(due, 'vaccine')} due" and "immun-overdue" not in row_due, text_due)
+check("only doses due now: it says 'due', not 'no record'",
+      text_due == f"{plural(due, 'vaccine')}: due" and "immun-norecord" not in row_due, text_due)
 
 # ---------------------------------------------------------------------------
 section("17. A SERVICE CORRECTION NEVER COMPLETES A VISIT; THE BADGE SAYS 'NEXT IN LINE' (Task 6e)")

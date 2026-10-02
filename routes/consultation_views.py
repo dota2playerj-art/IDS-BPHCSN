@@ -90,6 +90,7 @@ from models.immunizations import (
     record_immunizations,
     record_reported_immunizations,
     reported_date_field,
+    reported_proof_field,
 )
 from models.patients import get_patient_by_id
 from routes.sealed_access import log_unopenable
@@ -345,17 +346,16 @@ def _immunization_context(patient, consultation, visit_date, ticked=None,
     ticked:
 
         already on file        locked, with where it came from and when
-        not yet given          free to tick, badged Due / Overdue / Upcoming
+        not yet given          free to tick, badged Due / No record / Upcoming
 
     A dose that is free to tick can be ticked two different ways, and the second
     one is why this feature exists. "Given today" records a dose this health
     center has just administered. "Previously given elsewhere" records a dose the
     parent has told the health worker about -- given at another hospital or in
     another barangay -- which is a fact learned at this consultation and stored
-    against it, but is emphatically not this health center's own work. The child
-    stops showing Overdue either way; only the second one is honest about a dose
-    the health center did not give, and before it existed the only way to clear a
-    false Overdue was to claim the dose as this health center's own.
+    against it, but is emphatically not this health center's own work. Since Task 9 the second needs proof: a card that was seen counts
+    as given, a parent's word alone does not. Only the second is honest about a dose
+    the health center did not give.
 
     ANY recorded dose is locked -- including one this very consultation recorded.
     It used to be that a dose given at this visit stayed an ordinary ticked
@@ -400,6 +400,7 @@ def _immunization_context(patient, consultation, visit_date, ticked=None,
         # because the operator ticked it on the submission that bounced.
         item["reported_checked"] = item["key"] in reported_ticked
         item["reported_date_value"] = reported_dates.get(item["key"], "")
+        item["reported_proof_value"] = (reported_submitted or {}).get("proofs", {}).get(item["key"], "")
     return status
 
 
@@ -597,6 +598,13 @@ def _submitted_reported_doses(form_data):
         "dates": {
             f"{row[0]}:{row[3]}": (
                 form_data.get(reported_date_field(f"{row[0]}:{row[3]}")) or ""
+            ).strip()
+            for row in EPI_SCHEDULE
+        },
+        # What each row said the dose rests on (the card was seen, or the parent says so).
+        "proofs": {
+            f"{row[0]}:{row[3]}": (
+                form_data.get(reported_proof_field(f"{row[0]}:{row[3]}")) or ""
             ).strip()
             for row in EPI_SCHEDULE
         },
@@ -867,7 +875,7 @@ def process_record_consultation(appointment_id, form_data, user_id,
     # The doses reported at this visit as already given somewhere else. Behind
     # the same age gate and dropped by the same rule, because they are graded
     # against the same schedule: the reading a reported dose changes is the EPI
-    # schedule's Overdue, and outside the under-five cohort there is no such
+    # schedule's No record, and outside the under-five cohort there is no such
     # reading to change. `given_today` is handed in so a dose ticked in both
     # columns is refused rather than silently resolved -- see
     # models.immunizations.parse_reported_doses().

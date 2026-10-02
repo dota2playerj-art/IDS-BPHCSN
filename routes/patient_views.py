@@ -68,6 +68,7 @@ from routes.consultation_views import (
     RESTRICT_ON,
 )
 from routes.sealed_access import log_unopenable
+from routes.dose_evidence_views import elsewhere_options
 from routes.vaccination_correction_views import correction_options
 from utils.context import HEADER_SEARCH_MAX
 from utils.dates import display_date
@@ -487,11 +488,11 @@ def process_archive_patients(form_data, user_id=None, ip_address=None):
 
 
 def immunization_next_step(patient, immunization):
-    """What to actually do about this patient's Due/Overdue doses, or None.
+    """What to actually do about this patient's Due or no-record doses, or None.
 
-    A dose that is merely Due or Overdue is not a record -- it is the schedule
-    saying the dose has not happened yet -- so the Immunization Record tab
-    deliberately offers no way to mark it given. That is the correct clinical
+    A dose that is merely Due or has No record is not a record -- it is the schedule
+    saying nothing is on file. A dose GIVEN HERE is recorded on the consultation form;
+    a dose given elsewhere has its own button (Task 9). That is the correct clinical
     rule: a vaccination is recorded during the visit it was given in, on the
     consultation form, against a real queue entry. What the tab used to do,
     though, was leave those rows blank, which reads as a dead end rather than as
@@ -564,8 +565,8 @@ def immunization_next_step(patient, immunization):
             "next consultation."
         ),
         "banner": (
-            f"{name} is not in today's queue. These doses are recorded during a "
-            "consultation, so they are given and recorded at the next visit."
+            f"{name} is not in today's queue. A dose given here is recorded during a "
+            "consultation, so give it at the next visit."
         ),
     }
 
@@ -680,7 +681,7 @@ def patient_profile_context(patient_id):
 
     return {
         "patient": patient,
-        # What a Due/Overdue row should tell staff to do next. None when nothing
+        # What a Due / No record row should tell staff to do next. None when nothing
         # is outstanding. Deliberately not a way to record a dose from here --
         # see immunization_next_step() for why the schedule half of this tab
         # carries guidance rather than an action.
@@ -729,6 +730,8 @@ def patient_profile_context(patient_id):
         # assembled here, so the dialog cannot offer a value the endpoint behind
         # it would refuse, or omit one it would accept.
         "correction": correction_options(),
+        # The "Record dose given elsewhere" dialog's vocabulary (Task 9).
+        "elsewhere": elsewhere_options(),
         # The Dispensing History tab, and the stat card above it. Both were
         # placeholders until medicine_dispensing existed.
         "dispensing": dispensing,

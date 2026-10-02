@@ -165,13 +165,16 @@
           <div class="stat-label">Immunization Doses Recorded</div>
 {#- Recorded, not given. This card is read by the Barangay Official, whose
     figures leave the health center, and the two readings are no longer the same
-    number: some of these doses were given at another hospital and reported here.
-    The total is the honest answer to "how many doses are on file"; the line
-    under it says how many of them this health center actually administered. #}
+    number: some of these doses were given at another hospital and the card was
+    seen here. The total counts doses with written evidence (given here, or a card
+    seen); a parent's word alone is not counted, and is named underneath. #}
           <div class="stat-trend" style="color:var(--text-muted);" title="{{ untracked.campaigns }}">
             {{ immunization_coverage.enrolled }} patient{{ '' if immunization_coverage.enrolled == 1 else 's' }} with a dose &middot; campaigns not tracked
-{%- if immunization_coverage.doses_reported %}
-            <span style="display:block;">{{ immunization_coverage.doses_administered }} given here &middot; {{ immunization_coverage.doses_reported }} reported as given elsewhere</span>
+{%- if immunization_coverage.doses_elsewhere %}
+            <span style="display:block;">{{ immunization_coverage.doses_administered }} given here &middot; {{ immunization_coverage.doses_elsewhere }} given elsewhere (card seen)</span>
+{%- endif %}
+{%- if immunization_coverage.doses_parent_report %}
+            <span style="display:block;">Parent says given, no card: {{ immunization_coverage.doses_parent_report }}</span>
 {%- endif %}
           </div>
         </div>
@@ -320,11 +323,14 @@
           <div class="panel-sub" style="margin-top:10px;">
             What is recorded: {{ immunization_coverage.doses_given }} dose{{ '' if immunization_coverage.doses_given == 1 else 's' }}
             across {{ immunization_coverage.enrolled }} patient{{ '' if immunization_coverage.enrolled == 1 else 's' }},
-{%- if immunization_coverage.doses_reported %}
+{%- if immunization_coverage.doses_elsewhere %}
             of which {{ immunization_coverage.doses_administered }} were given at this health center and
-            {{ immunization_coverage.doses_reported }} were reported as given elsewhere,
+            {{ immunization_coverage.doses_elsewhere }} were given elsewhere (card seen),
 {%- endif %}
-            with {{ immunization_coverage.needing_attention }} child{{ 'ren' if immunization_coverage.needing_attention != 1 }} currently behind the DOH schedule.
+{%- if immunization_coverage.doses_parent_report %}
+            and a parent says {{ immunization_coverage.doses_parent_report }} more {{ 'was' if immunization_coverage.doses_parent_report == 1 else 'were' }} given, with no card (not counted),
+{%- endif %}
+            with {{ immunization_coverage.needing_attention }} child{{ 'ren' if immunization_coverage.needing_attention != 1 }} with a dose due, with no record, or with only a parent's word.
           </div>
         </div>
 

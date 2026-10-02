@@ -77,6 +77,14 @@ def inject_role_context():
             # a shared template reusing it would fail loudly rather than emit a
             # URL they bounce off.
             "correct_vaccination_endpoint": "staff_correct_vaccination",
+            # Recording a dose given elsewhere (a card seen, or a parent's word), and
+            # changing or removing such a record, from the Immunization Record tab
+            # (Task 9). Staff and the Doctor only: the other roles get no name, so a
+            # template reusing one of these fails loudly rather than emit a URL they
+            # would bounce off.
+            "record_elsewhere_endpoint": "staff_record_dose_elsewhere",
+            "change_elsewhere_endpoint": "staff_change_dose_elsewhere",
+            "remove_elsewhere_endpoint": "staff_remove_dose_elsewhere",
             "register_patient_endpoint": "staff_register_patient",
             "archive_patients_endpoint": "staff_archive_patients",
             "medicine_inventory_endpoint": "staff_medicine_inventory",
