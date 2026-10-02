@@ -509,8 +509,12 @@
           </div>
           <div style="height:16px;"></div>
           <div class="fig-row">
-            <span class="fig-name">Attended<span class="fig-note">Completed, plus those in the clinic right now</span></span>
+            <span class="fig-name">Attended<span class="fig-note">Completed visits, plus those in the clinic right now</span></span>
             <span class="fig-value">{{ appt.attended }}</span>
+          </div>
+          <div class="fig-row">
+            <span class="fig-name">Waiting for the Doctor<span class="fig-note">Intake saved, no diagnosis yet</span></span>
+            <span class="fig-value">{{ appt.awaiting }}</span>
           </div>
           <div class="fig-row">
             <span class="fig-name">Cancelled or no-show</span>

@@ -184,7 +184,33 @@ CASES = {
               "Routine childhood immunization",
               "Vaccines given according to the DOH EPI schedule. Mother advised on mild fever and the next dose.",
               ()),
+    # A dental visit is done by Staff and never needs the Doctor (Task 6b).
+    "dental": ("Toothache", ("Gum bleeding", "Tooth extraction follow-up"),
+               "", "", ()),
 }
+
+# The service Staff choose at check-in for each kind of visit (Task 6b, D1). Prenatal
+# check-ups, immunizations and dental visits are finished by Staff without the Doctor;
+# the rest wait for him until he writes a diagnosis. A few acute visits are follow-ups,
+# picked from the visit date, so the mix is the same on every build.
+SERVICE_BY_CASE = {
+    "immun": "Immunization",
+    "prenatal": "Prenatal Check-up",
+    "dental": "Dental",
+    "htn": "Hypertension / Diabetes Monitoring",
+    "dm": "Hypertension / Diabetes Monitoring",
+    "asthma": "Follow-up Consultation",
+}
+
+
+def service_for(visit):
+    """The service Staff choose for one planned visit."""
+    service = SERVICE_BY_CASE.get(visit["case"])
+    if service:
+        return service
+    return "Follow-up Consultation" if visit["date"].toordinal() % 7 == 0 else "Consultation"
+
+
 ACUTE_WEIGHTS = (("ari", 30), ("diarrhea", 18), ("fever", 12), ("skin", 12), ("uti", 10),
                  ("headache", 8), ("wound", 5))
 
@@ -512,6 +538,7 @@ def plan_visits(rng, today, people):
 LEFT_VISITS = 8
 INTAKE_ONLY_VISITS = 6
 STALE_WAITING_VISITS = 2
+DENTAL_VISITS = 10
 
 
 def plan_extras(rng, today, people, last_day):
@@ -558,6 +585,10 @@ def plan_extras(rng, today, people, last_day):
            for _ in range(INTAKE_ONLY_VISITS)]
         + [("stale", True, (last_day - first_day).days - rng.randint(3, 8))
            for _ in range(STALE_WAITING_VISITS)]
+        # Dental visits, finished by Staff. Added last so everything planned before them is
+        # the same as without them.
+        + [("dental", False, rng.randint(0, (last_day - first_day).days))
+           for _ in range(DENTAL_VISITS)]
     )
     placed = []
     cursor = 0
@@ -569,7 +600,8 @@ def plan_extras(rng, today, people, last_day):
             person = pool[cursor % len(pool)]
             cursor += 1
             if eligible(person, day, quiet_after):
-                visit = {"date": day, "case": rng.choice(acute), "variant": variant}
+                visit = ({"date": day, "case": "dental", "variant": None} if variant == "dental"
+                         else {"date": day, "case": rng.choice(acute), "variant": variant})
                 person["visits"].append(visit)
                 person["visits"].sort(key=lambda v: v["date"])
                 placed.append((person, visit))
@@ -871,6 +903,8 @@ def build(path, say=print, show_passwords=True, today_override=None):
     flask_app = app_module.create_app()
     from models.settings import clear_cache
     clear_cache()
+    from models.doctor_worklist import VISIT_SERVICES, needs_doctor
+    assert set(SERVICE_BY_CASE.values()) <= set(VISIT_SERVICES)
     from database.connection import db_connection
     with db_connection() as conn:
         with open(config.SCHEMA, "r", encoding="utf-8") as handle:
@@ -943,7 +977,7 @@ def build(path, say=print, show_passwords=True, today_override=None):
         per_day = {}
         patient_row = {}
         counters = {"registered": 0, "visits": 0, "sealed": 0, "status": 0, "broadcasts": 0,
-                    "left": 0, "stale": 0, "waiting for the Doctor": 0}
+                    "left": 0, "stale": 0, "waiting for the Doctor": 0, "finished by Staff": 0}
         for moment, _order, kind, index, payload in events:
             day = moment.date()
             if kind == "register":
@@ -966,8 +1000,10 @@ def build(path, say=print, show_passwords=True, today_override=None):
 
                 variant = visit.get("variant")
                 set_clock(base)
+                service = service_for(visit)
                 staff.post("/staff/appointment_scheduling/check-in",
-                           {"patient_id": str(pid), "reason": data["complaint"]})
+                           {"patient_id": str(pid), "reason": data["complaint"],
+                            "service": service})
                 appointment = rows(path, "SELECT MAX(id) FROM appointments WHERE patient_id = ?", (pid,))[0][0]
                 stamper.stamp(_clock["now"])
                 if variant == "stale":
@@ -997,14 +1033,20 @@ def build(path, say=print, show_passwords=True, today_override=None):
                     counters["visits"] += 1
                     counters["waiting for the Doctor"] += 1
                     continue
-                set_clock(base + timedelta(minutes=33))
-                actors["doctor"].post(f"/staff/consultation/edit/{consultation}",
-                                      consult_form(data, doses, elsewhere, with_diagnosis=True))
-                stamper.stamp(_clock["now"])
+                # A service that does not need the Doctor (immunization, prenatal, dental)
+                # was Completed by the intake itself: Staff finish it, no diagnosis.
+                by_staff = not needs_doctor(service)
+                if by_staff:
+                    counters["finished by Staff"] += 1
+                else:
+                    set_clock(base + timedelta(minutes=33))
+                    actors["doctor"].post(f"/staff/consultation/edit/{consultation}",
+                                          consult_form(data, doses, elsewhere, with_diagnosis=True))
+                    stamper.stamp(_clock["now"])
                 if data["dispense"]:
                     set_clock(base + timedelta(minutes=45))
                     staff.post(f"/staff/consultation/edit/{consultation}",
-                               consult_form(data, doses, elsewhere, with_diagnosis=True,
+                               consult_form(data, doses, elsewhere, with_diagnosis=not by_staff,
                                             dispense=[(item_ids[k], q) for k, q in data["dispense"]]))
                     stamper.stamp(_clock["now"])
                 if visit["case"] == "sealed":
@@ -1044,6 +1086,12 @@ def build(path, say=print, show_passwords=True, today_override=None):
         "left before being seen": rows(path, "SELECT COUNT(*) FROM appointments WHERE status = 'Left before being seen'")[0][0],
         "still waiting from earlier days": rows(path, "SELECT COUNT(*) FROM appointments WHERE status = 'Waiting'")[0][0],
         "waiting for the Doctor": count_waiting(path),
+        "finished by Staff, no diagnosis": rows(
+            path, "SELECT COUNT(*) FROM appointments a JOIN consultations c "
+                  "ON c.appointment_id = a.id WHERE a.status = 'Completed' "
+                  "AND TRIM(COALESCE(c.diagnosis, '')) = ''")[0][0],
+        "services used": rows(
+            path, "SELECT COUNT(DISTINCT appointment_type) FROM appointments")[0][0],
         "immunizations": rows(path, "SELECT COUNT(*) FROM immunizations")[0][0],
         "dispensing issues": rows(path, "SELECT COUNT(*) FROM medicine_dispensing")[0][0],
         "inventory items": rows(path, "SELECT COUNT(*) FROM inventory_items")[0][0],
