@@ -1036,7 +1036,6 @@ QUEUE_COLUMNS = (
     "Service / Reason",
     "Notes",
     "Arrived",
-    "Booked for",
     "Status",
     "Assigned to",
 )
@@ -1106,7 +1105,6 @@ def _appointment_export(context, produced_by):
             *([_value(RESTRICTED_PLACEHOLDER if entry.get("reason_sealed")
                       else entry.get("notes"))] if show_reason else []),
             _value(entry.get("arrival_time")),
-            _value(entry.get("booked_time")),
             _value(entry.get("display_status")),
             _value(entry.get("assigned_staff")),
         ]

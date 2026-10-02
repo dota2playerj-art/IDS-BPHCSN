@@ -582,9 +582,9 @@ def _log_withheld_consultations(patient, withheld, viewer_role):
     multiply one access by the length of the patient's history, and a row per
     profile view would file an entry about an ordinary page.
 
-    Nothing is written when nothing was withheld, which is every render for the
-    Administrator and every render of a patient with no sealed visit -- so the
-    ordinary use of this screen adds nothing to the trail.
+    Nothing is written when nothing was withheld, which is every render of a
+    patient with no sealed visit -- so the ordinary use of this screen adds nothing
+    to the trail.
 
     THE ACCESS RULE IS NOT ENFORCED HERE. The content is already gone by the time
     this runs: get_consultations_for_patient() redacted it at the read, and this

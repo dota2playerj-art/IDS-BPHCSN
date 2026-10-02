@@ -525,7 +525,7 @@
             <span class="fig-value">{{ appt.left }}</span>
           </div>
           <div class="fig-row">
-            <span class="fig-name">Still expected<span class="fig-note">Booked, not yet resolved</span></span>
+            <span class="fig-name">Still expected<span class="fig-note">From the earlier booking system, never closed</span></span>
             <span class="fig-value">{{ appt.expected }}</span>
           </div>
           <div class="fig-row">
@@ -537,7 +537,7 @@
 {%- endif %}
           </div>
           <div class="fig-row">
-            <span class="fig-name">Walk-ins<span class="fig-note">Of {{ appt.booked }} booked in advance</span></span>
+            <span class="fig-name">Walk-ins<span class="fig-note">Of {{ appt.total }} appointments in this range</span></span>
             <span class="fig-value">{{ appt.walk_ins }}</span>
           </div>
         </div>

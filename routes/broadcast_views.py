@@ -51,6 +51,7 @@ from utils.sms import (
     CONCATENATED_SEGMENT_GSM,
     CONCATENATED_SEGMENT_UNICODE,
     gateway_configured,
+    sms_mode,
     message_metrics,
 )
 
@@ -93,14 +94,10 @@ def _gateway_context():
     live = gateway_configured()
     return {
         "gateway_live": live,
-        "gateway_label": "Live — connected" if live else "Simulated — no key set",
+        "gateway_label": sms_mode(),
         "gateway_note": (
-            "A key is set, so broadcasts are transmitted through the messaging "
-            "service."
-            if live else
-            "No key is set, so broadcasts are recorded in full but not "
-            "transmitted. Setting a key on the server and restarting this system "
-            "is the only step needed to go live."
+            "" if live else
+            "Set SEMAPHORE_API_KEY on the server and restart the system to send for real."
         ),
     }
 

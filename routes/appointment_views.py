@@ -342,23 +342,6 @@ def process_new_patient_check_in(patient_id, reason, user_id, ip_address=None, *
     )
 
 
-# ---------------------------------------------------------------------------
-# NEW APPOINTMENT (advance booking)
-# ---------------------------------------------------------------------------
-
-
-# ---------------------------------------------------------------------------
-# CANCELLING AND RESCHEDULING
-#
-# Neither of these introduces a rule of its own. Cancelling is the appointment
-# equivalent of Screen 03's status change -- a guarded UPDATE to a status the
-# CHECK already admits, with the row kept -- and rescheduling reuses the booking
-# form's validator and its conflict check unchanged, because moving a visit to
-# Thursday 10:00 has to be judged by exactly the standard that booking it for
-# Thursday 10:00 in the first place would have been.
-# ---------------------------------------------------------------------------
-
-
 def process_start_consultation(form_data, user_id=None, ip_address=None):
     """Move one Waiting patient to In Consultation. Returns the message to flash.
 

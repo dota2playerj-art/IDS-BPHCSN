@@ -187,6 +187,15 @@ SIMULATED_NOTE = (
 )
 
 
+SMS_MODE_LIVE = "SMS mode: Live (messages are sent through Semaphore)"
+SMS_MODE_SIMULATED = "SMS mode: Simulated (messages are saved but not sent)"
+
+
+def sms_mode(api_key=None):
+    """The one line that says whether messages really go out."""
+    return SMS_MODE_LIVE if gateway_configured(api_key) else SMS_MODE_SIMULATED
+
+
 def gateway_configured(api_key=None):
     """Whether a Semaphore API key is available to this process."""
     return bool(api_key or os.environ.get("SEMAPHORE_API_KEY"))

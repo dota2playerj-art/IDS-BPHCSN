@@ -263,14 +263,6 @@ UNTRACKED = {
     # Dispensing section below, the Administrator dashboard's Medicine Units
     # Dispensed chart, and that dashboard's Medicine column on Recent
     # Consultations.
-    #
-    # What is NOT claimed by its removal, and is worth stating so nobody has to
-    # re-derive it: supplies and equipment leaving the store are still not
-    # recorded. models/dispensing.py dispenses items of category 'Medicine' only,
-    # for the reason its header gives -- a dose issued to a patient for
-    # consumption is a different event from a consumable used during a procedure.
-    # That is a real remaining gap in stock movement, it is a smaller and
-    # different one, and nothing on these screens claims otherwise.
     "prenatal": (
         "Prenatal enrolment is not recorded. Nothing marks a patient as pregnant "
         "or stores an expected delivery date, so active cases, check-ups due and "

@@ -141,31 +141,6 @@
          asserted an event that had not happened and could not happen, the
          second one describing a save this screen cannot perform. They are
          replaced by the note below, which states what this screen actually is. -->
-{#- REWRITTEN, AND THE HEADLINE IT OPENED WITH WAS THE PART THAT WENT FALSE.
-    It said "Nothing on this screen is saved", then named the three values that
-    were read live rather than typed. Both halves are now wrong in the same
-    direction: General Settings saves six values into the settings table, and
-    four separate panes read live figures rather than three.
-
-    The counted word is gone with it, and its own predecessor said why it would
-    be: "A counted word is a liability in a note like this -- 'one' was wrong the
-    day it was written". It was right, and "Three" lasted one task. What replaces
-    it does not count anything. It names the one pane that stores, points at the
-    kind of thing the read-only panes report, and leaves the rest to the
-    per-pane wording -- which is where a reader is standing when it matters, and
-    which cannot go stale for a pane that was not the one they are looking at.
-
-    THE SHARED REASON NO LONGER PRINTS INSIDE THIS NOTE, AND THAT IS THE OTHER
-    HALF OF THE SAME CHANGE. It used to, on the arrangement that the two carried
-    different halves of one statement -- the reason saying what the screen is,
-    the note adding the live exceptions. That arrangement rested on the reason
-    being about the SCREEN, and unavailable["settings"] has just stopped being:
-    it now describes the individual dead control it is the tooltip on, because a
-    sentence characterising the whole of Screen 13 has gone stale three times in
-    three tasks. A control-level sentence read aloud in a screen-level note would
-    open "This control is not connected to anything" above nine panes, one of
-    which saves. So the note says its own piece, and the reason stays where it
-    is true -- on the controls. #}
     <div class="scope-note">
       <strong>Some of this screen is live, and each pane says which it is.</strong>
       <strong style="display:inline; font-weight:600;">General Settings</strong> is saved and read
@@ -180,27 +155,10 @@
     <div class="panel-card">
       <div class="row g-0">
         <div class="col-lg-3">
-{#- WHICH PANE IS OPEN IS DECIDED ON THE SERVER NOW, NOT HARDCODED HERE.
-    Every one of the sixteen class attributes below -- eight nav buttons and
-    eight panes -- reads the same `active_pane`, which routes/settings_views.py
-    resolves from ?tab= and validates against the panes that actually exist.
-
-    Before this, `active` and `show active` were typed onto General and nowhere
-    else, so the screen always opened on General whatever had just happened. That
-    was invisible until a pane other than General grew a control that saves:
-    turning maintenance mode on redirected the administrator back here and
-    dropped them on General Settings, several panes from the switch they had just
-    thrown. Saving General Settings looked correct only because its destination
-    and the hardcoded default happened to be the same pane.
-
-    Bootstrap still does the switching when somebody clicks; this only decides
-    where the screen starts. The two cannot disagree, because `active` on the
-    button and `show active` on its pane are written from one value. #}
           <div class="settings-nav">
             <div class="nav flex-column" role="tablist">
               <button class="nav-link{% if active_pane == 'pane-general' %} active{% endif %}" data-bs-toggle="pill" data-bs-target="#pane-general" type="button"><span class="material-symbols-outlined">tune</span>General Settings</button>
-              <button class="nav-link{% if active_pane == 'pane-hc' %} active{% endif %}" data-bs-toggle="pill" data-bs-target="#pane-hc" type="button"><span class="material-symbols-outlined">local_hospital</span>Health Center Information</button>
-              <button class="nav-link{% if active_pane == 'pane-sms' %} active{% endif %}" data-bs-toggle="pill" data-bs-target="#pane-sms" type="button"><span class="material-symbols-outlined">sms</span>SMS Gateway Configuration</button>
+              <button class="nav-link{% if active_pane == 'pane-sms' %} active{% endif %}" data-bs-toggle="pill" data-bs-target="#pane-sms" type="button"><span class="material-symbols-outlined">sms</span>SMS</button>
               <button class="nav-link{% if active_pane == 'pane-security' %} active{% endif %}" data-bs-toggle="pill" data-bs-target="#pane-security" type="button"><span class="material-symbols-outlined">shield</span>Security Settings</button>
               <button class="nav-link{% if active_pane == 'pane-pwd' %} active{% endif %}" data-bs-toggle="pill" data-bs-target="#pane-pwd" type="button"><span class="material-symbols-outlined">password</span>Password Policy</button>
               <button class="nav-link{% if active_pane == 'pane-backup' %} active{% endif %}" data-bs-toggle="pill" data-bs-target="#pane-backup" type="button"><span class="material-symbols-outlined">backup</span>Backup &amp; Restore</button>
@@ -236,36 +194,6 @@
               <div class="section-title">General Settings</div>
               <div class="section-sub">The health center&#39;s own name, where it stands, and the hours it keeps</div>
 
-{#- THE ONE FORM ON THIS SCREEN THAT SAVES.
-
-    WHAT WAS HERE BEFORE. Ten inputs inside the page-wide disabled fieldset,
-    every one of them holding a value typed into the mockup: the name, a contact
-    number, the barangay, the municipality, the province, a complete address, an
-    email address, an operating-days dropdown, and the two times.
-
-    WHAT IS HERE NOW, AND WHY IT IS SIX AND NOT TEN. The line is not which fields
-    would be nice to store -- it is which fields some other part of this system
-    already reads. Six do, and each of the six says on the field itself what a
-    change to it will move. The four that are gone had no reader anywhere in
-    this project:
-
-    * Contact Number and Email Address appear in no other file. They were typed
-      into the mockup, and utils/unavailable.py's own inventory of this screen
-      already listed them as such. Storing them would have produced exactly the
-      defect this project keeps removing -- a control that accepts input and
-      changes nothing.
-    * Complete Address is not gone but is no longer typed. It is DERIVED from the
-      barangay, municipality and province below, and shown as a fact under them.
-      A stored address would be a fourth string that could disagree with the
-      three it is made of, and the first time somebody corrected the municipality
-      in one place and not the other, this screen would name two municipalities.
-    * Operating Days was the most misleading of the four, because it was a rule
-      rather than a value. validate_booking() checks that the date is in the
-      future, inside the horizon, and that the time is one of the slots -- it
-      never looks at the day of the week, so a Saturday booking is taken.
-      "Monday - Friday" in a dropdown claimed a restriction that does not exist.
-      Storing it would not have created one; enforcing days is a real change to
-      booking validation and not a settings field. #}
               <form method="post" action="{{ url_for('admin.save_general_settings') }}" novalidate>
                 {{ csrf_field() }}
 
@@ -355,17 +283,6 @@
 {%- endif %}
                 </div>
               </div>
-{#- WHAT THESE TWO STILL DECIDE, NOW THAT NOTHING IS BOOKED AGAINST THEM.
-    They used to generate the bookable slots on Appointment Scheduling, and this
-    hint said so. Advance booking was retired on 2026-09-05, so no dropdown is
-    built from them and nothing is refused for falling outside them.
-
-    They are not decoration, though, and the hint is corrected rather than
-    deleted. They are what the health center publishes as its own hours -- the
-    pair every letterhead and every printed record carries -- and the day still
-    has to be at least one 30-minute slot long, because models/settings.py checks
-    that against models/appointments.py SLOT_MINUTES. An administrator is owed
-    the truth about which of those two things is which. #}
               <div class="form-text-hint" style="margin-top:8px;">
                 Currently {{ general.opening_label }} to {{ general.closing_label }}.
                 These are the hours the health center publishes as its own &mdash; they appear on exports and
@@ -389,226 +306,17 @@
             </div>
 
             <!-- HEALTH CENTER INFORMATION -->
-            <div class="tab-pane fade{% if active_pane == 'pane-hc' %} show active{% endif %}" id="pane-hc">
-              <div class="section-title">Health Center Information</div>
-              <div class="section-sub">Facility identity, licensing, and leadership details</div>
-{#- Its own disabled fieldset, for the reason the note at the top of this tab
-    strip gives. Nothing in this pane has a reader anywhere in the project: no
-    file asks what the facility type is, none reads a DOH licence number, and
-    none reads a date established or a description. The Administrator box is the
-    exception that proves it -- it shows the signed-in administrator, which is
-    live, and is a display of who is looking rather than a stored fact about the
-    facility.
-
-    Its label read "Head Physician / Administrator" until the account's persona
-    was corrected to Kagawad Antonio Acido, who chairs the Health Committee and
-    is not a physician. Since the box renders whoever is signed in rather than a
-    stored head physician, the half of the label that was never true of the value
-    is gone rather than left to contradict the name printed under it. #}
-              <fieldset class="unavailable-form" disabled title="{{ unavailable.settings }}">
-
-              <div class="row g-3 mb-3">
-                <div class="col-md-6">
-                  <label class="field-label">Facility Type</label>
-                  <select class="form-select">
-                    <option selected>Barangay Health Station</option>
-                    <option>Rural Health Unit</option>
-                    <option>City Health Office</option>
-                  </select>
-                </div>
-                <div class="col-md-6">
-                  <label class="field-label">DOH License Number</label>
-                  <input type="text" class="form-control" value="DOH-CARAGA-BHS-2024-0317">
-                </div>
-              </div>
-
-              <div class="row g-3 mb-3">
-                <div class="col-md-6">
-                  <label class="field-label">Administrator</label>
-                  <input type="text" class="form-control" value="{{ sidebar_user_name }}">
-                </div>
-                <div class="col-md-6">
-                  <label class="field-label">Date Established</label>
-                  <input type="date" class="form-control" value="2018-06-12">
-                </div>
-              </div>
-
-              <div class="row g-3">
-                <div class="col-12">
-                  <label class="field-label">Facility Description</label>
-                  <textarea class="form-control" style="min-height:96px;">Serves the residents of {{ health_center.barangay }} and surrounding puroks with primary care, maternal and child health services, immunization, and chronic disease monitoring.</textarea>
-                </div>
-              </div>
-              </fieldset>
-            </div>
-
-{#- USER PREFERENCES AND NOTIFICATION SETTINGS ARE BOTH GONE FROM THIS FILE.
-
-    They were two panes and eleven controls: a language dropdown, a date format,
-    a records-per-page figure, two dashboard toggles, three notification channel
-    switches, and two reminder-timing dropdowns. Every one of them sat inside the
-    page-wide disabled fieldset, and every one of them described a feature this
-    project does not have.
-
-    REMOVED RATHER THAN LEFT DISABLED, which is a different decision from the one
-    made about SMS Gateway or System Maintenance a few panes down, and the
-    difference is what the control is waiting for. A disabled control is honest
-    when the feature is real and unbuilt: the SMS gateway exists, the key is
-    genuinely read from the server, and the Test Connection button has something
-    real to test the day that key is set. These eleven were not waiting for
-    anything.
-
-    * Language and Date Format: this system renders one language and one date
-      format, through utils/dates.py's filters, for every screen. There is no
-      second rendering for a switch to choose between.
-    * Records Per Page: no list in this project pages. Patient Records and
-      Medicine Inventory filter in the browser over the whole set, and Audit
-      Logs caps at a fixed PAGE_SIZE that the screen states in its own footer.
-    * The two dashboard toggles: both widgets they name are unconditional in
-      admin_dashboard.html and staff_dashboard.html, and the low-stock figure is
-      also a badge in the sidebar on every screen.
-    * The three notification channels: this system sends no email at all -- no
-      address is stored for any account and no mail is configured. SMS is not a
-      channel that can be switched off here; it is a send an operator performs on
-      SMS Notifications, one message at a time, and it is recorded whether or not
-      a gateway key is present. And "system alerts" are not written, stored or
-      cleared anywhere -- utils/unavailable.py's `notifications` reason says so,
-      and Screen 14 prints that reason.
-    * Both reminder timings: nothing in this project runs on a timer. There is
-      no scheduler and no job for one to run, so "1 day before" is not a setting
-      that is off -- it is a description of a mechanism that does not exist.
-
-    This follows the precedent already set on this screen twice: the Billing Info
-    subsection under SMS Gateway and the Cache Status field under System
-    Maintenance were both deleted rather than marked "Not tracked", because that
-    wording belongs to things this system HAS and does not record. A permanent
-    disabled placeholder for a feature nobody is building is a promise the
-    project has no intention of keeping, and it is read as a roadmap.
-
-    Nothing else references either pane. Checked before removing: the strings
-    "pane-prefs", "pane-notif", "Records Per Page", "Date Format", "Show Low
-    Stock Alerts", "Show Today's Appointments", "Appointment Reminder" and
-    "Immunization Reminder" appear nowhere else in the project, and
-    unavailable.notifications -- which survives -- is quoted by Screen 14 and
-    base.html, neither of which had anything to do with this pane. #}
-
-            <!-- SMS GATEWAY CONFIGURATION -->
             <div class="tab-pane fade{% if active_pane == 'pane-sms' %} show active{% endif %}" id="pane-sms">
-              <div class="section-title">SMS Gateway Configuration</div>
-              <div class="section-sub">Connection settings for outbound SMS notifications</div>
-{#- Its own disabled fieldset now, holding what the page-wide one used to. The
-    controls here are disabled for the reason quoted on them rather than for the
-    reason the rest of the screen was: the gateway is real and utils/sms.py is a
-    working Semaphore client -- what is missing is the API key on the server, and
-    nothing typed on this screen is part of setting it. #}
-              <fieldset class="unavailable-form" disabled>
-
-              <div class="row g-3 mb-3">
-                <div class="col-md-6">
-                  <label class="field-label">Gateway Provider<span class="req">*</span></label>
-                  <select class="form-select">
-                    <option selected>Semaphore</option>
-                    <option>Globe Labs</option>
-                    <option>Twilio</option>
-                  </select>
-                </div>
-                <div class="col-md-6">
-                  <label class="field-label">Sender Name<span class="req">*</span></label>
-                  <input type="text" class="form-control" value="IDS-BPHCSN">
-                  {#- WAS "Appears as the sender ID on recipients' phones", which
-                      was a claim about what a recipient sees, and it was wrong.
-                      send_announcement_sms() builds its payload from three keys
-                      -- apikey, number, message -- and there is no sendername
-                      among them. Semaphore calls this a sender ID, it is
-                      optional, and utils/sms.py deliberately omits it: an
-                      account without an approved sender name has its messages
-                      delivered under Semaphore's default, which is the correct
-                      behaviour for a new account and is documented at the top of
-                      that file.
-
-                      So whatever this box says, nothing carries it to a phone.
-                      That made it the most checkable false claim left on the
-                      screen -- a panellist with a handset could have disproved it
-                      in one send -- and the worst kind to leave beside the API
-                      Key hint below, which is true and specific and was lending
-                      it credibility.
-
-                      Corrected rather than removed, unlike Billing Info. The
-                      sender ID is a real Semaphore feature this account may one
-                      day have approved, so the field has something to become;
-                      a billing account had nothing to become because none
-                      exists. The hint now says what happens instead, and names
-                      what would have to change for the field to mean anything. #}
-                  <div class="form-text-hint">Not sent. Messages are delivered under the provider's default sender identity, because no sender name has been approved for this account.</div>
-                </div>
+              <div class="section-title">SMS</div>
+              <div class="section-sub">How community messages are sent</div>
+              <div class="gateway-banner {{ 'live' if sms_mode.startswith('SMS mode: Live') else 'simulated' }}" style="margin-top:0;">
+                <span class="material-symbols-outlined">{{ 'cell_tower' if sms_mode.startswith('SMS mode: Live') else 'wifi_off' }}</span>
+                <div><span class="gw-title">{{ sms_mode }}</span></div>
               </div>
-
-              <div class="row g-3 mb-3">
-                <div class="col-md-8">
-                  <label class="field-label">API Key<span class="req">*</span></label>
-                  <div class="key-input-group">
-                    {#- No value. What sat here was a made-up string that read as
-                        a live secret: it carried the same prefix a real provider
-                        key uses, so anyone
-                        looking at this screen -- or at a screenshot of it in the
-                        defence -- would have taken it for the barangay's actual
-                        credential. It was never one. The real key is read from
-                        the SEMAPHORE_API_KEY environment variable by
-                        utils/sms.py and is never stored in this project or
-                        displayed by it.
-
-                        The field stays inside the disabled fieldset opened above,
-                        so emptying it does not make it editable -- nothing on
-                        this screen is. It is blank because there is nothing true
-                        to put in it, not because it is waiting for input. #}
-                    <input type="password" class="form-control" value="" placeholder="Set on the server, not on this screen">
-                    <button type="button" class="key-toggle-btn" disabled title="{{ unavailable.sms_gateway }}"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button>
-                  </div>
-                  {#- The old hint promised "only the last 4 characters are
-                      visible to other administrators", describing a masking rule
-                      this project does not implement -- there is no key stored to
-                      mask and no per-administrator view of one. #}
-                  <div class="form-text-hint">The key is read from the server this system runs on, not from this screen. It is checked on every send.</div>
-                </div>
-                <div class="col-md-4">
-                  <label class="field-label">Connection Status</label>
-                  <div style="padding-top:11px;">
-                    {#- This said "Connected", in green, beside the fake key --
-                        a claim about live system state that nothing had checked.
-                        It also directly contradicted the reason on the two
-                        disabled controls in this same panel, which says sends are
-                        simulated. Broadcasts are recorded either way; what the
-                        key decides is whether they also go on the wire. #}
-                    <span class="status-pill status-unconfigured"><span class="status-dot-sm"></span>Not configured</span>
-                  </div>
-                </div>
+              <div class="scope-note">
+                The provider is Semaphore. Its key is read from the server (SEMAPHORE_API_KEY), not from this screen.
+                Every broadcast is recorded in SMS Notifications either way.
               </div>
-
-              <button type="button" class="btn-outline-teal" disabled title="{{ unavailable.sms_gateway }}"><span class="material-symbols-outlined" style="font-size:18px;">wifi_tethering</span>Test Connection</button>
-
-{#- WAS a "Billing Info" subsection reading "Cost per SMS -- P0.50" and
-    "Billing Account -- Barangay LGU Account". Both were invented, and the second
-    was the worse of the two: it named an account this barangay does not hold.
-
-    No Semaphore account has been opened for this health center. The Connection
-    Status pill a few lines above says Not configured, and it says so because
-    utils/sms.py finds no key in the environment -- so there is nothing to bill
-    against, no contracted rate, and not one centavo has ever been charged for a
-    message this system sent. A peso figure and an account name printed on the
-    same panel as that pill contradicted it outright.
-
-    Removed rather than marked "Not tracked", for the reason the Cache Status
-    field records under System Maintenance: that wording belongs to things this
-    system has and does not record, and a billing relationship is not one of
-    them. There is no cost being incurred and no account incurring it.
-
-    What is genuinely known about what a message costs is already on SMS
-    Notifications, where it is true and where the person spending it is
-    standing: Semaphore charges one message credit per segment per recipient,
-    and the composer counts the segments as the message is typed. Credits are
-    what a sender actually spends. The peso price of one is a matter between the
-    barangay and the provider, and was never something this project knew. #}
-              </fieldset>
             </div>
 
             <!-- SECURITY SETTINGS -->
@@ -616,12 +324,6 @@
               <div class="section-title">Security Settings</div>
               <div class="section-sub">What this system enforces and records about signing in</div>
 
-{#- NO CONTROLS IN THIS PANE. It used to hold four disabled controls: Session
-    Timeout, Login Attempt Limit, Two-Factor Authentication and Auto Logout.
-    None did anything. The session limits are now real and are stated below
-    as facts, read from utils/security.py SESSION_RULE_TEXT, which is built
-    from config.py. Two-factor sign-in and a lockout policy are not part of
-    this system, so their controls are gone. #}
               <div class="subsection-title"><span class="material-symbols-outlined" style="color:var(--teal-dark); font-size:18px;">verified_user</span>What is actually enforced</div>
               <div class="fact-row">
                 <div>
@@ -645,14 +347,7 @@
                 <div class="fact-value" style="color:#15803D;">Enforced</div>
               </div>
 
-              {#- THE ONE BLOCK ON THIS SCREEN THAT READS REAL DATA.
-                  Outside the disabled fieldset in spirit though not in markup:
-                  it contains no control, only figures. Every setting above it is
-                  a value this system does not store and does not enforce; this
-                  is what it does record about signing in, counted from the same
-                  audit rows Screen 12 counts, so the two screens cannot report
-                  different numbers. See routes/settings_views.py. #}
-              <div class="subsection-divider"></div>
+                            <div class="subsection-divider"></div>
               <div class="subsection-title"><span class="material-symbols-outlined" style="color:var(--teal-dark); font-size:18px;">fact_check</span>What is actually recorded</div>
               <div class="scope-note" style="margin-top:0;">
                 These figures are live. They are the same rows
@@ -686,22 +381,7 @@
                 <div class="backup-value" style="color:var(--text-muted);" title="The trail holds no sign-in yet. This is a real state on a freshly seeded database, not a missing figure.">No sign-in recorded yet</div>
                 {%- endif %}
               </div>
-              {#- THE SAME FIVE SENTENCES AUDIT LOGS PRINTS, WORD FOR WORD.
-                  These facts were being stated twice in the project, at two
-                  lengths and in two vocabularies: here at 618 characters, and
-                  under Screen 12's Security Events card at 901, where they also
-                  quoted a NOT NULL constraint and a foreign key at a barangay
-                  official. Both are now the same short sentences, and
-                  audit_views.UNTRACKED["login_scope"] adds only the three facts
-                  that are about that card rather than about signing in.
-
-                  Why an attempt on an unknown username writes nothing:
-                  audit_logs.user_id is NOT NULL and foreign-keyed to a real
-                  account, so there is no row for it to belong to. Why a
-                  password never appears: see the module note in routes/auth.py.
-                  Neither reason is on the screen, because neither changes what
-                  anybody does about it. #}
-              <div class="form-text-hint" style="margin-top:10px;">
+                            <div class="form-text-hint" style="margin-top:10px;">
                 A refused sign-in records the account, the time and the address.
                 The password is never recorded.
                 An attempt on a username that does not exist is not recorded at all.
@@ -712,45 +392,6 @@
             </div>
 
             <!-- PASSWORD POLICY -->
-{#- THE WHOLE PANE IS A DISPLAY NOW, AND EVERY FIGURE IN IT IS READ FROM THE
-    VALIDATOR RATHER THAN TYPED HERE.
-
-    WHAT WAS HERE. Five controls: "Minimum Length 8" in a number box, "Password
-    Expiry (days) 90" with the hint "0 = never expires", and four switches --
-    Require Uppercase Letter (on), Require Number (on), Require Special Character
-    (off), Prevent Password Reuse (on, "Disallow reusing the last 3 passwords").
-
-    EVERY ONE OF THE FIVE WAS FALSE, AND FALSE IN A DIFFERENT WAY.
-    * The length was understated. The rule refuses anything under 12; the box
-      said 8, so an administrator reading this pane and setting a nine-character
-      password would have been refused by a system they had just been told
-      allowed it.
-    * The three complexity switches described a rule of a different SHAPE. The
-      validator does not require any single kind of character. It counts how many
-      of four kinds appear and asks for three of them, which is why a long
-      passphrase with no symbol passes -- so "Require Uppercase Letter: on" and
-      "Require Special Character: off" were not merely miscalibrated, they
-      described a mechanism that is not the one running.
-    * Expiry and reuse-prevention are features that do not exist anywhere in this
-      system. No password has an age recorded against it and only the current
-      hash is stored, so there is nothing to expire and no history to compare
-      against.
-
-    WHY IT IS NOT SIMPLY THE CORRECT NUMBERS IN THE SAME BOXES. That is the
-    obvious repair and it is the one this pane exists to refuse. Retyping "12"
-    into a disabled input creates a SECOND copy of the rule -- and a second copy
-    is precisely how the first one came to be wrong. Somebody wrote the validator
-    and this screen went on describing something else, and nothing about that is
-    prevented by the new numbers being right on the day they are typed.
-
-    So every figure below comes from models/users.password_policy(), which reads
-    the constants check_password_strength() itself branches on and the very list
-    _character_kinds() iterates. Raising PASSWORD_MIN_LENGTH to 14 changes this
-    pane in the same edit. Adding a fifth character kind adds a line to the list
-    below without anyone touching this file. There is no path by which this pane
-    can be wrong while the validator is right, which is a stronger claim than
-    "these numbers are correct" and is the only one worth making about a screen
-    that describes a rule it does not itself enforce. #}
             <div class="tab-pane fade{% if active_pane == 'pane-pwd' %} show active{% endif %}" id="pane-pwd">
               <div class="section-title">Password Policy</div>
               <div class="section-sub">The rule enforced when an account is created or its password is reset</div>
@@ -827,19 +468,6 @@
               <div class="section-title">Backup &amp; Restore</div>
               <div class="section-sub">Take a copy of the database, now, from this screen</div>
 
-{#- DOWNLOAD BACKUP IS REAL NOW. The three buttons here used to be disabled
-    together under one reason that said backup and restore "are not built" and
-    that doing it from this screen "needs a job that can copy the file safely
-    while the system is running". That job is models/backup.py: SQLite's own
-    online backup interface, which copies page by page from inside the database
-    engine and restarts if another connection writes during the copy, so what
-    comes out is a complete database as of one consistent moment rather than a
-    file assembled from two. The copy is then checked with PRAGMA
-    integrity_check before it is served, because the whole danger of a naive copy
-    is that its damage is invisible until the file is needed.
-
-    Restore stays disabled, and the reason on it now says why it is the harder
-    half rather than lumping it in with a download that works. #}
               <div class="scope-note" style="margin-top:0;">
                 <strong>Download Backup takes a real copy, right now.</strong>
                 It uses SQLite&#39;s own backup interface rather than copying the file, so it is safe to press
@@ -854,11 +482,6 @@
 
               <div class="backup-row">
                 <div class="backup-label">Database size</div>
-{#- WAS "Backup Size — 248 MB", a mockup figure on a file of well under a
-    megabyte. It is the size of the LIVE database rather than of any copy, and
-    the label says so: the backup is the same set of pages, so this is within a
-    page or two of what the download will weigh, but only one of the two is a
-    thing this screen can actually measure. #}
 {%- if backup.size %}
                 <div class="backup-value" title="Measured from the database file this system is serving your request from, at the moment this page was built.">{{ backup.size }}</div>
 {%- else %}
@@ -867,17 +490,6 @@
               </div>
               <div class="backup-row">
                 <div class="backup-label">Last backup downloaded from this screen</div>
-{#- WAS "Last Backup Date", which had a frozen timestamp on it and then read
-    "Not tracked". Now it is tracked, but only for backups taken HERE -- and the
-    label carries that qualifier because it is load-bearing. The practice at this
-    health center has been to copy app.db by hand with the date in its name, and
-    this system cannot see that those copies exist. A row labelled "Last backup"
-    would be claiming to answer a question it cannot.
-
-    The figure comes out of the audit trail, which is the only record that a
-    download happened: models/backup.py writes no file and keeps no history of
-    its own, by design -- what it makes goes straight to the browser that asked
-    for it. #}
 {%- if backup.last_at %}
                 <div class="backup-value">{{ backup.last_at }}{% if backup.last_by %} <span style="color:var(--text-muted); font-weight:400;">&middot; {{ backup.last_by }}</span>{% endif %}</div>
 {%- else %}
@@ -886,82 +498,23 @@
               </div>
               <div class="backup-row">
                 <div class="backup-label">Backup schedule</div>
-{#- Unchanged, and still None rather than "Not tracked". A schedule is not
-    something this system has and fails to record -- there is no scheduler here,
-    no cron entry and no job for one to run, so "Not tracked" would be asserting
-    a schedule exists that nobody wrote down. The honest value for a thing that
-    does not exist is None. Pressing the button below is the whole of how a
-    backup is taken. #}
                 <div class="backup-value" style="color:var(--text-muted);" title="No backup runs on a timer. Nothing in this system schedules one; a backup happens when somebody presses Download Backup.">None &mdash; backups are taken by hand</div>
               </div>
 
               <div class="d-flex gap-2 flex-wrap" style="margin-top:20px;">
-{#- An anchor with `download`, not a button, and a GET, exactly like the eleven
-    export links elsewhere in this project: it changes nothing, and a download is
-    a link. The route is Admin-only all the same -- what leaves is every patient
-    record in the system in one file, which makes it the most consequential read
-    this application offers. The download is recorded in Audit Logs for that
-    reason, even though no record changed. #}
                 <a class="btn-primary-teal" href="{{ url_for('admin.download_backup') }}" download
                    title="Take a copy of the database now and download it. Safe to press while the system is in use — the copy is made through SQLite's own backup interface and checked before it is sent. The download is recorded in Audit Logs.">
                   <span class="material-symbols-outlined" style="font-size:18px;">download</span>Download Backup
                 </a>
               </div>
 
-              <div class="subsection-divider"></div>
-              <div class="subsection-title"><span class="material-symbols-outlined" style="color:var(--teal-dark); font-size:18px;">pending</span>Not built</div>
-{#- The three controls that are still not real, in their own fieldset now that
-    the button above them is. Keeping them beside a working download would be
-    misleading if they were not visibly separated from it, which is what this
-    subheading and the fieldset are for. #}
-              <fieldset class="unavailable-form" disabled>
-              <div class="row g-3 mt-1 mb-3">
-                <div class="col-md-6">
-                  <label class="field-label">Backup Frequency</label>
-                  <select class="form-select" title="{{ unavailable.backup }}">
-                    <option selected>Daily</option>
-                    <option>Weekly</option>
-                    <option>Monthly</option>
-                  </select>
-                </div>
-                <div class="col-md-6">
-                  <label class="field-label">Retention Period</label>
-                  <select class="form-select" title="{{ unavailable.backup }}">
-                    <option>30 days</option>
-                    <option selected>90 days</option>
-                    <option>1 year</option>
-                  </select>
-                </div>
-              </div>
-
-              <button type="button" class="btn-ghost-ids" title="{{ unavailable.restore }}"><span class="material-symbols-outlined" style="font-size:18px;">restore</span>Restore Backup</button>
-              </fieldset>
-              <div class="form-text-hint" style="margin-top:8px;">{{ unavailable.restore }}</div>
+              <div class="form-text-hint" style="margin-top:14px;">To restore a backup, run restore_backup.py on the health-center computer.</div>
             </div>
 
             <!-- SYSTEM MAINTENANCE -->
             <div class="tab-pane fade{% if active_pane == 'pane-maint' %} show active{% endif %}" id="pane-maint">
               <div class="section-title">System Maintenance</div>
               <div class="section-sub">Tools for keeping the system running smoothly</div>
-{#- MAINTENANCE MODE IS LIVE. It was a dead switch inside the pane-wide disabled
-    fieldset, beside a System Log Retention dropdown and a Clear Cache button,
-    and it is the only one of the three that had anything real behind it.
-
-    It is a form rather than a checkbox, and that is the point of the shape.
-    A switch that flips when you touch it is the wrong control for an action
-    that closes the health center out of its own patient records: it can be hit
-    by a stray click and it gives no moment in which to read what is about to
-    happen. So the state is shown as a pill and the change is a submit with the
-    consequence written on the button.
-
-    The two buttons post to the same route with different `action` values, which
-    is the arrangement User Management's Deactivate / Reactivate pair uses -- the
-    other place in this project where a control decides who can use the system.
-
-    WHY THIS IS SAFE TO OPERATE, IN ONE SENTENCE FOR SOMEBODY STANDING HERE:
-    the guard in utils/security.py admits every Administrator whatever this says,
-    so the person who closes the system is never the person locked out of
-    reopening it. #}
               <div class="toggle-row" style="align-items:flex-start;">
                 <div>
                   <div class="toggle-row-label">Maintenance Mode</div>
@@ -979,12 +532,6 @@
 {%- endif %}
               </div>
 
-{#- The warning that decides whether an administrator should press this NOW, and
-    it is deliberately a warning rather than a refusal. Closing the system during
-    a consultation is a legitimate thing to want to do -- that is what an urgent
-    problem looks like -- so the screen owes them the fact before they press it,
-    not a veto. Read from get_active_consultation(), the same call Appointment
-    Scheduling asks "is the room free?" with. #}
 {%- if maintenance.in_consultation and not maintenance.on %}
               <div class="alert-ids alert-warning-ids" style="margin-top:14px;">
                 <span class="material-symbols-outlined">warning</span>
@@ -1021,54 +568,6 @@
                 Never used. The system has been open since it was installed.
               </div>
 {%- endif %}
-
-              <div class="subsection-divider"></div>
-{#- What is left in this pane's disabled fieldset after the switch above came
-    out of it and Clear Cache was deleted: one dropdown, for a retention policy
-    nothing applies. Nothing prunes the audit trail on any schedule, or at all --
-    models/audit.py is append-only by design and has no delete in it. #}
-              <fieldset class="unavailable-form" disabled>
-              <div class="row g-3 mb-3">
-                <div class="col-md-6">
-                  <label class="field-label">System Log Retention</label>
-                  <select class="form-select">
-                    <option>90 days</option>
-                    <option selected>1 year</option>
-                    <option>2 years</option>
-                  </select>
-                </div>
-{#- CACHE STATUS WENT FIRST, AND NOW CLEAR CACHE HAS GONE AFTER IT.
-
-    The field here read "Healthy - 42 MB" on a green pill and was removed as
-    mockup residue; the note left behind said the figure was "worse than an
-    invented number: there is no cache here to have a status at all", and then
-    pointed at the Clear Cache button below as the thing that already told
-    anyone who hovered it so.
-
-    That pointer was the tell. A removed field explaining itself by referring to
-    a button that exists only to say the same absence is one absence stated
-    twice, and the button was the worse of the two: a field reports, a button
-    offers. This one offered an operation on a thing that does not exist. Pages
-    are served with no-store (see app.py's no_store()), every figure on every
-    screen is read from the database on the request that draws it, and the only
-    thing in this project called a cache is models/settings.py's one-request
-    memo on flask.g -- which is discarded when the request ends and could not be
-    cleared by a button that would have to finish its own request to do it.
-
-    So it is deleted rather than left disabled, on the precedent this screen has
-    now set four times: Billing Info under SMS Gateway, Cache Status here, and
-    the User Preferences and Notification Settings panes. A disabled control is
-    honest when the feature is real and unbuilt -- the SMS gateway's buttons are
-    exactly that, and they stay. This one was not waiting for anything: nothing
-    in this project caches, nothing ever has, and no cache is planned, so the
-    button was a permanent placeholder for a feature that will never arrive.
-
-    Nothing referenced it. Checked before removing: no route, no template, no
-    model and no reason in utils/unavailable.py mentions cache clearing, and the
-    shared `settings` reason it quoted is still quoted by the two fieldsets on
-    Health Center Information and Security Settings. #}
-              </div>
-              </fieldset>
             </div>
 
             <!-- ABOUT SYSTEM -->
@@ -1078,28 +577,6 @@
 
               <div class="about-item"><div class="about-label">System Name</div><div class="about-value">{{ system_short_name }}</div></div>
               <div class="about-item"><div class="about-label">System Version</div><div class="about-value">1.0.0</div></div>
-{#- WAS "PostgreSQL 15.4", "Jul 01, 2026" and "DOH-Licensed" on these three
-    rows. Each was wrong in its own way.
-
-    The database line named a database this project has never used. There is one
-    store here and it is SQLite: database/connection.py opens config.DATABASE
-    with sqlite3, and app.db begins with the bytes "SQLite format 3". It now
-    reports the SQLite the running interpreter is linked against, read on each
-    load, so it cannot go stale the way a typed-in version already had.
-
-    "Last Update" was an invented date. Nothing in this system records when it
-    was last changed -- no update mechanism, no deployment stamp, no version
-    history in the schema -- and the repository's git log, which does know, is
-    not something the running application should be reaching into. The row says
-    that instead of a date nobody checked.
-
-    "License Status" is gone rather than answered. No licence, accreditation or
-    endorsement is recorded anywhere in this codebase, its schema or its
-    documentation; the project's own audit report already listed this claim as
-    decorative, and "Trusted Gov System" left the login screen for the same
-    absence. A row reading "Not licensed" would imply a licence was expected and
-    missing -- there is simply no licensing to report, so the row goes, and so
-    does the word in the heading above it. #}
               <div class="about-item" title="Read from the server running this page rather than typed in. This system keeps all of its records in a single file.">
                 <div class="about-label">Database</div><div class="about-value">SQLite {{ system.sqlite_version }}</div>
               </div>
@@ -1107,11 +584,6 @@
                 <div class="about-label">Last Update</div><div class="about-value">Not tracked</div>
               </div>
               <div class="about-item"><div class="about-label">Developer</div><div class="about-value">BSIT Capstone Development Team</div></div>
-{#- These two were typed literals naming the same place three fields on General
-    Settings now store. They read the stored values, so renaming the facility or
-    correcting the province updates the pane that reports what this system is
-    deployed for, instead of leaving it naming somewhere the system has stopped
-    calling itself. #}
               <div class="about-item"><div class="about-label">Institution</div><div class="about-value">{{ health_center.municipality }}, {{ health_center.province }}</div></div>
               <div class="about-item"><div class="about-label">Deployed For</div><div class="about-value">{{ health_center.name }}</div></div>
             </div>
@@ -1121,29 +593,4 @@
       </div>
     </div>
 
-{#- THE PAGE-WIDE ACTION BAR IS GONE. It held Cancel, Reset to Default and Save
-    Changes, all three disabled, under a legend reading "Fields marked * would be
-    required if this screen were connected."
-
-    It cannot survive this change, and not merely because it was dead. A single
-    Save Changes at the foot of the page claims to save the page, and the page is
-    now nine panes of which exactly one saves -- so a live version of that button
-    would be promising to store the DOH licence number and the session timeout,
-    and a disabled version sitting below a General Settings pane that genuinely
-    saves would read as the save having failed. Neither is acceptable.
-
-    The one pane that saves carries its own Save button, inside its own form,
-    where the fields it writes are. That is also how every other form in this
-    project ends -- Register Patient, Add/Edit Medicine, Record Consultation --
-    so this screen now looks like the rest of the application rather than like a
-    settings mockup.
-
-    Cancel and Reset to Default go with it and are not replaced. Cancel had
-    nothing to abandon; reloading the page is what it would have done. Reset to
-    Default would need to mean deleting the six stored rows so the defaults in
-    models/settings.py take over again, which is a real action with real
-    consequences -- it would rename the health center on every screen and export
-    in one click -- and it is not one this task built or tested. A button that
-    does that is a different piece of work; a disabled button promising it is the
-    thing this screen has spent three passes removing. #}
 {% endblock %}

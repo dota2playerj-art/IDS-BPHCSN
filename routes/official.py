@@ -186,13 +186,6 @@ def export_community_reports_pdf():
     ))
 
 
-@official_bp.route('/notifications')
-@login_required
-@role_required("Barangay Official")
-def notifications():
-    return render_template('notifications.html')
-
-
 # The Service Schedule, read-only, for the Barangay Official -- what the barangay
 # can tell residents runs on which day. The same builder as the other roles'
 # copies, and a GET with no POST counterpart anywhere in this blueprint, so this

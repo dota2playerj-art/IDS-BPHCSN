@@ -759,9 +759,8 @@ def _appointments(context):
             ("Left before being seen", window["left"],
              "Checked in, then went home before the Doctor saw them"),
             ("Still expected", window["expected"],
-             "Booked and not yet resolved. Zero from September 2026 on, when "
-             "advance booking was retired — a visit is now recorded on the day "
-             "the patient arrives, so none is ever pending"),
+             "From the earlier booking system, never closed. Zero since September "
+             "2026, when booking ended"),
             ("Resolved", window["resolved"],
              "Attended, waiting for the Doctor, cancelled/no-show and left before being seen — a visit still to happen has "
              "neither succeeded nor failed"),
@@ -770,9 +769,8 @@ def _appointments(context):
             ("Missed rate (%)", window["missed_pct"],
              "Of the resolved appointments only"),
             ("Walk-ins", window["walk_ins"], ""),
-            ("Booked in advance", window["booked"],
-             "Visits recorded before the day they happened. Only months before "
-             "September 2026 can hold any"),
+            ("From the earlier booking system", window["booked"],
+             "Visits booked ahead before September 2026"),
         ]),
     ]
 

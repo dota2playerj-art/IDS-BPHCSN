@@ -190,8 +190,10 @@
     <div class="gateway-banner {{ 'live' if gateway_live else 'simulated' }} mt-3">
       <span class="material-symbols-outlined">{{ 'cell_tower' if gateway_live else 'wifi_off' }}</span>
       <div>
-        <span class="gw-title">SMS gateway: {{ gateway_label }}</span>
+        <span class="gw-title">{{ gateway_label }}</span>
+{%- if gateway_note %}
         {{ gateway_note }}
+{%- endif %}
       </div>
     </div>
 

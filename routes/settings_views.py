@@ -16,7 +16,7 @@ WHOLE DESIGN.
 1. STORED AND READ BACK -- General Settings.
    Six values in the settings table (models/settings.py), written by
    process_general_settings() below and read by the SMS composer, all three
-   export modules, the booking slot generator and every template's header. This
+   export modules and every template's header. This
    is the only pane with a live control on it.
 
 2. READ FROM WHAT THE SYSTEM ACTUALLY DOES -- Security Settings' sign-in
@@ -64,6 +64,7 @@ file the backup would be taken from. Nothing is counted locally here.
 import config
 import sqlite3
 
+from utils.sms import sms_mode
 from models.appointments import get_active_consultation
 from models.audit import (
     ACTION_BACKUP_DOWNLOADED,
@@ -186,7 +187,6 @@ TAB_MAINTENANCE = "maint"
 # only place the two vocabularies meet.
 SETTINGS_TABS = {
     TAB_GENERAL: "pane-general",
-    "hc": "pane-hc",
     "sms": "pane-sms",
     "security": "pane-security",
     "pwd": "pane-pwd",
@@ -288,6 +288,7 @@ def settings_context(general_form=None, general_errors=None, active_tab=None):
         # The pane that opens. Every render goes through resolve_tab(), so this
         # is always the id of a pane that exists.
         "active_pane": SETTINGS_TABS[resolve_tab(active_tab)],
+        "sms_mode": sms_mode(),
         "general": {
             # What the form draws. Typed values on a refused submit, stored
             # values otherwise -- so nothing an administrator wrote is thrown

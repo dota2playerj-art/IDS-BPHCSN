@@ -648,7 +648,6 @@
               <th>Patient Name</th>
               <th>Service / Reason</th>
               <th>Arrived</th>
-              <th>Booked</th>
               <th>Status</th>
               <th style="text-align:right;">Actions</th>
             </tr>
@@ -697,7 +696,6 @@
 {%- endif %}
               </td>
               <td>{{ entry.arrival_time or '—' }}</td>
-              <td>{{ entry.booked_time or '—' }}</td>
               <td><span class="badge-status {{ entry.display_badge_class }}">{{ entry.display_status }}</span></td>
               <td>
                 <div class="d-flex justify-content-end gap-1 align-items-center">

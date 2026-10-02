@@ -411,10 +411,6 @@
                 <div class="meta-value">{{ patient.blood_type or 'Not recorded' }}</div>
               </div>
               <div class="meta-item">
-                <div class="meta-label">PhilHealth No.</div>
-                <div class="meta-value">Not recorded</div>
-              </div>
-              <div class="meta-item">
                 <div class="meta-label">Contact Number</div>
                 <div class="meta-value">{{ patient.contact_number or 'Not recorded' }}</div>
               </div>
@@ -545,7 +541,6 @@
             <div class="info-item"><div class="info-label">Age / Sex</div><div class="info-value">{{ patient.age if patient.age is not none else '—' }} / {{ patient.sex or '—' }}</div></div>
             <div class="info-item"><div class="info-label">Civil Status</div><div class="info-value">{{ patient.civil_status or 'Not recorded' }}</div></div>
             <div class="info-item"><div class="info-label">Blood Type</div><div class="info-value">{{ patient.blood_type or 'Not recorded' }}</div></div>
-            <div class="info-item"><div class="info-label">PhilHealth No.</div><div class="info-value">Not recorded</div></div>
             <div class="info-item"><div class="info-label">Contact Number</div><div class="info-value">{{ patient.contact_number or 'Not recorded' }}</div></div>
             <div class="info-item"><div class="info-label">Address</div><div class="info-value">{{ patient.display_address or 'Not recorded' }}</div></div>
             <div class="info-item"><div class="info-label">Emergency Contact</div><div class="info-value">{{ patient.emergency_contact_name or 'Not recorded' }}{% if patient.emergency_contact_relationship %} ({{ patient.emergency_contact_relationship }}){% endif %}</div></div>
@@ -1361,9 +1356,7 @@
     than its row shows: a Bootstrap collapse over a detail row, built from the
     info-grid classes, holding divs rather than inputs. There is no form
     element inside it and no endpoint it could post to, so nothing here can
-    alter the booking -- Reschedule and Cancel beside it are the only controls
-    on this row that write, and they still go to the dialogs that own those
-    rules.
+    alter the booking.
 
     It reads appointment.notes, which get_appointments_for_patient() already
     selects and the Patient Queue already prints verbatim in its own

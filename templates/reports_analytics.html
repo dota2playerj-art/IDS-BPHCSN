@@ -371,7 +371,7 @@
                either way, because a category of zero adds nothing. -->
           <div class="panel-sub">
             Monthly appointment outcomes &middot; {{ appt.total }} in this range
-            ({{ appt.booked }} booked, {{ appt.walk_ins }} walk-in)
+            ({{ appt.walk_ins }} walk-in{% if appt.booked %}, {{ appt.booked }} from the earlier booking system{% endif %})
           </div>
           <div class="chart-wrap"><canvas id="chartAppt"></canvas></div>
 {{ ct.chart_table('Appointment outcomes, by month',
@@ -390,9 +390,8 @@
           </div>
 {%- if not appt.expected %}
           <div class="panel-sub" style="margin-top:8px; line-height:1.55;">
-            <strong style="display:inline;">Still expected</strong> is zero, and stays zero: patients are seen in the
-            order they arrive, so no visit is recorded before it happens. It is kept in the legend because
-            older months can still hold one &mdash; this system booked visits ahead until September 2026.
+            <strong style="display:inline;">Still expected</strong> is zero. Patients are seen in the order they
+            arrive, so no visit is recorded before it happens. Older months can hold some, from the earlier booking system.
           </div>
 {%- endif %}
         </div>
@@ -655,7 +654,7 @@
           </div>
           <div class="basis-note mt-3">
             For reference, {{ appointment_report.window.prenatal_visits }} Prenatal Check-up
-            appointment{{ '' if appointment_report.window.prenatal_visits == 1 else 's' }} were booked
+            appointment{{ '' if appointment_report.window.prenatal_visits == 1 else 's' }} were recorded
             between {{ window.start | display_date }} and {{ window.end | display_date }}
             &mdash; a count of visits, not of patients enrolled.
           </div>
