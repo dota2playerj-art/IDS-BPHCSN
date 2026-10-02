@@ -121,6 +121,7 @@
   }
   .badge-scheduled{background:#DBEAFE; color:#1D4ED8;}
   .badge-completed{background:#DCFCE7; color:#15803D;}
+  .badge-waiting-doctor{background:#EDE9FE; color:#6D28D9;}
   .badge-cancelled{background:#FEE2E2; color:#B91C1C;}
   .badge-waiting{background:#FEF3C7; color:#B45309;}
   .badge-inconsult{background:var(--teal-light); color:var(--teal-dark);}
@@ -387,7 +388,7 @@
           <div class="stat-icon" style="background:#DCFCE7;"><span class="material-symbols-outlined" style="color:var(--success);">check_circle</span></div>
           <div class="stat-value">{{ queue_stats.completed }}</div>
           <div class="stat-label">Completed</div>
-          <div class="stat-trend" style="color:var(--text-muted);">Today</div>
+          <div class="stat-trend" style="color:var(--text-muted);">Finished today{% if queue_stats.waiting_doctor %} &middot; {{ queue_stats.waiting_doctor }} waiting for the Doctor{% endif %}</div>
         </div>
       </div>
     </div>
@@ -653,8 +654,8 @@
 {%- for entry in queue %}
 {%- set patient_name = entry.first_name ~ ' ' ~ entry.last_name %}
             <tr class="queue-row{% if entry.is_in_consultation %} row-inconsult{% elif entry.is_ready %} row-ready{% endif %}"
-                data-search="{{ (entry.first_name ~ ' ' ~ (entry.middle_name or '') ~ ' ' ~ entry.last_name ~ ' ' ~ entry.patient_reference ~ ' ' ~ ('' if entry.reason_sealed else (entry.notes or '')) ~ ' ' ~ (entry.appointment_type or '')) | lower }}"
-                data-service="{{ (entry.appointment_type or 'Consultation') | lower }}"
+                data-search="{{ (entry.first_name ~ ' ' ~ (entry.middle_name or '') ~ ' ' ~ entry.last_name ~ ' ' ~ entry.patient_reference ~ ' ' ~ ('' if entry.reason_sealed else (entry.notes or '')) ~ ' ' ~ ((entry.appointment_type or '') if care_team_view else '')) | lower }}"
+                data-service="{{ ((entry.appointment_type or 'Consultation') if care_team_view else '') | lower }}"
                 data-status="{{ (entry.display_status or '') | lower }}">
               <td>
 {%- if entry.is_in_consultation %}
@@ -678,7 +679,11 @@
                 <div class="po-meta">{{ entry.patient_reference }}</div>
               </td>
               <td>
+{%- if care_team_view %}
                 <div>{{ entry.appointment_type or 'Consultation' }}</div>
+{%- else %}
+                <div style="color:#C7CBD1;">&mdash;</div>
+{%- endif %}
 {%- if entry.notes %}
                 <div class="reason-text">{% if entry.reason_sealed %}<span class="no-print">{{ entry.notes }}</span><span class="print-only">{{ restricted_placeholder }}</span>{% else %}{{ entry.notes }}{% endif %}</div>
 {%- endif %}
@@ -741,6 +746,15 @@
                           class="btn-outline-teal" style="padding:6px 12px; font-size:12.5px;"
                           title="Put {{ patient_name }} back to {{ entry.status_before_left }}. Today only.">
                     <span class="material-symbols-outlined" style="font-size:16px;">undo</span>Undo
+                  </button>
+{%- endif %}
+{%- if entry.can_change_service %}
+                  <button type="button" class="btn-outline-teal" style="padding:6px 12px; font-size:12.5px;"
+                          data-bs-toggle="modal" data-bs-target="#serviceModal"
+                          data-appointment="{{ entry.id }}" data-name="{{ patient_name }}"
+                          data-service="{{ entry.appointment_type or '' }}"
+                          title="Correct the service of {{ patient_name }}'s visit">
+                    <span class="material-symbols-outlined" style="font-size:16px;">edit</span>Change service
                   </button>
 {%- endif %}
 {%- endif %}
@@ -815,6 +829,9 @@
           &middot; {{ queue_stats.still_waiting }} waiting
 {%- if queue_stats.not_arrived %}
           &middot; {{ queue_stats.not_arrived }} not yet arrived
+{%- endif %}
+{%- if queue_stats.waiting_doctor %}
+          &middot; {{ queue_stats.waiting_doctor }} waiting for the Doctor
 {%- endif %}
 {%- if queue_stats.completed %}
           &middot; {{ queue_stats.completed }} completed
@@ -926,6 +943,51 @@
       });
     </script>
 
+    <!-- CHANGE SERVICE (Task 6b, D2): correct the service of a visit that is not finished. -->
+    <div class="modal fade" id="serviceModal" tabindex="-1" aria-labelledby="serviceModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.12);">
+          <div class="modal-header">
+            <h5 class="modal-title" id="serviceModalLabel">Change the service of this visit</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <form method="post" action="{{ url_for(change_service_endpoint) }}">
+            {{ csrf_field() }}
+            <input type="hidden" name="appointment_id" id="serviceAppointmentId" value="">
+            <div class="modal-body">
+              <p style="font-size:13.5px; margin-bottom:10px;"><strong id="servicePatientName"></strong></p>
+              <label class="field-label" for="serviceChoice">Service</label>
+              <select class="form-select" id="serviceChoice" name="service" required>
+{%- for service in visit_services %}
+                <option value="{{ service }}">{{ service }}</option>
+{%- endfor %}
+              </select>
+              <p style="font-size:12.5px; color:var(--text-muted); margin:10px 0 0;">
+                Use this only to correct a mistake. The change is recorded.
+              </p>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn-reset" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn-primary-teal">Save service</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+    <script>
+      document.getElementById('serviceModal').addEventListener('show.bs.modal', function (event) {
+        var trigger = event.relatedTarget;
+        document.getElementById('serviceAppointmentId').value = trigger.getAttribute('data-appointment');
+        document.getElementById('servicePatientName').textContent = trigger.getAttribute('data-name');
+        var choice = document.getElementById('serviceChoice');
+        var current = trigger.getAttribute('data-service');
+        for (var i = 0; i < choice.options.length; i++) {
+          if (choice.options[i].value === current) { choice.selectedIndex = i; return; }
+        }
+        choice.selectedIndex = 0;
+      });
+    </script>
+
     <!-- CHECK-IN DIALOG — same modal shape as Patient Records' status dialog:
          centred, 16px radius, header / body / footer.
 
@@ -1015,6 +1077,15 @@
                   <div class="pick-empty" id="pickEmpty">No active patient matches that search.</div>
                 </div>
 
+                <label class="field-label mt-3" for="checkInService">Service<span class="req">*</span></label>
+                <select class="form-select" id="checkInService" name="service" required>
+                  <option value="" selected disabled>Choose a service</option>
+{%- for service in visit_services %}
+                  <option value="{{ service }}">{{ service }}</option>
+{%- endfor %}
+                </select>
+                <div class="form-text-hint">What the patient came for. It decides whether the visit waits for the Doctor.</div>
+
                 <label class="field-label mt-3" for="checkInReason">Reason for visit</label>
                 <input type="text" class="form-control" id="checkInReason" name="reason" maxlength="200"
                        placeholder="e.g. Fever and cough for three days" required>
@@ -1035,7 +1106,16 @@
                   <em>and</em> places them in today's queue in one step.
                 </div>
 
-                <label class="field-label" for="newPatientReason">Reason for visit</label>
+                <label class="field-label" for="newPatientService">Service<span class="req">*</span></label>
+                <select class="form-select" id="newPatientService" name="check_in_service" required>
+                  <option value="" selected disabled>Choose a service</option>
+{%- for service in visit_services %}
+                  <option value="{{ service }}">{{ service }}</option>
+{%- endfor %}
+                </select>
+                <div class="form-text-hint">What the patient came for. It decides whether the visit waits for the Doctor.</div>
+
+                <label class="field-label mt-3" for="newPatientReason">Reason for visit</label>
                 <input type="text" class="form-control" id="newPatientReason" name="check_in_reason" maxlength="200"
                        placeholder="e.g. First prenatal check-up" required>
                 <div class="form-text-hint">Carried through the registration form and recorded against today's visit.</div>

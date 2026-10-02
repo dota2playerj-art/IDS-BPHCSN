@@ -107,8 +107,11 @@ for who, user_id, form in (
           row is not None and row["updated_at"] is not None
           and row["updated_at"] == row["created_at"],
           dict(row) if row else None)
-    check(f"{who}: the queue entry was completed",
-          q1("SELECT status FROM appointments WHERE id = ?", (appt,))[0] == "Completed")
+    # Task 6b, D3: the Doctor's record (with a diagnosis) completes the visit; Staff's
+    # intake leaves a consultation visit waiting for the Doctor.
+    check(f"{who}: the queue entry moved on",
+          q1("SELECT status FROM appointments WHERE id = ?", (appt,))[0]
+          == ("Completed" if who == "Doctor" else "Waiting for the Doctor"))
 doctor_row = q1("SELECT diagnosis FROM consultations "
                 "WHERE chief_complaint = 'Integrity check: doctor visit'")
 check("Doctor: the diagnosis was stored",

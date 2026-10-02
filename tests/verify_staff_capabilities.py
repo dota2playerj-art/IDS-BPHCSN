@@ -194,8 +194,10 @@ def main():
     check("stock came off the shelf",
           after_stock == stock_before - 2,
           f"{stock_before} -> {after_stock}")
-    check("the queue entry was completed", queue_status == "Completed",
-          repr(queue_status))
+    # Task 6b, D3: Staff take the intake, the Doctor has not diagnosed, and the visit is
+    # a Walk-in Consultation, so it now waits for the Doctor instead of being Completed.
+    check("the queue entry now waits for the Doctor (the intake is saved, no diagnosis)",
+          queue_status == "Waiting for the Doctor", repr(queue_status))
 
     # -----------------------------------------------------------------
     print("\nSTAFF EDITS THAT CONSULTATION")

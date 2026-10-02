@@ -17,6 +17,8 @@ from models.audit import (
     ACTION_CONSULTATION_COMPLETED,
     ACTION_LEFT_BEFORE_SEEN,
     ACTION_LEFT_UNDONE,
+    ACTION_SENT_TO_DOCTOR,
+    ACTION_SERVICE_CHANGED,
     ACTION_CONSULTATION_RECORDED,
     ACTION_CONSULTATION_STARTED,
     ACTION_EPI_DOSES_RECORDED,
@@ -284,3 +286,30 @@ def left_before_seen(appointment_id, user_id, ip_address=None):
 
 def left_undone(appointment_id, user_id, ip_address=None):
     return _queue_move(ACTION_LEFT_UNDONE, appointment_id, user_id, ip_address)
+
+
+def consultation_finished(appointment_id, user_id, ip_address=None):
+    """Intake saved. Completed when nothing is left for the Doctor, else waiting for him.
+
+    `audit(conn, new_status)`: the action says which. It names the patient and the
+    visit, never what was recorded.
+    """
+    done = _queue_move(ACTION_CONSULTATION_COMPLETED, appointment_id, user_id, ip_address)
+    waiting = _queue_move(ACTION_SENT_TO_DOCTOR, appointment_id, user_id, ip_address)
+
+    def audit(conn, new_status):
+        (done if new_status == "Completed" else waiting)(conn)
+    return audit
+
+
+def visit_service_changed(appointment_id, user_id, ip_address=None):
+    """One short entry: the visit and the two services. It names no patient."""
+    write = _entry(user_id, ip_address, ACTION_SERVICE_CHANGED, MODULE_APPOINTMENTS)
+
+    def audit(conn, old, new, now_completed):
+        _, ref, _ = _visit(conn, appointment_id)
+        text = f"Changed the service of visit {ref} from {old} to {new}."
+        if now_completed:
+            text += " The visit is now Completed."
+        write(conn, text)
+    return audit

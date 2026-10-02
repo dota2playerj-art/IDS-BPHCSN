@@ -64,7 +64,8 @@ refusing it, and only the second is a permission.
 """
 from models.appointments import (
     IN_CONSULTATION,
-    complete_consultation,
+    complete_after_diagnosis,
+    finish_intake,
     get_appointment_by_id,
     get_queue_stats,
     queue_display_name,
@@ -149,8 +150,10 @@ from models.immunizations import (
 )
 from models.patients import get_patient_by_id
 from routes.sealed_access import log_unopenable
+from models.doctor_worklist import has_diagnosis
 from routes.audit_entries import (
     consultation_completed,
+    consultation_finished,
     consultation_recorded,
     epi_doses_recorded,
     medicine_dispensed,
@@ -1052,13 +1055,15 @@ def process_record_consultation(appointment_id, form_data, user_id,
         audit=medicine_dispensed(patient["id"], consultation_id, user_id, ip_address),
     )
 
-    # Reuses the queue's own transition rather than writing 'Completed' here, so
-    # the one-patient-at-a-time invariant and the "only the visit in progress may
-    # be completed" guard both still apply -- and completing frees the clinician
-    # for whoever is next exactly as it does from the queue screen.
-    outcome = complete_consultation(
-        appointment["id"],
-        audit=consultation_completed(appointment["id"], user_id, ip_address),
+    # Saving the intake moves the visit on (Task 6b, D3): to Waiting for the Doctor
+    # when its service needs a diagnosis and none was written, otherwise to Completed
+    # (an immunization or prenatal visit done by Staff, or a visit the Doctor recorded
+    # himself with a diagnosis). It goes through the queue's own guarded transition, so
+    # the one-patient-at-a-time invariant still applies and the clinician is freed for
+    # whoever is next either way.
+    outcome = finish_intake(
+        appointment["id"], has_diagnosis(values.get("diagnosis")),
+        audit=consultation_finished(appointment["id"], user_id, ip_address),
     )
 
     message = (
@@ -1113,9 +1118,12 @@ def process_record_consultation(appointment_id, form_data, user_id,
         )
     message += _dispensing_message(dispensed, dispense_failures)
 
-    if outcome == "completed":
+    if outcome in ("completed", "waiting-for-doctor"):
         stats = get_queue_stats()
-        message += " Their visit is now marked Completed."
+        if outcome == "completed":
+            message += " Their visit is now marked Completed."
+        else:
+            message += " Their visit is now Waiting for the Doctor, who has not written the diagnosis yet."
         if stats["next_up_name"]:
             message += (
                 f" {stats['next_up_name']} is next and can be started now."
@@ -1534,6 +1542,14 @@ def process_edit_consultation(consultation_id, form_data, user_id, ip_address=No
     )
 
     after = get_consultation_by_id(consultation_id)
+    # The Doctor's diagnosis finishes a visit that was Waiting for the Doctor (Task
+    # 6b, D3). Any other visit keeps its status: the Doctor may write a diagnosis on
+    # any visit, and a Completed one stays Completed. A sealed diagnosis is stored
+    # encrypted, which is not blank, so it counts.
+    now_completed = bool(after) and has_diagnosis(after["diagnosis"]) and complete_after_diagnosis(
+        after["appointment_id"],
+        audit=consultation_completed(after["appointment_id"], user_id, ip_address),
+    )
     # The diagnosis and treatment plan are named, never quoted (D2). For the
     # Doctor both sides are compared decrypted, so sealing or lifting a record
     # does not read as a change to its text.
@@ -1560,6 +1576,8 @@ def process_edit_consultation(consultation_id, form_data, user_id, ip_address=No
     # record, which is why it is a separate sentence and its own branch below.
     seal_message = _restriction_message(restriction_outcome, patient, before)
 
+    visit_note = " Their visit is now Completed." if now_completed else ""
+
     if not changed:
         # `dispensed` is empty on this path by construction -- anything stored
         # would have put "items dispensed" into `changed` -- so the only thing
@@ -1571,11 +1589,13 @@ def process_edit_consultation(consultation_id, form_data, user_id, ip_address=No
                 seal_message
                 + " No clinical field was changed by this save."
                 + _dispensing_message(dispensed, dispense_failures, hide_names)
+                + visit_note
             )
         return patient["id"], None, (
             f"No changes. {patient['full_name']}'s consultation of "
             f"{display_date(before['consultation_date'])} is unchanged."
             + _dispensing_message(dispensed, dispense_failures, hide_names)
+            + visit_note
         )
 
     # Self-contained on purpose: an audit entry read months later, on its own,
@@ -1605,6 +1625,7 @@ def process_edit_consultation(consultation_id, form_data, user_id, ip_address=No
         "The change has been recorded in the audit log."
         + (f" {seal_message}" if seal_message else "")
         + _dispensing_message(dispensed, dispense_failures, hide_names)
+        + visit_note
     )
 
 

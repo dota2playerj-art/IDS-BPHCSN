@@ -79,6 +79,7 @@ def inject_role_context():
             "check_in_patient_endpoint": "staff_check_in_patient",
             "start_consultation_endpoint": "staff_start_consultation",
             "complete_consultation_endpoint": "staff_complete_consultation",
+            "change_service_endpoint": "staff_change_service",
             "mark_left_endpoint": "staff_mark_left",
             "undo_left_endpoint": "staff_undo_left",
             "record_consultation_endpoint": "staff_record_consultation",

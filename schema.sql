@@ -210,7 +210,7 @@ CREATE TABLE appointments (
     appointment_date TEXT NOT NULL,
     appointment_time TEXT,
     assigned_staff_id INTEGER,
-    status TEXT NOT NULL DEFAULT 'Scheduled' CHECK (status IN ('Scheduled', 'Confirmed', 'Waiting', 'In Consultation', 'Completed', 'Cancelled', 'No-show', 'Left before being seen')),
+    status TEXT NOT NULL DEFAULT 'Scheduled' CHECK (status IN ('Scheduled', 'Confirmed', 'Waiting', 'In Consultation', 'Waiting for the Doctor', 'Completed', 'Cancelled', 'No-show', 'Left before being seen')),
     notes TEXT,
     is_walkin INTEGER NOT NULL DEFAULT 0,
     checked_in_at TEXT,

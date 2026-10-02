@@ -494,7 +494,8 @@ db_conn = db()
 db_conn.execute("UPDATE appointments SET status = 'Completed' WHERE status = 'In Consultation'")
 db_conn.commit(); db_conn.close()
 r = staff.post("/staff/appointment_scheduling/check-in",
-               data={"patient_id": str(patient["id"]), "reason": "Fever since last night"},
+               data={"patient_id": str(patient["id"]), "reason": "Fever since last night",
+                     "service": "Consultation"},
                follow_redirects=True)
 check("Sunday, nothing scheduled: a walk-in with a fever is checked in",
       re.search(rf"{patient['first_name']}.*{patient['last_name']} checked in as a walk-in", visible(text(r))), visible(text(r))[:400])
@@ -512,7 +513,8 @@ set_clock(date(2026, 10, 14))  # Immunization day: a non-immunization walk-in
 patient2 = db().execute("SELECT id, first_name, last_name FROM patients WHERE status = 'Active' AND id != ? ORDER BY id LIMIT 1",
                         (patient["id"],)).fetchone()
 r = staff.post("/staff/appointment_scheduling/check-in",
-               data={"patient_id": str(patient2["id"]), "reason": "Cough"}, follow_redirects=True)
+               data={"patient_id": str(patient2["id"]), "reason": "Cough",
+                     "service": "Consultation"}, follow_redirects=True)
 check("on immunization day, a walk-in for a cough is checked in too",
       re.search(rf"{patient2['first_name']}.*{patient2['last_name']} checked in as a walk-in", visible(text(r))), visible(text(r))[:400])
 reset_clock()

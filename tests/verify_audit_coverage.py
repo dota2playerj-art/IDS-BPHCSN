@@ -181,22 +181,22 @@ none_written("saving the form with nothing changed writes nothing", start)
 section("3. THE PATIENT QUEUE: CHECK IN, START, COMPLETE")
 reason = "Masakit ang tiyan mula kahapon"
 start = mark()
-staff.post("/staff/appointment_scheduling/check-in", data={"patient_id": "2", "reason": reason})
+staff.post("/staff/appointment_scheduling/check-in", data={"patient_id": "2", "reason": reason, "service": "Consultation"})
 visit = latest_visit(2)
 one_entry("check-in writes one entry, without the visit reason", start,
           A.ACTION_PATIENT_CHECKED_IN, A.MODULE_APPOINTMENTS, STAFF_ID,
           f"{patient_ref(2)}, visit APT-{visit:05d}, walk-in.")
 start = mark()
-staff.post("/staff/appointment_scheduling/check-in", data={"patient_id": "2", "reason": reason})
+staff.post("/staff/appointment_scheduling/check-in", data={"patient_id": "2", "reason": reason, "service": "Consultation"})
 none_written("checking in someone already in the queue writes nothing", start)
 start = mark()
-staff.post("/staff/appointment_scheduling/check-in", data={"patient_id": "3", "reason": ""})
+staff.post("/staff/appointment_scheduling/check-in", data={"patient_id": "3", "reason": "", "service": "Consultation"})
 none_written("a check-in refused for no reason writes nothing", start)
 start = mark()
 doctor.post("/staff/appointment_scheduling/start-consultation", data={"appointment_id": str(visit)})
 one_entry("starting a consultation writes one entry", start, A.ACTION_CONSULTATION_STARTED,
           A.MODULE_APPOINTMENTS, DOCTOR_ID, f"{patient_ref(2)}, visit APT-{visit:05d}.")
-staff.post("/staff/appointment_scheduling/check-in", data={"patient_id": "3", "reason": "Ubo"})
+staff.post("/staff/appointment_scheduling/check-in", data={"patient_id": "3", "reason": "Ubo", "service": "Consultation"})
 other = latest_visit(3)
 start = mark()
 staff.post("/staff/appointment_scheduling/start-consultation", data={"appointment_id": str(other)})
@@ -271,7 +271,7 @@ check("the dispensing entry of a sealed consultation does not name the medicine"
 
 # An unsealed visit: since Task 5c the medicine is not named here either. The
 # entry is read by the Administrator, who is not part of the patient's care.
-staff.post("/staff/appointment_scheduling/check-in", data={"patient_id": "4", "reason": "Lagnat"})
+staff.post("/staff/appointment_scheduling/check-in", data={"patient_id": "4", "reason": "Lagnat", "service": "Consultation"})
 v4 = latest_visit(4)
 doctor.post("/staff/appointment_scheduling/start-consultation", data={"appointment_id": str(v4)})
 start = mark()
@@ -290,7 +290,7 @@ check("and it names no medicine, even on an unsealed visit (Task 5c)",
 
 # A child: an EPI dose given here, and one reported as given elsewhere. The
 # fixture already holds this infant's birth doses (BCG, Hepatitis B).
-staff.post("/staff/appointment_scheduling/check-in", data={"patient_id": "17", "reason": "Bakuna"})
+staff.post("/staff/appointment_scheduling/check-in", data={"patient_id": "17", "reason": "Bakuna", "service": "Immunization"})
 v17 = latest_visit(17)
 doctor.post("/staff/appointment_scheduling/start-consultation", data={"appointment_id": str(v17)})
 start = mark()

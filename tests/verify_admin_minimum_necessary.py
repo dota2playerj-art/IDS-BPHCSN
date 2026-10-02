@@ -362,7 +362,7 @@ REMOVED_ADMIN = [
     ("POST", f"/admin/register_patient/{P}", {"first_name": "Zed"}),
     ("POST", "/admin/patient_records/archive", {"patient_ids": [str(P)], "status": "Inactive"}),
     ("POST", f"/admin/patient_profile/{P}/correct-vaccination", {"record_id": "1"}),
-    ("POST", "/admin/appointment_scheduling/check-in", {"patient_id": "6", "reason": "x"}),
+    ("POST", "/admin/appointment_scheduling/check-in", {"patient_id": "6", "reason": "x", "service": "Consultation"}),
     ("POST", "/admin/appointment_scheduling/start-consultation", {"appointment_id": str(QUEUE_APPT)}),
     ("POST", "/admin/appointment_scheduling/complete-consultation", {"appointment_id": str(QUEUE_APPT)}),
     ("GET", f"/admin/consultation/record/{QUEUE_APPT}", None),
@@ -381,7 +381,7 @@ STAFF_EQUIVALENTS = [
     ("POST", "/staff/patient_records/archive", {"patient_ids": [str(P)], "status": "Inactive"}),
     ("POST", f"/staff/patient_profile/{P}/correct-vaccination", {"record_id": "1"}),
     ("GET", f"/staff/patient_profile/{P}", None),
-    ("POST", "/staff/appointment_scheduling/check-in", {"patient_id": "6", "reason": "x"}),
+    ("POST", "/staff/appointment_scheduling/check-in", {"patient_id": "6", "reason": "x", "service": "Consultation"}),
     ("POST", "/staff/appointment_scheduling/start-consultation", {"appointment_id": str(QUEUE_APPT)}),
     ("POST", "/staff/appointment_scheduling/complete-consultation", {"appointment_id": str(QUEUE_APPT)}),
     ("GET", f"/staff/consultation/record/{QUEUE_APPT}", None),
@@ -434,7 +434,8 @@ check("Doctor: Reports & Analytics opens", doctor.get("/staff/reports_analytics"
 check("Doctor: the full profile with the vaccine given at the visit",
       MK["vaccine_name"].lower() in body(doctor.get(f"/staff/patient_profile/{P}")).lower())
 response = staff.post("/staff/appointment_scheduling/check-in", data={"patient_id": "6",
-                                                                     "reason": "Cough"})
+                                                                     "reason": "Cough",
+                                                                     "service": "Consultation"})
 check("Staff: check-in still writes",
       q1("SELECT COUNT(*) FROM appointments WHERE patient_id = 6 AND status = 'Waiting' "
          "AND date(appointment_date) = date('now','localtime')")[0] == 1)

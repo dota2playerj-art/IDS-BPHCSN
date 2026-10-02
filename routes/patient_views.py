@@ -31,6 +31,7 @@ from models.immunizations import (
     dose_label,
     get_immunization_status,
 )
+from models.doctor_worklist import clean_service
 from models.patients import (
     ALLERGY_OPTIONS,
     BLOOD_TYPES,
@@ -105,6 +106,9 @@ MIXED_STATUS_MESSAGE = (
 # never queued, which is the exact two-step problem this path removes.
 CHECK_IN_FLAG_FIELD = "check_in"
 CHECK_IN_REASON_FIELD = "check_in_reason"
+# The service Staff chose in the Check In dialog (Task 6b, D1). It travels exactly like
+# the reason: handed over by POST, kept in the session, carried as a hidden field.
+CHECK_IN_SERVICE_FIELD = "check_in_service"
 
 # Matches the appointments.notes / check-in reason length the dialog allows.
 CHECK_IN_REASON_MAX = 200
@@ -129,6 +133,11 @@ def check_in_reason(source):
     return (source.get(CHECK_IN_REASON_FIELD) or "").strip()[:CHECK_IN_REASON_MAX]
 
 
+def check_in_service(source):
+    """The service chosen in the Check In dialog if it is in VISIT_SERVICES, else ""."""
+    return clean_service(source.get(CHECK_IN_SERVICE_FIELD)) or ""
+
+
 # THE REASON NEVER TRAVELS IN THE URL. The Check In dialog POSTs it to Register
 # Patient with this marker. The route keeps it in the signed session and
 # redirects to ?check_in=1, and the form reads it back only from the session.
@@ -136,6 +145,7 @@ def check_in_reason(source):
 # the query string is ignored.
 CHECK_IN_HANDOFF_FIELD = "check_in_start"
 _CHECK_IN_SESSION_KEY = "check_in_reason"
+_CHECK_IN_SERVICE_SESSION_KEY = "check_in_service"
 
 
 def check_in_handoff_requested(form_data):
@@ -146,6 +156,7 @@ def check_in_handoff_requested(form_data):
 def store_check_in_reason(form_data):
     """Keep the dialog's reason in the session until the patient is saved."""
     session[_CHECK_IN_SESSION_KEY] = check_in_reason(form_data)
+    session[_CHECK_IN_SERVICE_SESSION_KEY] = check_in_service(form_data)
 
 
 def stored_check_in_reason():
@@ -153,9 +164,15 @@ def stored_check_in_reason():
     return (session.get(_CHECK_IN_SESSION_KEY) or "")[:CHECK_IN_REASON_MAX]
 
 
+def stored_check_in_service():
+    """The service the dialog handed over, or "" if there is none."""
+    return clean_service(session.get(_CHECK_IN_SERVICE_SESSION_KEY)) or ""
+
+
 def clear_check_in_reason():
-    """Forget the handed-over reason once the new patient is checked in."""
+    """Forget the handed-over reason and service once the new patient is checked in."""
     session.pop(_CHECK_IN_SESSION_KEY, None)
+    session.pop(_CHECK_IN_SERVICE_SESSION_KEY, None)
 
 
 # Save & Register Another. The submit button carries this name/value pair, the
@@ -861,7 +878,8 @@ def patient_to_form(patient):
 
 def register_patient_context(form=None, errors=None, duplicates=None,
                              acknowledge_duplicate=False, patient=None,
-                             check_in=False, check_in_reason_text=""):
+                             check_in=False, check_in_reason_text="",
+                             check_in_service_text=""):
     """Context for the patient form.
 
     `patient` set means edit mode: the template switches its wording, shows the
@@ -897,6 +915,8 @@ def register_patient_context(form=None, errors=None, duplicates=None,
         # acknowledgement instead of being dropped on the first round trip.
         "check_in": check_in,
         "check_in_reason": check_in_reason_text if check_in else "",
+        "check_in_service": check_in_service_text if check_in else "",
+        "check_in_service_field": CHECK_IN_SERVICE_FIELD,
         "check_in_flag_field": CHECK_IN_FLAG_FIELD,
         "check_in_reason_field": CHECK_IN_REASON_FIELD,
         "check_in_reason_max": CHECK_IN_REASON_MAX,
@@ -959,6 +979,7 @@ def process_register_patient(form_data, patient=None, user_id=None, ip_address=N
     # every branch below can pass the same intent through.
     check_in = check_in_requested(form_data)
     reason = check_in_reason(form_data)
+    service = check_in_service(form_data)
 
     errors = validate_patient_form(values)
     if errors:
@@ -971,6 +992,7 @@ def process_register_patient(form_data, patient=None, user_id=None, ip_address=N
             acknowledge_duplicate=form_data.get("confirm_duplicate") == "yes",
             check_in=check_in,
             check_in_reason_text=reason,
+            check_in_service_text=service,
         )
 
     if patient is not None:
@@ -985,6 +1007,7 @@ def process_register_patient(form_data, patient=None, user_id=None, ip_address=N
         return None, register_patient_context(
             form=values, duplicates=duplicates, acknowledge_duplicate=True,
             check_in=check_in, check_in_reason_text=reason,
+            check_in_service_text=service,
         )
 
     return create_patient(values, audit=patient_registered(user_id, ip_address)), None

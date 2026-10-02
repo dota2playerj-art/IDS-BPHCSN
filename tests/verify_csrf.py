@@ -211,7 +211,8 @@ free = q("""SELECT p.id FROM patients p WHERE p.status = 'Active' AND NOT EXISTS
             AND a.appointment_date = date('now', 'localtime')) ORDER BY p.id LIMIT 1""")[0][0]
 appts = len(q("SELECT id FROM appointments WHERE patient_id = ?", (free,)))
 r = staff.post("/staff/appointment_scheduling/check-in",
-               data={"patient_id": str(free), "reason": "Lagnat at ubo"})
+               data={"patient_id": str(free), "reason": "Lagnat at ubo",
+                     "service": "Consultation"})
 check("staff: Check In without a token is refused", is_expired_page(r))
 check("staff: and no visit was added",
       len(q("SELECT id FROM appointments WHERE patient_id = ?", (free,))) == appts)
@@ -265,7 +266,7 @@ check("admin: Add User with the page's token works",
       r.status_code == 302 and q("SELECT 1 FROM users WHERE username = 'maytoken'"),
       r.status_code)
 r = staff.post("/staff/appointment_scheduling/check-in", data={
-    "patient_id": str(free), "reason": "Lagnat at ubo",
+    "patient_id": str(free), "reason": "Lagnat at ubo", "service": "Consultation",
     "csrf_token": page_token(staff, "/staff/appointment_scheduling")})
 check("staff: Check In with the page's token works",
       r.status_code == 302

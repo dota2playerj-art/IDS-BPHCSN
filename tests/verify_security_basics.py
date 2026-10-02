@@ -432,7 +432,8 @@ check("Register Patient: a check-in reason in the URL is ignored", "ZZURLTEXT" n
 page = s.get(f"/staff/register-patient?address={EVIL}&zip_code={EVIL}").get_data(as_text=True)
 check("Register Patient: address text in the URL is ignored", "ZZURLTEXT" not in page)
 r = s.post("/staff/register-patient", data={"check_in_start": "1",
-                                            "check_in_reason": "Ubo at sipon ng tatlong araw"})
+                                            "check_in_reason": "Ubo at sipon ng tatlong araw",
+                                            "check_in_service": "Consultation"})
 check("the Check In dialog hands the reason over by POST, and the URL has no reason",
       r.status_code == 302 and location(r).endswith("/staff/register-patient?check_in=1"),
       location(r))

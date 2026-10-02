@@ -10,6 +10,7 @@ This mirrors routes/patient_views.py and routes/inventory_views.py exactly.
 from models.appointments import (
     attach_leave_flags,
     attach_visit_reasons,
+    change_visit_service,
     check_in_patient,
     complete_consultation,
     get_active_consultation,
@@ -26,12 +27,13 @@ from models.appointments import (
     undo_left,
 )
 from models.consultations import RESTRICTED_PLACEHOLDER
+from models.doctor_worklist import VISIT_SERVICES, clean_service
 from models.immunizations import get_immunization_alert, get_immunization_status
 from models.patients import get_all_patients, get_patient_by_id
 from models.service_schedule import get_entries as get_schedule_entries, services_on
 from routes.audit_entries import (
     consultation_completed, consultation_started, left_before_seen, left_undone,
-    patient_checked_in,
+    patient_checked_in, visit_service_changed,
 )
 from utils.dates import today
 from utils.roles import is_care_team
@@ -131,14 +133,18 @@ def appointment_scheduling_context(month=None):
         # nobody is here for today would be an option that can only empty the
         # table. Screen 12's module filter is built the same way.
         "queue_filter_options": {
+            # The service names a clinical fact, so the Administrator's queue has
+            # no service filter and no service column (Task 6b).
             "services": sorted({
                 entry["appointment_type"] or "Consultation" for entry in entries
-            }),
+            }) if care_team else [],
             "statuses": sorted({
                 entry["display_status"] for entry in entries if entry["display_status"]
             }),
         },
         "checkin_patients": patients,
+        # The one fixed list Staff choose from at check-in and when correcting a visit.
+        "visit_services": VISIT_SERVICES,
         "queue_date": reference,
         "immunization_alert": immunization_alert,
         # How many of the children needing a dose are actually in the building
@@ -208,8 +214,14 @@ def process_check_in(form_data, user_id, ip_address=None):
     if not reason:
         return "Enter a reason for the visit before checking the patient in."
 
+    # A required choice with no default, checked here and again in check_in_patient().
+    service = clean_service(form_data.get("service"))
+    if service is None:
+        return "Choose the service before checking the patient in."
+
     appointment_id, outcome = check_in_patient(
-        patient_id, reason, user_id, audit=patient_checked_in(user_id, ip_address)
+        patient_id, reason, user_id, audit=patient_checked_in(user_id, ip_address),
+        service=service,
     )
     return _check_in_message(patient["full_name"], appointment_id, outcome, patient)
 
@@ -304,7 +316,7 @@ def _check_in_message(full_name, appointment_id, outcome, patient=None):
     return f"{full_name} checked in as a walk-in{at}. {placement}" + note
 
 
-def process_new_patient_check_in(patient_id, reason, user_id, ip_address=None):
+def process_new_patient_check_in(patient_id, reason, user_id, ip_address=None, *, service):
     """Queue a patient who was registered from the Check In dialog.
 
     The second half of the "New Patient (first visit)" path: Register Patient has
@@ -320,7 +332,8 @@ def process_new_patient_check_in(patient_id, reason, user_id, ip_address=None):
         return "That patient record could not be found, so nobody was checked in."
 
     appointment_id, outcome = check_in_patient(
-        patient_id, reason, user_id, audit=patient_checked_in(user_id, ip_address)
+        patient_id, reason, user_id, audit=patient_checked_in(user_id, ip_address),
+        service=service,
     )
     return (
         f"{patient['full_name']} registered as patient {patient['patient_id']}. "
@@ -435,6 +448,38 @@ def process_undo_left(form_data, user_id=None, ip_address=None):
         return (f"Another patient is in consultation, so {name} cannot go back in "
                 "yet. Try again when that visit is complete.")
     return f"{name} is not marked as left before being seen."
+
+
+def process_change_service(form_data, user_id=None, ip_address=None):
+    """Correct the service of a visit that is not finished. Returns the message.
+
+    The rules are change_visit_service()'s, which settles them in SQL: only a visit
+    that is Waiting, In Consultation or Waiting for the Doctor, and only to a service
+    in VISIT_SERVICES. This turns its outcome into a sentence.
+    """
+    raw_id = (form_data.get("appointment_id") or "").strip()
+    if not raw_id.isdigit():
+        return "Choose a patient from the queue."
+    appointment_id = int(raw_id)
+    appointment = get_appointment_by_id(appointment_id)
+    if appointment is None:
+        return "That queue entry could not be found."
+    name = queue_display_name(appointment)
+    outcome = change_visit_service(
+        appointment_id, form_data.get("service"),
+        audit=visit_service_changed(appointment_id, user_id, ip_address),
+    )
+    if outcome in ("changed", "changed-completed"):
+        message = f"The service of {name}'s visit is changed to {clean_service(form_data.get('service'))}."
+        if outcome == "changed-completed":
+            message += " This service does not need the Doctor, so the visit is now Completed."
+        return message
+    if outcome == "same":
+        return f"{name}'s visit already has that service."
+    if outcome == "invalid":
+        return "Choose a service from the list."
+    return (f"The service of {name}'s visit cannot be changed. "
+            "A visit that is finished or marked as left cannot be changed.")
 
 
 def process_complete_consultation(form_data, user_id=None, ip_address=None):

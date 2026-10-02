@@ -45,6 +45,7 @@
     padding:4px 11px; border-radius:999px; white-space:nowrap;
   }
   .badge-completed{background:#DCFCE7; color:#15803D;}
+  .badge-waiting-doctor{background:#EDE9FE; color:#6D28D9;}
   .badge-followup{background:#FEF3C7; color:#B45309;}
   .badge-referred{background:#EDE9FE; color:var(--purple);}
   .badge-appointment-pending{background:rgba(59,130,246,0.12); color:#1D4ED8;}
@@ -230,8 +231,7 @@
             In consultation now &middot; {{ active_consultation_name }}
           </div>
           <div class="panel-sub">
-            {{ active_consultation.reference }} &middot;
-            {{ active_consultation.appointment_type or 'Consultation' }}
+            {{ active_consultation.reference }}
 {%- if active_consultation.arrival_time %} &middot; checked in {{ active_consultation.arrival_time }}{% endif %}
 {%- if active_consultation.assigned_staff %} &middot; {{ active_consultation.assigned_staff }}{% endif %}
           </div>

@@ -1,32 +1,26 @@
-"""Visits waiting for the Doctor (Task 6, M4).
+"""Visits waiting for the Doctor (Task 6, M4; Task 6b).
 
 At a barangay health station the Doctor comes only on certain days. Staff take the
 intake every day, so a visit that needs a diagnosis can wait days for the Doctor.
-This module answers one question: which visits need a diagnosis and do not have one
-yet? It is the one place that decides it. The Doctor's dashboard lists them, the
-Staff dashboard and the Administrator's dashboard show the count, and all three call
-the functions below, so they cannot disagree.
+This module answers one question: which visits are waiting for the Doctor? It is the
+one place that decides it. The Doctor's dashboard lists them, the Staff dashboard and
+the Administrator's dashboard show the count, and all three call the functions below,
+so they cannot disagree.
 
-WHAT "WAITING FOR THE DOCTOR" MEANS
------------------------------------
-A visit is on the list when ALL of these are true:
+WHAT "WAITING FOR THE DOCTOR" MEANS (Task 6b)
+---------------------------------------------
+It is a queue status. Staff choose the service when they check a patient in
+(VISIT_SERVICES). When the intake is saved, the visit becomes "Waiting for the Doctor"
+if its service is in SERVICES_NEEDING_DOCTOR and no diagnosis exists yet. Otherwise it
+becomes Completed, as before (an immunization or a prenatal check-up is done by Staff
+and never needs the Doctor). When the Doctor saves a diagnosis, the visit becomes
+Completed. The list is every visit with that status, oldest first, across all days.
 
-* its queue status is Waiting, In Consultation or Completed. (Cancelled, No-show and
-  "Left before being seen" are over. Scheduled and Confirmed have not arrived.)
-* it has no diagnosis. "Has a diagnosis" is decided here: the consultation's
-  `diagnosis` is not blank. A sealed diagnosis is stored encrypted, which is not
-  blank, so a sealed visit counts as diagnosed.
-* if it is Completed, it has a consultation. Saving the intake form completes the
-  queue entry, so a Completed visit with intake and no diagnosis is exactly the case
-  this list exists for. A visit closed with nothing written at all is not a visit
-  waiting for a diagnosis, and is not listed.
-* its service needs the Doctor (SERVICES_NEEDING_DOCTOR).
+"Has a diagnosis" is decided here too (has_diagnosis): the stored `diagnosis` is not
+blank. A sealed diagnosis is stored encrypted, which is not blank.
 
-ACROSS ALL DAYS. A visit from three days ago is on the list until it has a diagnosis
-or is marked "Left before being seen".
-
-THE COUNT NEVER READS A NAME. count_waiting_for_doctor() selects ids and the service
-only, so the Administrator's dashboard is built without any patient's name.
+THE COUNT NEVER READS A NAME. count_waiting_for_doctor() selects ids only, so the
+Administrator's dashboard is built without any patient's name.
 
 NO SEALED TEXT. Nothing here reads a complaint, a check-in reason or any consultation
 text. A row carries the name, the patient ID, the service and the times.
@@ -36,41 +30,57 @@ from datetime import datetime
 from database.connection import db_connection
 from utils.dates import now, today
 
-# The services (appointment_type) whose visits need a diagnosis from the Doctor.
+# The queue status a visit holds from the moment its intake is saved until the Doctor
+# writes the diagnosis.
+WAITING_FOR_DOCTOR = "Waiting for the Doctor"
+
+# THE SERVICES STAFF CHOOSE FROM WHEN THEY CHECK A PATIENT IN (Task 6b, D1).
 #
-# Consultations and clinical follow-ups need one. Prenatal Check-up and Immunization
-# are done by midwives and health workers, and Dental is a dentist's service, so they
-# are not here and are never listed.
-#
-# TODAY EVERY NEW VISIT IS A "Walk-in Consultation": the service is the typed check-in
-# reason and is not stored as a type. So in practice every visit without a diagnosis is
-# on the list, and this constant separates services only when a visit carries one of
-# the other types. A visit with no type is treated as a consultation.
-SERVICES_NEEDING_DOCTOR = (
-    "Walk-in Consultation",
+# One fixed list, a required choice with no default. It is built from the services
+# the code and the reports already name: Prenatal Check-up and Immunization are
+# counted in Reports & Analytics, and the retired booking list held Consultation,
+# Follow-up Consultation, DM / Hypertension Monitoring and Dental. Labels are plain.
+VISIT_SERVICES = (
     "Consultation",
     "Follow-up Consultation",
-    "DM / Hypertension Monitoring",
+    "Hypertension / Diabetes Monitoring",
+    "Prenatal Check-up",
+    "Immunization",
+    "Dental",
 )
 
-# The queue statuses a visit can be in while it still needs a diagnosis.
-_OPEN_STATUSES = ("Waiting", "In Consultation", "Completed")
+# The services whose visits need a diagnosis from the Doctor: a subset of
+# VISIT_SERVICES. Prenatal Check-up and Immunization are done by midwives and health
+# workers, and Dental is a dentist's service, so they are not here.
+#
+# "Walk-in Consultation" is what every visit was called before the service was
+# chosen at check-in. Old rows still carry it, and it needs the Doctor like a
+# Consultation. It is not offered for a new visit. A visit with no service is treated
+# as a consultation.
+SERVICES_NEEDING_DOCTOR = (
+    "Consultation",
+    "Follow-up Consultation",
+    "Hypertension / Diabetes Monitoring",
+    "Walk-in Consultation",
+)
 
 _FROM_SQL = """
     FROM appointments a
     LEFT JOIN consultations c ON c.appointment_id = a.id
 """
-_WHERE_SQL = """
-    WHERE a.status IN ('Waiting', 'In Consultation', 'Completed')
-      AND (c.id IS NULL OR TRIM(COALESCE(c.diagnosis, '')) = '')
-      AND (a.status != 'Completed' OR c.id IS NOT NULL)
-"""
+_WHERE_SQL = " WHERE a.status = '" + WAITING_FOR_DOCTOR + "'"
 
 
 def needs_doctor(appointment_type):
     """Whether a visit of this service needs a diagnosis. A blank type does."""
     kind = (appointment_type or "").strip()
     return not kind or kind in SERVICES_NEEDING_DOCTOR
+
+
+def clean_service(value):
+    """The chosen service if it is in VISIT_SERVICES, else None. No default."""
+    value = (value or "").strip()
+    return value if value in VISIT_SERVICES else None
 
 
 def has_diagnosis(diagnosis):
@@ -81,9 +91,8 @@ def has_diagnosis(diagnosis):
 def count_waiting_for_doctor():
     """How many visits are waiting for the Doctor. Reads no name and no text."""
     with db_connection() as conn:
-        rows = conn.execute(
-            "SELECT a.id, a.appointment_type " + _FROM_SQL + _WHERE_SQL).fetchall()
-    return sum(1 for row in rows if needs_doctor(row["appointment_type"]))
+        return conn.execute(
+            "SELECT COUNT(*) FROM appointments a" + _WHERE_SQL).fetchone()[0]
 
 
 def _checked_in(row):
@@ -123,8 +132,7 @@ def get_waiting_for_doctor():
     from_earlier_day, status, consultation_id, and `action`: where the button goes.
 
     * "edit"   the intake exists: open it to write the diagnosis
-    * "record" the patient is In Consultation and nothing is recorded yet
-    * "queue"  still Waiting: the visit has to be started from the Patient Queue
+    * "queue"  no intake record can be found: open the Patient Queue
 
     For the Doctor only. The dashboard builder calls this for the Doctor and
     count_waiting_for_doctor() for everyone else.
@@ -142,15 +150,8 @@ def get_waiting_for_doctor():
     day = today().isoformat()
     visits = []
     for row in rows:
-        if not needs_doctor(row["appointment_type"]):
-            continue
         since = _checked_in(row)
-        if row["consultation_id"]:
-            action = "edit"
-        elif row["status"] == "In Consultation":
-            action = "record"
-        else:
-            action = "queue"
+        action = "edit" if row["consultation_id"] else "queue"
         visits.append({
             "id": row["id"],
             "reference": f"APT-{row['id']:05d}",

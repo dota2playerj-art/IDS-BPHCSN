@@ -37,6 +37,7 @@ from models.inventory import get_inventory_item_by_id, get_low_stock_alert
 from models.patients import get_patient_by_id
 from routes.appointment_views import (
     appointment_scheduling_context,
+    process_change_service,
     process_check_in,
     process_complete_consultation,
     process_mark_left,
@@ -75,6 +76,7 @@ from routes.roster_export import (
 from routes.patient_views import (
     check_in_handoff_requested,
     check_in_reason,
+    check_in_service,
     clear_check_in_reason,
     check_in_requested,
     patient_profile_context,
@@ -84,6 +86,7 @@ from routes.patient_views import (
     address_prefill_args,
     store_check_in_reason,
     stored_check_in_reason,
+    stored_check_in_service,
     address_prefill_form,
     process_register_patient,
     register_patient_context,
@@ -426,6 +429,17 @@ def staff_start_consultation():
 # "Left before being seen" and its same-day undo (Task 6, M5). Staff and the Doctor
 # only; there is no /admin/ twin, so the Administrator's queue stays read-only. The
 # rules are in models/appointments.py mark_left() and undo_left().
+# Correcting the service of a visit that is not finished (Task 6b, D2). Staff and the
+# Doctor only; no /admin/ twin, so the Administrator's queue stays read-only. The rules
+# are in models/appointments.py change_visit_service().
+@staff_bp.route('/appointment_scheduling/change-service', methods=["POST"])
+@login_required
+@role_required(*CLINICAL_FLOOR_ROLES)
+def staff_change_service():
+    flash(process_change_service(request.form, session.get("user_id"), request.remote_addr))
+    return redirect(url_for("staff.staff_appointment_scheduling"))
+
+
 @staff_bp.route('/appointment_scheduling/mark-left', methods=["POST"])
 @login_required
 @role_required(*CLINICAL_FLOOR_ROLES)
@@ -595,8 +609,20 @@ def staff_register_patient(patient_id=None):
     # The Check In dialog hands its reason over by POST, never in the URL. It is
     # kept in the session and the form opens with ?check_in=1 only.
     if request.method == "POST" and patient is None and check_in_handoff_requested(request.form):
+        # The service is a required choice with no default (Task 6b, D1): a missing or
+        # unknown one is refused here, before a registration form is even opened.
+        if not check_in_service(request.form):
+            flash("Choose the service before checking the patient in.")
+            return redirect(url_for("staff.staff_appointment_scheduling"))
         store_check_in_reason(request.form)
         return redirect(url_for("staff.staff_register_patient", check_in=1))
+
+    if request.method == "POST" and patient is None and check_in_requested(request.form) \
+            and not check_in_service(request.form):
+        # A forged or stale submit that asks to be checked in with no valid service:
+        # nothing is registered and nothing is queued.
+        flash("Choose the service before checking the patient in.")
+        return redirect(url_for("staff.staff_appointment_scheduling"))
 
     if request.method == "POST":
         saved_id, context = process_register_patient(
@@ -615,6 +641,7 @@ def staff_register_patient(patient_id=None):
                         check_in_reason(request.form),
                         session.get("user_id"),
                         request.remote_addr,
+                        service=check_in_service(request.form),
                     )
                 )
                 clear_check_in_reason()
@@ -655,6 +682,7 @@ def staff_register_patient(patient_id=None):
             check_in=check_in_requested(request.args),
             # From the session only, never from the URL.
             check_in_reason_text=stored_check_in_reason(),
+            check_in_service_text=stored_check_in_service(),
         ),
     )
 

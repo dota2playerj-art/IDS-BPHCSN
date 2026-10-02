@@ -1047,6 +1047,7 @@ CALENDAR_COLUMNS = (
     "Visits",
     "Never closed",
     "In the queue",
+    "Waiting for the Doctor",
     "Completed",
     "Cancelled or no-show",
 )
@@ -1088,16 +1089,18 @@ def _appointment_export(context, produced_by):
 
     # No check-in reason for a role outside the care team. The column is left out
     # of the file rather than blanked, so the file does not suggest one was given.
+    # The service names a clinical fact (a prenatal visit, an immunization), so the
+    # Administrator's file has no service either (Task 6b).
     show_reason = bool(context.get("show_visit_reason"))
     queue_columns = [name for name in QUEUE_COLUMNS
-                     if show_reason or name != "Notes"]
+                     if show_reason or name not in ("Notes", "Service / Reason")]
     queue_rows = [
         [
             _value(entry.get("line_position")),
             _value(entry.get("reference")),
             _value(_patient_name(entry)),
             _value(entry.get("patient_reference")),
-            _value(entry.get("appointment_type") or "Consultation"),
+            *([_value(entry.get("appointment_type") or "Consultation")] if show_reason else []),
             # A sealed visit's reason never goes into a file, even for the Doctor
             # who can read it on screen.
             *([_value(RESTRICTED_PLACEHOLDER if entry.get("reason_sealed")
@@ -1139,6 +1142,7 @@ def _appointment_export(context, produced_by):
             cell["total"],
             cell["pending"],
             cell["in_queue"],
+            cell["waiting_doctor"],
             cell["completed"],
             cell["cancelled"],
         ]
@@ -1189,8 +1193,10 @@ def _appointment_export(context, produced_by):
                   f"{display_date(queue_stats['active_date'])} and still open"
                   if queue_stats["active_is_stale"]
                   else queue_stats["active_name"] or "The clinician is free")),
+                ("Waiting for the Doctor today", queue_stats["waiting_doctor"],
+                 "Intake saved; the Doctor has not written the diagnosis yet"),
                 ("Completed today", queue_stats["completed"],
-                 f"Of the {queue_stats['total_today']} checked in today"),
+                 f"Finished visits, of the {queue_stats['total_today']} checked in today"),
                 (f"Visits in {calendar['label']}", calendar["month_total"],
                  f"Of which {calendar['month_pending']} were never closed"),
             ],

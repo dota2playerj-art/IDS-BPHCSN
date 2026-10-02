@@ -551,6 +551,10 @@ ACTION_CONSULTATION_COMPLETED = "Completed consultation"
 # and the same-day undo. The entry names the patient and the visit, never why.
 ACTION_LEFT_BEFORE_SEEN = "Marked as left before being seen"
 ACTION_LEFT_UNDONE = "Undid left before being seen"
+# Task 6b: the intake is saved and the visit waits for the Doctor, and a correction of a
+# visit's service.
+ACTION_SENT_TO_DOCTOR = "Intake saved, waiting for the Doctor"
+ACTION_SERVICE_CHANGED = "Changed the service of a visit"
 
 # Every action that means somebody was turned away at the login form. Grouped so
 # the Security Events figure counts refusals rather than one particular kind of
