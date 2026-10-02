@@ -399,17 +399,29 @@ Expiration date required.
 
 ## Patient Queue
 
+**Statuses and what moves a visit (Task 6b, 2026-10-02).** Waiting, then In Consultation. Saving the intake
+makes the visit *Waiting for the Doctor* when its service needs a diagnosis and none was written, otherwise
+*Completed*. The Doctor's diagnosis makes it *Completed*. The Completed card counts finished visits only; the
+footer counts Waiting for the Doctor on its own.
+
+**Service at check-in (Task 6b).** The Check In dialog has a required **Service** list on both tabs
+(existing patient, new patient), with no default: Consultation, Follow-up Consultation, Hypertension /
+Diabetes Monitoring, Prenatal Check-up, Immunization, Dental. A row has a **Change service** button, with a
+dialog, while the visit is Waiting, In Consultation or Waiting for the Doctor. Health Center Staff and the
+Doctor only. The Administrator's queue shows no service column, filter or button.
+
 **Left before being seen (Task 6, 2026-10-02).** A new status for a patient who checked in and went home.
 Health Center Staff and the Doctor have a button on the row. It opens a dialog: "Mark this patient as left
-before being seen?" The button is offered when the visit is Waiting, In Consultation, or has intake and no
-diagnosis. It is refused on a visit with a diagnosis, and on one that is finished. The entry records who and
+before being seen?" The button is offered when the visit is Waiting, In Consultation, or Waiting for the
+Doctor. It is refused on a visit with a diagnosis, and on one that is finished. The entry records who and
 when and writes one audit entry ("Name (PAT-005), visit APT-00081."). **Undo** is on the row the same day and
 puts the visit back to its previous status; it is refused on a later day, and refused while another patient is
 in consultation if the visit was In Consultation. The Administrator's queue is read-only: no button, and the
 server refuses his POST. The table footer counts these visits.
 
 Under the table, Staff and the Doctor see **Still waiting from earlier days**: visits still Waiting from a
-day that has gone, oldest first, with a button to close them. Nothing closes a visit automatically.
+day that has gone, oldest first, with a button to close them. Nothing closes a visit automatically. Visits
+that are Waiting for the Doctor are not here; they are on the Doctor's list.
 
 Purpose
 
@@ -681,13 +693,13 @@ Purpose
 
 Dashboard for healthcare workers.
 
-**Waiting for the Doctor (Task 6, 2026-10-02).** On the Doctor's dashboard, a list of every visit that needs a
-diagnosis and does not have one, oldest first, across all days. Each row shows the patient's name and ID, the
-check-in date and time, the service, how long it has waited ("2 days"), and a button: Open consultation (the
-intake is saved), or Open Patient Queue (the patient is still Waiting). A visit from an earlier day is marked
-"From an earlier day". Health Center Staff see one card, "Waiting for the Doctor: N", and no list. The
-Administrator's dashboard has the same card and no names. Immunization and prenatal visits are not listed.
-A sealed visit is listed by name only and shows no sealed text.
+**Waiting for the Doctor (Tasks 6 and 6b, 2026-10-02).** On the Doctor's dashboard, a list of every visit with
+the status Waiting for the Doctor, oldest first, across all days. Each row shows the patient's name and ID,
+the check-in date and time, the service, how long it has waited ("2 days"), and a button: Open consultation.
+A visit from an earlier day is marked "From an earlier day". Health Center Staff see one card, "Waiting for
+the Doctor: N", and no list. The Administrator's dashboard has the same card and no names. Immunization,
+prenatal and dental visits never get this status. A sealed visit is listed by name only and shows no sealed
+text.
 
 Widgets
 

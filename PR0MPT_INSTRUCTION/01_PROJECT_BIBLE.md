@@ -533,21 +533,33 @@ patients with only free-text conditions, or Prenatal Check-up visits) reads "Few
 to 4. Zero stays "0". Audit entries never store a whole phone number: they are written masked, and
 `migrate_mask_audit_phone_numbers.py` masked the old ones.
 
-**The Doctor's list, and Left before being seen (2026-10-02, Task 6).** The Doctor comes only on
-certain days, while Staff take the intake every day. So the Doctor's dashboard has a list,
-**Waiting for the Doctor**: every visit that needs a diagnosis and has none, oldest first, across all
+**The visit flow, the Doctor's list and Left before being seen (2026-10-02, Tasks 6 and 6b).** The Doctor
+comes only on certain days, while Staff take the intake every day. A visit moves like this:
+
+1. **Check-in.** Staff choose the service from one fixed list (Consultation, Follow-up Consultation,
+   Hypertension / Diabetes Monitoring, Prenatal Check-up, Immunization, Dental). The choice is required, has
+   no default, and is checked on the server. Status: *Waiting*.
+2. **Start.** *In Consultation*. One patient at a time.
+3. **Intake saved.** If the service needs a diagnosis (the first three) and none was written: *Waiting for
+   the Doctor*. Otherwise: *Completed*. Prenatal, immunization and dental visits are finished by Staff.
+4. **Diagnosis saved by the Doctor.** *Completed*. If the Doctor records the whole consultation himself, with a
+   diagnosis, it goes straight to *Completed*. He may write a diagnosis on any visit; it stays *Completed*.
+5. **Left before being seen.** Staff and the Doctor can set it, after a confirmation, on a visit that is
+   Waiting, In Consultation or Waiting for the Doctor. It is refused on a visit with a diagnosis or a finished
+   one. It is recorded (who and when) and audited, and can be undone the same day, back to the previous
+   status. The Administrator's queue stays read-only.
+6. **Correcting the service.** Staff and the Doctor can change a visit's service until it is Completed or
+   Left before being seen. Each change is audited. The Administrator cannot.
+
+The Doctor's dashboard lists every visit with the status *Waiting for the Doctor*, oldest first, across all
 days, with how long it has waited. Visits from earlier days are marked. Health Center Staff and the
 Administrator see the count only ("Waiting for the Doctor: N"), with no names. One function decides, so the
-three agree. Which services need a diagnosis is one named constant (`SERVICES_NEEDING_DOCTOR`).
-Immunization, prenatal check-ups and dental visits are not on the list. Today every new visit is a
-"Walk-in Consultation", so every visit without a diagnosis is listed.
-
-A patient who checks in and goes home can now be closed: **Left before being seen**. Staff and the Doctor set
-it from the Patient Queue, after a confirmation, on a visit that is Waiting, In Consultation, or has intake
-and no diagnosis. It is refused on a visit with a diagnosis. It is recorded (who and when) and audited, and
-can be undone the same day. The Administrator's queue stays read-only. Visits still Waiting from earlier
-days are shown to Staff under "Still waiting from earlier days"; nothing closes them automatically.
-Queue reports count it as its own status.
+three agree. Which services need a diagnosis is one named constant (`SERVICES_NEEDING_DOCTOR`), a subset of
+the list Staff choose from (`VISIT_SERVICES`). "Completed" counts only finished visits. Visits still *Waiting*
+from earlier days are shown to Staff under "Still waiting from earlier days"; nothing closes them
+automatically. Queue reports count Waiting for the Doctor and Left before being seen as their own figures.
+The service names a clinical fact, so the Administrator's queue, its export and his dashboard show no
+service.
 
 **Stock accountability.** Dispensing writes no stock entry, because an entry per issue would tie a
 medicine to a visit time. Accountability comes from the stock levels and from the dispensed totals
@@ -728,3 +740,8 @@ Stock accountability is stated correctly. See "Clinical Data Is for the Care Tea
 Version 3.0 (2026-10-02)
 
 Task 6, the Doctor's list and Left before being seen. See "Clinical Data Is for the Care Team".
+
+Version 3.1 (2026-10-02)
+
+Task 6b, the service chosen at check-in and the status Waiting for the Doctor. "Completed" now means
+finished. See "The visit flow" under "Clinical Data Is for the Care Team".

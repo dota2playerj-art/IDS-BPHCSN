@@ -1168,11 +1168,15 @@ The Doctor, Health Center Staff and the Barangay Official are unchanged.
 - *Task 5e.* The small-count rule also covers "Appointments by service requested", and single counts
   tied to a condition or service read "Fewer than 5" when 1 to 4. Audit entries are written with phone
   numbers masked.
-- *Task 6 (2026-10-02).* The Doctor's dashboard lists the visits **Waiting for the Doctor** (a visit that
-  needs a diagnosis and has none, oldest first, across all days). Staff and the Administrator see the count
-  only. The Patient Queue has **Left before being seen**: Staff and the Doctor set it after a
-  confirmation, it is audited and can be undone the same day, and the Administrator's queue stays
-  read-only. Staff see "Still waiting from earlier days" so they can close old visits.
+- *Tasks 6 and 6b (2026-10-02).* The visit flow, as statuses: **Waiting** (checked in, with the service
+  Staff chose) -> **In Consultation** -> **Waiting for the Doctor** (intake saved, the service needs a
+  diagnosis, none written) or **Completed** (finished by Staff, or the Doctor's diagnosis saved) . A
+  visit can also become **Left before being seen** from Waiting, In Consultation or Waiting for the
+  Doctor, and be undone the same day. The Doctor's dashboard lists the visits Waiting for the Doctor,
+  oldest first, across all days. Staff and the Administrator see the count only. "Completed" counts
+  finished visits only. Staff and the Doctor can correct a visit's service until it is finished. The
+  Administrator's queue stays read-only and shows no service. Staff see "Still waiting from earlier days"
+  (status Waiting only) so they can close old visits.
 - *Stock accountability.* Dispensing writes no stock entry. Accountability comes from the stock
   levels and the dispensed totals in Reports. The Doctor and Health Center Staff hold the full
   dispensing records.
