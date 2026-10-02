@@ -59,8 +59,11 @@ their own password the first time they sign in.
 ## Running the tests
 
 ```
-python tests/run_all.py
+python tests/run_all.py            # every suite
+python tests/run_all.py --quick    # skips the slow demo-data suite (about 3 minutes less)
 ```
+
+Use `--quick` while you work, and run the full suite before you push.
 
 Each suite runs on its own fresh test database in the system temp folder, and
 never on `app.db`. The runner prints one line per suite and a total, and exits

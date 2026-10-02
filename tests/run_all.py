@@ -1,4 +1,12 @@
-"""Run every test suite, each on its own fresh test database."""
+"""Run every test suite, each on its own fresh test database.
+
+    python tests/run_all.py            run all suites
+    python tests/run_all.py -v         also print each suite's full output
+    python tests/run_all.py rbac epi   run only the suites whose names contain these words
+    python tests/run_all.py --quick    skip the suites that take over 60 seconds (SLOW_SUITES)
+
+The live app.db is never used: the runner checks its size, time and checksum after the run.
+"""
 import hashlib
 import os
 import re
@@ -13,6 +21,10 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
 LIVE_DB = REPO / "app.db"
 GUARD_EXIT_CODE = 97  # the same value as tests/_support.py
+
+# Suites that take over 60 seconds. `--quick` skips them. verify_demo_data.py builds the
+# demo database twice (about 3 minutes) to prove it is deterministic.
+SLOW_SUITES = ("verify_demo_data.py",)
 
 # Suite file, and the file name it had in the old temp folder.
 SUITES = [
@@ -103,14 +115,19 @@ def main(argv):
     # as "—". Replace those instead of stopping the run.
     sys.stdout.reconfigure(errors="replace")
     verbose = "-v" in argv
+    quick = "--quick" in argv
     words = [a for a in argv if not a.startswith("-")]
     chosen = [s for s in SUITES if not words or any(w in s[0] for w in words)]
+    skipped = [s[0] for s in chosen if quick and s[0] in SLOW_SUITES]
+    chosen = [s for s in chosen if s[0] not in skipped]
     if not chosen:
         print("No suite matches:", " ".join(words))
         return 2
 
     before = fingerprint(LIVE_DB)
     print(f"Running {len(chosen)} suite(s). Each uses its own fresh test database.")
+    if skipped:
+        print("Skipped (slow): " + ", ".join(skipped))
     print("-" * 72)
 
     total_passed = total_checks = 0
@@ -161,6 +178,8 @@ def main(argv):
     print("Live app.db unchanged (size, modified time and checksum match)."
           if before else "No live app.db in this folder; none was created.")
 
+    if skipped:
+        print("Quick run: run the full suite before pushing.")
     if failed_suites:
         print("FAILED suites: " + ", ".join(failed_suites))
         return 1
