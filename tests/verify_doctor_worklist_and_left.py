@@ -979,11 +979,22 @@ shutil.rmtree(work2, ignore_errors=True)
 section("12. NO AUDIT ENTRY NAMES A VISIT'S SERVICE (L32)")
 entries_all = [dict(r) for r in db().execute(
     "SELECT action, details FROM audit_logs WHERE module = 'Appointment Scheduling'")]
+STATUS_PHRASE = "The visit is now In Consultation."
+
+
+def names_service(text):
+    """Whether an audit text names a service. Only the full status sentence is ignored."""
+    return any(sv in (text or "").replace(STATUS_PHRASE, "") for sv in VISIT_SERVICES)
+
+
 check("no entry of the Patient Queue names any service, whatever the action",
-      entries_all and not [e for e in entries_all if any(
-          s in (e["details"] or "").replace("In Consultation", "") for s in VISIT_SERVICES)],
-      [e for e in entries_all if any(
-          s in (e["details"] or "").replace("In Consultation", "") for s in VISIT_SERVICES)][:2])
+      entries_all and not [e for e in entries_all if names_service(e["details"])],
+      [e for e in entries_all if names_service(e["details"])][:2])
+check("the service check ignores only the full status sentence: a service name next to it is still flagged",
+      not names_service(f"Corrected the service of visit APT-00001. {STATUS_PHRASE}")
+      and all(names_service(f"Corrected the service of visit APT-00001 to {sv}. {STATUS_PHRASE}")
+              for sv in VISIT_SERVICES)
+      and names_service("In Consultation for Consultation") and names_service("Follow-up Consultation"))
 check("the correction entries all read 'Corrected the service of visit APT-nnnnn.', alone or with 'The "
       "visit is now In Consultation.'",
       all(re.fullmatch(r"Corrected the service of visit APT-\d{5}\.( The visit is now In Consultation\.)?",
