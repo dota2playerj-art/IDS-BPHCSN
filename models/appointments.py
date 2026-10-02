@@ -952,8 +952,12 @@ def change_visit_service(appointment_id, service, audit=None):
     Returns the outcome:
 
         "changed"            the service was changed
-        "changed-completed"  changed, and the visit was Waiting for the Doctor but the
-                             new service does not need him, so it is now Completed
+        "changed-in-consultation"  changed, and the visit was Waiting for the Doctor but
+                             the new service does not need him, so it is now In
+                             Consultation: a correction never completes a visit, the
+                             service is recorded first
+        "busy"               that move needs the room and someone else is in it; nothing
+                             changed
         "same"               it already has that service
         "invalid"            not a service in VISIT_SERVICES
         "not-allowed"        the visit is Completed, Left before being seen, or not in
@@ -961,7 +965,7 @@ def change_visit_service(appointment_id, service, audit=None):
         "missing"            no such appointment
 
     Enforced here, in SQL, not by the buttons: a stale page or a forged POST gets the
-    same answer. `audit(conn, old, new, now_completed)` runs before the commit, only
+    same answer. `audit(conn, old, new, moved)` runs before the commit, only
     when the service changed.
     """
     chosen = clean_service(service)
@@ -979,20 +983,25 @@ def change_visit_service(appointment_id, service, audit=None):
         old = (row["appointment_type"] or "").strip() or WALK_IN_TYPE
         if old == chosen:
             return "same"
-        now_completed = row["status"] == WAITING_DOCTOR and not needs_doctor(chosen)
+        # A correction never completes a visit (Task 6e). Waiting for the Doctor with a
+        # service that no longer needs him goes back to In Consultation, so the service
+        # is actually recorded first; the room rule of start_consultation() applies.
+        moved = row["status"] == WAITING_DOCTOR and not needs_doctor(chosen)
         cursor = conn.execute(
             "UPDATE appointments SET appointment_type = ?, "
             "status = CASE WHEN ? THEN ? ELSE status END, updated_at = CURRENT_TIMESTAMP "
-            "WHERE id = ? AND status = ?",
-            (chosen, 1 if now_completed else 0, COMPLETED, appointment_id, row["status"]),
+            "WHERE id = ? AND status = ? AND (? = 0 OR NOT EXISTS "
+            "(SELECT 1 FROM appointments busy WHERE busy.status = ?))",
+            (chosen, 1 if moved else 0, IN_CONSULTATION, appointment_id, row["status"],
+             1 if moved else 0, IN_CONSULTATION),
         )
         if cursor.rowcount != 1:
             conn.rollback()
-            return "not-allowed"
+            return "busy" if moved else "not-allowed"
         if audit:
-            audit(conn, old, chosen, now_completed)
+            audit(conn, old, chosen, moved)
         conn.commit()
-    return "changed-completed" if now_completed else "changed"
+    return "changed-in-consultation" if moved else "changed"
 
 
 # ---------------------------------------------------------------------------

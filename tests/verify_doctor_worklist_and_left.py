@@ -402,14 +402,15 @@ for who, client in (("Administrator", admin), ("Barangay Official", official)):
 check("the Administrator has no /admin/ route for it",
       admin.post("/admin/appointment_scheduling/change-service",
                  data={"appointment_id": str(fix), "service": "Immunization"}).status_code == 404)
-# A visit that was waiting for the Doctor and is corrected to a service that does not
-# need him is finished: the same rule the intake follows.
+# A correction never completes a visit (Task 6e): waiting for the Doctor, corrected to a
+# service that does not need him, goes back In Consultation so the service is recorded.
 run_sql("UPDATE appointments SET status = ?, appointment_type = ? WHERE id = ?", (WFD, CONSULT, fix))
 staff.post(CHANGE, data={"appointment_id": str(fix), "service": "Immunization"})
-check("a visit waiting for the Doctor, corrected to a service that does not need him, is Completed, "
-      "and the entry says so",
-      status_of(fix) == "Completed" and (audits("Changed the service of a visit") or [{}])[-1].get(
-          "details", "").endswith("The visit is now Completed."))
+check("a visit waiting for the Doctor, corrected to Immunization, is In Consultation and never "
+      "Completed, and the entry says so",
+      status_of(fix) == "In Consultation" and (audits("Changed the service of a visit") or [{}])[-1].get(
+          "details", "").endswith("The visit is now In Consultation."))
+run_sql("UPDATE appointments SET status = 'Completed' WHERE id = ?", (fix,))
 run_sql("UPDATE appointments SET status = ?, appointment_type = 'Dental' WHERE id = ?", (WFD, fix))
 staff.post(CHANGE, data={"appointment_id": str(fix), "service": CONSULT})
 check("corrected to a service that does need him, it stays waiting for the Doctor",
@@ -979,14 +980,17 @@ section("12. NO AUDIT ENTRY NAMES A VISIT'S SERVICE (L32)")
 entries_all = [dict(r) for r in db().execute(
     "SELECT action, details FROM audit_logs WHERE module = 'Appointment Scheduling'")]
 check("no entry of the Patient Queue names any service, whatever the action",
-      entries_all and not [e for e in entries_all if any(s in (e["details"] or "") for s in VISIT_SERVICES)],
-      [e for e in entries_all if any(s in (e["details"] or "") for s in VISIT_SERVICES)][:2])
+      entries_all and not [e for e in entries_all if any(
+          s in (e["details"] or "").replace("In Consultation", "") for s in VISIT_SERVICES)],
+      [e for e in entries_all if any(
+          s in (e["details"] or "").replace("In Consultation", "") for s in VISIT_SERVICES)][:2])
 check("the correction entries all read 'Corrected the service of visit APT-nnnnn.', alone or with 'The "
-      "visit is now Completed.'",
-      all(re.fullmatch(r"Corrected the service of visit APT-\d{5}\.( The visit is now Completed\.)?", e["details"])
+      "visit is now In Consultation.'",
+      all(re.fullmatch(r"Corrected the service of visit APT-\d{5}\.( The visit is now In Consultation\.)?",
+                       e["details"])
           for e in entries_all if e["action"] == "Changed the service of a visit"))
-check("the entry for a visit completed by a service correction says so without naming the service",
-      any(e["details"].endswith("The visit is now Completed.") for e in entries_all
+check("the entry for a visit moved by a service correction says so without naming the service",
+      any(e["details"].endswith("The visit is now In Consultation.") for e in entries_all
           if e["action"] == "Changed the service of a visit"))
 
 # ---------------------------------------------------------------------------
@@ -1294,7 +1298,7 @@ for label, spec, expected in CASES:
         runs += 1
         with app.app_context():
             outcome = call(visit_id)
-        accepted = outcome in ("marked", "changed", "changed-completed")
+        accepted = outcome in ("marked", "changed", "changed-in-consultation")
         if accepted != (action in expected.get("staff", set())):
             model_problems.append((label, name, outcome))
 check("the model's own rules for 'left before being seen' and 'change service' accept exactly the statuses "
@@ -1390,6 +1394,55 @@ days, over, due = found["due"]
 text_due, row_due = badge_for(days)
 check("only doses due now: it says 'due', not 'overdue'",
       text_due == f"{plural(due, 'vaccine')} due" and "immun-overdue" not in row_due, text_due)
+
+# ---------------------------------------------------------------------------
+section("17. A SERVICE CORRECTION NEVER COMPLETES A VISIT; THE BADGE SAYS 'NEXT IN LINE' (Task 6e)")
+NON_DOCTOR = [sv for sv in VISIT_SERVICES if sv not in ("Consultation", "Follow-up Consultation",
+                                                          "Hypertension / Diabetes Monitoring")]
+for label, spec in (("no intake", dict(status=WFD)), ("with intake", dict(status=WFD, intake=True))):
+    for role, client in (("Staff", staff), ("the Doctor", doctor)):
+        v, _ = build(spec, f"C{label[:2]}{role[:2]}")
+        n_audit = len(audits("Changed the service of a visit"))
+        client.post(CHANGE, data={"appointment_id": str(v), "service": "Immunization"})
+        entry = (audits("Changed the service of a visit") or [{}])[-1]
+        check(f"{role}: Waiting for the Doctor ({label}) corrected to Immunization is In Consultation, "
+              "not Completed; one entry",
+              status_of(v) == "In Consultation" and len(audits("Changed the service of a visit")) == n_audit + 1
+              and entry.get("details", "").endswith("The visit is now In Consultation."), status_of(v))
+v, _ = build(dict(status=WFD), "Cdoc")
+staff.post(CHANGE, data={"appointment_id": str(v), "service": FOLLOW})
+check("corrected to a service that does need the Doctor, it stays Waiting for the Doctor (as before)",
+      status_of(v) == WFD)
+# The room is held by someone else: the move is refused and nothing changes.
+v, _ = build(dict(status=WFD), "Cbusy")
+other, _ = add_visit(MATRIX_PID, "Cbusy2", 0, "In Consultation")
+n_audit = len(audits("Changed the service of a visit"))
+staff.post(CHANGE, data={"appointment_id": str(v), "service": "Dental"})
+check("with the room busy, the correction is refused: status, service and audit unchanged",
+      state_of(v)[:2] == (WFD, CONSULT) and len(audits("Changed the service of a visit")) == n_audit,
+      state_of(v))
+run_sql("UPDATE appointments SET status = 'Completed' WHERE id IN (?, ?)", (v, other))
+# No route completes a visit through a service change: every status x service x role.
+bad = []
+for status in ("Waiting", "In Consultation", WFD):
+    for service in VISIT_SERVICES:
+        for role, client in (("staff", staff), ("doctor", doctor), ("admin", admin), ("official", official)):
+            v, _ = build(dict(status=status, kind="Immunization" if service != "Immunization" else CONSULT),
+                         "Call")
+            client.post(CHANGE, data={"appointment_id": str(v), "service": service})
+            if status_of(v) == "Completed":
+                bad.append((status, service, role))
+check("no status x service x role of a service change leaves a visit Completed "
+      f"(3 x {len(VISIT_SERVICES)} x 4)", not bad, bad[:4])
+run_sql("UPDATE appointments SET status = 'Completed' WHERE status = 'In Consultation'")
+from models.appointments import change_visit_service as _change  # noqa: E402
+
+v, _ = build(dict(status=WFD), "Cmodel")
+with app.app_context():
+    outcome = _change(v, "Dental")
+check("the model itself does it too, called directly",
+      outcome == "changed-in-consultation" and status_of(v) == "In Consultation", outcome)
+run_sql("UPDATE appointments SET status = 'Completed' WHERE id = ?", (v,))
 
 # ---------------------------------------------------------------------------
 passed = sum(1 for _, ok in results if ok)

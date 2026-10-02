@@ -297,11 +297,11 @@ def visit_service_changed(appointment_id, user_id, ip_address=None):
     """One short entry: the visit only. It names no patient and no service (Task 6c)."""
     write = _entry(user_id, ip_address, ACTION_SERVICE_CHANGED, MODULE_APPOINTMENTS)
 
-    def audit(conn, old, new, now_completed):
+    def audit(conn, old, new, moved):
         _, ref, _ = _visit(conn, appointment_id)
         text = f"Corrected the service of visit {ref}."
-        if now_completed:
-            text += " The visit is now Completed."
+        if moved:
+            text += " The visit is now In Consultation."
         write(conn, text)
     return audit
 

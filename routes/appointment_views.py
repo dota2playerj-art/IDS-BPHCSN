@@ -493,11 +493,15 @@ def process_change_service(form_data, user_id=None, ip_address=None):
         appointment_id, form_data.get("service"),
         audit=visit_service_changed(appointment_id, user_id, ip_address),
     )
-    if outcome in ("changed", "changed-completed"):
+    if outcome in ("changed", "changed-in-consultation"):
         message = f"The service of {name}'s visit is changed to {clean_service(form_data.get('service'))}."
-        if outcome == "changed-completed":
-            message += " This service does not need the Doctor, so the visit is now Completed."
+        if outcome == "changed-in-consultation":
+            message += (" This service does not need the Doctor, so the visit is back In "
+                        "Consultation. Record it to finish the visit.")
         return message
+    if outcome == "busy":
+        return (f"Another patient is in consultation, so {name}'s service cannot be "
+                "changed yet. Try again when that visit is complete.")
     if outcome == "same":
         return f"{name}'s visit already has that service."
     if outcome == "invalid":
