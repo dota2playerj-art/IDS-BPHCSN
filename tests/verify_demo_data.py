@@ -72,22 +72,6 @@ with contextlib.redirect_stdout(io.StringIO()):
 print(f"       two builds took {time.time() - started:.0f} s")
 check("both builds finished and made a database file",
       Path(PATH_A).exists() and Path(PATH_B).exists())
-try:
-    seed.build(PATH_A, show_passwords=False)
-    refused = False
-except SystemExit:
-    refused = True
-check("building onto an existing file stops with a plain message", refused)
-
-counts = built_a["counts"]
-check("about 150 patients and about 400 visits, a handful of sealed visits, ten broadcasts",
-      140 <= counts["patients"] <= 160 and 350 <= counts["visits"] <= 450
-      and 3 <= counts["sealed visits"] <= 5 and counts["broadcasts"] == 10, counts)
-check("immunizations, dispensing, inventory and audit entries are all filled",
-      counts["immunizations"] > 100 and counts["dispensing issues"] > 100
-      and counts["inventory items"] == 15 and counts["audit entries"] > 1000, counts)
-
-
 def connect(path):
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
@@ -117,6 +101,26 @@ def snapshot(path):
         return out
     finally:
         conn.close()
+
+
+snap_before_refusal = snapshot(PATH_A)
+try:
+    seed.build(PATH_A, show_passwords=False)
+    refused = False
+except SystemExit as stop:
+    refused = "already exists" in str(stop)
+except Exception:  # it tried to build over the file: it did not refuse
+    refused = False
+check("building onto an existing file stops with a plain message, and leaves the file as it was",
+      refused and snapshot(PATH_A) == snap_before_refusal)
+
+counts = built_a["counts"]
+check("about 150 patients and about 400 visits, a handful of sealed visits, ten broadcasts",
+      140 <= counts["patients"] <= 160 and 350 <= counts["visits"] <= 450
+      and 3 <= counts["sealed visits"] <= 5 and counts["broadcasts"] == 10, counts)
+check("immunizations, dispensing, inventory and audit entries are all filled",
+      counts["immunizations"] > 100 and counts["dispensing issues"] > 100
+      and counts["inventory items"] == 15 and counts["audit entries"] > 1000, counts)
 
 
 section("2. IT IS DETERMINISTIC")
@@ -285,19 +289,40 @@ check("exactly one patient is Deceased, declared by the Doctor, and three are In
       and db.execute("SELECT COUNT(*) FROM patients WHERE status = 'Inactive'").fetchone()[0] == 3
       and db.execute("SELECT user_id FROM audit_logs WHERE action = 'Declared patient deceased'")
       .fetchone()[0] == doctor_id)
-late = []
-for p_row in db.execute("SELECT id, patient_id FROM patients WHERE status != 'Active'"):
-    changed_on = db.execute(
-        "SELECT MIN(substr(created_at,1,10)) FROM audit_logs WHERE action IN "
-        "('Changed patient status', 'Declared patient deceased') AND details LIKE ?",
-        (f"%{p_row['patient_id']}%",)).fetchone()[0]
-    last_visit = db.execute("SELECT MAX(substr(consultation_date,1,10)) FROM consultations "
-                            "WHERE patient_id = ?", (p_row["id"],)).fetchone()[0]
-    if changed_on is None or (last_visit and last_visit > changed_on):
-        late.append(p_row["patient_id"])
+def visits_after_leaving(conn):
+    """Patients who are not Active and have no status change on record, or a visit after it."""
+    late = []
+    for p_row in conn.execute("SELECT id, patient_id FROM patients WHERE status != 'Active'").fetchall():
+        changed_on = conn.execute(
+            "SELECT MIN(substr(created_at,1,10)) FROM audit_logs WHERE action IN "
+            "('Changed patient status', 'Declared patient deceased') AND details LIKE ?",
+            (f"%{p_row['patient_id']}%",)).fetchone()[0]
+        last_visit = conn.execute("SELECT MAX(substr(consultation_date,1,10)) FROM consultations "
+                                  "WHERE patient_id = ?", (p_row["id"],)).fetchone()[0]
+        if changed_on is None or (last_visit and last_visit > changed_on):
+            late.append(p_row["patient_id"])
+    return late
+
+
+late = visits_after_leaving(db)
 check("each of the four patients whose status changed has the change on record, and no visit "
       "after it", not late and db.execute(
           "SELECT COUNT(*) FROM patients WHERE status != 'Active'").fetchone()[0] == 4, late)
+# A negative control: the same function must flag a visit written after somebody left.
+import shutil as _sh  # noqa: E402
+
+_control = TEST_DIR / "late_visit_control.db"
+_sh.copy(PATH_A, _control)
+_c = sqlite3.connect(_control)
+_gone = _c.execute("SELECT id FROM patients WHERE status != 'Active' LIMIT 1").fetchone()[0]
+_c.execute("INSERT INTO consultations (patient_id, recorded_by, consultation_date, "
+           "chief_complaint, diagnosis) VALUES (?, 1, ?, 'x', 'x')",
+           (_gone, date.today().isoformat()))
+_c.commit()
+_c.row_factory = sqlite3.Row
+check("negative control: the same check flags a visit dated after the patient left",
+      len(visits_after_leaving(_c)) == 1)
+_c.close()
 check("the Service Schedule is empty: it holds the real service days, not invented ones",
       db.execute("SELECT COUNT(*) FROM service_schedule").fetchone()[0] == 0)
 items = db.execute("SELECT * FROM inventory_items").fetchall()
@@ -531,8 +556,11 @@ check("a file that is not a database, an existing .idsbackup and a bundle were l
 restored = []
 for a in archives:
     handle = TEST_DIR / f"roundtrip_{a.stem}.db"
-    handle.write_bytes(archive.decrypt_backup(a.read_bytes()))
-    restored.append(archive.fingerprint(handle))
+    try:
+        handle.write_bytes(archive.decrypt_backup(a.read_bytes()))
+        restored.append(archive.fingerprint(handle))
+    except Exception as error:  # a damaged archive does not open: the check fails, it does not crash
+        restored.append(("could not be opened", type(error).__name__))
 check("each archive decrypts again to a database whose table counts and content hash equal "
       "an original's", sorted(restored, key=str) == sorted(originals, key=str), restored)
 again = archive.run(project=project, backup_dir=backups, say=output.append)
