@@ -826,7 +826,8 @@ def build(path, say=print, show_passwords=True, today_override=None):
     global _TZ
     path = str(Path(path).resolve())
     if Path(path).exists():
-        raise SystemExit(f"{path} already exists. Use --replace to archive it and build a new one.")
+        raise SystemExit(f"{path} already exists. Run: python seed_demo_data.py --replace "
+                         "(it archives the old database first, then builds a new one).")
 
     os.environ.pop("SEMAPHORE_API_KEY", None)  # nothing is ever really sent
     config.DATABASE = path
@@ -1110,7 +1111,8 @@ def main(argv):
 
     if target.exists():
         if not args.replace:
-            print(f"{target} already exists. Use --replace to archive it and build a new one.")
+            print(f"{target} already exists. Run: python seed_demo_data.py --replace "
+                  "(it archives the old database first, then builds a new one).")
             return 1
         done = archive_existing(target)
         if not done:

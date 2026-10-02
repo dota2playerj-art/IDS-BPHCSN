@@ -185,6 +185,37 @@ for label, client in (("Health Center Staff", staff), ("Doctor", doctor)):
     check(f"{label}: numbers are masked to the last four digits, none in full", "•••• •••" in text and not full)
 
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+section("2. README GETTING STARTED ORDER AND THE SEED REFUSAL (M36, D2)")
+readme = (REPO / "README.md").read_text(encoding="utf-8")
+start = readme[readme.index("## Getting started"):]
+start = start[:start.index("\n## ", 5)]
+order = ["python -m venv .venv", "pip install -r requirements.txt", "python setup_env.py",
+         "python archive_plain_databases.py", "python seed_demo_data.py", "python app.py",
+         "http://127.0.0.1:5001"]
+positions = [start.find(step) for step in order]
+check("the README starts with the steps in the order that works on a clean clone",
+      all(p >= 0 for p in positions) and positions == sorted(positions), positions)
+check("it says pip needs internet once, that the seed prints the passwords once, and that a new "
+      "password is set at first sign-in",
+      "needs internet" in start and "**once**" in start and "set a new password" in start)
+import seed_demo_data as seed  # noqa: E402
+existing = Path(_support.TEST_DIR) / "already_there.db"
+existing.write_bytes(b"")
+try:
+    seed.build(str(existing), show_passwords=False)
+    refusal = ""
+except SystemExit as stop:
+    refusal = str(stop)
+check("the seed refuses to build over an existing app.db and says to run it with --replace",
+      "python seed_demo_data.py --replace" in refusal and "archives the old" in refusal, refusal)
+main_refusal = subprocess.run([sys.executable, str(REPO / "seed_demo_data.py"), "--path", str(existing)],
+                              capture_output=True, text=True, cwd=REPO,
+                              env=dict(os.environ, PYTHONIOENCODING="utf-8"))
+check("the command line says the same, and exits 1 without changing the file",
+      main_refusal.returncode == 1 and "--replace" in main_refusal.stdout
+      and existing.read_bytes() == b"", main_refusal.stdout)
+
 # ==== END ====
 passed = sum(1 for _, ok in results if ok)
 print("\n" + "=" * 78)

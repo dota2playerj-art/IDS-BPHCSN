@@ -29,32 +29,56 @@ and then **Waiting for the Doctor** (the intake is saved and the service needs a
 completes a visit. A patient who goes home is marked **Left before being seen**, and it can be undone the
 same day. The flow is described in `PR0MPT_INSTRUCTION/01_PROJECT_BIBLE.md`.
 
-## Running it
+## Getting started
 
-```
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-python setup_env.py
-python app.py
-```
+Do these steps in order, once on each computer. Run them from the project folder.
 
-`python setup_env.py` is a one-time step on each computer. It creates `.env`
-with a new secret key and a key for sealed records, or adds what is missing. The
-app will not start without them. Never commit `.env`.
+1. Create and activate a virtual environment:
+   ```
+   python -m venv .venv
+   .venv\Scripts\activate
+   ```
+2. Install the packages. This is the only step that needs internet, and only once:
+   ```
+   pip install -r requirements.txt
+   ```
+3. Create the secret keys. This makes a `.env` file. The app will not start without it, and
+   it must never be committed:
+   ```
+   python setup_env.py
+   ```
+4. Archive any old plain database. It is safe to run when there is nothing to archive:
+   ```
+   python archive_plain_databases.py
+   ```
+5. Build the demo database. It prints the five account passwords **once**, on the screen.
+   Write them down:
+   ```
+   python seed_demo_data.py
+   ```
+6. Start the app:
+   ```
+   python app.py
+   ```
+7. Open <http://127.0.0.1:5001>, sign in, and set a new password. Each account must do this
+   the first time it signs in.
 
-The app serves on <http://127.0.0.1:5001>. It runs entirely offline: Bootstrap,
-Chart.js and the Inter/Material fonts are vendored under `static/`, so no CDN is
-reached at any point. There is no jQuery; the scripts are plain JavaScript.
+If port 5001 is already in use, another copy of the app is running. Close it first.
+
+The app runs entirely offline: Bootstrap, Chart.js and the Inter/Material fonts are vendored
+under `static/`, so no CDN is reached at any point. There is no jQuery; the scripts are plain
+JavaScript.
+
+`python setup_env.py` is a one-time step on each computer. It creates `.env` with a new secret
+key and a key for sealed records, or adds what is missing.
 
 SMS runs in one of two modes, shown in Settings and on SMS Notifications. Without a
 `SEMAPHORE_API_KEY` in `.env`, messages are saved but not sent ("Simulated"). With the key set, and the
 app restarted, they are sent through Semaphore ("Live").
 
-On a new install, the first run creates four accounts (`admin`, `staff`,
-`official`, `doctor`) with random passwords. It shows them once, in the
-terminal. Write them down then; they are not shown again. Each person must set
-their own password the first time they sign in.
+If you start the app with no `app.db` at all (skipping step 5), it makes an empty database with
+four accounts (`admin`, `staff`, `official`, `doctor`) and random passwords, shown once in the
+terminal. To get demo data after that, run `python seed_demo_data.py --replace`.
 
 ## Running the tests
 
@@ -97,7 +121,6 @@ rebuild it is tracked:
 
 ```
 python seed_demo_data.py   # builds app.db with fictional demo data (see below)
-python app.py              # starts the app
 ```
 
 If the schema changes after a database already exists, the scripts in `migrations/` bring it
@@ -121,8 +144,8 @@ are the real ones. The Service Schedule is left empty on purpose.
 
 It prints the five account passwords **once**, in a block on the screen. Write them
 down. Each account must change its password at first sign-in. If `app.db` already
-exists, the script stops; add `--replace` to archive the old one first (see below)
-and build a new one. `--path` builds somewhere else.
+exists, the script stops and tells you to run `python seed_demo_data.py --replace`, which
+archives the old one first (see below) and builds a new one. `--path` builds somewhere else.
 
 ## Archiving old databases
 
@@ -168,6 +191,11 @@ schema.sql              full schema for a fresh database
 migrations/             idempotent schema migrations, each self-verifying (see its README)
 seed_demo_data.py       builds the fictional demo database
 archive_plain_databases.py   encrypts old plain databases, verifies, removes
+setup_env.py            creates .env with the secret keys
+restore_backup.py       opens an encrypted .idsbackup file
+export_sealed_key.py    prints the sealed-records key for the Doctor's envelope
+tests/                  the test suites; run python tests/run_all.py
+docs/verification/      a note for each task and the final audit
 routes/                 blueprints, one per role surface, plus shared context builders
 models/                 all data access; each figure has exactly one owner here
 utils/                  dates, roles, security, SMS, phone formatting, endpoint shim
