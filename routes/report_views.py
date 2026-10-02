@@ -4,30 +4,6 @@ Screen 10 is rendered by three blueprints -- once for the Administrator, once
 for the Barangay Official and once for the Doctor -- from the same template with
 the same data. The queries live here so the role variants cannot drift apart;
 the routes stay thin and each keeps its own role_required guard.
-
-This mirrors routes/patient_views.py, routes/inventory_views.py and
-routes/appointment_views.py exactly.
-
-Every role receives an identical context. That is deliberate: the Barangay
-Official's access to this screen is read-only by virtue of there being nothing
-to write -- every route reaching it is GET, and no action on the page posts
-anywhere -- rather than by handing that role a reduced set of numbers. A
-statistics screen that showed two roles different totals would be two reports
-wearing one name. The Doctor is given no view of their own for the same reason:
-a sealed diagnosis appears in the ranking only as "Confidential" for every
-viewer, the Doctor included, and is read on the patient's record rather than here.
-
-
-WHAT THIS SCREEN CANNOT REPORT
-------------------------------
-Four of its panels ask for things the database has no record of, and each is
-surfaced as "not yet tracked" rather than filled with a plausible number. They
-are listed in UNTRACKED below with the reason, and the template renders that
-list rather than hard-coding the same sentences into each panel.
-
-The rule being followed is the one Screen 03's Prenatal card already set: a
-figure with no data source reports its own absence. An invented one is worse
-than a blank, because it will be read into a DOH submission and believed.
 """
 from datetime import datetime
 

@@ -1,40 +1,7 @@
 """Encrypt every old plain database, check the copy, then remove the plain file.
 
-usage:
-    python archive_plain_databases.py                  archive what is found
-    python archive_plain_databases.py --remove-previous   delete previous-app.db
-
 Run it from the project folder, on a computer whose .env holds this system's
 SEALED_DATA_KEY. It prints counts only, never a name or a value.
-
-WHAT IT LOOKS AT
-----------------
-* app.db in the project folder, unless it is the fictional demo database
-  (seed_demo_data.py marks it).
-* Every plain SQLite file in the IDS-BPHCSN-backups folder next to the project.
-  A file is plain SQLite when it starts with "SQLite format 3". Encrypted
-  .idsbackup files, and files that are not SQLite, are left alone.
-
-WHAT IT DOES TO EACH
---------------------
-1. Makes an encrypted copy, archive-<file name>-<timestamp>.idsbackup, in the
-   backups folder. It uses the same code as the Backup download: the copy is
-   compacted and checked (models/backup.py create_backup_bytes()), then encrypted
-   (utils/backup_crypto.py encrypt_backup()). No second implementation.
-2. Checks the copy: decrypts it into a temporary file, runs PRAGMA
-   integrity_check, and compares every table's row count and a hash of every
-   table's rows with the original. A mismatch keeps the plain file and is
-   reported.
-3. Only after step 2 matches: removes the plain file. app.db is not deleted. It is
-   moved to the backups folder as previous-app.db, so the app has no old data
-   while the demo database is built. Once the demo database works, run this
-   again with --remove-previous. That deletes previous-app.db, but only after
-   its archive has been decrypted and compared again.
-
-Safe to run twice. The folder holds archive_index.json: the content hash and the
-file name of each verified archive, and nothing else. A file whose hash is already
-there is not archived again; its existing archive is checked again, then the
-plain file is removed.
 """
 import hashlib
 import json

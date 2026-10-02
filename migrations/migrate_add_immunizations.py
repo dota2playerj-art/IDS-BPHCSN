@@ -5,35 +5,15 @@ per-patient clinical fact with an author and a date, so it needs a table; the
 schedule it is measured against does not, and lives as EPI_SCHEDULE in
 models/immunizations.py -- see the note at the top of that module for why.
 
-Idempotent -- re-running is a no-op. This is the first migration in the project
-to add a whole table rather than columns, so it uses CREATE TABLE IF NOT EXISTS
-where the three ALTER TABLE ... ADD COLUMN migrations used a column check. The
-verification half follows them exactly: snapshot every existing table before,
-compare after, and prove the new constraints actually refuse bad data rather than
-merely being spelled out in the DDL.
-
-WHAT THE CONSTRAINTS ARE FOR
-----------------------------
-UNIQUE (patient_id, vaccine_code, dose_number) is the clinically important one:
-a child cannot be given the same dose of the same vaccine twice, and a schema
-that allows it will eventually hold it. With the constraint, a double-submitted
-form is absorbed by INSERT OR IGNORE instead of quietly duplicating a dose and
-making a defaulting child look up to date.
-
-consultation_id is ON DELETE SET NULL rather than CASCADE. If a consultation
-record were ever removed, the vaccination still happened -- the dose must survive
-losing its paperwork. patient_id is ON DELETE CASCADE, matching consultations:
-patients are never hard-deleted in this system, so that path is theoretical, and
-where it is used elsewhere it means the same thing.
-
-administered_by is ON DELETE RESTRICT, matching consultations.recorded_by: a user
-account cannot be deleted out from under a clinical record that names them.
-
-Run:  python migrate_add_immunizations.py
+Run: python migrations/migrate_add_immunizations.py (project root). Safe to run twice.
 """
 import sqlite3
 import sys
 
+import sys as _sys
+from pathlib import Path as _P
+
+_sys.path.insert(0, str(_P(__file__).resolve().parent.parent))  # so it runs from the project root
 import config
 
 TABLE_SQL = """

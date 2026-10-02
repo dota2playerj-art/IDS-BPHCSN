@@ -5,19 +5,6 @@ endpoint was just the function name. The 19 templates address them that way --
 ``url_for('logout')``, ``url_for('user_management')`` -- as do the endpoint-name
 strings handed out by inject_role_context(). Blueprints rename all of them to
 ``auth.logout``, ``admin.user_management`` and so on.
-
-Rather than rewrite every template (this session must not touch them, and the
-names would be equally correct either way), a build-error handler maps a bare
-name back to its qualified endpoint. The result is exactly the namespace the app
-had before: the same bare names resolve to the same URLs.
-
-Two properties worth keeping:
-
-* An unknown name still raises the original BuildError, so a typo -- or an
-  endpoint a role is not meant to reach -- fails as loudly as it did before.
-* Registration aborts if two blueprints expose the same view name, because then
-  a bare name would be ambiguous and this shim would have to guess. Today all 31
-  view functions are uniquely named, so the mapping is total and unambiguous.
 """
 from flask import url_for
 

@@ -1,67 +1,11 @@
 """My Account: the signed-in person's own details, and their own password.
 
-WHY THIS EXISTS AT ALL
-----------------------
-Until now the only way any password in this system could change was an
-Administrator opening User Management and resetting it. That is the right tool
-for the situation it was built for -- somebody has forgotten theirs, or an
-account is being handed over -- and it is the wrong and only tool for the
-ordinary one: a health worker who wants to change a password they still know.
-With no self-service path they have to ask the Administrator, tell them the new
-password out loud or over the phone so it can be typed in for them, and end up
-with a credential a second person has seen. The feature that is supposed to
-protect the account is the thing that leaks it.
-
 So this screen asks for the current password and the administrator's reset does
 not, and those two facts are the same decision seen from both ends. See
 models/users.py's section note: a reset exists precisely BECAUSE the old password
 is unavailable, and a change exists precisely because it is available and is the
 only thing that proves the person at the keyboard is the account holder rather
 than whoever found the machine still signed in.
-
-WHAT IS DELIBERATELY NOT ON THIS SCREEN
-----------------------------------------
-The name and the role are printed and are not editable, and neither is the
-username. That is the same boundary User Management already draws, kept from the
-other side: full_name and role are EDITABLE_USER_FIELDS and belong to the
-Administrator, because a role a person can raise on themselves is not a role, and
-a name the trail attributes actions to should not be changeable by the person the
-trail is about. The username is not editable by anybody at all -- see
-models/users.py on why it is fixed for the life of the account.
-
-There is no photograph, no contact detail and no preference of any kind. Nothing
-in this application stores or reads any of those (users.email and users.phone are
-never written -- User Management says so on its own face), so a box for one would
-be a control for a feature that does not exist, which is the thing this project
-keeps deleting rather than adding.
-
-NEITHER FUNCTION BELOW TAKES AN ACCOUNT TO ACT ON, AND THAT IS THE GUARD
--------------------------------------------------------------------------
-routes/user_views.py has _resolve_target(), which reads a user_id out of the form
-and looks the row up, because those dialogs are rendered per row and genuinely
-act on somebody else. Nothing here does. Both functions call get_current_user()
-and act on whatever comes back, so there is no parameter, no hidden field and no
-path of any kind by which a request could name a different account. A posted
-`user_id` is not rejected here -- it is never read, which is the stronger answer,
-and it is the same answer validate_user_edit_form() gives a posted username.
-
-That is also why this needs no role check. It is available to the Administrator,
-to Health Center Staff and to the Barangay Official identically, because what it
-can reach is not a role's worth of screens -- it is one row, the caller's own.
-@login_required is the whole of the requirement: be somebody, and this acts on
-you.
-
-WHAT A REFUSED SUBMIT DOES
---------------------------
-It re-renders this same screen with the error beside the box it belongs to, at
-200, exactly as Add User and Register Patient do -- the project's form-redisplay
-standard, and this feature is built to it from the start rather than corrected
-into it later. Nothing typed is written back into the page, and here that costs
-nothing to explain: all three boxes hold a password, and re-rendering a password
-into a `value=` attribute is the one case this project refuses outright. See
-routes/user_views.py::_reset_state(). All three come back empty, and the banner
-at the top says so, so an empty box after a refusal reads as intended rather than
-as the screen having lost what was typed.
 """
 from models.audit import (
     ACTION_PASSWORD_CHANGE_FAILED_SELF,

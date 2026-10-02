@@ -363,7 +363,7 @@ Tasks
 
 ☑ Additional tables not in the original list — `consultations`, `immunizations`,
   `sms_broadcasts`, `sms_broadcast_recipients`, `settings`. A sixth, `schedule_logs`, was created
-  and has since been dropped by `migrate_drop_schedule_logs.py`: it was declared to back
+  and has since been dropped by `migrations/migrate_drop_schedule_logs.py`: it was declared to back
   Community Announcements, that screen was retired as a feature that never existed, and nothing
   else ever read the table. This is why the counts above read 10 tables and 12 indexes rather
   than the 11 and 13 recorded earlier in this document's history.
@@ -463,7 +463,7 @@ Testing Types
 ☑ Database Testing — integrity and foreign-key checks pass; the fresh-install vs migrated
   comparison described in Phase 5 was carried out and recorded; all 8 migrations were re-run
   against a copy of the live database and 7 of 8 are cleanly idempotent (the eighth,
-  `migrate_drop_schedule_logs.py`, is a `DROP TABLE IF EXISTS` and is a no-op on re-run)
+  `migrations/migrate_drop_schedule_logs.py`, is a `DROP TABLE IF EXISTS` and is a no-op on re-run)
 
 ☐ User Acceptance Testing — not performed with barangay health center staff
 

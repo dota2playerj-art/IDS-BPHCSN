@@ -445,7 +445,7 @@ sealed clinical text inside them must be unreadable without the key.
   with AES-256-GCM. The key is SEALED_DATA_KEY in .env, separate from SECRET_KEY. Only the Doctor's
   screens decrypt. The backup carries ciphertext and still restores fully.
 - D2. No audit entry stores diagnosis or treatment-plan text, sealed or not. An edit names the
-  field ("Changed: Diagnosis"). Older entries were cleaned by migrate_redact_clinical_audit_text.py.
+  field ("Changed: Diagnosis"). Older entries were cleaned by migrations/migrate_redact_clinical_audit_text.py.
 - D3. In Reports & Analytics, sealed consultations count in every total and appear in the diagnosis
   ranking as one "Confidential" row, for every role.
 - D4. Exports (Excel, PDF) and print views never contain sealed text, for any role, the Doctor
@@ -531,7 +531,7 @@ or condition: "Appointments by service requested" folds rows of 1 to 4 into "Oth
 5)" for the Administrator and the Official, and a single count tied to a condition or service (such as
 patients with only free-text conditions, or Prenatal Check-up visits) reads "Fewer than 5" when it is 1
 to 4. Zero stays "0". Audit entries never store a whole phone number: they are written masked, and
-`migrate_mask_audit_phone_numbers.py` masked the old ones.
+`migrations/migrate_mask_audit_phone_numbers.py` masked the old ones.
 
 **The visit flow, the Doctor's list and Left before being seen (2026-10-02, Tasks 6 and 6b).** The Doctor
 comes only on certain days, while Staff take the intake every day. A visit moves like this:

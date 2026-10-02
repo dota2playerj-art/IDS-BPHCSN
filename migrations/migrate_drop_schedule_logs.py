@@ -1,42 +1,14 @@
 """Migration: drop the schedule_logs table.
 
-Community Announcements has been retired. It never had a feature behind it --
-a static template, no model, no query, and no create/edit/delete endpoint -- and
-SMS Notifications already covers notifying the community while keeping a real
-record of every send. The screen, its route and its template are gone, and this
-removes the table that was supposed to have backed it.
-
-WHY DROPPING IS SAFE, AND WHY DROPPING RATHER THAN EMPTYING
------------------------------------------------------------
-schedule_logs was declared to hold both appointments and announcements
-(log_type CHECK IN ('Appointment', 'Announcement')). Neither half ever used it:
-
-  * Appointments live in their own `appointments` table, which is what the
-    consultation queue, the calendar and Appointment Scheduling all read. No row
-    in schedule_logs has ever carried log_type='Appointment'.
-  * Announcements were only ever seeded by populate_records.py, and read by
-    nothing -- no model function, no route, no template.
-
-Nothing references it either: no other table has a foreign key into it, and its
-only index is its own. So there is no dependency to break.
-
-It is dropped rather than left empty because an empty table with a CHECK
-constraint naming 'Appointment' is an invitation to write appointments into the
-wrong place. A table that exists is a table someone will eventually use. The
-comment left in schema.sql records what it was and why it went, which is the
-part worth keeping.
-
-The verification half follows migrate_add_sms_broadcasts.py: snapshot every
-other table before, compare row for row after, and confirm the drop took.
-
-Idempotent -- DROP TABLE IF EXISTS, so re-running on a database that has already
-been migrated is a no-op.
-
-Run:  python migrate_drop_schedule_logs.py
+Run: python migrations/migrate_drop_schedule_logs.py (project root). Safe to run twice.
 """
 import sqlite3
 import sys
 
+import sys as _sys
+from pathlib import Path as _P
+
+_sys.path.insert(0, str(_P(__file__).resolve().parent.parent))  # so it runs from the project root
 import config
 
 DOOMED_TABLE = "schedule_logs"

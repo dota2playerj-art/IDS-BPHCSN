@@ -299,7 +299,7 @@ check("the routes allowed while flagged are exactly these",
 # ===========================================================================
 section("4. THE SEED HAS NO FIXED PASSWORD")
 from database.schema import init_db  # noqa: E402
-from migrate_add_must_change_password import old_demo_passwords  # noqa: E402
+from migrations.migrate_add_must_change_password import old_demo_passwords  # noqa: E402
 from models.users import DEMO_USERS, check_password_strength  # noqa: E402
 from werkzeug.security import check_password_hash  # noqa: E402
 
@@ -363,7 +363,7 @@ check("this repository's history holds no old demo password any more", history_c
 
 # ===========================================================================
 section("5. THE MUST-CHANGE MIGRATION")
-import migrate_add_must_change_password as migration  # noqa: E402
+from migrations import migrate_add_must_change_password as migration  # noqa: E402
 from werkzeug.security import generate_password_hash  # noqa: E402
 
 GIVEN_OLD = "Lumang-Demo-Pass-31"

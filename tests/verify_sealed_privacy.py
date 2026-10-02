@@ -602,7 +602,7 @@ check("an edit entry names the field instead: Changed: Diagnosis",
       edit_entry is not None and "Changed: Diagnosis" in edit_entry[0],
       edit_entry[0] if edit_entry else None)
 
-import migrate_redact_clinical_audit_text as migration  # noqa: E402
+from migrations import migrate_redact_clinical_audit_text as migration  # noqa: E402
 
 copy = Path(_support.work_path("migrate.db"))
 shutil.copyfile(TEST_DB, copy)
@@ -1019,7 +1019,7 @@ check("Administrator: there is no edit page to print at all (404, Task 5c)",
 
 # ===========================================================================
 section("13. THE SECOND MIGRATION: AUDIT ENTRIES AND ALREADY-SEALED VISITS (Task 5b)")
-import migrate_seal_free_text_fields as migration2  # noqa: E402
+from migrations import migrate_seal_free_text_fields as migration2  # noqa: E402
 
 copy2 = Path(_support.work_path("migrate2.db"))
 shutil.copyfile(TEST_DB, copy2)

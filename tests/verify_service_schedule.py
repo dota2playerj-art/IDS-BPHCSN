@@ -5,18 +5,6 @@ tests/_support.py (and runs the real migrate_add_service_schedule.py on it
 first). Every assertion
 is made against an HTTP response body or the database as the application left
 it. Nothing reaches into a view function.
-
-HOW THE DATE IS CONTROLLED
---------------------------
-utils/dates.py is the application's one source of "now": today() is
-`return now().date()`, and `now` is looked up in utils.dates' module globals at
-call time. So replacing utils.dates.now moves "today" for every caller of
-today() at once -- the queue's date, the schedule's "Running today", the header's
-clinic_today -- whichever module imported today(). set_clock() does that; the
-queue page's own "Today's Queue <date>" line is checked each time to prove the
-whole screen believed the date it was given.
-
-usage: python tests/verify_service_schedule.py
 """
 import html as html_lib
 import os
@@ -34,7 +22,7 @@ os.chdir(PROJECT)
 TEST_DB = _support.DB_PATH
 
 mig = subprocess.run(
-    [sys.executable, "migrate_add_service_schedule.py", TEST_DB],
+    [sys.executable, "migrations/migrate_add_service_schedule.py", TEST_DB],
     capture_output=True, text=True,
 )
 print(mig.stdout.strip().splitlines()[-1])

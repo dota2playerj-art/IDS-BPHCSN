@@ -58,7 +58,7 @@ not touched. Add `--replace` to put it in place: it copies the current `app.db` 
 first, and then you restart the app.
 
 After pulling an update that adds a migration, run it once on each laptop, for example
-`python migrate_seal_free_text_fields.py`. It makes a backup first and is safe to run twice.
+`python migrations/migrate_seal_free_text_fields.py`. It makes a backup first and is safe to run twice.
 
 ## The database
 
@@ -70,7 +70,7 @@ python seed_demo_data.py   # builds app.db with fictional demo data (see below)
 python app.py              # starts the app
 ```
 
-If the schema changes after a database already exists, the `migrate_*.py`
+If the schema changes after a database already exists, the `migrations/migrate_*.py`
 scripts in the project root bring it up to date. Each one is idempotent — safe to
 re-run — and each verifies afterwards that no existing row moved.
 
@@ -135,7 +135,7 @@ documents in `PR0MPT_INSTRUCTION/` — is tracked on purpose.
 app.py                  application factory and entry point
 config.py               paths and SECRET_KEY
 schema.sql              full schema for a fresh database
-migrate_*.py            idempotent schema migrations, each self-verifying
+migrations/             idempotent schema migrations, each self-verifying (see its README)
 seed_demo_data.py       builds the fictional demo database
 archive_plain_databases.py   encrypts old plain databases, verifies, removes
 routes/                 blueprints, one per role surface, plus shared context builders

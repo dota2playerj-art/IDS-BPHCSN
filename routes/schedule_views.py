@@ -6,32 +6,6 @@ only role that can change it; Health Center Staff and the Doctor read it at
 /staff/service_schedule; the Barangay Official reads it at
 /official/service_schedule. Every one of them is built here, from the same
 entries, so no two roles can be shown different days for the same service.
-
-WHO MAY WRITE, AND WHERE THAT IS DECIDED
-----------------------------------------
-Only the Administrator. That is enforced by the three POST routes existing
-under /admin and nowhere else, each guarded role_required("Admin") -- there is
-no /staff/... or /official/... URL a forged form could be posted to, which is
-the same "enforced by absence" arrangement SMS Notifications uses for Health
-Center Staff. `can_edit` below decides only whether the form and the Edit and
-Delete buttons are drawn, and it is read from the stored account role, so a
-query string cannot switch it on.
-
-WHAT THE SCHEDULE DOES NOT DO
------------------------------
-It restricts nothing. The Patient Queue shows today's services; check-in, the
-queue order and Record Consultation are exactly as they were. A walk-in with a
-fever is seen on prenatal day, which is the RHU's own account of how these
-facilities work. It sends no SMS.
-
-THE FORM AND ITS REDISPLAY
---------------------------
-Add, Edit and Delete happen on the screen itself rather than in dialogs: the
-form sits in a side panel, ?edit=<id> fills it with one entry, ?delete=<id>
-turns it into a confirmation. A refused submit re-renders the screen with the
-panel holding exactly what was typed and each message beside its field -- the
-standard Add User, Edit User and General Settings set -- and needs no script
-to reopen anything, because the panel is never closed.
 """
 from models.audit import (
     ACTION_SCHEDULE_ENTRY_ADDED,

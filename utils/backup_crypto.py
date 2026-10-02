@@ -1,24 +1,4 @@
-"""Encryption for backup files (Task 5c, M25).
-
-The Administrator's backup download is the whole database. It used to be served
-as a plain SQLite file, so anyone holding it could read every patient's record
-with a database tool. It is now encrypted as one block:
-
-    IDSBAK1 | 12-byte nonce | AES-256-GCM ciphertext and tag
-
-The header is the associated data, so a file with a changed header does not
-open. The extension is .idsbackup.
-
-THE KEY. One key and one envelope for the team: the backup key is derived from
-SEALED_DATA_KEY with HKDF-SHA256 (info "ids-bphcsn-backup-v1"). It is a
-different key from the one that seals fields, so the two uses never share a key,
-and nothing about how sealed fields are encrypted changes.
-
-THE APP ONLY ENCRYPTS. Opening a backup is done by hand at the health-center PC
-with restore_backup.py, which is not part of the web app. So no screen can open
-a backup, and models/consultations.py open_sealed_value() is still the only
-code in the app that decrypts anything.
-"""
+"""Encryption for backup files (Task 5c, M25)."""
 import os
 
 from cryptography.hazmat.primitives import hashes

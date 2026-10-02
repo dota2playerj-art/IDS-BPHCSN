@@ -5,62 +5,6 @@ the clinical floor's that Health Center Staff and the Doctor share -- from the
 same template with the same data and the same validation. The logic lives here so the two role variants
 cannot drift apart; the routes stay thin and each keeps its own role_required
 guard and its own redirect target.
-
-This mirrors routes/patient_views.py, routes/inventory_views.py and
-routes/appointment_views.py exactly.
-
-RECORDING AND EDITING ARE THE SAME FORM
----------------------------------------
-One template, one validator, one normaliser, distinguished only by whether a
-consultation already exists -- the same arrangement Register Patient and Add/Edit
-Medicine already use. What differs between the two is deliberately small and all
-of it is here:
-
-* recording is anchored to a queue entry and completes it on save;
-* editing writes an audit entry naming what moved, and touches neither the
-  patient, the visit date, nor who originally recorded it.
-
-
-WHAT EACH ROLE MAY PUT ON THIS FORM, AND WHY THE SERVER DECIDES IT
-------------------------------------------------------------------
-Diagnosing a patient and deciding their treatment is a licensed act, and the
-Doctor is the licensed clinician. Health Center Staff and BHWs record the
-intake -- the complaint, the vitals, the growth measurements -- give the
-vaccinations and hand over medicine the doctor has prescribed. The
-Administrator, a barangay Kagawad who runs the system, can do the same intake
-on this form and no more. None of them writes `diagnosis` or `treatment_plan`
-(models/consultations.py DOCTOR_ONLY_FIELDS), and this module is where that
-stops being a claim.
-
-Until the RHU's field data separated the two jobs, the Administrator was taken
-to be the doctor and held these fields. The rule below is unchanged; the role it
-names is not.
-
-IT IS ENFORCED IN THREE INDEPENDENT PLACES, AND THE ONE ON THE PAGE IS THE
-WEAKEST OF THEM ON PURPOSE:
-
-  1. The template does not render the two fields for a role that may not write
-     them -- genuinely absent, not disabled. An input the operator cannot use is
-     still an input, and this project's rule is that a control which cannot act
-     should not be drawn (utils/unavailable.py). But a page is only ever a
-     suggestion: this alone would stop nobody who did not use the page.
-
-  2. _apply_clinical_authority() below strips both fields out of EVERY
-     submission by such a role, before validation and before anything is stored.
-     Not rejected with an error -- stripped, and on an edit replaced by what the
-     record already holds, so a forged POST carrying a diagnosis writes the
-     stored value back over itself and moves nothing. The refusal is recorded in
-     the audit trail.
-
-  3. The role it asks is utils.security.current_role(), which reads the STORED
-     account row. There is no form field, query parameter or header that can
-     change the answer, so there is nothing for a tampered request to aim at.
-
-The submitted values never reach models.consultations.store_values() at all,
-which is the same shape the growth-field rule already has: allowed_growth_fields()
-drops a head circumference submitted for an adult rather than trusting the form
-not to offer one. A form not offering a field is not the same as the server
-refusing it, and only the second is a permission.
 """
 from models.appointments import (
     IN_CONSULTATION,

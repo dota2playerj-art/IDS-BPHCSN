@@ -6,24 +6,6 @@ This module answers one question: which visits are waiting for the Doctor? It is
 one place that decides it. The Doctor's dashboard lists them, the Staff dashboard and
 the Administrator's dashboard show the count, and all three call the functions below,
 so they cannot disagree.
-
-WHAT "WAITING FOR THE DOCTOR" MEANS (Task 6b)
----------------------------------------------
-It is a queue status. Staff choose the service when they check a patient in
-(VISIT_SERVICES). When the intake is saved, the visit becomes "Waiting for the Doctor"
-if its service is in SERVICES_NEEDING_DOCTOR and no diagnosis exists yet. Otherwise it
-becomes Completed, as before (an immunization or a prenatal check-up is done by Staff
-and never needs the Doctor). When the Doctor saves a diagnosis, the visit becomes
-Completed. The list is every visit with that status, oldest first, across all days.
-
-"Has a diagnosis" is decided here too (has_diagnosis): the stored `diagnosis` is not
-blank. A sealed diagnosis is stored encrypted, which is not blank.
-
-THE COUNT NEVER READS A NAME. count_waiting_for_doctor() selects ids only, so the
-Administrator's dashboard is built without any patient's name.
-
-NO SEALED TEXT. Nothing here reads a complaint, a check-in reason or any consultation
-text. A row carries the name, the patient ID, the service and the times.
 """
 from datetime import datetime
 

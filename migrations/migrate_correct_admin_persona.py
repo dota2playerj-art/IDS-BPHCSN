@@ -1,53 +1,14 @@
 """Migration: give the Administrator account its real persona.
 
-The `admin` account has carried "Dr. Joshua Reyes" since the database was first
-seeded. That name was a placeholder invented in `06_DESIGN_CONTENT_LIBRARY.md`
-and copied from there into `models/users.py`. The person who actually holds this
-account is **Antonio Acido**, a Kagawad -- an elected barangay councilor --
-chairing the barangay's Health Committee, confirmed by the project team's
-technical adviser. He is not a physician, so the honorific is "Kagawad".
-
-`models/users.py` seeds the corrected name and has been changed alongside this
-script, so a database built from scratch comes out right. This exists for the
-database that is already here, which a reseed would not touch -- seed_demo_users()
-only runs into an empty users table.
-
-WHAT THIS DOES NOT TOUCH, ON PURPOSE
-------------------------------------
-* **The username.** `admin` is unchanged. `models/users.py` states the rule at
-  length: a username is permanently fixed, because past audit rows are
-  attributable to it.
-* **The password.** password_hash is verified byte-for-byte unchanged, so the
-  existing credentials keep working exactly as they did.
-* **The role.** The stored value stays "Admin". That is what the schema's CHECK
-  constraint allows and what role_required() compares; nothing about this
-  account's permissions changes. Only the person filling the role changed.
-* **The audit trail.** 506 entries in audit_logs.details name "Dr. Joshua Reyes"
-  in sentences already written. They are left exactly as they are. An audit trail
-  records what the system knew at the time, and rewriting old entries to look
-  tidy is the one thing it must never do. The rows will read a little oddly next
-  to the corrected name in the User column, which is joined live from users --
-  that is the honest result, not a defect.
-
-  That figure is counted, not remembered: this docstring said 508 until the
-  count was actually run against the database as it stood before the migration,
-  which is 506. The number is printed by the script itself on every run, before
-  and after, so what a reader is told is what the file holds rather than what a
-  comment claims about it.
-
-Only users.full_name is written, and only on the one row named below. Every
-other column of that row, and every other row in the table, is verified
-byte-for-byte unchanged.
-
-Idempotent -- re-running is a no-op. A row already carrying the corrected name is
-skipped; a row matching neither the expected before-state nor the after-state is
-reported and left alone rather than overwritten.
-
-Run:  python migrate_correct_admin_persona.py
+Run: python migrations/migrate_correct_admin_persona.py (project root). Safe to run twice.
 """
 import sqlite3
 import sys
 
+import sys as _sys
+from pathlib import Path as _P
+
+_sys.path.insert(0, str(_P(__file__).resolve().parent.parent))  # so it runs from the project root
 import config
 
 USERNAME = "admin"

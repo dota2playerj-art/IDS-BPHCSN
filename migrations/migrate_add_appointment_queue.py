@@ -5,52 +5,15 @@ has to be able to say "this patient has arrived and is waiting" and "this patien
 is with the clinician right now". The existing status vocabulary had neither: it
 went straight from Scheduled/Confirmed to Completed, with nothing in between.
 
-Two statuses are added to the CHECK:
-
-    Waiting           checked in and in the queue
-    In Consultation   currently being seen
-
-"Waiting" is not a new coinage -- appointment_scheduling.html already ships a
-.badge-waiting style and a "Waiting" option in its status filter, so this adopts
-the word the frozen UI was already written around. "In Consultation" follows the
-same Title Case as every other value.
-
-Idempotent -- re-running is a no-op. Run:  python migrate_add_appointment_queue.py
-
-WHY THIS ONE IS NOT PURELY ALTER TABLE
---------------------------------------
-migrate_add_patient_columns.py and migrate_add_inventory_columns.py only ever
-needed ALTER TABLE ... ADD COLUMN, which SQLite supports directly. This migration
-needs that too, for the two new columns -- and that half follows their pattern
-exactly, including the byte-for-byte verification below.
-
-But it also has to widen a CHECK constraint on a column that already exists, and
-SQLite has no ALTER TABLE ... ALTER COLUMN / DROP CONSTRAINT. The only supported
-way is the table rebuild documented at sqlite.org/lang_altertable.html#otheralter:
-create the replacement, copy every row, drop the original, rename. That is done
-here inside one transaction with foreign keys disabled for the swap, followed by
-a foreign_key_check, and the row-by-row comparison at the end proves the copy was
-lossless rather than assuming it.
-
-The rebuild is skipped entirely when the CHECK already lists both new statuses,
-so the expensive path runs at most once.
-
-TWO NEW COLUMNS
----------------
-* is_walkin -- 1 when the visit had no prior booking. The queue and any later
-  reporting need to tell a walk-in from a kept appointment, and the distinction
-  cannot be recovered afterwards: once a scheduled patient is checked in, their
-  row looks exactly like a walk-in's apart from this flag.
-
-* checked_in_at -- when the patient physically arrived. created_at cannot serve
-  here. For a walk-in the two coincide, but for a patient who booked last week
-  created_at is the booking time, so ordering the queue by it would put every
-  pre-booked patient ahead of every walk-in regardless of who actually turned up
-  first. The queue orders by this column.
+Run: python migrations/migrate_add_appointment_queue.py (project root). Safe to run twice.
 """
 import sqlite3
 import sys
 
+import sys as _sys
+from pathlib import Path as _P
+
+_sys.path.insert(0, str(_P(__file__).resolve().parent.parent))  # so it runs from the project root
 import config
 
 # (column_name, column_definition) in the order they are added. Same shape as the

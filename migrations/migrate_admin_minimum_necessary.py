@@ -1,47 +1,8 @@
 """Remove patient-linked clinical details from earlier audit entries.
 
-usage:
-    python migrate_admin_minimum_necessary.py [database]
-
 The database defaults to app.db (config.DATABASE).
 
-WHY (Task 5c; RA 11166, RA 10173, the minimum-necessary standard)
------------------------------------------------------------------
-Clinical data is for the care team only: the Doctor and Health Center Staff.
-Audit Logs are read and exported by the Administrator, who runs the system and
-is not part of anyone's care. Older entries name what a named patient was given
-or measured:
-
-    Dispensed medicine          "For <Name> (PAT-005), consultation #42: 2 tablets of ..."
-    Recorded ... doses          "2 doses for <Name> (PAT-005) at consultation #42: BCG, ..."
-    Updated consultation record "... 2 fields changed — Temperature: 36 °C → 37 °C; ..."
-    Corrected ... record        "... 1 field corrected — Vaccine: "A" → "B""
-    Sent appointment SMS        "... to <Name> (PAT-005) on <mobile number>, ...; message: "...""
-
-New entries already use the wording below (routes/audit_entries.py,
-routes/consultation_views.py, routes/vaccination_correction_views.py).
-
-WHAT IT DOES, IN ORDER
-----------------------
-1. Looks for work. When there is nothing to change and the record of an earlier
-   run exists, it makes no copy and writes nothing.
-2. Copies the database into IDS-BPHCSN-backups next to the project, with a
-   timestamped name, before it changes anything.
-3. Rewrites those entries. Who, when, the action and the record reference stay:
-       "Dispensed 2 items for <Name> (PAT-005) at consultation #42."
-       "Recorded 2 doses for <Name> (PAT-005) at consultation #42."
-       "... 2 fields changed — Changed: Temperature, items dispensed"
-       "... 1 field corrected — Changed: Vaccine"
-       "... to <Name> (PAT-005), about appointment APT-00012; ...; message removed"
-4. Writes ONE audit entry saying the migration ran, how many entries it changed
-   and why, filed under the first active Administrator account and saying the
-   migration did it, as the Task 5 migration does.
-5. Checks before committing: only those entries moved, who, when and action are
-   unchanged, and none of them still quotes a value, a medicine, a vaccine, a
-   mobile number or a message.
-6. Runs VACUUM, so the old text does not stay in the file's free space.
-
-Safe to run twice. The second run finds nothing to change and writes nothing.
+Run: python migrations/migrate_admin_minimum_necessary.py (project root). Safe to run twice.
 """
 import re
 import sqlite3
@@ -49,9 +10,13 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+import sys as _sys
+from pathlib import Path as _P
+
+_sys.path.insert(0, str(_P(__file__).resolve().parent.parent))  # so it runs from the project root
 import config  # loads .env into the environment
 
-PROJECT = Path(__file__).resolve().parent
+PROJECT = Path(__file__).resolve().parent.parent
 BACKUP_DIR = PROJECT.parent / "IDS-BPHCSN-backups"
 TASK = "admin-minimum-necessary"
 

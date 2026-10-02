@@ -4,25 +4,6 @@ One builder for both, for the reason every other shared screen in this project
 has one: the two dashboards report several of the same figures -- today's queue,
 low stock, immunisation defaulters -- and two builders would eventually disagree
 about them while each looked right on its own.
-
-Nothing here counts anything itself. Every number is read from the model function
-that already owns it and that some other screen is already reporting from, so a
-dashboard card and the screen it links to cannot show different totals:
-
-    patients            models/patients.py       get_patient_stats()
-    today's queue       models/appointments.py   get_todays_appointments/get_queue_stats
-    consultations       models/consultations.py  get_consultation_stats/get_consultation_report
-    inventory           models/inventory.py      get_inventory_stats/get_low_stock_alert
-    immunisation        models/immunizations.py  get_immunization_alert()
-    broadcasts          models/broadcasts.py     get_broadcast_stats/audience_options
-    system activity     models/audit.py          get_audit_logs/get_audit_stats
-
-WHAT THESE SCREENS CANNOT SHOW
-------------------------------
-Both dashboards were drawn with panels the schema has no source for. They are
-listed in UNTRACKED and the templates print the reason next to the panel rather
-than the mockup figure that used to sit there -- the rule Screen 03's Prenatal
-card set and Screen 10 follows.
 """
 from models.appointments import (
     get_active_consultation,

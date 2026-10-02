@@ -5,15 +5,6 @@ breakdown by diagnosis, complaint, condition or dispensed medicine with a count
 of 1 to 4 folds into one row, "Other (each fewer than 5)". The "Confidential" row
 folds the same way when its count is under 5. Totals stay exact. The Doctor sees
 every count. The threshold is SMALL_COUNT_THRESHOLD in config.py.
-
-D3. On every SMS screen, export and JSON response, for every role, a phone
-number shows its last four digits only. The send path still gets full numbers.
-
-Counts of 1, 4, 5 and 12 are seeded for diagnoses, complaints, medicines and
-conditions. Each viewer's screen, chart data, print table, Excel file and PDF is
-compared with the model's own answer for that viewer.
-
-Runs on a fresh test database built by tests/_support.py.
 """
 import io
 import json
@@ -795,7 +786,7 @@ check("an entry with no number is stored unchanged",
 import shutil as _shutil  # noqa: E402
 import tempfile  # noqa: E402
 from pathlib import Path  # noqa: E402
-import migrate_mask_audit_phone_numbers as migration  # noqa: E402
+from migrations import migrate_mask_audit_phone_numbers as migration  # noqa: E402
 
 work = Path(tempfile.mkdtemp(prefix="idsmask_"))
 copy = work / "copy.db"

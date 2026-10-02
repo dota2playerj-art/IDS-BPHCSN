@@ -3,39 +3,6 @@
 Dates are stored as ISO text ('2026-07-07', or '2026-07-07 09:15:00' for the
 CURRENT_TIMESTAMP columns). The screens display them as 'Jul 07, 2026' or
 'July 7, 2026', so the conversion lives here rather than in the models.
-
-
-WHY THE TIMEZONE IS HARDCODED
------------------------------
-This system serves one barangay health center: Barangay Poblacion Health Center
-in San Francisco (formerly Anao-Aon), Surigao del Norte. There is one site, one
-set of opening hours, and one answer to "what is today" -- so "today" is
-deliberately fixed to Asia/Manila here rather than being made configurable or
-derived from the server clock.
-
-(This paragraph used to cite 01_PROJECT_BIBLE.md for "San Francisco, Agusan del
-Sur". Both halves were wrong: the Bible states no province anywhere, and neither
-does the approved Capstone Proposal. The citation is dropped rather than
-repointed, because no governance document fixes the location -- the barangay,
-the municipality and the province are facts about the deployment, and this
-comment now states them as such.)
-
-That is a decision, not an oversight:
-
-* Reading the server clock (`date.today()`) silently makes correctness depend on
-  where the application happens to be hosted. Deployed to a UTC host, "today"
-  would roll over at 08:00 Manila time, so a medicine expiring today would read
-  as already expired for the first eight hours of every working day.
-* SQLite's `CURRENT_TIMESTAMP` is always UTC. Storage keeps that -- it is an
-  unambiguous instant and nothing needs to change -- but any *business* question
-  ("is this expired?", "how many registered this month?") is answered in the
-  timezone the health center actually works in.
-* ZoneInfo("Asia/Manila") rather than a fixed +08:00 offset, so the answer stays
-  right on its own if the Philippines ever revisits daylight saving, which it has
-  observed before.
-
-Every module that needs the current date calls today() or now() from here. There
-should be no other source of "now" in the application.
 """
 from datetime import datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError

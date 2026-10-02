@@ -5,41 +5,6 @@ delivered to every contact in a chosen audience, which makes it a different thin
 from the per-patient reminders the rest of the system deals in: it belongs to no
 patient record, and its history is a record of what the barangay said to the
 community rather than of anyone's care.
-
-
-WHERE THE RECIPIENT NUMBERS COME FROM
--------------------------------------
-There is no resident registry in this project. The schema holds patients, users,
-appointments, consultations, immunizations and inventory -- nothing that lists a
-barangay household or a resident who has never attended the health center. So the
-only real source of mobile numbers is patients.contact_number, plus users.phone
-for health center personnel, and every audience below is a query over those two
-columns. Nothing here invents a contact.
-
-Two consequences worth stating plainly rather than papering over:
-
-* "Entire Barangay" is NOT offered. The system cannot reach a resident who is not
-  a registered patient, and an audience labelled that way would claim a reach the
-  data does not support. AUDIENCE_NOT_AVAILABLE below records this as the open
-  question it is: it needs a resident contact list the project does not yet have.
-
-* "Pregnant Women" is NOT offered either, for the reason get_patient_stats()
-  already gives for its prenatal figure -- nothing in the schema records a
-  pregnancy. It needs a prenatal flag or an appointment type before an audience
-  can be built from it.
-
-Both are in 03_SCREEN_SPECIFICATIONS.md's recipient list. They are missing here
-because their data source is missing, not because they were forgotten.
-
-
-WHAT IS AND IS NOT RECORDED ABOUT DELIVERY
-------------------------------------------
-A recipient row is 'Sent' or 'Failed', and nothing else. There is no 'Delivered'
-status because nothing in this system would ever learn of a delivery: Semaphore
-reports delivery through a callback URL, and this app exposes no endpoint to
-receive one. 'Sent' means the gateway accepted the message, which is genuinely
-all a POST to the messages endpoint tells you. A delivery percentage would have
-to be made up, so none is stored or shown.
 """
 from database.connection import db_connection
 from models.consultations import PEDIATRIC_AGE_YEARS

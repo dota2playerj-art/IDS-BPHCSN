@@ -6,22 +6,6 @@ older rows in the table still carry the date and the time they were booked for,
 so both shapes read out of one table and one query rather than a union of two
 sources that could disagree about who is next. See utils/unavailable.py
 `advance_booking` for why the booking half went.
-
-ONE CONSULTATION AT A TIME
---------------------------
-Barangay Poblacion Health Center is a small facility with a single health worker
-consulting at any given moment -- the nearby Rural Health Unit is what handles
-larger capacity. So the queue is not a set of parallel rooms: at most one
-appointment in the whole system is In Consultation, and everyone else who has
-arrived is waiting for that one person to finish.
-
-That rule is held in two places, and both are needed:
-
-* start_consultation() refuses in SQL, inside the UPDATE's own WHERE clause, so
-  two requests racing each other cannot both find the room empty.
-* _apply_queue_flow() derives, for a whole day at once, who may be brought in and
-  who is next -- so the screen offers the action only where the model would
-  accept it, and the two cannot drift.
 """
 import calendar as _calendar
 from datetime import date, datetime

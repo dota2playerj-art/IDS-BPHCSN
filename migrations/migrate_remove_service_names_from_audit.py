@@ -1,33 +1,8 @@
 """Migration: take visit service names out of earlier audit entries (Task 6c, L32).
 
-usage:
-    python migrate_remove_service_names_from_audit.py [database]
-
 The database defaults to app.db (config.DATABASE).
 
-WHY
----
-A service names a clinical fact (a prenatal check-up, an immunization). The Administrator
-reads the Audit Logs, so no entry may name a visit's service. Task 6b wrote
-"Changed the service of visit APT-00081 from Consultation to Immunization." The entry is
-now "Corrected the service of visit APT-00081." This rewords the earlier ones.
-
-WHAT IT DOES, IN ORDER
-----------------------
-1. Looks for entries of the action "Changed the service of a visit" whose text still has
-   "from ... to ...". When there are none, it makes no copy and writes nothing.
-2. Copies the database into IDS-BPHCSN-backups next to the project, with a timestamped
-   name, before it changes anything.
-3. Rewrites the `details` of those entries to "Corrected the service of visit <ref>.",
-   keeping a trailing "The visit is now Completed." Who, when, the action and the module
-   stay as they are.
-4. Writes ONE audit entry recording the run, with the count. audit_logs.user_id must name
-   an account, and no "system" account exists, so it is filed under the first active
-   Administrator. The entry says the migration did it, not that person.
-5. Checks before it commits: only `details` of those entries moved, no entry still names
-   a service, and the audit table gained exactly one row. Any problem rolls it back.
-
-Safe to run twice: the second run finds nothing to reword. It prints counts only.
+Run: python migrations/migrate_remove_service_names_from_audit.py (project root). Safe to run twice.
 """
 import re
 import sqlite3
@@ -35,9 +10,13 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+import sys as _sys
+from pathlib import Path as _P
+
+_sys.path.insert(0, str(_P(__file__).resolve().parent.parent))  # so it runs from the project root
 import config  # loads .env into the environment
 
-PROJECT = Path(__file__).resolve().parent
+PROJECT = Path(__file__).resolve().parent.parent
 BACKUP_DIR = PROJECT.parent / "IDS-BPHCSN-backups"
 TASK = "remove-service-names-from-audit"
 

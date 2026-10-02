@@ -3,27 +3,6 @@
 The table has existed since the first schema pass and held nothing; this is its
 first writer. It is deliberately append-only: nothing here updates or deletes a
 row, because an audit trail that can be edited answers no question worth asking.
-
-WHAT AN ENTRY HAS TO SAY TO BE WORTH KEEPING
---------------------------------------------
-"Consultation updated" is not an audit entry, it is a timestamp with a label. An
-entry earns its place only if someone reading it months later -- during a review,
-or when two people disagree about what was recorded -- can tell what the record
-said before and what it says now without opening anything else. So `details`
-carries the field-by-field before and after, spelled out:
-
-    Consultation #12 for Elena Gonzales (PAT-005), recorded 07 Aug 2026.
-    Temperature: 37.2 °C → 38.4 °C; Diagnosis: "Viral upper respiratory
-    infection" → "Dengue fever, suspected"; Follow-up date: not recorded →
-    Aug 15, 2026
-
-The four columns map onto the Audit Logs screen's existing table, so entries
-written here are already in the shape that screen reads:
-
-    action       the short activity phrase in its Activity column
-    module       the pill beside it, one of MODULE_*
-    details      the expansion, as above
-    ip_address   where the request came from
 """
 import config
 from database.connection import db_connection

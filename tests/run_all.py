@@ -1,21 +1,4 @@
-"""Run every test suite, each on its own fresh test database.
-
-    python tests/run_all.py            run all suites
-    python tests/run_all.py -v         also print each suite's full output
-    python tests/run_all.py rbac epi   run only the suites whose names contain these words
-
-Each suite runs in its own Python process, with its own empty temporary
-folder outside the project. tests/_support.py builds the test database in that
-folder from schema.sql and fixtures. The folder is deleted when the suite ends.
-
-The live app.db is never opened for writing. This runner records its size,
-modified time and checksum before the run and checks them again after. If a
-suite tries to use a database inside the project, tests/_support.py stops it,
-and this runner stops the whole run.
-
-It prints one line per suite (passed/total), then a total. The exit code is 0
-only when every check in every suite passed.
-"""
+"""Run every test suite, each on its own fresh test database."""
 import hashlib
 import os
 import re

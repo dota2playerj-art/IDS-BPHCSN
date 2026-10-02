@@ -863,7 +863,8 @@ env = dict(os.environ)
 proc = subprocess.run(
     [sys.executable, "-c",
      f"import config; config.DATABASE = r'{TEST_DB}';"
-     "exec(open('migrate_add_consultation_restriction.py').read().replace("
+     "__file__ = 'migrations/migrate_add_consultation_restriction.py';"
+     "exec(open('migrations/migrate_add_consultation_restriction.py').read().replace("
      "'if __name__ == \"__main__\":', 'if True:'))"],
     capture_output=True, text=True, cwd=PROJECT, env=env)
 print(proc.stdout.strip())

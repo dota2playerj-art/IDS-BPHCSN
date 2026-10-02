@@ -4,21 +4,6 @@ Screen 09 is rendered by three blueprints -- Administrator, Barangay Official an
 Health Center Staff -- from one template with one set of data. The queries live
 here so the three role variants cannot drift apart; each route stays thin and
 keeps its own role_required guard.
-
-Same arrangement as routes/inventory_views.py and routes/patient_views.py,
-including how a failed submit is redisplayed: the template repopulates the
-compose dialog from a `compose` dict and reopens it on what was entered.
-
-
-THE PERMISSION SPLIT IS ENFORCED IN TWO PLACES, NOT ONE
--------------------------------------------------------
-Per the confirmed team ruling, Administrator and Barangay Official compose and
-send community broadcasts; Health Center Staff is view-only. The template hides
-the compose controls from Staff via can_broadcast, but hidden markup is not a
-permission -- a POST can be forged. So the send endpoint simply does not exist in
-the Staff blueprint: there is no /staff/sms_notifications/send URL to post to,
-and the two that do exist are each guarded by role_required. Staff has the GET
-and nothing else.
 """
 from flask import session
 

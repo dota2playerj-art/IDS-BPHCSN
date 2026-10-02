@@ -1,55 +1,21 @@
 """Migration: the queue status "Waiting for the Doctor" (Task 6b, M33 and L31).
 
-usage:
-    python migrate_visit_service_and_doctor_status.py [database]
-
 The database defaults to app.db (config.DATABASE).
 
-WHY
----
-Saving the intake used to set a visit to "Completed" even when the Doctor had not seen
-the patient, so "Completed" counts were wrong, and every visit was saved as a
-"Walk-in Consultation", so immunization and prenatal visits landed on the Doctor's
-list. Staff now choose the service at check-in, and a visit whose service needs a
-diagnosis waits in its own status, "Waiting for the Doctor", until the Doctor writes it.
-
-WHAT IT DOES, IN ORDER
-----------------------
-1. Looks for work. When the status CHECK already admits "Waiting for the Doctor", it
-   makes no copy and writes nothing.
-2. Copies the database into IDS-BPHCSN-backups next to the project, with a timestamped
-   name, before it changes anything.
-3. Rebuilds `appointments` with the wider status CHECK. SQLite cannot widen a CHECK in
-   place, so the table is rebuilt the way sqlite.org documents (create, copy, drop,
-   rename, with foreign keys off for the swap), as migrate_add_left_before_seen.py did.
-4. Converts the visits the Doctor still owes a diagnosis to "Waiting for the Doctor":
-   those that are Completed, whose service needs the Doctor (a Walk-in Consultation, or
-   no service at all, needs him), that have a consultation record and no diagnosis. A
-   Completed visit with no consultation record at all was closed from the queue with
-   nothing written; the Doctor has nothing to open, so it stays Completed. A sealed
-   diagnosis is stored encrypted, which is not blank, so it counts as a diagnosis.
-5. Does the same for a visit that was marked "Left before being seen" from Completed:
-   its `status_before_left` becomes "Waiting for the Doctor", so the same-day undo puts
-   it back where it belongs.
-6. Writes ONE audit entry recording the run, with the counts. audit_logs.user_id must
-   name an account, and no "system" account exists, so it is filed under the first
-   active Administrator. The entry says the migration did it, not that person.
-7. Checks before it finishes: every other column of every row is unchanged, only the
-   converted rows moved and only in `status` (and `status_before_left`), foreign keys are
-   clean, both indexes exist, the CHECK admits the new status and still refuses a
-   made-up one, and the audit table gained exactly one row. Any problem rolls it all back.
-
-Safe to run twice: the second run finds the CHECK already wide and does nothing.
-It prints counts only.
+Run: python migrations/migrate_visit_service_and_doctor_status.py (project root). Safe to run twice.
 """
 import sqlite3
 import sys
 from datetime import datetime
 from pathlib import Path
 
+import sys as _sys
+from pathlib import Path as _P
+
+_sys.path.insert(0, str(_P(__file__).resolve().parent.parent))  # so it runs from the project root
 import config  # loads .env into the environment
 
-PROJECT = Path(__file__).resolve().parent
+PROJECT = Path(__file__).resolve().parent.parent
 BACKUP_DIR = PROJECT.parent / "IDS-BPHCSN-backups"
 TASK = "visit-service-and-doctor-status"
 

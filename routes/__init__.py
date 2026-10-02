@@ -6,16 +6,6 @@ admits the clinical floor -- Health Center Staff and the Doctor -- and
 /official/* is the Barangay Official's. So a blueprint's url_prefix and its
 guard say the same thing, and adding a route to the wrong file is immediately
 visible in its URL.
-
-    auth_bp      /              index, login, logout, dashboard, and
-                                My Account -- the one screen no role owns,
-                                because it acts on the caller's own row
-    admin_bp     /admin/*       11 Administrator screens
-    staff_bp     /staff/*        8 clinical-floor screens, for Health Center
-                                Staff and the Doctor (routes/staff.py says why
-                                the Doctor shares them rather than having a copy),
-                                plus Reports & Analytics for the Doctor alone
-    official_bp  /official/*     8 Barangay Official screens
 """
 from routes.admin import admin_bp
 from routes.auth import auth_bp

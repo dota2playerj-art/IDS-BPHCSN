@@ -1,19 +1,4 @@
-"""Create the .env file this app needs, or add what is missing from it.
-
-    python setup_env.py
-
-A new .env gets a random SECRET_KEY, a random SEALED_DATA_KEY and IDS_DEBUG=0.
-If .env already exists, only missing values are added. Existing values are never
-changed. It never prints a key.
-
-SECRET_KEY signs the sign-in cookies. SEALED_DATA_KEY encrypts sealed
-consultations. Changing SECRET_KEY only signs everyone out. Losing or changing
-SEALED_DATA_KEY makes every sealed record unreadable, so print it once with
-export_sealed_key.py and give it to the Doctor in a sealed envelope.
-
-.env is ignored by git. Never commit it, and never copy it to another computer:
-each installation has its own keys.
-"""
+"""Create the .env file this app needs, or add what is missing from it."""
 import secrets
 import sys
 from pathlib import Path

@@ -4,19 +4,6 @@ Runs the REAL Flask application over a fresh test database built by
 tests/_support.py, driving real
 HTTP requests, and reads the ACTUAL BYTES of freshly generated .xlsx and .pdf
 exports rather than trusting the builders that made them.
-
-THE POSITIVE CONTROL IS THE POINT OF THE DESIGN.
-Every "the sealed value is absent" assertion is paired with "an ordinary value
-with the same shape is present, extracted the same way". Without that pair, a
-broken extractor -- a PDF whose text this suite cannot decompress, a workbook
-read from the wrong sheet -- reports absence for everything and passes while
-proving nothing. Two sentinels are planted for exactly this reason:
-
-    SEALED   on a restricted consultation. Must appear NOWHERE.
-    CONTROL  on an ordinary one.           Must appear EVERYWHERE the ranking does.
-
-Both are single unhyphenated tokens so PDF word-wrap cannot split them across
-text runs and turn a leak into a false pass.
 """
 import io
 import os

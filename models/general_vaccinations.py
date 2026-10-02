@@ -1,70 +1,9 @@
 """Vaccinations given to any patient, at any age, with no schedule attached.
 
-WHY THIS IS NOT PART OF models/immunizations.py
-------------------------------------------------
-Two different clinical questions, deliberately kept apart:
-
     "was this vaccine given?"        record-keeping. True of any patient of any
                                      age -- a 19-year-old having a hepatitis B
                                      dose is exactly as real a clinical event as
                                      an infant having one.
-
-    "is this patient on schedule?"   evaluation. Only answerable where an
-                                     official schedule genuinely exists. In the
-                                     Philippines that is the DOH Expanded Program
-                                     on Immunization infant schedule, which
-                                     covers children under five and nobody else.
-
-models/immunizations.py answers the second, and to do it it needs the first as
-well -- so it stores doses *and* grades them. That is correct for the cohort the
-EPI schedule describes and wrong for everyone else: there is no single national
-adult immunisation schedule to grade an adult against, so any due/overdue reading
-this module produced would be invented. It therefore produces none. There is no
-due date, no grace period, no status badge and no "overdue" anywhere in this
-file, and that absence is the design rather than an omission.
-
-This is the same separation the HL7 FHIR standard draws between Immunization
-(the administration that happened) and ImmunizationRecommendation (a forecast a
-schedule produces). Only the first kind of record is written here.
-
-The consequence worth stating plainly: before this module existed, an adult who
-received a vaccine at the health center had nowhere in the system for it to go.
-The EPI screens quite correctly refused them -- they are not the EPI cohort --
-and there was no second place to look. The dose simply was not recorded.
-
-
-WHY THERE IS NO SCHEDULE CONSTANT HERE
---------------------------------------
-COMMON_VACCINES below is a *convenience list for the entry form*, not policy. It
-is what the health center gives often enough to be worth a tick box, and it ends
-in a free-text row precisely because it does not claim to be exhaustive. Nothing
-reads it to decide anything about a patient; the row that gets stored carries the
-vaccine's name as text, so a vaccine nobody anticipated is recorded exactly as
-well as one on the list.
-
-One thing does now read the list -- vaccines_for_age() drops the rows an infant
-cannot be given before the form prints them -- and that is still not policy about
-a patient. It decides what a screen offers, not what a record may say: every row
-it drops remains typeable in the free-text row, and no stored record is read,
-graded or changed by it.
-
-That is the opposite of EPI_SCHEDULE, which *is* national policy, is closed, and
-is the yardstick every EPI status is measured against. Storing a name here rather
-than a code is the same decision read from the other side: a code only earns its
-keep when something looks the record up, and nothing looks these up.
-
-
-WHAT IS STORED, AND WHAT IS NOT
--------------------------------
-Patient, vaccine name, an optional dose number, the date, who gave it, and the
-consultation it was given during -- the same anchoring the EPI table uses, so a
-visit's record is complete read from either direction.
-
-dose_number is nullable, unlike the EPI table's, because most of these have no
-fixed dose count. "Influenza" is one shot a year forever; a Td booster is not
-"dose 3 of 3" of anything a barangay health station tracks. Requiring a number
-would force a health worker to invent one, and an invented number in a clinical
-record is worse than an absent one.
 """
 from database.connection import db_connection
 

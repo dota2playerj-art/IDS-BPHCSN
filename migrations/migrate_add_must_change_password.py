@@ -1,36 +1,8 @@
 """Add users.must_change_password, and mark accounts still on an old demo password.
 
-usage:
-    python migrate_add_must_change_password.py [database]
-    python migrate_add_must_change_password.py [database] --flag-all
-
 The database defaults to app.db (config.DATABASE).
 
-WHAT IT DOES, IN ORDER
-----------------------
-1. Reads the old demo passwords from git history: every version of
-   models/users.py whose DEMO_USERS list held a password. They are kept in
-   memory only. They are never written to this file, printed, or stored.
-2. Before it changes anything, copies the database into the folder
-   IDS-BPHCSN-backups next to the project, with a timestamped name. When there
-   is nothing to change, it makes no copy and writes nothing.
-3. Adds users.must_change_password (INTEGER NOT NULL DEFAULT 0) if it is missing.
-4. Sets must_change_password = 1 for every account whose stored hash matches an
-   old demo password. Prints those usernames. Never prints a password.
-
-Safe to run twice. The second run finds the column and the flags in place and
-changes nothing.
-
-If git or the history cannot be read, it stops and changes nothing. Then
---flag-all marks every account instead, so everyone sets a new password once.
-
-The H6 privacy cleanup (2026-09-29) took the old passwords out of git history.
-Every old version now reads "(retired demo password)" instead, and step 1
-skips that text. So on any copy of the repository made after the cleanup, step
-1 finds nothing and the script stops: run it with --flag-all.
-
-Afterwards it checks that only the new column moved: the same accounts, the
-same values in every other column, and the same number of rows in every table.
+Run: python migrations/migrate_add_must_change_password.py (project root). Safe to run twice.
 """
 import ast
 import sqlite3
@@ -41,9 +13,13 @@ from pathlib import Path
 
 from werkzeug.security import check_password_hash
 
+import sys as _sys
+from pathlib import Path as _P
+
+_sys.path.insert(0, str(_P(__file__).resolve().parent.parent))  # so it runs from the project root
 import config
 
-PROJECT = Path(__file__).resolve().parent
+PROJECT = Path(__file__).resolve().parent.parent
 BACKUP_DIR = PROJECT.parent / "IDS-BPHCSN-backups"
 TASK = "must-change-password"
 COLUMN = "must_change_password"

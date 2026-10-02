@@ -1,40 +1,14 @@
 """Migration: reduce the queue to one consultation at a time.
 
-Barangay Poblacion Health Center has a single health worker consulting at any
-given moment. Until now "Start Consultation" only wrote a status label -- there
-was no rule behind it -- so every patient it was pressed on stayed In
-Consultation, and the live database ended up holding six of them at once. That
-is not a state the clinic can be in, and it is not a state the repaired code can
-produce; this migration brings the existing rows into line with the invariant
-start_consultation() now enforces.
-
-WHY THE OTHERS GO BACK TO WAITING, NOT COMPLETED
-------------------------------------------------
-The one with the latest arrival is the only one that can still plausibly be in
-the room, so it keeps its status. For the rest, what actually happened is
-unknown: the button was pressed, and nothing recorded whether the patient was
-seen, went home, or was never called at all.
-
-'Completed' would assert a consultation took place. On a medical record that is
-a claim, not a tidy-up -- it would show in the day's completed count and in the
-patient's appointment history as a visit that was carried out, when no
-consultation record exists to back it up.
-
-'Waiting' asserts only that the patient arrived, which the checked_in_at column
-already proves. They return to the queue where the desk can look at them and
-resolve each one properly -- start it, complete it, or mark it No-show. That
-leaves the correction visible to staff rather than silently absorbed, which is
-the right default for data nobody can reconstruct.
-
-Nothing is deleted, and checked_in_at is untouched, so arrival order survives and
-the returned patients queue in the order they actually turned up.
-
-Idempotent -- re-running is a no-op once at most one row is In Consultation.
-Run:  python migrate_enforce_single_consultation.py
+Run: python migrations/migrate_enforce_single_consultation.py (project root). Safe to run twice.
 """
 import sqlite3
 import sys
 
+import sys as _sys
+from pathlib import Path as _P
+
+_sys.path.insert(0, str(_P(__file__).resolve().parent.parent))  # so it runs from the project root
 import config
 
 IN_CONSULTATION = "In Consultation"

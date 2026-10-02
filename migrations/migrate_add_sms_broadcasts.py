@@ -1,43 +1,14 @@
 """Migration: add the sms_broadcasts and sms_broadcast_recipients tables.
 
-Screen 09's SMS history had no table behind it -- the rows on that screen were
-markup. This adds the two tables that make it a record: one per broadcast, and
-one per number each broadcast was actually attempted against. See the block
-comments in schema.sql for what each column is for and, in particular, why there
-is no delivered_count and no delivery percentage.
-
-Idempotent -- re-running is a no-op. Follows migrate_add_immunizations.py, the
-project's other whole-table migration: CREATE TABLE IF NOT EXISTS, then a
-verification half that snapshots every pre-existing table before and compares it
-after, and probes the new constraints to prove they refuse bad data rather than
-merely being spelled out in the DDL.
-
-WHAT THE CONSTRAINTS ARE FOR
-----------------------------
-reference is UNIQUE. It is the SMS-YYYY-NNNN identifier the screen shows and the
-one an operator would quote when asking about a message; two broadcasts sharing
-one would make that question unanswerable.
-
-delivery_mode is CHECK-constrained to ('live', 'simulated') and is NOT NULL, so a
-row cannot exist without saying whether its messages really left the building.
-That is the whole point of the column: a simulated send recorded as though it
-were live would be a fabricated delivery record.
-
-status on a recipient row is CHECK-constrained to ('Sent', 'Failed') and
-deliberately has no 'Delivered' member. Nothing in this application receives
-Semaphore's delivery callbacks, so no row could ever legitimately hold it.
-
-broadcast_id is ON DELETE CASCADE: recipient rows describe one broadcast and mean
-nothing without it. patient_id and user_id are ON DELETE SET NULL -- the message
-was sent to that number whether or not the record it came from still exists.
-sent_by is ON DELETE RESTRICT, matching consultations.recorded_by: an account
-cannot be deleted out from under a record that names them as the sender.
-
-Run:  python migrate_add_sms_broadcasts.py
+Run: python migrations/migrate_add_sms_broadcasts.py (project root). Safe to run twice.
 """
 import sqlite3
 import sys
 
+import sys as _sys
+from pathlib import Path as _P
+
+_sys.path.insert(0, str(_P(__file__).resolve().parent.parent))  # so it runs from the project root
 import config
 
 BROADCASTS_SQL = """

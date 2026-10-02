@@ -3,32 +3,6 @@
 Three things live here, in order: the real HTTP call, what a message costs to
 send, and the one decision that says whether an outbound message goes to the
 gateway or is recorded as a simulated send.
-
-
-TURNING THIS FEATURE LIVE
--------------------------
-The SMS broadcast feature is complete and writes real history. The only thing it
-does not do today is put bytes on the wire, because the project has no Semaphore
-account yet. To make it fully live:
-
-    1. Create a Semaphore account at https://semaphore.co and obtain the API key
-       from its dashboard.
-    2. Set that key in the environment the app runs in, then restart it:
-
-           Windows PowerShell   $env:SEMAPHORE_API_KEY = "your-key-here"
-           Linux / macOS        export SEMAPHORE_API_KEY="your-key-here"
-
-That is the whole activation step. Nothing in this file, in models/broadcasts.py,
-in routes/broadcast_views.py or in the templates changes: deliver_announcement_sms()
-below reads the environment on every call, so the first broadcast sent after the
-key is present goes through send_announcement_sms() to Semaphore's live endpoint
-and is recorded with delivery_mode 'live'. Broadcasts already in the history keep
-their 'simulated' mark, which is correct -- those messages genuinely were not
-transmitted.
-
-A sender name (Semaphore calls it a sender ID) is optional and is deliberately
-not sent: an account without an approved sender name has its messages delivered
-under Semaphore's default, which is the correct behaviour for a new account.
 """
 import os
 from urllib import parse, request as urllib_request

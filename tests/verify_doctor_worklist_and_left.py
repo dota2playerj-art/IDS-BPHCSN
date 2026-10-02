@@ -4,19 +4,6 @@
 M4. A visit whose intake is saved and that needs a diagnosis waits in its own status,
 "Waiting for the Doctor". The Doctor's dashboard lists exactly those visits, oldest first,
 across all days. Staff and the Administrator see the count only. One function decides.
-
-M33. Staff choose the service from one fixed list when they check a patient in. It is
-checked on the server. Staff and the Doctor can correct it while the visit is not finished.
-
-L31. Saving the intake gives "Waiting for the Doctor" for a service that needs the Doctor
-and no diagnosis, otherwise Completed. The Doctor's diagnosis completes the visit.
-"Completed" counts only finished visits.
-
-M5. Staff and the Doctor can mark a visit as "Left before being seen" from Waiting, In
-Consultation or Waiting for the Doctor, with a confirmation, an audit entry and a same-day
-undo. The Administrator cannot. Queue reports count each status as its own figure.
-
-Runs on a fresh test database built by tests/_support.py.
 """
 import io
 import re
@@ -815,7 +802,7 @@ section("10. THE SCHEMA AND THE MIGRATION")
 import tempfile  # noqa: E402
 import shutil  # noqa: E402
 from pathlib import Path  # noqa: E402
-import migrate_add_left_before_seen as migration  # noqa: E402
+from migrations import migrate_add_left_before_seen as migration  # noqa: E402
 
 SCHEMA = open("schema.sql", encoding="utf-8").read()
 fresh = sqlite3.connect(":memory:")
@@ -880,7 +867,7 @@ shutil.rmtree(work, ignore_errors=True)
 
 # ---------------------------------------------------------------------------
 section("11. THE MIGRATION FOR THE NEW STATUS (migrate_visit_service_and_doctor_status.py)")
-import migrate_visit_service_and_doctor_status as m2  # noqa: E402
+from migrations import migrate_visit_service_and_doctor_status as m2  # noqa: E402
 
 work2 = Path(tempfile.mkdtemp(prefix="idsdoc_"))
 old2 = work2 / "old.db"
@@ -990,7 +977,7 @@ check("the entry for a visit completed by a service correction says so without n
 
 # ---------------------------------------------------------------------------
 section("13. THE MIGRATION THAT REWORDS OLD ENTRIES (migrate_remove_service_names_from_audit.py)")
-import migrate_remove_service_names_from_audit as m3  # noqa: E402
+from migrations import migrate_remove_service_names_from_audit as m3  # noqa: E402
 
 work3 = Path(tempfile.mkdtemp(prefix="idsaud_"))
 old3 = work3 / "old.db"

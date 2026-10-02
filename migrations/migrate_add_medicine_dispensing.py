@@ -1,123 +1,14 @@
 """Migration: add the medicine_dispensing table.
 
-THE GAP THIS CLOSES
--------------------
-Medicine leaving the health center was recorded nowhere. `inventory_items` holds
-one number per item -- the level on the shelf right now -- and every write path
-into it moved that number *up* or corrected it wholesale: Add Medicine sets it,
-Edit Medicine overwrites it. Nothing in the system took a unit off the shelf and
-said who it went to.
-
-The consequences were stated, honestly, in three separate places for the whole
-life of the project, and this table is what makes all three false:
-
-  * Patient Profile's Medicine History tab said "Medicine dispensing is not
-    recorded yet";
-  * routes/report_views.UNTRACKED["dispensing"] and its twin in
-    routes/dashboard_views.py said units dispensed in a month "cannot be
-    recovered", which is why Reports & Analytics had a note where a chart
-    belonged and the Administrator dashboard had a grey box where one did;
-  * Proposal Objective 2 asks Medicine Inventory for "real-time monitoring", and
-    a stock figure that only ever goes up is not monitoring. It is a purchase
-    ledger.
-
-WHAT A ROW IS
--------------
-One issue of one medicine, to one patient, during one consultation, by one
-member of staff, on one day -- the six things that make a dispensing event
-traceable. That is deliberately HL7 FHIR's MedicationDispense in its ward-stock
-sense: "issuing a dose from ward stock to a patient for consumption", which
-FHIR ties to the Encounter that justified it. It is also what DOH guidance for
-this level of facility requires: medicine handed out at a barangay health
-station must be traceable to the medical supervision that authorised it, so
-there is no dispensing path in this system that is not anchored to a
-consultation.
-
-
-WHY inventory_item_id *AND* medicine_name / unit
-------------------------------------------------
-Both, and they answer different questions.
-
-`inventory_item_id` is the traceability link. It is what lets a dispensing row
-be followed back to the batch number, the expiry date and the supplier the units
-actually came from, and it is the column models/dispensing.py decrements against.
-ON DELETE RESTRICT because an inventory row must not be able to vanish from
-under a clinical record naming it -- and it never needs to, since retiring an
-item in this project is a status flag, not a deletion (models/inventory.py
-RETIRED_STATUS).
-
-`medicine_name` and `unit` are the record of what was actually handed over. The
-Add / Edit Medicine form can rewrite an inventory row's name in place -- that is
-how the supplier and location corrections earlier in this project were made -- so
-a history rendered purely by joining would silently re-label a dose given six
-months ago as whatever the row is called today. A clinical record says what
-happened at the time. This is the same pair sms_broadcast_recipients already
-stores: patient_id for the link, recipient_name and mobile_number for what the
-message was actually addressed to.
-
-
-WHY quantity_dispensed HAS A CHECK
------------------------------------
-CHECK (quantity_dispensed > 0). A dispensing row is the only writer in this
-project that moves stock *down*, so a zero row would be a record of nothing and a
-negative one would be a restock wearing a dispensing record's clothes -- adding
-units to the shelf through a path with no supplier, no batch and no expiry date.
-The form refuses both before it gets here; this is the refusal that holds when
-the form is not what is calling.
-
-
-WHY UNIQUE (consultation_id, inventory_item_id)
------------------------------------------------
-One medicine appears at most once per visit, and the amount goes on that one
-line. This is the constraint that took the most thought, so the reasoning is
-written down rather than left in the DDL.
-
-The obvious alternative was no constraint at all, on the grounds that dispensing
-is quantitative and has no natural uniqueness -- ten tablets now and ten more
-later really is twenty tablets, not a duplicate. That is true, and it is exactly
-why this table cannot use the INSERT OR IGNORE that general_vaccinations uses to
-make a double-submitted form harmless. An ignored insert here would swallow the
-record while the stock decrement beside it did not happen, or the reverse, and
-the two halves this feature exists to keep in step would be out of step.
-
-So the double-submit had to be refused rather than absorbed, and refusing it
-needs something to refuse *on*. "The same medicine, at the same visit" is that
-something, and it is also how a real dispensing slip reads: one line per
-medicine, with a quantity on it. A second dose of the same drug at the same
-visit is recorded by putting the full amount on the one line, and
-models/dispensing.py says so in as many words when it refuses, naming the amount
-already on file rather than failing silently.
-
-consultation_id is nullable and SQLite counts NULLs as distinct, so the
-constraint stops applying if a consultation is ever deleted out from under its
-rows. That is the correct behaviour and not a hole: at write time every
-dispensing row has a consultation (there is no other way to create one), and
-once the consultation is gone there is no visit left for two rows to be
-duplicates *within*.
-
-
-THE THREE FOREIGN KEYS
-----------------------
-    patient_id         ON DELETE CASCADE  -- matches consultations and
-                                             general_vaccinations
-    consultation_id    ON DELETE SET NULL -- the medicine was handed over whether
-                                             or not its paperwork survives
-    inventory_item_id  ON DELETE RESTRICT -- see above
-    dispensed_by       ON DELETE RESTRICT -- an account cannot be deleted out
-                                             from under a clinical record naming it
-
-Idempotent -- re-running is a no-op. Follows migrate_add_general_vaccinations.py
-exactly: CREATE TABLE IF NOT EXISTS, snapshot every pre-existing table before,
-compare row for row after, and prove the constraints actually refuse bad data
-rather than merely being spelled out in the DDL. `inventory_items` is snapshotted
-first and deliberately, because this migration must not move a single stock
-figure: the feature it supports is the only thing that may.
-
-Run:  python migrate_add_medicine_dispensing.py
+Run: python migrations/migrate_add_medicine_dispensing.py (project root). Safe to run twice.
 """
 import sqlite3
 import sys
 
+import sys as _sys
+from pathlib import Path as _P
+
+_sys.path.insert(0, str(_P(__file__).resolve().parent.parent))  # so it runs from the project root
 import config
 
 TABLE_SQL = """

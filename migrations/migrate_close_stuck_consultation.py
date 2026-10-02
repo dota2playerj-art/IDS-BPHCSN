@@ -1,62 +1,14 @@
 """Migration: close the visit left In Consultation on 2026-08-28.
 
-WHAT WAS WRONG
---------------
-Appointment 67 -- Remedios Lagunzad Manalastas, PAT-026, a walk-in on 2026-08-28 -- was
-checked in at 23:36:30 and brought in six seconds later, and nothing ever closed
-it. No consultation record was written for it. It sat In Consultation across
-midnight, and on 2026-08-29 it blocked every attempt to start a new one: the
-single-active-consultation guard inside start_consultation() asks
-`NOT EXISTS (... status = 'In Consultation')` over the whole table, with no date
-filter, so a visit from an earlier day still holds the clinician. Checking in
-Arnel Manalastas succeeded and starting his consultation was refused with
-"Remedios Manalastas is still in consultation", naming a patient who was nowhere in
-Today's Queue.
-
-The invisibility was a second defect and is fixed in code, not here: the queue
-screen decided who could start from today's rows alone while the server decided
-from all of them. See models/appointments.py _apply_queue_flow() and
-get_queue_stats(). This script deals only with the one row already stuck.
-
-WHY 'Completed' AND NOT SOMETHING ELSE
---------------------------------------
-The status CHECK admits seven values and only three could describe a visit that
-began and stopped:
-
-    No-show    False. She arrived, was checked in, and was brought in. No-show
-               means the patient never came, and the record would say she did
-               not turn up on a day she did.
-    Cancelled  False. A cancellation is a visit called off before it happened.
-               This one happened; what is missing is the write-up, not the visit.
-    Completed  True in the only sense this system gives the word: the queue entry
-               is closed and no longer holds the room. It does not assert that a
-               consultation record exists -- twelve other Completed appointments
-               have none, and Appointment Scheduling offers "Mark Completed"
-               beside "Record Consultation" precisely for the visit that ends
-               with nothing written down.
-
-So Completed, and the fact that nothing was written is stated rather than
-implied: it goes into the row's own notes, and into an audit_logs entry under
-Appointment Scheduling naming the appointment, both statuses and the reason.
-Nothing invents a consultation record. Fabricating one would put a diagnosis in
-a patient's clinical history that no clinician ever made, which is the one
-outcome worse than a visit with no notes.
-
-WHAT THIS TOUCHES
------------------
-appointments.status, appointments.notes and appointments.updated_at, on row 67
-and no other, and one INSERT into audit_logs. Every other column of that row, and
-every other row in both tables, is verified unchanged. The whole thing is one
-transaction: if verification fails, nothing is committed.
-
-Idempotent -- re-running is a no-op. A row already Completed is reported and left
-alone, and the note is never appended twice.
-
-Run:  python migrate_close_stuck_consultation.py
+Run: python migrations/migrate_close_stuck_consultation.py (project root). Safe to run twice.
 """
 import sqlite3
 import sys
 
+import sys as _sys
+from pathlib import Path as _P
+
+_sys.path.insert(0, str(_P(__file__).resolve().parent.parent))  # so it runs from the project root
 import config
 
 APPOINTMENT_ID = 67

@@ -1,107 +1,4 @@
-"""User accounts, authentication lookups, and the writes that create or revoke one.
-
-WHAT THIS MODULE GAINED, AND WHY THE WRITES LIVE HERE RATHER THAN IN A ROUTE
------------------------------------------------------------------------------
-It was read-only for the project's whole life apart from seed_demo_users(): the
-three accounts were written once at first boot and nothing else could add,
-disable or restore one. User Management said so on its own face, and the login
-route enforced a flag no screen could set. This module is now the writer as well,
-and everything that decides whether a write is allowed is in it -- the password
-rules, the username rules, and the refusal to switch off the last administrator.
-
-That placement is the point rather than a filing preference. A guard that lives
-in a route protects that route; a guard that lives here protects the table. The
-last-administrator check in particular is inside deactivate_user() and reads its
-count on the same connection and inside the same transaction as the UPDATE it is
-guarding, so a second entry point added later -- another blueprint, a management
-command, a future bulk action -- inherits the refusal by calling the function
-rather than by its author remembering the rule exists.
-
-WHAT IS DELIBERATELY NOT HERE
------------------------------
-There is no delete. Accounts are revoked, never removed, for the reason patients
-are archived rather than deleted: audit_logs.user_id is NOT NULL and foreign-keyed
-ON DELETE RESTRICT, so every entry an account ever wrote is anchored to a row that
-has to keep existing. Deleting an account would either be refused by the database
-or, if that constraint were ever relaxed, would orphan the history of everything
-that account did -- which is the one outcome an audit trail exists to prevent.
-
-PASSWORD RESET AND ACCOUNT EDITING ARE HERE NOW, AND WHAT THEY DECIDED
-----------------------------------------------------------------------
-The paragraph that used to stand here said there was no password change and no
-reset, and listed the three questions such a feature would have to answer first.
-They are answered, and the answers are the shape of set_user_password() and
-update_user() below:
-
-* An administrator overwrites the password on somebody else's account. THIS IS
-  NO LONGER THE ONLY WAY A PASSWORD CHANGES -- see the section below -- but it
-  is still the only way one changes without its holder taking part, and that is
-  what the entry in the audit trail has to say.
-* The old password is NOT required, and asking for it would be theatre. An
-  administrator resetting an account does not know its password -- that is the
-  situation the reset exists for -- and could not be made to know it, because
-  the stored value is a one-way hash. A prompt for something nobody can supply
-  would refuse every legitimate reset and stop nothing else.
-* The new password meets the same rule a new account's does, through the same
-  check_password_strength(). One rule, one implementation; a reset that could
-  set a weaker password than creation allows would make the rule advisory.
-
-Hashing is unchanged and is not negotiable. generate_password_hash() with no
-arguments, exactly as create_user() and seed_demo_users() call it, so every
-credential in the table is verified by one code path. Nothing anywhere stores,
-logs or can read back a password -- not the administrator who set it, not this
-module, and not the audit trail.
-
-update_user() edits a full name and a role, and nothing else. THE USERNAME IS
-FIXED FOR THE LIFE OF THE ACCOUNT and is not in its UPDATE at all. It is the
-stable identity every audit entry is attributed to: audit_logs.user_id points at
-the row, and the entries themselves spell the username into their text, so
-renaming one would leave the trail saying that "mdelacruz" performed an action
-that the roster now attributes to somebody else's name. An account that needs a
-different username is a different account -- create it, and deactivate the old
-one, which keeps its history intact and attributable.
-
-The role is the security-sensitive half of that edit, and it carries the
-last-administrator guard for the same reason deactivation does: demoting the only
-Administrator who can sign in is the same unrecoverable lockout as switching them
-off, reached by a different button.
-
-AND THE HOLDER CAN NOW CHANGE THEIR OWN PASSWORD, WHICH THE NOTE ABOVE USED TO
-SAY WAS IMPOSSIBLE
------------------------------------------------------------------------------
-It said "the holder does not change their own. There is no self-service screen".
-There is one now -- My Account, reached from the profile chip in the header by
-every role -- and the two paths are deliberately not the same function with a
-flag on it. What separates them is the one question each can ask:
-
-    reset   an administrator, on someone else's account, WITHOUT the old
-            password, because they do not have it and cannot be given it
-    change  the holder, on their own account, ONLY with the old password,
-            because they do have it and it is the only thing that proves the
-            person at the keyboard is them and not somebody who walked up to a
-            signed-in machine
-
-verify_user_password() is what makes the second sentence true, and it is a real
-comparison against the stored hash -- the same check_password_hash() call the
-login form makes, against the same column. A change whose current-password box
-is wrong writes nothing at all.
-
-Everything else about the two is deliberately identical. The new password goes
-through check_password_strength(), the same function, with the account's own
-stored username and full name -- so a password a holder may set on themselves is
-exactly a password an administrator could have set on them and exactly one that
-creating the account would have allowed. And the write is set_user_password(),
-the same function, so there is one UPDATE and one hashing call in this module
-and no second way for a credential to enter the table.
-
-THERE IS STILL NO REUSE HISTORY, AND THIS DID NOT ADD ONE. A change may set the
-password back to what it already was: nothing stores what it was before, the
-current one is knowable here only because the holder just typed it, and
-password_policy() says out loud on Settings that previous passwords are not
-remembered. That statement is left true. What the change path does instead is
-notice the case and say so -- see routes/account_views.py -- rather than refuse
-it with a rule the rest of the system does not have.
-"""
+"""User accounts, authentication lookups, and the writes that create or revoke one."""
 import re
 import sqlite3
 
@@ -136,7 +33,7 @@ from database.connection import db_connection
 # person must set their own at first sign-in.
 DEMO_USERS = [
     # username, full name, role
-    ("admin", "Kagawad Antonio Acido", "Admin"),
+    ("admin", "System Administrator", "Admin"),
     ("staff", "Health Center Staff", "Health Center Staff"),
     ("official", "Barangay Official", "Barangay Official"),
     ("doctor", "RHU Physician (demo)", "Doctor"),

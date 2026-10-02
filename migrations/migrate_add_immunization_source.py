@@ -1,84 +1,18 @@
 """Migration: let an immunisation record say whether this health center gave it.
 
-WHY THIS COLUMN EXISTS
-----------------------
-A real finding from capstone testing. An infant showed **Overdue** for EPI doses
-the child had already received -- at another hospital, in another barangay,
-during a stay with relatives. The parent said so at the counter. The health
-worker had nowhere to put that: the only way to stop the Overdue reading was to
-tick "given today", which would have filed somebody else's vaccination as this
-health center's own work, on today's date, with this health center's staff named
-as the person who administered it. Three untruths to silence one false alarm.
-
 So the schedule went on calling the child a defaulter, the follow-up list went on
 chasing them, and the coverage figures went on counting a protected child as
 unprotected.
 
-`source` is the column that lets the truth be recorded instead:
-
-    'administered'  this health center gave this dose. Somebody here held the
-                    syringe, on the date in date_administered, and
-                    administered_by names them.
-
-    'reported'      this dose was reported to us, during a real consultation, as
-                    already having been given somewhere else. The health center
-                    did not give it and does not claim to have.
-
-That is the distinction HL7 FHIR draws with Immunization.primarySource -- whether
-"the data was captured from the individual who administered the vaccine" or came
-to the record as a report. A real standard's real distinction, and the one this
-situation actually needs.
-
-WHAT THE FLAG IS NOT
---------------------
-It is not a way to enter a vaccination without a visit. A 'reported' row is still
-written by the consultation form, against a consultation_id, at a real encounter
-where a health worker heard the fact and judged it worth recording. The schema
-cannot say so -- consultation_id has to stay nullable, because a consultation
-deleted out from under a dose sets it NULL and the vaccination still happened --
-so models/immunizations.record_reported_immunizations() refuses to write one
-without a consultation, and nothing else writes this value.
-
-It is also not a second grade of truth for the schedule to weigh. A dose is a
-dose: get_immunization_status() counts a reported dose as Completed, because the
-child is protected either way and that is the entire point. What the flag changes
-is what every screen SAYS about the dose, never whether it counts.
-
-WHY date_administered BECOMES NULLABLE
---------------------------------------
-Because "we do not know the date" is the honest answer often enough to be worth
-storing. A parent who remembers their child had BCG at the hospital where they
-were born may not remember the day, and this project's standing rule is that a
-record must not invent precision it does not have. Both alternatives were worse:
-stamping the visit date onto the row would file a dose given eighteen months ago
-as though it were given today, and refusing the entry would leave the health
-worker back at the false Overdue this migration exists to fix.
-
-The relaxation is deliberately one-sided, and the table CHECK is what makes it
-one-sided:
-
-    CHECK (source = 'reported' OR date_administered IS NOT NULL)
-
-A dose this health center administered must still say when, exactly as before --
-that is a fact its own staff hold, and there is no excuse for its being absent.
-Only the reported dose, whose date lives in somebody else's records, may go
-without one.
-
-Changing a NOT NULL and adding a CHECK is not something SQLite's ALTER TABLE can
-do, so this migration uses the documented table rebuild -- the same sequence
-migrate_add_appointment_queue.py uses to widen the appointments status CHECK,
-with foreign keys off around the swap and a foreign_key_check afterwards. Every
-column is copied by name and every pre-existing row is compared field by field
-after the swap.
-
-Idempotent -- re-running is a no-op. The rebuild happens only when the live table
-does not already carry `source` and a nullable date_administered.
-
-Run:  python migrate_add_immunization_source.py
+Run: python migrations/migrate_add_immunization_source.py (project root). Safe to run twice.
 """
 import sqlite3
 import sys
 
+import sys as _sys
+from pathlib import Path as _P
+
+_sys.path.insert(0, str(_P(__file__).resolve().parent.parent))  # so it runs from the project root
 import config
 
 # The two values `source` may hold. Named here so the verification below can tell

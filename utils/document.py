@@ -5,56 +5,6 @@ section per part, headed tables, wrapped explanatory notes, and the one house
 style they are drawn in. What the numbers *are* belongs to the modules that
 assemble them -- routes/report_export.py, routes/audit_export.py and
 routes/roster_export.py; this module would lay out a document of anything.
-
-WHY THIS IS THE TWIN OF utils/workbook.py
------------------------------------------
-workbook.py turns a list of sheet dictionaries into a .xlsx file. This turns the
-*same* list of sheet dictionaries into a .pdf file. An export module assembles
-those dictionaries once -- a cover, the sheets that screen is made of, and a "not
-tracked" sheet -- and hands the identical structure to either writer. A figure
-cannot read one way in the spreadsheet and another on the printout, because there
-is one assembly and two renderers, not two assemblies. That is the same rule the
-rest of the project reports under, carried up one level: not "one query, every
-screen" but "one report, every file".
-
-A `sheet` is {"title", "heading", "intro", "blocks"}. A `block` is the dict
-`table()`/`figures()` build: {"kind", "title", "columns", "rows", "note",
-"empty"}. This file reads those keys and knows nothing else about them.
-
-WHY fpdf2
----------
-It writes a real PDF offline -- nothing in it reaches the network, the constraint
-this project is built under -- and its whole dependency set installs from
-prebuilt wheels, so there is no compiler to run on a health center PC. Its API
-maps almost one-to-one onto the document this needs: header() and footer() are
-methods the library calls on every page, which is exactly where a letterhead and
-a page number belong, and table() paginates a long table and repeats its heading
-row on the next page on its own. The alternatives were weighed:
-
-  * WeasyPrint would render the print stylesheet straight to PDF, which is
-    tempting because templates/_print.html already exists. It is rejected for the
-    same reason openpyxl was chosen over its heavier rivals: it needs the native
-    GTK / Cairo / Pango stack, and getting that onto a Windows clinic machine is
-    precisely the "wheel-for-your-platform problem" this project avoids.
-  * reportlab is the other serious candidate and would also do the job, but it is
-    a heavier dependency that bundles a compiled accelerator, and this report
-    needs nothing its Platypus flowables provide that fpdf2's table() and
-    multi_cell() do not.
-
-fpdf2 itself is pure Python, though it declares Pillow -- which is compiled -- for
-image handling. This report embeds no images, but the dependency is still pulled
-in, so the honest claim is "installs from wheels, runs offline", not "pure
-Python all the way down". That is a weaker claim than openpyxl's and is stated as
-the weaker one.
-
-CHARTS ARE ALREADY TABLES
--------------------------
-There is no charting here and none is wanted. Every chart on the two report
-screens already carries a table of its own numbers for the printer
-(templates/_chart_table.html), and report_export.py turned those same series into
-`table` blocks for the workbook. The PDF renders those blocks, so the reader gets
-the numbers behind every chart -- the same numbers the screen plots and the
-spreadsheet lists.
 """
 from datetime import date, datetime
 

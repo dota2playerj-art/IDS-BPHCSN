@@ -1,38 +1,9 @@
-"""Remove diagnosis and treatment text from old audit entries, and encrypt sealed records.
-
-usage:
-    python migrate_redact_clinical_audit_text.py [database]
+"""Seal all free text of restricted visits, and remove free clinical text from old audit entries.
 
 The database defaults to app.db (config.DATABASE). Run python setup_env.py
 first: step 4 needs SEALED_DATA_KEY in .env.
 
-WHY (Task 5, H4; RA 11166 Section 44, RA 10173)
------------------------------------------------
-Audit Logs are read and exported by the Administrator, who is not a physician.
-Older consultation-edit entries quote the diagnosis and treatment plan, for
-example 'Diagnosis: "A" → "B"'. Sealed consultations still hold those two
-fields as plain text, so the backup file carries them.
-
-WHAT IT DOES, IN ORDER
-----------------------
-1. Looks for work. When there is nothing to change and the record of an earlier
-   run exists, it makes no copy and writes nothing.
-2. Copies the database into IDS-BPHCSN-backups next to the project, with a
-   timestamped name, before it changes anything.
-3. In every audit entry, replaces the quoted text after "Diagnosis:" and
-   "Treatment plan / medicines given:" with "(clinical text removed)". Who,
-   when, the action and the record reference stay as they are.
-4. Encrypts the diagnosis and treatment plan of every sealed consultation still
-   holding plain text (utils/sealed_crypto.py).
-5. Writes ONE audit entry saying the redaction ran, how many entries it changed
-   and why. audit_logs.user_id must name an account, and no "system" account
-   exists, so it is filed under the first active Administrator account. The
-   entry says the migration did it, not that person.
-6. Checks before committing: only those fields moved, every encrypted value
-   decrypts back to its old text, and no quoted clinical text is left.
-7. Runs VACUUM, so the old plain text does not stay in the file's free space.
-
-Safe to run twice. The second run finds nothing to change and writes nothing.
+Run: python migrations/migrate_seal_free_text_fields.py (project root). Safe to run twice.
 """
 import os
 import re
@@ -41,15 +12,22 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+import sys as _sys
+from pathlib import Path as _P
+
+_sys.path.insert(0, str(_P(__file__).resolve().parent.parent))  # so it runs from the project root
 import config  # loads .env into the environment
 from utils import sealed_crypto
 
-PROJECT = Path(__file__).resolve().parent
+PROJECT = Path(__file__).resolve().parent.parent
 BACKUP_DIR = PROJECT.parent / "IDS-BPHCSN-backups"
-TASK = "redact-clinical-audit-text"
+TASK = "seal-free-text-fields"
 
-SEALED_FIELDS = ("diagnosis", "treatment_plan")
-LABELS = ("Diagnosis", "Treatment plan / medicines given")
+# The consultation columns this task adds to the sealed set, and the queue visit's.
+CONSULTATION_FIELDS = ("chief_complaint", "remarks")
+VISIT_TABLE, VISIT_FIELD = "appointments", "notes"
+
+LABELS = ("Chief complaint", "Additional notes", "Check-in reason", "Reason for visit")
 REMOVED = "(clinical text removed)"
 # A rendered value in an edit entry: quoted text, or one of two fixed words.
 _VALUE = r'(?:not recorded|\[withheld — Restricted\]|".*?")'
@@ -58,16 +36,17 @@ PATTERNS = [
     for label in LABELS
 ]
 # What must not be left in any entry afterwards.
-LEFTOVER = re.compile(r'(?:Diagnosis|Treatment plan / medicines given): [^;]*"')
+LEFTOVER = re.compile(rf'(?:{"|".join(re.escape(l) for l in LABELS)}): [^;]*"')
 
-ACTION = "Removed clinical text from earlier audit entries"
+ACTION = "Sealed all free text of restricted visits"
 MODULE = "Medical Confidentiality"
-REASON = ("Clinical text removed from earlier entries to protect patient "
-          "privacy (RA 11166, RA 10173).")
+REASON = ("Free clinical text removed from earlier audit entries, and the free "
+          "text of restricted visits encrypted, to protect patient privacy "
+          "(RA 11166 Section 44, RA 10173).")
 
 
 def redact(details):
-    """The entry text with diagnosis and treatment text removed. Unchanged if none."""
+    """The entry text with free clinical text removed. Unchanged if none."""
     if not details:
         return details
     for pattern in PATTERNS:
@@ -101,18 +80,30 @@ def _counts(conn):
     return {t: conn.execute(f'SELECT COUNT(*) FROM "{t}"').fetchone()[0] for t in tables}
 
 
+def _needs_sealing(value):
+    return value not in (None, "") and not sealed_crypto.is_encrypted(value)
+
+
 def _plan(conn):
     entries = [(row["id"], row["details"], redact(row["details"]))
                for row in conn.execute("SELECT id, details FROM audit_logs ORDER BY id")]
     entries = [(i, old, new) for i, old, new in entries if new != old]
-    sealed = [row for row in conn.execute(
-        f"SELECT id, {', '.join(SEALED_FIELDS)} FROM consultations "
-        "WHERE is_restricted = 1 ORDER BY id")
-        if any(row[f] not in (None, "") and not sealed_crypto.is_encrypted(row[f])
-               for f in SEALED_FIELDS)]
+    sealed = list(conn.execute(
+        f"SELECT id, appointment_id, {', '.join(CONSULTATION_FIELDS)} "
+        "FROM consultations WHERE is_restricted = 1 ORDER BY id"))
+    consultations, visits = [], []
+    for row in sealed:
+        if any(_needs_sealing(row[f]) for f in CONSULTATION_FIELDS):
+            consultations.append(row)
+        if row["appointment_id"]:
+            visit = conn.execute(
+                f"SELECT id, {VISIT_FIELD} FROM {VISIT_TABLE} WHERE id = ?",
+                (row["appointment_id"],)).fetchone()
+            if visit is not None and _needs_sealing(visit[VISIT_FIELD]):
+                visits.append(visit)
     recorded = conn.execute(
         "SELECT COUNT(*) FROM audit_logs WHERE action = ?", (ACTION,)).fetchone()[0]
-    return entries, sealed, recorded
+    return entries, consultations, visits, recorded
 
 
 def run(db_path, backup_dir=BACKUP_DIR):
@@ -128,10 +119,11 @@ def run(db_path, backup_dir=BACKUP_DIR):
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA secure_delete = ON")
     result = {"database": db_path, "backup": None, "entries_redacted": 0,
-              "records_encrypted": 0, "record_written": False, "problems": []}
+              "consultations_encrypted": 0, "visits_encrypted": 0,
+              "record_written": False, "problems": []}
     try:
-        entries, sealed, recorded = _plan(conn)
-        if not entries and not sealed and recorded:
+        entries, consultations, visits, recorded = _plan(conn)
+        if not entries and not consultations and not visits and recorded:
             return result  # nothing to change: no copy, no write
 
         result["backup"] = str(_backup(db_path, backup_dir))
@@ -148,21 +140,29 @@ def run(db_path, backup_dir=BACKUP_DIR):
         for entry_id, _old, new in entries:
             conn.execute("UPDATE audit_logs SET details = ? WHERE id = ?", (new, entry_id))
         plain = {}
-        for row in sealed:
-            plain[row["id"]] = {f: row[f] for f in SEALED_FIELDS}
+        for row in consultations:
+            plain[row["id"]] = {f: row[f] for f in CONSULTATION_FIELDS}
             conn.execute(
-                f"UPDATE consultations SET {', '.join(f'{f} = ?' for f in SEALED_FIELDS)} "
-                "WHERE id = ?",
+                f"UPDATE consultations SET "
+                f"{', '.join(f'{f} = ?' for f in CONSULTATION_FIELDS)} WHERE id = ?",
                 [row[f] if sealed_crypto.is_encrypted(row[f])
                  else sealed_crypto.encrypt(row[f], row["id"], f)
-                 for f in SEALED_FIELDS]
+                 for f in CONSULTATION_FIELDS]
                 + [row["id"]])
+        plain_visits = {}
+        for visit in visits:
+            plain_visits[visit["id"]] = visit[VISIT_FIELD]
+            conn.execute(
+                f"UPDATE {VISIT_TABLE} SET {VISIT_FIELD} = ? WHERE id = ?",
+                (sealed_crypto.encrypt(visit[VISIT_FIELD], visit["id"], VISIT_FIELD,
+                                       VISIT_TABLE), visit["id"]))
         details = (
-            f"Done by the migration script migrate_redact_clinical_audit_text.py, "
+            f"Done by the migration script migrate_seal_free_text_fields.py, "
             f"not by this account. {len(entries)} earlier "
             f"entr{'y' if len(entries) == 1 else 'ies'} changed; "
-            f"{len(sealed)} sealed consultation{'' if len(sealed) == 1 else 's'} "
-            f"encrypted. {REASON}")
+            f"{len(consultations)} restricted consultation"
+            f"{'' if len(consultations) == 1 else 's'} and {len(visits)} check-in "
+            f"reason{'' if len(visits) == 1 else 's'} encrypted. {REASON}")
         conn.execute(
             "INSERT INTO audit_logs (user_id, action, module, details) VALUES (?, ?, ?, ?)",
             (actor["id"], ACTION, MODULE, details))
@@ -179,13 +179,13 @@ def run(db_path, backup_dir=BACKUP_DIR):
             problems.append("an audit entry's who, when or action changed")
         if any(LEFTOVER.search(r[0] or "") for r in conn.execute(
                 "SELECT details FROM audit_logs")):
-            problems.append("quoted clinical text is still in an audit entry")
+            problems.append("quoted free text is still in an audit entry")
         for cid, fields in plain.items():
             row = conn.execute(
-                f"SELECT {', '.join(SEALED_FIELDS)} FROM consultations WHERE id = ?",
+                f"SELECT {', '.join(CONSULTATION_FIELDS)} FROM consultations WHERE id = ?",
                 (cid,)).fetchone()
-            for f in SEALED_FIELDS:
-                if fields[f] in (None, "") or sealed_crypto.is_encrypted(fields[f]):
+            for f in CONSULTATION_FIELDS:
+                if not _needs_sealing(fields[f]):
                     continue
                 stored = row[f]
                 # Checked with the same module the app uses. The migration is the
@@ -193,13 +193,21 @@ def run(db_path, backup_dir=BACKUP_DIR):
                 if (not sealed_crypto.is_encrypted(stored)
                         or sealed_crypto.decrypt(stored, cid, f) != fields[f]):
                     problems.append(f"consultation {cid} {f} did not encrypt correctly")
+        for vid, text in plain_visits.items():
+            stored = conn.execute(
+                f"SELECT {VISIT_FIELD} FROM {VISIT_TABLE} WHERE id = ?",
+                (vid,)).fetchone()[VISIT_FIELD]
+            if (not sealed_crypto.is_encrypted(stored)
+                    or sealed_crypto.decrypt(stored, vid, VISIT_FIELD, VISIT_TABLE) != text):
+                problems.append(f"queue visit {vid} reason did not encrypt correctly")
         if problems:
             conn.execute("ROLLBACK")
             result["backup_note"] = "Nothing was changed."
             return result
         conn.execute("COMMIT")
-        result.update(entries_redacted=len(entries), records_encrypted=len(sealed),
-                      record_written=True)
+        result.update(entries_redacted=len(entries),
+                      consultations_encrypted=len(consultations),
+                      visits_encrypted=len(visits), record_written=True)
         conn.execute("VACUUM")
         return result
     finally:
@@ -216,11 +224,12 @@ def main(argv):
             print(f"  - {problem}")
         return 1
     if not result["backup"]:
-        print("Nothing to do. It has already run, and no clinical text is left.")
+        print("Nothing to do. It has already run, and no free clinical text is left.")
         return 0
     print(f"backup: {result['backup']}")
-    print(f"audit entries with clinical text removed: {result['entries_redacted']}")
-    print(f"sealed consultations encrypted: {result['records_encrypted']}")
+    print(f"audit entries with free clinical text removed: {result['entries_redacted']}")
+    print(f"restricted consultations encrypted: {result['consultations_encrypted']}")
+    print(f"check-in reasons encrypted: {result['visits_encrypted']}")
     print("one audit entry written recording this run.")
     return 0
 

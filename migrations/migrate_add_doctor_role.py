@@ -1,74 +1,6 @@
 """Migration: add the Doctor role, and the demo account that holds it.
 
-WHY THERE IS A FOURTH ROLE
---------------------------
-Clinical authority -- entering a diagnosis and a treatment plan, sealing a
-consultation as Restricted, reading one that is sealed, declaring a patient
-deceased -- was given to the Administrator account, on the assumption that the
-Administrator was the health center's licensed doctor. That assumption stopped
-being true when the Administrator's persona was corrected to Kagawad Antonio
-Acido, chair of the barangay Health Committee (migrate_correct_admin_persona.py):
-an elected barangay official, not a physician. Field data gathered from the RHU
-of San Francisco, Surigao del Norte then showed the two jobs are genuinely
-separate there -- the Kagawad administers, the RHU doctor diagnoses -- so the
-only account this system allowed to diagnose was held by someone not licensed to.
-
-The fix is a separate Doctor role. This script does the database half of it:
-
-  1. The users.role CHECK constraint admits exactly three strings, so a Doctor
-     account cannot be stored at all. It is widened to four.
-  2. One demo Doctor account, "doctor", is created, because a live database was
-     seeded long before the role existed and seed_demo_users() only ever runs
-     into an empty users table. Its values are read from models/users.py
-     DEMO_USERS -- the same list a fresh database is seeded from -- so the two
-     cannot come to disagree about the account.
-
-The display name is "RHU Physician (demo)", a placeholder on purpose: the real
-doctor's name is not yet confirmed, and an invented person's name would read as
-a real one. The team renames it through Edit User when it is.
-
-Idempotent -- re-running is a no-op and writes nothing.
-
-    python migrate_add_doctor_role.py              the project database
-    python migrate_add_doctor_role.py <path>       a copy, to rehearse on first
-
-WHY THE CHECK NEEDS A TABLE REBUILD
------------------------------------
-SQLite has no ALTER TABLE ... DROP CONSTRAINT. The supported way to change a
-CHECK is the rebuild documented at sqlite.org/lang_altertable.html#otheralter,
-which migrate_add_appointment_queue.py already uses for the appointments status
-CHECK: create the replacement, copy every row, drop the original, rename -- in
-one transaction, with foreign keys off for the swap and a foreign_key_check
-after it.
-
-users is the table every other table points at (audit_logs, consultations,
-appointments and seven more reference users(id)), so this is done with more
-care than that script needed rather than less:
-
-* The replacement's definition is the LIVE table's own CREATE statement with
-  only the CHECK clause substituted, not a retyped copy. A retyped copy is a
-  second definition that could differ in a column default nobody noticed. If
-  the live CHECK is not exactly the three-role clause this script expects, it
-  stops without writing anything.
-* The AUTOINCREMENT high-water mark is carried across, so an id that was ever
-  issued is never issued again -- audit_logs.user_id rows must never come to
-  point at a different person.
-* Every pre-existing account row is compared column by column afterwards,
-  password_hash included, and so is every row of every OTHER table: the only
-  permitted difference anywhere in the database is the one new account.
-
-WHAT THIS DOES NOT TOUCH, ON PURPOSE
-------------------------------------
-* No existing account changes. The Administrator keeps the "Admin" role; this
-  moves no permission by itself. Which role may diagnose is decided in code
-  (models/consultations.py can_diagnose), not in the users table.
-* No consultation, seal or audit entry changes. A diagnosis written under the
-  Administrator account stays exactly as written and attributed; a seal set
-  under it stays set.
-* No audit entry is written for the new account. seed_demo_users() writes none
-  for the accounts it creates either: audit_logs.user_id is NOT NULL and names
-  the account that acted, and no signed-in account acted here. The account's
-  existence is recorded where every account's is -- in users, with created_at.
+Run: python migrations/migrate_add_doctor_role.py (project root). Safe to run twice.
 """
 import os
 import sqlite3
@@ -76,6 +8,10 @@ import sys
 
 from werkzeug.security import generate_password_hash
 
+import sys as _sys
+from pathlib import Path as _P
+
+_sys.path.insert(0, str(_P(__file__).resolve().parent.parent))  # so it runs from the project root
 import config
 from models.users import (
     DEMO_USERS,

@@ -1,19 +1,4 @@
-"""Database integrity: a fresh install works, and a failed write frees its lock.
-
-Three things, each a defect found on 2026-09-28 (PROJECT_STATUS.md H5, M16):
-
-A. On a database built from schema.sql, Health Center Staff and the Doctor
-   can both record a consultation. Before the fix, schema.sql made
-   consultations.updated_at NOT NULL, the insert wrote NULL, and every new
-   consultation failed with HTTP 500.
-B. A write that fails does not leave its connection open. Before the fix, the
-   open connection kept SQLite's write lock, and the next write failed with
-   "database is locked".
-C. A fresh install's consultations table has the expected structure,
-   including a nullable updated_at, so schema.sql cannot drift back.
-
-Runs on a fresh test database built by tests/_support.py.
-"""
+"""Database integrity: a fresh install works, and a failed write frees its lock."""
 import sqlite3
 import sys
 import time

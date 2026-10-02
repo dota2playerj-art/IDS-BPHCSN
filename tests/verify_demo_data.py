@@ -1,25 +1,4 @@
-"""The fictional demo data follows every rule the system enforces (Task 8).
-
-seed_demo_data.py builds a database from nothing by driving the app's own routes as
-each role. This suite builds it twice into the test folder (never app.db) and checks:
-
-* it is deterministic: two builds hold identical content;
-* the workflow is the real one: Staff check in and take the intake, only the Doctor
-  writes a diagnosis and treatment plan, the Administrator made no clinical write;
-* sealed visits are stored encrypted;
-* every phone number is 0900000NNNN, and every patient name comes from the
-  generator's own invented lists (no real name is stored anywhere in the repo);
-* immunization dates follow the DOH EPI schedule;
-* the top three diagnoses, complaints and dispensed medicines reach 5 over one month
-  and over twelve months, so the Administrator's and the Official's reports show real
-  named rows;
-* the audit trail holds the workflow actions;
-* every role's pages load;
-* archive_plain_databases.py archives, verifies, removes, skips what it has done, and
-  keeps a plain file when the check fails.
-
-Runs in a temporary folder built by tests/_support.py.
-"""
+"""The fictional demo data follows every rule the system enforces (Task 8)."""
 import contextlib
 import io
 import os

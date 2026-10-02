@@ -3,67 +3,6 @@
 Built here rather than inline in routes/admin.py for the same reason every other
 screen in this project has a `*_views.py`: the route stays a guard plus a render,
 and the shape of the screen is one readable thing in one place.
-
-WHAT THIS SCREEN CAN AND CANNOT SHOW
-------------------------------------
-Every path that changes a record or an account writes to audit_logs, and
-everything written is shown here in full. Since Task 4 (H3) that includes
-patient registration, edits and status changes (a death declaration and its
-reversal have their own phrases), new consultations, doses recorded at a visit,
-dispensing, inventory changes and the Patient Queue. Those entries are written
-by routes/audit_entries.py, in the same transaction as the change.
-tests/verify_audit_coverage.py fails if a write path has no audit entry.
-
-THE FOURTH WRITER IS THE FIRST THAT IS NOT AN EDIT, A MESSAGE OR AN ACCESS
---------------------------------------------------------------------------
-It is a correction, and the trail says so in its own word. Both places a
-vaccination can be entered are deliberately add-only -- a recorded dose is shown
-as locked fact rather than as a checkbox, because an absent checkbox is not
-evidence a child was never vaccinated -- so a wrongly recorded vaccine, dose or
-date is put right on a separate, confirmed path reached from the Patient Profile
-and nowhere else. Every correction writes one entry here under
-"Immunization Records", naming the record, the patient, who recorded it
-originally, and each field that moved with both of its values. The two activity
-phrases stay apart because an EPI dose is graded against the national schedule
-and a vaccination outside it is graded against nothing: moving an EPI date moves
-who reads as Due Now or Overdue, and a reader scanning for that must not have to
-open each entry to tell the two apart.
-
-THE THIRD WRITER IS NEW, AND IT CHANGED WHAT THIS SCREEN CAN SAY
------------------------------------------------------------------
-This note used to read "exactly two writers", and went on to say that
-routes/auth.py logged neither logins nor logout nor failed attempts -- which is
-why the screen's "Login Events" and "Security Events" cards both printed a dash
-and named their own absence. That is no longer the state of the system. The login
-route now writes one entry per successful sign-in and one per sign-in refused
-against an account that exists, so both cards report counts of real rows, and
-"Authentication" is a module the filter above the table can select.
-
-A refusal is written under one of two activity phrases, and the difference is the
-point of keeping them apart. "Refused sign-in attempt" is a credential that did
-not match. "Blocked sign-in to deactivated account" is an account that has been
-switched off, refused whether or not the password was right -- and its entry says
-which, because a correct password against a revoked account is the one line here
-that tells an administrator a withdrawn credential is still live. The Security
-Events card adds the two; the trail keeps them separate. The person at the login
-form is told neither: all three outcomes return one identical message, so the
-form cannot be used to sort guessed usernames into real, disabled and fictional.
-
-What is left absent is narrower, and precise enough to be worth stating rather
-than glossing: an attempt against a username that does not exist writes nothing
-at all (audit_logs.user_id is NOT NULL and foreign-keyed to a real account, so
-there is no row to attribute one to), and signing out is not recorded. Those two
-are what UNTRACKED["login_scope"] below says, and the Security Events card
-carries it as its own tooltip -- a real figure with its boundary stated beside
-it, rather than a figure left to be read as more than it is.
-
-The User / Activity Type / Status filters the screen was drawn with still have
-nothing behind them.
-
-That is the rule Screen 03's Prenatal card set and Screen 10 follows: a figure
-with no source reports its own absence, because an invented one gets believed --
-and its corollary, which this screen is now the clearest example of, that a
-reason is deleted the moment the gap it describes is closed.
 """
 from models.audit import (
     ACTION_CONSULTATION_COMPLETED,

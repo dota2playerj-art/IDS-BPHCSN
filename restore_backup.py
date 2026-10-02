@@ -1,23 +1,8 @@
 """Open an encrypted backup (.idsbackup) at the health-center computer.
 
-usage:
-    python restore_backup.py <file.idsbackup>              decrypt and check only
-    python restore_backup.py <file.idsbackup> --replace    then replace app.db
-
 Run it from the project folder, on a computer whose .env holds this system's
 SEALED_DATA_KEY (the key in the Doctor's envelope). The backup key is derived
 from it, as utils/backup_crypto.py explains.
-
-WHAT IT DOES
-------------
-1. Decrypts the file into a NEW database in the IDS-BPHCSN-backups folder next
-   to the project. app.db is not touched.
-2. Runs PRAGMA integrity_check on that new file and says what SQLite answered.
-3. Only with --replace, and only when the check says "ok": copies the current
-   app.db into IDS-BPHCSN-backups first, then replaces app.db with the restored
-   copy, and tells you to restart the app.
-
-A wrong key or a damaged file gives one plain line and changes nothing.
 """
 import os
 import sqlite3

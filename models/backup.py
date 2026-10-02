@@ -1,72 +1,11 @@
 """Taking a consistent copy of the database while the system is running.
 
-WHY THIS IS NOT shutil.copyfile()
-----------------------------------
-An SQLite database is not a file you can copy at an arbitrary moment and expect
-to be able to open. A write is a sequence of page writes plus a journal, and a
-plain byte-for-byte copy taken partway through one produces a file whose pages
-come from two different points in time -- the classic outcome is a copy that
-opens, reads normally for a while, and then reports "database disk image is
-malformed" against the one table somebody needed. Worse, the failure is silent
-at copy time: nothing about the copy operation reports that it caught the
-database mid-write, so the first anybody knows is when the backup is needed.
-
 This project makes that easy to hit rather than unlikely. database/connection.py
 opens a NEW connection per call and closes it after, so a request that saves a
 consultation and a request that downloads a backup are two connections to the
 same file with no coordination between them beyond SQLite's own locking -- and
 utils/unavailable.py's `backup` reason said exactly this, that doing it from the
 screen "needs a job that can copy the file safely while the system is running".
-
-SQLite HAS THAT JOB, AND IT IS THE ONLINE BACKUP API
------------------------------------------------------
-sqlite3.Connection.backup() drives SQLite's own backup interface
-(sqlite3_backup_step). It copies page by page from inside the database engine,
-holding a read lock while it works, and if another connection writes to the
-source during the copy the backup restarts from the beginning rather than
-producing a mixed file. What comes out is a complete database as of a single
-consistent point -- never half of one write. It is the method SQLite's own
-documentation names for backing up a live database, and it needs no scheduler,
-no exclusive lock on the application, and no downtime.
-
-The whole copy happens in one step here -- `pages=0` copies the database in a
-single call rather than in slices with sleeps between them. That choice is about
-size: app.db is well under a megabyte, so a single step is milliseconds, and
-stepping it would mean holding the operation open longer for no benefit. A
-database large enough for that to matter would be a different decision.
-
-AND THE COPY IS CHECKED BEFORE IT IS HANDED OVER
--------------------------------------------------
-create_backup_bytes() runs PRAGMA integrity_check on the finished copy and
-refuses to return it if SQLite does not answer "ok". This is cheap at this size
-and it closes the one gap the paragraphs above cannot: the reason a naive copy is
-dangerous is that its damage is invisible until the file is needed, so a backup
-routine that never verifies its own output has the same defect however carefully
-it was made. A backup that cannot be opened is worse than no backup, because it
-is believed in.
-
-WHY IT GOES THROUGH A TEMPORARY FILE AND COMES BACK AS BYTES
--------------------------------------------------------------
-The backup API writes into a database, and a database needs a path -- so the
-copy is made to a temporary file, verified there, read into memory, and the
-temporary file is deleted before anything is sent. Serving the bytes rather than
-the path means there is no window in which a file holding every patient record
-sits in the system temp directory waiting for a response to finish streaming,
-and no cleanup that can be skipped if the response fails.
-
-WHAT THIS MODULE DOES NOT DO
------------------------------
-It does not restore. Reading a database out is a copy; writing one back in
-replaces every patient record in the system with whatever was in the uploaded
-file, and doing that from a web form -- with no verification of what was
-uploaded, no way to undo it, and the running application holding open
-connections to the file being replaced -- is a different and far more dangerous
-piece of work. The Restore control on Screen 13 stays disabled and now says so
-in those terms.
-
-It also does not schedule. Nothing in this project runs on a timer; there is no
-scheduler, no cron entry and no job for one to run, which is why the Backup
-Schedule row on that screen reads None rather than a frequency.
 """
 import os
 import sqlite3

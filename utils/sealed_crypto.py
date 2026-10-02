@@ -1,19 +1,4 @@
-"""Encryption for the fields a sealed consultation hides (RA 11166, RA 10173).
-
-AES-256-GCM with the key in SEALED_DATA_KEY (.env). A stored value looks like
-
-    enc:v1:<base64 of nonce + ciphertext>
-
-Each value is bound to its table, row and field: the table name, the row id and
-the field name are the associated data, so a value copied into another row or
-field does not decrypt. Most values live on a consultation. The check-in reason
-of the linked queue visit lives on an appointments row and is bound to that row.
-Every encryption uses a fresh random 96-bit nonce.
-
-Only models/consultations.py open_sealed_value() may call decrypt(). It checks
-that the reader is the Doctor first. tests/verify_sealed_privacy.py fails if any
-other code calls decrypt().
-"""
+"""Encryption for the fields a sealed consultation hides (RA 11166, RA 10173)."""
 import base64
 import binascii
 import os

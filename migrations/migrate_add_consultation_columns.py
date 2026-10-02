@@ -1,59 +1,14 @@
 """Migration: extend consultations with vitals, growth measures and follow-up.
 
-`consultations` as first written held four clinical text fields -- chief
-complaint, diagnosis, treatment plan and remarks. The Record Consultation form
-captures what a barangay health worker actually writes down at the end of a
-visit, which is those four plus the vital signs taken on the way in, the growth
-measurements taken for young children, and the date the patient is told to come
-back. The ten columns added here close that gap.
-
-Idempotent -- re-running is a no-op. Uses ALTER TABLE ... ADD COLUMN so the five
-existing consultation rows are preserved in place; the table is never dropped or
-recreated. Same pattern as migrate_add_patient_columns.py and
-migrate_add_inventory_columns.py, including the byte-for-byte verification at the
-end. SQLite appends new columns, so the live column order differs from the
-grouped order in schema.sql -- cosmetic, since all access is by name.
-
-Run:  python migrate_add_consultation_columns.py
-
-
-UNITS ARE FIXED, NOT STORED
----------------------------
-temperature is degrees Celsius, weight kilograms, height and head_circumference
-centimetres, pulse_rate beats per minute, respiratory_rate breaths per minute.
-One health center, one set of instruments, one convention -- storing a unit
-alongside each number would invite two rows in different units and no way to
-compare them. The form labels every field with its unit so nothing is implied.
-
-blood_pressure is TEXT, not two numbers. It is read and written as one reading
-("120/80"); splitting it into systolic and diastolic columns would let a row hold
-one without the other, which is not a blood pressure. The form validates the
-shape and the plausible range of both halves before it gets here.
-
-THE TWO PEDIATRIC COLUMNS
--------------------------
-height is recorded for children under five and head_circumference for infants
-under one -- see PEDIATRIC_AGE_YEARS in models/consultations.py for why those
-boundaries. They are plain nullable columns like the rest: the age rule is a
-property of the patient on the day of the visit, not of the column, and freezing
-it into the schema would mean a CHECK that has to be rebuilt if the programme's
-cohort ever changes.
-
-appointment_id ties a consultation back to the queue entry it documents. Without
-it there is no way to tell which visit a record belongs to, and nothing stops the
-same queue entry being written up twice. Nullable, because the five seeded rows
-predate the queue and a consultation can legitimately be recorded outside it.
-
-updated_at cannot take DEFAULT CURRENT_TIMESTAMP here: SQLite rejects a
-non-constant default in ADD COLUMN. It is therefore added plain and backfilled
-from each row's created_at, so no row is left NULL, and every write sets it
-explicitly. schema.sql gives fresh installs the NOT NULL DEFAULT that patients
-and inventory_items already carry; that constraint difference between a migrated
-and a fresh database is deliberate and is the only one.
+Run: python migrations/migrate_add_consultation_columns.py (project root). Safe to run twice.
 """
 import sqlite3
 import sys
 
+import sys as _sys
+from pathlib import Path as _P
+
+_sys.path.insert(0, str(_P(__file__).resolve().parent.parent))  # so it runs from the project root
 import config
 
 # (column_name, column_definition) in the order they are added.

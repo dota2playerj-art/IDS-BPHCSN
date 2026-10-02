@@ -42,7 +42,7 @@ SEXES = ("Female", "Male")
 # municipalities and provinces around a *different* San Francisco, ~150 km away
 # in the wrong province. Nothing in the approved Capstone Proposal ever named a
 # province; the value was invented here and then spread into real records. See
-# migrate_correct_patient_location.py, which repaired the eleven it reached.
+# a repair script (since deleted) that fixed the eleven records it reached.
 MUNICIPALITIES = ("San Francisco", "Surigao City", "Malimono", "Sison")
 # Surigao del Norte is the province the health center is in. Surigao del Sur is
 # kept because it genuinely adjoins Surigao del Norte to the south, so a patient

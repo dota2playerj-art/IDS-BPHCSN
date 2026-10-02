@@ -65,8 +65,8 @@ def inject_role_context():
     if normalized_role in {"health staff", "doctor"}:
         context = {
             "sidebar_role_label": "Health Staff",
-            "sidebar_user_name": "Angela Cruz",
-            "sidebar_user_initials": "AC",
+            "sidebar_user_name": "Health Center Staff",
+            "sidebar_user_initials": "HS",
             "dashboard_endpoint": "staff_dashboard",
             "patient_records_endpoint": "staff_patient_records",
             "patient_profile_endpoint": "staff_patient_profile",
@@ -123,8 +123,8 @@ def inject_role_context():
             # until the RHU physician's real name is confirmed.
             context.update({
                 "sidebar_role_label": "Doctor",
-                "sidebar_user_name": "RHU Physician",
-                "sidebar_user_initials": "RP",
+                "sidebar_user_name": "Doctor",
+                "sidebar_user_initials": "DR",
                 # Sealing one consultation as Restricted, from the profile's
                 # Consultation History tab. Present for THIS ROLE ONLY: the
                 # route behind it is guarded to the Doctor, because deciding
@@ -153,8 +153,8 @@ def inject_role_context():
             # Management shows in the Role column. Only the chip's subtitle
             # describes the person, so only it says Kagawad.
             "sidebar_role_label": "Kagawad, Health Committee",
-            "sidebar_user_name": "Kagawad Antonio Acido",
-            "sidebar_user_initials": "AA",
+            "sidebar_user_name": "Administrator",
+            "sidebar_user_initials": "AD",
             "dashboard_endpoint": "admin_dashboard",
             "patient_records_endpoint": "patient_records",
             "patient_profile_endpoint": "patient_profile",
@@ -205,8 +205,8 @@ def inject_role_context():
     elif normalized_role == "barangay official":
         context = {
             "sidebar_role_label": "Barangay Official",
-            "sidebar_user_name": "Hon. Roberto Villanueva",
-            "sidebar_user_initials": "RV",
+            "sidebar_user_name": "Barangay Official",
+            "sidebar_user_initials": "BO",
             "dashboard_endpoint": "official_dashboard",
             "sms_notifications_endpoint": "official_sms_notifications",
             "send_broadcast_endpoint": "official_send_sms_broadcast",

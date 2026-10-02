@@ -1,75 +1,11 @@
 """The deliberate correction path for a vaccination that was recorded wrongly.
 
-WHY THIS EXISTS AT ALL
-----------------------
-Both places a vaccination can be entered are add-only, and each says so in its
-own words. routes/consultation_views.py's _apply_immunization_edit() explains
-why: a recorded dose is rendered as locked fact rather than as a checkbox,
-because an absent checkbox is not evidence a child was never vaccinated -- a
-partial POST, a script-rebuilt form or a serialiser that drops unchecked inputs
-all produce one, and each would otherwise destroy a clinical record.
-
 That was the right call and it left a real gap, which this module closes. A
 genuine mistake -- the wrong vaccine ticked, the wrong dose number, the wrong
 date -- could be made but not put right. "The record is wrong and cannot be
 corrected" is not a safer state than "the record can be corrected carelessly";
 it is a different failure, and on a child's immunisation history it is the one
 that gets read as fact for years.
-
-So the capability is built, and every part of how it is reached is chosen to keep
-it out of the fast path:
-
-    NOT on the consultation form.  That form is worked at speed with a patient in
-                                   the room, and an accidental click there is the
-                                   exact risk the add-only rule was adopted to
-                                   remove. Nothing here is reachable from it.
-
-    ON the Patient Profile.        Where records are reviewed rather than
-                                   entered, one at a time, by somebody already
-                                   looking at the row they mean to fix.
-
-    BEHIND A CONFIRMATION.         The same dialog shape Patient Records' status
-                                   change uses -- one modal, the current values
-                                   shown, an explicit submit. No new UI pattern.
-
-    ALWAYS AUDITED.                Every correction writes an entry naming the
-                                   patient, the record, each field that moved and
-                                   both of its values. A correction that left no
-                                   trace would be indistinguishable from the
-                                   original record having always said that.
-
-WHAT A CORRECTION IS, AND WHAT IT IS NOT
-----------------------------------------
-It moves three field values on a row that goes on existing: the vaccine, the
-dose number, and the date it was administered. It is not a deletion -- neither
-model has a DELETE on this path, the row keeps its id, its patient, its
-consultation anchor and its administering user -- and it cannot move a record to
-a different patient. A record filed against the wrong *child* is one history
-claiming another's vaccination, which is a larger act than correcting a typed
-value and is deliberately not offered here.
-
-WHY THE TWO TABLES SHARE THIS FILE
------------------------------------
-The EPI table and the general vaccination table are kept rigorously apart in
-models/ -- one is graded against a national schedule and the other against
-nothing, and models/general_vaccinations.py's header is largely about why. That
-separation is about what the records *mean*. Correcting one is the same act in
-both cases: resolve the row, re-validate the submitted values as strictly as the
-original entry did, refuse a duplicate, write the change, describe it in the
-audit trail, say what happened. So the flow below is written once and the two
-kinds differ only in a small adapter each -- KINDS -- rather than in two copies
-of a correction mechanism that would drift.
-
-WHO MADE THE CHANGE IS THE AUDIT ROW ITSELF
---------------------------------------------
-`details` names the patient, the record, its original author and every field
-that moved. It does not repeat the name of whoever is correcting it, because
-audit_logs.user_id already carries that: it is NOT NULL, foreign-keyed to a real
-account, resolved to a name by get_audit_logs() and printed in the Audit Logs
-table's own User column and its detail panel. Writing it into the text as well
-would be a second copy of one fact, and a second copy is a thing that can
-disagree with the first. This is exactly what the consultation edit entry does
-and is read the same way.
 """
 from datetime import datetime
 

@@ -1,55 +1,18 @@
 """Migration: give a consultation somewhere to record that it is confidential.
 
-WHY THIS COLUMN EXISTS
-----------------------
-RA 11166 (the Philippine HIV and AIDS Policy Act of 2018) makes a person's HIV
-status "privileged medical information" and attaches criminal penalties to
-disclosing it without consent. It is not the only such rule a barangay health
-station meets, and a system that tried to guess which diagnoses are covered
-would be wrong in both directions -- it would miss the ones the law names in
-wording the system does not recognise, and it would seal ordinary records that
-happen to contain a matched word.
-
 So nothing here guesses. `is_restricted` is a flag the licensed clinician sets,
 on the entry they judge to be sensitive, for whatever reason they judge it. The
 schema holds the decision; it does not make it.
 
-WHAT THE FLAG SEALS, AND WHAT IT DELIBERATELY DOES NOT
--------------------------------------------------------
-The seal covers the two fields only an Administrator may write in the first
-place -- `diagnosis` and `treatment_plan` (models/consultations.py
-DOCTOR_ONLY_FIELDS). It does not cover the visit's date, its chief complaint,
-its vital signs, the doses given at it or the medicine dispensed from it.
-
-That split is the point rather than a compromise. Health Center Staff and BHWs
-still take the intake and still hand medicine over, and they cannot do either
-against a record whose existence has been hidden from them. What they are kept
-away from is the clinician's judgement about what the patient has and what is
-being done about it -- which is the fact the law protects.
-
-THE OTHER TWO COLUMNS
----------------------
-`restricted_by` and `restricted_at` say who sealed the record and when. The
-audit trail says that too, and says it in a form that cannot be edited, so these
-are not the authority -- audit_logs is. They are here because the Patient Profile
-has to be able to print "Restricted by <name> on <date>" beside the entry, for
-every entry on the page, and deriving that from the trail would mean a LIKE
-search of a free-text `details` column per row.
-
-Both are nullable and both are cleared when a restriction is lifted, so a record
-that is not sealed carries no claim about who sealed it.
-
-Idempotent -- re-running is a no-op. Uses ALTER TABLE ... ADD COLUMN so existing
-consultations are preserved in place; the table is never dropped or recreated.
-SQLite appends new columns at the end, so the live column order differs from the
-grouped order in schema.sql. That difference is cosmetic -- same names, same
-types, same constraints -- and all access is by column name.
-
-Run:  python migrate_add_consultation_restriction.py
+Run: python migrations/migrate_add_consultation_restriction.py (project root). Safe to run twice.
 """
 import sqlite3
 import sys
 
+import sys as _sys
+from pathlib import Path as _P
+
+_sys.path.insert(0, str(_P(__file__).resolve().parent.parent))  # so it runs from the project root
 import config
 
 # (column_name, column_definition) in the order they are added.

@@ -1,21 +1,6 @@
 """Shared setup for every suite in tests/.
 
 Every suite imports this module FIRST, before it imports anything from the app.
-It does four things:
-
-1. Builds a fresh test database in a temporary folder. The database is made
-   from schema.sql and the fixtures below. It never copies app.db.
-2. Points the app at that database, by setting config.DATABASE before the app
-   is imported. The app reads config.DATABASE (or app.config["DATABASE"],
-   which is filled from it) every time it opens a connection.
-3. Stops the whole run if any database path is the live app.db, or is inside
-   the project folder. See guard_path().
-4. Creates test accounts with test-only passwords. The demo passwords in
-   models/users.py are never used.
-
-run_all.py gives each suite its own empty temporary folder through the
-IDS_TEST_DIR environment variable, and deletes it after the suite ends. A suite
-run on its own makes its own folder and deletes it at exit.
 """
 import atexit
 import base64

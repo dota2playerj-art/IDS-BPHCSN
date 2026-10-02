@@ -1,45 +1,21 @@
 """Migration: add the "Left before being seen" queue status (Task 6, M5).
 
-usage:
-    python migrate_add_left_before_seen.py [database]
-
 The database defaults to app.db (config.DATABASE).
 
-WHY
----
-A patient who checks in and leaves before being seen could not be closed: the visit
-stayed Waiting. The queue now has a status for it, "Left before being seen". Staff or
-the Doctor set it, and can undo it the same day.
-
-WHAT IT CHANGES IN `appointments`
----------------------------------
-* The status CHECK admits 'Left before being seen'. SQLite cannot widen a CHECK in
-  place, so the table is rebuilt the way sqlite.org documents (create, copy, drop,
-  rename, with foreign keys off for the swap), as migrate_add_appointment_queue.py did.
-* Three new columns: left_by (who), left_at (when, clinic time) and
-  status_before_left (what the status was, so an undo can put it back).
-
-WHAT IT DOES, IN ORDER
-----------------------
-1. Looks for work. When the CHECK and the columns are already there, it makes no copy
-   and writes nothing.
-2. Copies the database into IDS-BPHCSN-backups next to the project, with a timestamped
-   name, before it changes anything.
-3. Rebuilds the table and copies every row.
-4. Checks before it finishes: every row and every column value is the same as before,
-   foreign keys are clean, both indexes exist, the CHECK admits the new status and
-   still refuses a made-up one. Any problem rolls the rebuild back.
-
-Safe to run twice. It prints counts only.
+Run: python migrations/migrate_add_left_before_seen.py (project root). Safe to run twice.
 """
 import sqlite3
 import sys
 from datetime import datetime
 from pathlib import Path
 
+import sys as _sys
+from pathlib import Path as _P
+
+_sys.path.insert(0, str(_P(__file__).resolve().parent.parent))  # so it runs from the project root
 import config  # loads .env into the environment
 
-PROJECT = Path(__file__).resolve().parent
+PROJECT = Path(__file__).resolve().parent.parent
 BACKUP_DIR = PROJECT.parent / "IDS-BPHCSN-backups"
 TASK = "left-before-seen"
 

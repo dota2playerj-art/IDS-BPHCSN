@@ -2,32 +2,6 @@
 
 Several of these render the same templates as the Admin blueprint; they exist
 separately so each role's URL space and role_required guard stay explicit.
-
-WHY THE DOCTOR IS HERE RATHER THAN IN A BLUEPRINT OF THEIR OWN
---------------------------------------------------------------
-The Doctor role was added when the RHU's field data showed that clinical
-authority belongs to the RHU physician, not to the Administrator (a barangay
-Kagawad). The Doctor works the same screens Health Center Staff do -- Patient
-Records, Patient Profile, Register Patient, the Patient Queue, Record
-Consultation, Medicine Inventory, and SMS Notifications read-only -- and every
-one of them is already built here from a context builder shared with the
-Administrator's copy. A /doctor/* blueprint would have been these same 24
-views a third time, each able to drift from the other two.
-
-So every clinical-floor screen in this file admits CLINICAL_FLOOR_ROLES, and
-what separates the Doctor from Health Center Staff there is not which screen
-they reach but what the screen lets them do: whether the diagnosis and
-treatment plan are drawn and accepted, whether a sealed consultation is
-readable, whether a patient may be marked deceased or brought back from it. Those are decided per request from the
-signed-in account's stored role (utils.security.current_role()), inside the
-shared builders, and are enforced there whichever blueprint the request came
-through -- see models/consultations.py can_diagnose().
-
-Two things here are the Doctor's alone, and their guards name the Doctor rather
-than CLINICAL_FLOOR_ROLES. restrict_consultation seals a consultation, which
-only the Doctor may do. Reports & Analytics (Screen 10) and its two exports are
-the second: the Doctor reads the same figures the Administrator and the Barangay
-Official do, from the same builder, and Health Center Staff do not reach them.
 """
 from flask import Blueprint, flash, redirect, render_template, request, session, url_for
 

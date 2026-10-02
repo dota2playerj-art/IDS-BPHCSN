@@ -6,15 +6,6 @@ medicine, a count of 1 over a short date range can point at one person. So for
 those two roles every row whose count is from 1 up to SMALL_COUNT_THRESHOLD - 1
 folds into one row, "Other (each fewer than 5)". Totals stay exact: only the names
 of small groups are held back, and what they add up to is still counted.
-
-The Doctor sees every count. Anyone else, and anyone whose role is unknown, gets
-the rule: it fails closed.
-
-ONE HELPER, USED WHERE THE RANKING IS BUILT. Every ranking in the project is
-built in models/consultations.py, models/dispensing.py or models/patients.py, and
-each calls fold_small_counts() before it returns. The screens, charts, Excel and
-PDF files and print views only print what the builder returned, so a new screen
-cannot show an unfolded ranking and a new export cannot skip the rule.
 """
 from config import SMALL_COUNT_THRESHOLD
 from utils.roles import is_care_team

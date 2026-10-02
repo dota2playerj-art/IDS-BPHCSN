@@ -4,20 +4,6 @@ Clinical data is for the care team: the Doctor and Health Center Staff. The
 Administrator runs the system and keeps accounts, settings, inventory, reports,
 SMS broadcasts and the audit trail, plus a demographics-only view of patients and
 a read-only Patient Queue.
-
-The core check: a unique marker is put into every clinical field, a contact
-number and a dispensed medicine name, on records nobody sealed (this is about
-the role, not the seal). Then every page, export, print view and JSON endpoint
-the Administrator can reach is fetched, and no marker may appear. His demographic
-fields must appear, so the check cannot pass on empty pages.
-
-Also checked: every removed route refuses him on the server, POST included; the
-Doctor and Staff keep their access; new audit entries name no medicine or
-vaccine, and the migration rewrites old ones; the backup download is encrypted
-and restore_backup.py round-trips it; the most-dispensed ranking counts
-sealed-visit dispensing as "Confidential".
-
-Runs on a fresh test database built by tests/_support.py.
 """
 import contextlib
 import io
@@ -474,7 +460,7 @@ check("no audit entry in the database holds a clinical marker, the medicine or t
            or "Paracetamol" in d and "PAT-" in d],
       [m for d in details for m in WORD_MARKS if m.lower() in d.lower()])
 
-import migrate_admin_minimum_necessary as migration  # noqa: E402
+from migrations import migrate_admin_minimum_necessary as migration  # noqa: E402
 
 copy = Path(_support.work_path("migrate5c.db"))
 shutil.copyfile(TEST_DB, copy)

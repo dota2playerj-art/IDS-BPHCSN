@@ -3,41 +3,6 @@
 The dashboard (15) is what this module was written for; Health Programs (16),
 Vaccination Campaigns (17) and Community Reports (18) joined it as each was
 taken off its static markup, and all four are built the same way.
-
-Built the way routes/report_views.py and routes/dashboard_views.py are: nothing
-here counts anything itself. Every figure is read from the function that already
-owns it and that some other screen this role can already reach is already
-reporting from, so this dashboard and the screen it links to cannot show
-different totals.
-
-WHAT THIS ROLE MAY SEE, AND WHY THAT DECIDES THE SOURCES
---------------------------------------------------------
-09_UI_Architecture §2 keeps the Barangay Official out of Patient Records,
-Medicine Inventory and the Patient Queue. This dashboard therefore draws
-only from the two screens the role does hold:
-
-    Reports & Analytics (Screen 10)   routes/report_views.py
-    SMS Notifications  (Screen 09)    models/broadcasts.py
-
-reports_analytics_context() is called rather than the models beneath it on
-purpose -- it is the exact context this role is already served at
-/official/reports_analytics, so no figure can appear here that the role could
-not already read there. Nothing patient-identifying, nothing from the inventory
-roster and nothing from the appointment queue is passed. The month grid is the
-one exception and is stripped to dates only; see the template.
-
-WHAT THIS SCREEN CANNOT SHOW
-----------------------------
-This screen was drawn almost entirely from invented community figures -- a
-barangay population of 2,418, six health programmes, three vaccination
-campaigns, twelve generated reports, five programme progress bars. None of them
-has a table behind it. They are listed in UNTRACKED and the template prints the
-reason where the number used to be, following the rule Screen 03's Prenatal card
-set: a figure with no data source reports its own absence.
-
-Most of those reasons are not written here. They are reports_analytics_context()'s
-own UNTRACKED entries, reused, so that this screen and Screen 10 explain the
-same gap in the same words.
 """
 from models.appointments import get_calendar_month
 from models.broadcasts import audience_options, get_broadcast_history, get_broadcast_stats

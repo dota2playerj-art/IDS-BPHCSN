@@ -1,49 +1,14 @@
 """Migration: add the appointment_sms_messages table.
 
-The individual-confirmation feature -- one text to one patient about one of
-their own appointments -- had nowhere to record what it sent. This adds the one
-table that makes a send a record rather than an assertion: the exact message, the
-number it was addressed to, the segment cost, who sent it, and whether the
-gateway was live or the send was only simulated.
-
-Idempotent -- re-running is a no-op. Follows migrate_add_sms_broadcasts.py, the
-project's other SMS table migration: CREATE TABLE IF NOT EXISTS, then a
-verification half that snapshots every pre-existing table before and compares it
-after, and probes the new constraints to prove they refuse bad data rather than
-merely being spelled out in the DDL.
-
-WHAT THE CONSTRAINTS ARE FOR
-----------------------------
-reference is UNIQUE. It is the APT-SMS-YYYY-NNNN identifier the history panel
-shows and the one an operator would quote when asking about a message; two rows
-sharing one would make that question unanswerable.
-
-event is CHECK-constrained to ('booked', 'rescheduled', 'cancelled'). Those are
-the three things worth telling one patient about their own appointment. There is
-deliberately no 'no-show' member: somebody who did not attend already knows they
-did not attend, and a text saying so would be a reprimand sent at the barangay's
-expense.
-
-status is CHECK-constrained to ('Sent', 'Failed') and has no 'Delivered' member,
-exactly as sms_broadcast_recipients.status does not. Nothing in this application
-receives Semaphore's delivery callbacks, so no row could ever legitimately hold
-it.
-
-delivery_mode is CHECK-constrained to ('live', 'simulated') and is NOT NULL, so a
-row cannot exist without saying whether the message really left the building. A
-simulated send recorded as though it were live would be a fabricated delivery
-record.
-
-appointment_id and patient_id are ON DELETE SET NULL -- the message was sent
-whether or not the rows it was composed from still exist. sent_by is ON DELETE
-RESTRICT, matching sms_broadcasts.sent_by: an account cannot be deleted out from
-under a record that names them as the sender.
-
-Run:  python migrate_add_appointment_sms.py
+Run: python migrations/migrate_add_appointment_sms.py (project root). Safe to run twice.
 """
 import sqlite3
 import sys
 
+import sys as _sys
+from pathlib import Path as _P
+
+_sys.path.insert(0, str(_P(__file__).resolve().parent.parent))  # so it runs from the project root
 import config
 
 MESSAGES_SQL = """

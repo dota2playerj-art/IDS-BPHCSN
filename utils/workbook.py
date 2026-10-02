@@ -6,44 +6,6 @@ belongs to the modules that assemble them -- routes/report_export.py knows about
 consultations, routes/audit_export.py about trail entries, routes/roster_export.py
 about reorder levels and queue positions; this one would write a workbook of
 anything.
-
-Kept apart for the same reason utils/dates.py is, and the argument has since been
-settled by events. It read "two report screens produce a workbook each, and a
-third would produce a third"; there are seven now -- the two report screens, the
-audit trail, and the four working lists routes/roster_export.py writes -- and all
-seven have the same headings, the same freeze row and the same way of stating a
-caveat, because none of them contains a line of formatting code. That is what a
-shared writer buys, and it is why an eighth costs a builder function rather than
-a stylesheet.
-
-WHY openpyxl
-------------
-It is the standard library for the .xlsx format in Python, it is pure Python
-with one small pure-Python dependency (et-xmlfile), and it writes a real
-OOXML workbook offline -- nothing in it reaches the network, which is the
-constraint this project works under. The alternatives were weighed:
-
-  * xlsxwriter writes beautifully but cannot read, and a future task that wants
-    to check a produced file would need a second library to open it. openpyxl
-    reads and writes, so the verification of an export is done with the same
-    dependency that produced it.
-  * pandas.to_excel would pull in pandas and numpy -- tens of megabytes of
-    compiled extensions -- to format a few dozen rows this project already holds
-    as plain dicts. It also needs openpyxl underneath regardless.
-  * Writing CSV needs no dependency at all, but a CSV is one flat table with no
-    sheets, no headings and no room for the notes that say which figures a date
-    range narrowed and which it did not. Those notes are the difference between
-    a report and a pile of numbers, and this project does not ship the second.
-
-A NOTE ON NOTES
----------------
-Long explanatory text is wrapped in Python and written one line per row, rather
-than put in a merged cell with wrap_text. Excel does not auto-fit the height of
-a merged cell, so that route produces a paragraph clipped to one visible line --
-the caveat would be in the file and invisible in the application that opens it,
-which is the worst of both. One line per row prints and displays correctly
-everywhere, and the wrapped rows are excluded from the column-width calculation
-so a paragraph cannot stretch column A to the width of the screen.
 """
 from datetime import date, datetime
 from io import BytesIO

@@ -1,51 +1,7 @@
 """Build the fictional demo database.
 
-usage:
-    python seed_demo_data.py [--path app.db] [--replace]
-
 Every person, address and phone number here is invented. Phone numbers all follow
 the pattern 0900000NNNN. Nothing in this file or its output is a real person.
-
-WHAT IT BUILDS
---------------
-A new database from schema.sql, then 12 months of clinic life ending yesterday:
-about 150 patients and about 400 visits. It is deterministic: a fixed random seed
-makes every laptop build the same people, visits and records. Dates are relative
-to the day it runs. Only the account passwords are random.
-
-HOW IT WRITES
--------------
-By driving the application itself. Each step is a request to the app's own routes
-(through Flask's test client), made as the account of the role that does that job:
-
-    Staff        register a patient, check in, start, record the intake
-                 (complaint, vitals, doses), and dispense
-    Doctor       write the diagnosis and treatment plan, seal a visit, declare a
-                 death
-    Staff/Doctor change a patient's status
-    Administrator, Official   send SMS broadcasts (simulated; nothing is sent)
-
-So the rules, the encryption of sealed visits and the audit entries apply exactly
-as in real use. The clock is frozen at each step's moment, so every record is dated
-inside the 12 months.
-
-THE ONLY RAW SQL (no model function exists for these)
------------------------------------------------------
-1. Creating the tables from schema.sql (what database/schema.py init_db() does).
-2. Setting created_at, updated_at, sent_at and restricted_at on the rows a step
-   just wrote. SQLite stamps them with the real clock (CURRENT_TIMESTAMP), which
-   no code in the app can set. Without this every audit entry would say "now".
-3. Clearing must_change_password while the steps run, then setting it back to 1.
-4. PRAGMA user_version = 5001, the mark archive_plain_databases.py reads to tell
-   this fictional database from one that may hold real people.
-5. Read-only SELECTs for ids the next step needs.
-
---replace: if the target already exists, its contents are first archived and
-verified by archive_plain_databases.py, and the old file is moved aside as
-previous-app.db in the IDS-BPHCSN-backups folder.
-
-THE SERVICE SCHEDULE IS LEFT EMPTY. It must hold the real service days from the
-health center interview, not invented ones.
 """
 import argparse
 import os

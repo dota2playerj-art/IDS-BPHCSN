@@ -1,68 +1,14 @@
 """Migration: add the general_vaccinations table.
 
-The gap this closes: an adult who receives a vaccine at the health center had
-nowhere in the system for it to go. The `immunizations` table exists to answer
-"is this child on the DOH EPI schedule?", so it is scoped -- correctly -- to the
-under-five cohort that schedule describes, and every screen that reads it is
-scoped the same way. A 19-year-old having a hepatitis B dose is not part of that
-question, and so was not recorded anywhere at all.
-
-This adds the second, plainer kind of record: a vaccine was given, to this
-patient, on this day, by this person, during this visit. No age restriction, and
-deliberately no schedule column of any kind -- no due date, no status, no grace
-period. There is no single official adult immunisation schedule in the
-Philippines to evaluate against, so a due/overdue reading here would be invented
-precision. The EPI logic in models/immunizations.py is untouched by this
-migration and by the feature it supports; the two live side by side, which is the
-same split HL7 FHIR draws between Immunization and ImmunizationRecommendation.
-
-Idempotent -- re-running is a no-op. Follows migrate_add_immunizations.py
-exactly: CREATE TABLE IF NOT EXISTS, snapshot every pre-existing table before,
-compare row for row after, and prove the constraints actually refuse bad data
-rather than merely being spelled out in the DDL.
-
-
-WHY THE CONSTRAINTS ARE WHAT THEY ARE
--------------------------------------
-UNIQUE (patient_id, vaccine_name, date_administered) rather than the EPI table's
-UNIQUE (patient_id, vaccine_code, dose_number).
-
-The EPI constraint says "a child cannot receive the same dose twice, ever",
-because the schedule is a closed list with a fixed dose count per vaccine. That
-is exactly wrong here: influenza is one shot every year for life, a Td booster a
-decade later is a new dose and not a duplicate, and a rabies course is several
-doses on consecutive days. A constraint spanning dose numbers would refuse real
-clinical events.
-
-What is still never right is the same vaccine, to the same patient, on the same
-day -- that is one event, however many times a form is submitted. So the date is
-what makes a row unique, which keeps double-clicking Save harmless (INSERT OR
-IGNORE absorbs it) without refusing next year's flu shot.
-
-dose_number is NULLABLE, unlike the EPI table's NOT NULL. Most of these vaccines
-have no fixed dose count, and requiring a number would force a health worker to
-invent one.
-
-vaccine_name is TEXT holding the name itself, not a code. The EPI table stores a
-code because EPI_SCHEDULE looks records up by it; nothing looks these up, the
-entry form's list is an explicitly non-exhaustive convenience ending in a
-free-text row, and a code for a vaccine nobody anticipated would have to be
-invented at the point of typing.
-
-The three foreign keys match the immunizations table exactly, for the reasons
-that table's migration gives:
-
-    patient_id       ON DELETE CASCADE  -- matches consultations
-    consultation_id  ON DELETE SET NULL -- the vaccination happened whether or
-                                           not its paperwork survives
-    administered_by  ON DELETE RESTRICT -- an account cannot be deleted out from
-                                           under a clinical record naming it
-
-Run:  python migrate_add_general_vaccinations.py
+Run: python migrations/migrate_add_general_vaccinations.py (project root). Safe to run twice.
 """
 import sqlite3
 import sys
 
+import sys as _sys
+from pathlib import Path as _P
+
+_sys.path.insert(0, str(_P(__file__).resolve().parent.parent))  # so it runs from the project root
 import config
 
 TABLE_SQL = """

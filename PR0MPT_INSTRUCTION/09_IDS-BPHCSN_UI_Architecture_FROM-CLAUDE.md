@@ -925,14 +925,14 @@ border with (Surigao City, Malimono, Sison); `PROVINCES` became Surigao del Nort
 del Sur because it genuinely adjoins and dropping Agusan del Sur and Davao de Oro, which border
 neither. The ZIP example moved 8501 → 8401 and Settings' area code 085 → 086. Correcting the lists
 alone would have orphaned the eleven stored records holding the old values — their Edit form would
-have rendered a blank province and refused to save — so `migrate_correct_patient_location.py`
-repaired all eleven in the same change. The fifteen patients with no municipality or province were
+have rendered a blank province and refused to save — so a one-time repair script
+(since deleted, with the old demo data) repaired all eleven in the same change. The fifteen patients with no municipality or province were
 deliberately left alone: NULL is incomplete, not wrong, and inventing an address for them would have
 been fabricating clinical data.
 
 **`da7c927`** — the leftovers. Settings' Province, Complete Address and Institution;
 `populate_records.py`'s infant seed and three inventory supplier strings, plus
-`migrate_correct_supplier_location.py` for the three live rows a reseed would not have touched
+a one-time repair script (since deleted) for the three live rows a reseed would not have touched
 (`INSERT OR IGNORE`); and the login page's "San Francisco, Philippines", which was ambiguous against
 the American city rather than wrong.
 
@@ -1013,7 +1013,7 @@ A fourth role, **Doctor**, holds clinical authority, and the Administrator does 
   but the Doctor, before anything is written. The status dialog does not offer it to them.
 - **Audit Logs** are the Administrator's, so an edit entry on a sealed consultation names the
   diagnosis as changed and does not quote it (`models/consultations.py::audit_formatters()`).
-- **Schema.** `users.role` admits `'Doctor'`. `migrate_add_doctor_role.py` widens the CHECK on an
+- **Schema.** `users.role` admits `'Doctor'`. `migrations/migrate_add_doctor_role.py` widens the CHECK on an
   existing database with the documented table rebuild and adds the demo account `doctor` ("RHU
   Physician (demo)"), to be renamed through Edit User once the physician's name is confirmed.
 
@@ -1150,7 +1150,7 @@ dashboard. The data builders read demographics only for him (`models/patients.py
 `get_all_patients_demographics()`), so nothing clinical is fetched and then hidden.
 
 **What else changed with it.** Audit entries name no medicine, vaccine or clinical value
-(`migrate_admin_minimum_necessary.py` rewrote the old ones). The backup download is an encrypted
+(`migrations/migrate_admin_minimum_necessary.py` rewrote the old ones). The backup download is an encrypted
 `.idsbackup` file, opened only with `restore_backup.py` at the health-center PC. The
 most-dispensed ranking counts sealed-visit dispensing as "Confidential".
 

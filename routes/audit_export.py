@@ -4,58 +4,6 @@ The Export control on Audit Logs presses this. It reads routes/audit_views'
 audit_export_context(), which decorates rows through the same _decorate() the
 screen renders from, so an entry cannot read one way in the table and another in
 the file.
-
-ONE ASSEMBLY, TWO FILES
------------------------
-The same arrangement routes/report_export.py uses, and for the same reason:
-_assemble() builds one list of sheet dicts and hands the identical structure to
-either renderer -- utils/workbook.build() writes it as .xlsx,
-utils/document.render() writes it as .pdf. The two files cannot disagree about an
-entry because there is one assembly and two renderers. The response plumbing is
-imported from report_export rather than repeated, so every download this project
-serves gets its attachment header and its filename decided in one place.
-
-WHY BOTH FORMATS, ON A SCREEN THAT IS ONE FLAT TABLE
-----------------------------------------------------
-They answer different questions and both get asked of an audit trail. The PDF is
-the artifact somebody files or submits: a paginated document with the health
-centre on every page and a footer saying who took it off the system and when, so
-a loose sheet still says what it is. The spreadsheet is what somebody sorts,
-filters and hands to a reviewer who wants to look down the User column. Neither
-substitutes for the other, and because the assembly is shared, the second format
-costs one route rather than a second implementation. Both report screens already
-offer both, so offering one here would be the odd screen out for no reason a
-reader could infer.
-
-WHAT THE FILE COVERS, AND THE ONE THING IT CANNOT
--------------------------------------------------
-Every entry matching the module filter, not the page of them the screen shows.
-Screen 12 caps its table at PAGE_SIZE and says so in its footer; a downloaded
-audit trail that silently stopped at the hundredth entry would be the worst place
-in this system for a quiet omission, because the file's whole claim is that it is
-the complete record. get_audit_logs(limit=None) is what that cap being absent
-looks like, and the cover sheet states the count so a reader can check it against
-the screen.
-
-The module filter is honoured because it is a real server-side filter: Screen 12
-submits it as ?module= and the export route reads the same query string, so the
-button exports the trail the operator is looking at.
-
-The search box is not, and cannot be. It narrows rows in the browser -- the same
-constraint templates/_print.html documents for Patient Records -- so the server
-never learns what was typed. Rather than invent a way to smuggle it across, the
-cover sheet says plainly that the file holds every entry for the module filter
-and that any search typed on the screen was not applied. That is the resolution
-this project already uses for the same problem, not a new one.
-
-WHAT IS DELIBERATELY IN IT
---------------------------
-The "not tracked" notes, on their own final sheet, exactly as report_export.py
-puts them on its own. The trail's most important property is what it does *not*
-record -- no logins, no failed attempts, no patient or stock writes -- and a file
-that left that out would let a reader take the entries it holds for the whole of
-what the system does. Those reasons are looked up from audit_views.UNTRACKED, so
-the file and the screen state them in one wording.
 """
 import config
 from models.settings import health_center_name

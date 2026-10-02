@@ -1,20 +1,4 @@
-"""Do Health Center Staff still have every capability they had before?
-
-The restriction was supposed to remove exactly two things from this role and
-nothing else. This exercises the ones most likely to have been broken by it,
-through real POSTs, and asserts on what actually landed in the database:
-
-  * recording a consultation at all -- the form now saves with two required
-    fields absent, so the validator had to stop requiring them;
-  * dispensing medicine, which moves stock;
-  * recording an EPI immunisation and a general vaccination;
-  * editing a consultation afterwards;
-  * correcting a vaccination, which is a separate audited path this role keeps.
-
-Everything it creates is removed at the end, including the stock it moved.
-
-Runs on a fresh test database built by tests/_support.py.
-"""
+"""Do Health Center Staff still have every capability they had before?"""
 import sqlite3
 import sys
 
