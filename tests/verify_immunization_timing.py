@@ -1,5 +1,10 @@
-"""Vaccines only when due (Task 13): a dose is eligible only when the child has reached its minimum
-age, the previous dose of its series is on file and valid, and the minimum interval has passed.
+"""Vaccines only when due (Task 13), and every dose judged by one rule, and repeats (Task 14).
+
+Task 13: a dose is eligible only when the child has reached its minimum age, the previous dose of its
+series is on file and valid, and the minimum interval has passed. Task 14: ONE rule judges every recorded
+dose, whatever its evidence: a dose more than 4 days before its minimum age or interval is invalid, stays
+in the history, and does not count; the same dose can then be repeated as a new record, and the next dose
+is judged from the repeat.
 
 The adviser's finding: a 1-month-old had a dose recorded, then at a second consultation the form
 still allowed ticking a vaccine meant for older babies. A dose given too early does not count and
@@ -398,6 +403,338 @@ r = staff.post(f"/staff/consultation/record/{visit}", data=dict(
 check("a card dose reported at this visit (given 140 days ago) lets the next dose be given at the same visit",
       given_keys(card_then) == ["PENTA:1", "PENTA:2"], flat(body(r))[:200])
 finish(visit)
+
+# ---------------------------------------------------------------------------
+# TASK 14: EVERY DOSE JUDGED BY ONE RULE, AND REPEATS
+# ---------------------------------------------------------------------------
+import os  # noqa: E402
+import shutil  # noqa: E402
+
+from models.audit import ACTION_IMMUNIZATION_CORRECTED  # noqa: E402
+
+
+def _raises(fn):
+    try:
+        fn()
+        return False
+    except sqlite3.IntegrityError:
+        return True
+
+
+MSG = "Given too early — ask the Doctor about a repeat"
+PROFILE = "/staff/patient_profile/{}"
+CORRECT = "/staff/patient_profile/{}/correct-vaccination"
+
+
+def rows_of(pid, key):
+    code, number = key.split(":")
+    return [dict(r) for r in db().execute(
+        "SELECT * FROM immunizations WHERE patient_id = ? AND vaccine_code = ? AND dose_number = ? "
+        "ORDER BY id", (pid, code, int(number)))]
+
+
+def coverage_numbers():
+    with app.app_context():
+        c = imm.get_immunization_coverage()
+        d = imm.get_dose_coverage()
+        penta1 = next(x for x in d["doses"] if (x["code"], x["dose_number"]) == ("PENTA", 1))
+        return (c["doses_given"], c["doses_administered"], c["doses_elsewhere"], c["enrolled"],
+                penta1["given"], d["total_given"])
+
+
+def correct(pid, record_id, key, day):
+    return staff.post(CORRECT.format(pid), data={"record_kind": "epi", "record_id": str(record_id),
+                                                 "correct_vaccine": key, "correct_date": day.isoformat()},
+                      follow_redirects=True)
+
+
+section("5. TASK 14: ONE RULE FOR EVERY DOSE: 5 DAYS EARLY IS INVALID, 3 DAYS EARLY COUNTS, WHATEVER THE EVIDENCE")
+for evidence in ("given_here", "card"):
+    kid5, b5 = child("V" + evidence[:1], 200)
+    put_dose(kid5, "PENTA:1", b5 + timedelta(days=42 - 5), evidence)
+    it = item(kid5, "PENTA:1")
+    check(f"a dose ({evidence}) given 5 days before its minimum age is invalid: it reads the Doctor message, "
+          "amber, does not count, and stays on file",
+          it["too_early"] and it["status"] == MSG and it["badge_class"] == "badge-waiting"
+          and not it["given"] and it["on_file"] and status(kid5)["completed_count"] == 0, dict(it))
+    check(f"... ({evidence}) the profile shows the message", MSG in body(staff.get(PROFILE.format(kid5))))
+    for days_early, counts in ((3, True), (4, True)):
+        kid3, b3 = child("W" + evidence[:1] + str(days_early), 200)
+        put_dose(kid3, "PENTA:1", b3 + timedelta(days=42 - days_early), evidence)
+        check(f"a dose ({evidence}) {days_early} days early is inside the 4-day grace and counts",
+              item(kid3, "PENTA:1")["given"] and not item(kid3, "PENTA:1")["too_early"]
+              and status(kid3)["completed_count"] == 1)
+base_kid, base_birth = child("XA", 200)
+cov_before = coverage_numbers()
+bad_kid, bad_birth = child("XB", 200)
+put_dose(bad_kid, "PENTA:1", bad_birth + timedelta(days=30))
+check("an invalid dose given here does not count in coverage (doses, enrolled, the dose's own coverage)",
+      coverage_numbers() == cov_before, (coverage_numbers(), cov_before))
+with app.app_context():
+    alert = imm.get_immunization_alert()
+check("... and the child stays on the follow-up list, with the dose among the items to follow up",
+      bad_kid in alert["patient_ids"] and any(i["key"] == "PENTA:1" for i in status(bad_kid)["attention_items"]))
+done = child_born("XC", months_ago(20))
+for key, days in (("BCG:1", 0), ("HEPB:1", 0), ("PENTA:1", 50), ("OPV:1", 50), ("PCV:1", 50),
+                  ("PENTA:2", 90), ("OPV:2", 90), ("PCV:2", 90), ("PENTA:3", 130), ("OPV:3", 130),
+                  ("PCV:3", 130), ("IPV:1", 120)):
+    put_dose(done, key, months_ago(20) + timedelta(days=days))
+put_dose(done, "MR:1", imm.add_months(months_ago(20), 9) + timedelta(days=10))
+put_dose(done, "MMR:1", imm.add_months(months_ago(20), 12) + timedelta(days=40))
+check("a child with all 14 doses valid is complete", status(done)["completed_count"] == 14
+      and "schedule complete" in status(done)["summary"])
+mmr_row = rows_of(done, "MMR:1")[0]["id"]
+run_sql("UPDATE immunizations SET date_administered = ? WHERE id = ?",
+        ((imm.add_months(months_ago(20), 9) + timedelta(days=10) + timedelta(days=20)).isoformat(), mmr_row))
+check("moving one dose to 20 days after its previous dose makes it invalid: 13 count, not complete",
+      status(done)["completed_count"] == 13 and "schedule complete" not in status(done)["summary"]
+      and status(done)["too_early_count"] == 1)
+
+# ---------------------------------------------------------------------------
+section("6. TASK 14: A DOSE GIVEN TOO EARLY IS REPEATED AS A NEW RECORD")
+rep, birth_r = child("YA", 50)
+early_day = birth_r + timedelta(days=30)
+put_dose(rep, "PENTA:1", early_day)
+gate = early_day + timedelta(weeks=4)
+v = item(rep, "PENTA:1")
+check("the dose has only an invalid record: it must be repeated, and it is on the follow-up items",
+      v["too_early"] and v["needs_attention"] and v["status"] == MSG)
+check("... it becomes eligible again from the later of its minimum age and the invalid date + 4 weeks",
+      not v["eligible"] and v["earliest_date"] == gate and gate > birth_r + timedelta(days=42), dict(v))
+response, visit = give(staff, rep, ["PENTA:1"])
+check("a forged POST for the repeat before that date is refused with the earliest date, nothing saved",
+      f"Earliest date: {display_date(gate)}" in flat(body(response)) and len(rows_of(rep, "PENTA:1")) == 1)
+finish(visit)
+run_sql("UPDATE immunizations SET date_administered = ? WHERE patient_id = ?",
+        ((birth_r + timedelta(days=20)).isoformat(), rep))
+check("once the interval has passed since the invalid dose, the dose is eligible again",
+      item(rep, "PENTA:1")["eligible"])
+visit = open_visit(rep)
+page = body(staff.get(f"/staff/consultation/record/{visit}"))
+check("... and the consultation form offers it as a tick box, with the earlier dose named under it",
+      tick_markup(page, "PENTA:1") and "was too early" in flat(page))
+finish(visit)
+response, visit = give(staff, rep, ["PENTA:1"])
+two = rows_of(rep, "PENTA:1")
+check("the repeat is recorded at a consultation as a NEW record: two records of the dose, the earlier one untouched",
+      len(two) == 2 and two[0]["date_administered"] == (birth_r + timedelta(days=20)).isoformat()
+      and two[1]["date_administered"] == TODAY.isoformat() and two[1]["evidence"] == "given_here",
+      flat(body(response))[:200])
+finish(visit)
+it = item(rep, "PENTA:1")
+check("the repeat counts: the dose reads Completed, with the repeat's record behind its row",
+      it["given"] and it["status"] == "Completed" and not it["too_early"] and it["record_id"] == two[1]["id"]
+      and status(rep)["completed_count"] == 1)
+check("... the invalid record stays in the history under the dose's row",
+      [h["kind"] for h in it["history"]] == ["too_early"] and it["history"][0]["record"]["id"] == two[0]["id"])
+text = flat(body(staff.get(PROFILE.format(rep))))
+check("... the profile says 'Earlier dose on <date> was too early' under the row",
+      f"Earlier dose on {display_date(birth_r + timedelta(days=20))} was too early" in text)
+response, visit = give(staff, rep, ["PENTA:1"])
+check("a second valid record of the dose is refused by the form's server check",
+      "already recorded" in flat(body(response)) and len(rows_of(rep, "PENTA:1")) == 2)
+finish(visit)
+with app.app_context():
+    again = imm.record_immunizations(rep, [("PENTA", 1)], STAFF_ID, TODAY)
+check("... by the model itself", again == [] and len(rows_of(rep, "PENTA:1")) == 2)
+r = card(rep, "PENTA:1", birth_r + timedelta(days=45))
+check("... and a card record of the same dose, from the profile: refused, nothing added",
+      "is already recorded as given" in flat(body(staff.get(PROFILE.format(rep))))
+      and len(rows_of(rep, "PENTA:1")) == 2)
+parent_row = run_sql("INSERT INTO immunizations (patient_id, vaccine_code, dose_number, evidence, "
+                     "administered_by) VALUES (?, 'PENTA', 1, 'parent_report', ?)", (rep, STAFF_ID))
+with app.app_context():
+    outcome = imm.update_elsewhere_dose(parent_row, "card", (birth_r + timedelta(days=45)).isoformat(), None)
+check("a parent's report cannot be changed into a card record that would be a second valid record",
+      outcome == "duplicate" and rows_of(rep, "PENTA:1")[-1]["evidence"] == "parent_report")
+check("only one parent's report per dose can exist (the table holds it)",
+      _raises(lambda: run_sql("INSERT INTO immunizations (patient_id, vaccine_code, dose_number, evidence, "
+                              "administered_by) VALUES (?, 'PENTA', 1, 'parent_report', ?)", (rep, STAFF_ID))))
+card_repeat, birth_cr = child("YB", 100)
+put_dose(card_repeat, "PENTA:1", birth_cr + timedelta(days=30), "card")
+r = card(card_repeat, "PENTA:1", birth_cr + timedelta(days=62))
+check("a repeat given elsewhere (a card, at least 4 weeks after the early one) is recorded and counts",
+      item(card_repeat, "PENTA:1")["given"] and len(rows_of(card_repeat, "PENTA:1")) == 2
+      and item(card_repeat, "PENTA:1")["history"][0]["kind"] == "too_early")
+
+# ---------------------------------------------------------------------------
+section("7. TASK 14: A CORRECTION IS CHECKED FOR SENSE, THEN JUDGED LIKE ANY OTHER DOSE")
+corr, birth_x = child("ZA", 200)
+put_dose(corr, "PENTA:1", birth_x + timedelta(days=60))
+rid = rows_of(corr, "PENTA:1")[0]["id"]
+def corrections():
+    return q1("SELECT COUNT(*) FROM audit_logs WHERE action = ?", (ACTION_IMMUNIZATION_CORRECTED,))[0]
+
+
+audit_before = corrections()
+response = correct(corr, rid, "PENTA:1", TODAY + timedelta(days=1))
+check("a correction to a future date is refused and nothing changes",
+      "cannot be in the future" in flat(body(response)) and rows_of(corr, "PENTA:1")[0]["date_administered"]
+      == (birth_x + timedelta(days=60)).isoformat())
+response = correct(corr, rid, "PENTA:1", birth_x - timedelta(days=1))
+check("a correction to a date before the child was born is refused and nothing changes",
+      "before" in flat(body(response)) and "was born" in flat(body(response))
+      and rows_of(corr, "PENTA:1")[0]["date_administered"] == (birth_x + timedelta(days=60)).isoformat())
+with app.app_context():
+    check("... the model refuses both by itself", (
+        imm.correct_immunization(rid, "PENTA", 1, TODAY + timedelta(days=1)),
+        imm.correct_immunization(rid, "PENTA", 1, birth_x - timedelta(days=1))) == ("bad_date", "bad_date"))
+check("... and neither refusal wrote an audit entry", corrections() == audit_before)
+response = correct(corr, rid, "PENTA:1", birth_x + timedelta(days=37))
+check("a correction to a too-early date is saved, and the dose is then invalid: the message, not counted",
+      item(corr, "PENTA:1")["too_early"] and not item(corr, "PENTA:1")["given"]
+      and item(corr, "PENTA:1")["status"] == MSG
+      and "does not count" in flat(body(response)), flat(body(response))[:300])
+check("... the correction kept its audit entry (one)", corrections() == audit_before + 1)
+check("... and the Correct button is still on the invalid dose's row",
+      'data-record-id="%d"' % rid in body(staff.get(PROFILE.format(corr))))
+correct(corr, rid, "PENTA:1", birth_x + timedelta(days=50))
+check("a later correction to a valid date makes the dose count again",
+      item(corr, "PENTA:1")["given"] and not item(corr, "PENTA:1")["too_early"])
+dup_kid, birth_d = child("ZB", 300)
+put_dose(dup_kid, "PENTA:1", birth_d + timedelta(days=60))
+put_dose(dup_kid, "PENTA:2", birth_d + timedelta(days=100))
+second = rows_of(dup_kid, "PENTA:2")[0]["id"]
+with app.app_context():
+    outcome = imm.correct_immunization(second, "PENTA", 1, birth_d + timedelta(days=100))
+check("a correction onto a dose that already has a valid record is refused as a duplicate",
+      outcome == "duplicate" and len(rows_of(dup_kid, "PENTA:2")) == 1)
+card_corr, birth_cc = child("ZC", 200)
+put_dose(card_corr, "PENTA:1", birth_cc + timedelta(days=60), "card")
+cid = rows_of(card_corr, "PENTA:1")[0]["id"]
+correct(card_corr, cid, "PENTA:1", birth_cc + timedelta(days=36))
+check("a correction of a card dose's date is judged the same way (6 days early: invalid)",
+      item(card_corr, "PENTA:1")["too_early"] and not item(card_corr, "PENTA:1")["given"])
+
+# ---------------------------------------------------------------------------
+section("8. TASK 14: THE NEXT DOSE IS JUDGED FROM THE REPEAT, NOT FROM THE INVALID DOSE")
+ch, birth_h = child("QA", 150)
+x_day, y_day = birth_h + timedelta(days=30), TODAY - timedelta(days=10)
+put_dose(ch, "PENTA:1", x_day)
+put_dose(ch, "PENTA:1", y_day)
+check("the repeat counts; dose 2 is eligible only 4 weeks after the REPEAT (not after the invalid dose)",
+      item(ch, "PENTA:1")["given"] and item(ch, "PENTA:2")["earliest_date"] == y_day + timedelta(weeks=4)
+      and y_day + timedelta(weeks=4) > x_day + timedelta(weeks=4) and not item(ch, "PENTA:2")["eligible"])
+response, visit = give(staff, ch, ["PENTA:2"])
+check("... and a POST for it before then is refused with that date",
+      f"Earliest date: {display_date(y_day + timedelta(weeks=4))}" in flat(body(response))
+      and not rows_of(ch, "PENTA:2"))
+finish(visit)
+put_dose(ch, "PENTA:2", y_day + timedelta(days=10), "card")
+check("a card dose 2 dated after the invalid dose + 4 weeks, but before the repeat + 4 weeks, is invalid",
+      item(ch, "PENTA:2")["too_early"] and not item(ch, "PENTA:2")["given"])
+ch2, birth_h2 = child("QB", 150)
+put_dose(ch2, "PENTA:1", birth_h2 + timedelta(days=30))
+put_dose(ch2, "PENTA:1", TODAY - timedelta(days=40))
+put_dose(ch2, "PENTA:2", TODAY - timedelta(days=40) + timedelta(weeks=4) - timedelta(days=3), "card")
+check("a card dose 2 within 3 days of the repeat + 4 weeks counts", item(ch2, "PENTA:2")["given"])
+ch3, birth_h3 = child("QC", 150)
+put_dose(ch3, "PENTA:1", birth_h3 + timedelta(days=30))
+put_dose(ch3, "PENTA:2", birth_h3 + timedelta(days=75), "card")
+check("a dose 2 on file while dose 1 has only an invalid record does not count (it was not spaced from a valid dose)",
+      item(ch3, "PENTA:1")["too_early"] and item(ch3, "PENTA:2")["too_early"])
+
+ch4, birth_h4 = child("QD", 150)
+put_dose(ch4, "PENTA:1", birth_h4 + timedelta(days=30))
+put_dose(ch4, "PENTA:1", birth_h4 + timedelta(days=45))
+check("a repeat given less than 4 weeks after the invalid dose is itself invalid, though the child is old enough",
+      item(ch4, "PENTA:1")["too_early"] and not item(ch4, "PENTA:1")["given"]
+      and len(rows_of(ch4, "PENTA:1")) == 2)
+put_dose(ch4, "PENTA:1", birth_h4 + timedelta(days=73))
+check("... and a repeat 4 weeks after the LAST invalid dose counts, with both earlier doses in the history",
+      item(ch4, "PENTA:1")["given"] and [h["kind"] for h in item(ch4, "PENTA:1")["history"]] == ["too_early"] * 2)
+
+# ---------------------------------------------------------------------------
+section("9. TASK 14: THE MIGRATION KEEPS EVERY RECORD, AND RECORD 302'S KIND IS JUDGED BY THE RULE")
+from migrations import migrate_immunization_repeats as mig  # noqa: E402
+
+kid302, birth302 = child("RA", 30)
+MIG_DB = _support.guard_path(str(_support.TEST_DIR) + "/migrating.db")
+shutil.copy2(TEST_DB, MIG_DB)
+c = sqlite3.connect(MIG_DB)
+c.row_factory = sqlite3.Row
+kept, seen_keys = [], set()
+for r in c.execute("SELECT * FROM immunizations ORDER BY id"):
+    key = (r["patient_id"], r["vaccine_code"], r["dose_number"])
+    if key not in seen_keys:
+        seen_keys.add(key)
+        kept.append(dict(r))
+c.executescript("DROP TABLE immunizations;")
+c.executescript("""
+CREATE TABLE immunizations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, patient_id INTEGER NOT NULL, consultation_id INTEGER,
+    vaccine_code TEXT NOT NULL, dose_number INTEGER NOT NULL,
+    evidence TEXT NOT NULL DEFAULT 'given_here' CHECK (evidence IN ('given_here', 'card', 'parent_report')),
+    date_administered TEXT, place_given TEXT, administered_by INTEGER NOT NULL, notes TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CHECK (evidence <> 'given_here' OR date_administered IS NOT NULL),
+    UNIQUE (patient_id, vaccine_code, dose_number),
+    FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
+    FOREIGN KEY (consultation_id) REFERENCES consultations(id) ON DELETE SET NULL,
+    FOREIGN KEY (administered_by) REFERENCES users(id) ON DELETE RESTRICT);
+CREATE INDEX idx_immunizations_patient ON immunizations(patient_id, date_administered);
+CREATE INDEX idx_immunizations_consultation ON immunizations(consultation_id);
+""")
+cols = ("id", "patient_id", "consultation_id", "vaccine_code", "dose_number", "evidence",
+        "date_administered", "place_given", "administered_by", "notes", "created_at")
+for r in kept:
+    c.execute(f"INSERT INTO immunizations ({', '.join(cols)}) VALUES ({', '.join('?' * len(cols))})",
+              [r[k] for k in cols])
+old302 = c.execute(
+    "INSERT INTO immunizations (patient_id, vaccine_code, dose_number, evidence, date_administered, "
+    "administered_by) VALUES (?, 'PENTA', 1, 'given_here', ?, ?)",
+    (kid302, TODAY.isoformat(), STAFF_ID)).lastrowid
+c.commit()
+c.close()
+conn = sqlite3.connect(MIG_DB)
+conn.row_factory = sqlite3.Row
+check("the old table refuses a second record of one dose, and the migration sees that it needs to run",
+      mig.needs_work(conn) and _raises(lambda: conn.execute(
+          "INSERT INTO immunizations (patient_id, vaccine_code, dose_number, evidence, date_administered, "
+          "administered_by) VALUES (?, 'PENTA', 1, 'given_here', '2026-01-01', ?)", (kid302, STAFF_ID))))
+before_rows = {r["id"]: dict(r) for r in conn.execute("SELECT * FROM immunizations")}
+audit_n = conn.execute("SELECT COUNT(*) FROM audit_logs").fetchone()[0]
+conn.close()
+BACKUPS = _support.guard_path(str(_support.TEST_DIR) + "/migration-backups")
+result = mig.run(MIG_DB, BACKUPS)
+conn = sqlite3.connect(MIG_DB)
+conn.row_factory = sqlite3.Row
+after_rows = {r["id"]: dict(r) for r in conn.execute("SELECT * FROM immunizations")}
+check("the migration keeps every record, with every value unchanged",
+      after_rows == before_rows and result["rows"] == len(before_rows) and not result["problems"])
+check("... it saved a copy first, and the copy holds the old rows",
+      result["backup"] and os.path.exists(result["backup"])
+      and sqlite3.connect(result["backup"]).execute("SELECT COUNT(*) FROM immunizations").fetchone()[0]
+      == len(before_rows))
+check("... it wrote one record of itself in the audit log",
+      conn.execute("SELECT COUNT(*) FROM audit_logs").fetchone()[0] == audit_n + 1)
+check("... the table now takes two records of one dose and still refuses two parent's reports of one dose",
+      not mig.needs_work(conn)
+      and not _raises(lambda: conn.execute(
+          "INSERT INTO immunizations (patient_id, vaccine_code, dose_number, evidence, date_administered, "
+          "administered_by) VALUES (?, 'PENTA', 1, 'given_here', '2026-06-01', ?)", (kid302, STAFF_ID)))
+      and _raises(lambda: [conn.execute(
+          "INSERT INTO immunizations (patient_id, vaccine_code, dose_number, evidence, administered_by) "
+          "VALUES (?, 'OPV', 2, 'parent_report', ?)", (kid302, STAFF_ID)) for _ in (0, 1)]))
+conn.rollback()
+conn.close()
+second_run = mig.run(MIG_DB, BACKUPS)
+conn = sqlite3.connect(MIG_DB)
+check("running it a second time does nothing: no copy, no change, no second audit entry",
+      second_run["backup"] is None and conn.execute("SELECT COUNT(*) FROM audit_logs").fetchone()[0] == audit_n + 1
+      and conn.execute("SELECT COUNT(*) FROM immunizations").fetchone()[0] == len(before_rows))
+conn.close()
+verdict_rows = sqlite3.connect(MIG_DB)
+verdict_rows.row_factory = sqlite3.Row
+rows302 = [dict(r) for r in verdict_rows.execute(
+    "SELECT id, vaccine_code, dose_number, evidence, date_administered FROM immunizations WHERE patient_id = ?",
+    (kid302,))]
+verdicts = imm.judge_records(birth302, rows302)
+check("a dose given here before its minimum age (the kind record 302 is: Pentavalent dose 1 at 30 days old) is "
+      "judged invalid by the rule",
+      verdicts[[r["id"] for r in rows302].index(old302)] == imm.VERDICT_EARLY, verdicts)
+verdict_rows.close()
+
 
 # the Administrator and Official do not reach any of it
 check("the Administrator cannot record a dose (no route), so none of it applies to him",
