@@ -338,6 +338,12 @@ def _immunization_note(patient):
             "Ask for the vaccination card. If the card shows the dose, record it as "
             "given elsewhere."
         )
+    if status["too_early_count"]:
+        early = ", ".join(item["label"] for item in status["schedule"] if item["too_early"])
+        return (
+            f" IMMUNISATION: {patient['first_name']} had {early} given too early. It does not "
+            "count. Ask the Doctor about a repeat."
+        )
     if status["due_count"]:
         return (
             f" IMMUNISATION: {patient['first_name']} is due for {doses} — "

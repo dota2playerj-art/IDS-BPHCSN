@@ -85,6 +85,8 @@ from models.immunizations import (
     dose_label,
     get_immunization_status,
     get_immunizations_for_consultation,
+    check_given_today,
+    dose_today_field,
     parse_dose_keys,
     parse_reported_doses,
     record_immunizations,
@@ -391,10 +393,13 @@ def _immunization_context(patient, consultation, visit_date, ticked=None,
         # a different sentence even though both states are now locked.
         item["given_here"] = pair in this_visit
         item["locked"] = item["given"]
+        # The one rule decides what can be ticked (Task 13): a dose that is not eligible is
+        # shown greyed out with its earliest date or its reason.
+        item["today_field"] = dose_today_field(item["key"])
         if ticked is None:
             item["checked"] = item["given_here"]
         else:
-            item["checked"] = item["key"] in ticked
+            item["checked"] = item["key"] in ticked and item["eligible"]
         # Never pre-ticked from the record. A dose already reported is locked
         # like any other dose on file, so this box only ever comes back ticked
         # because the operator ticked it on the submission that bounced.
@@ -911,6 +916,10 @@ def process_record_consultation(appointment_id, form_data, user_id,
     errors.update(general_errors)
     errors.update(reported_errors)
     errors.update(dispense_errors)
+    # A dose that is not due is refused whatever the form showed (Task 13).
+    if age_context["is_pediatric"]:
+        errors.update(check_given_today(patient, dose_keys, context["visit_date"],
+                                        reported_entries))
     if errors:
         return None, consultation_form_context(
             patient, appointment=appointment, form=values, errors=errors,
@@ -1419,6 +1428,14 @@ def process_edit_consultation(consultation_id, form_data, user_id, ip_address=No
     errors.update(general_errors)
     errors.update(reported_errors)
     errors.update(dispense_errors)
+    # A dose that is not due is refused on an edit too (Task 13). Doses this visit already
+    # recorded are locked on the form and skipped here, as the save skips them.
+    if age_context["is_pediatric"]:
+        already_here = {(dose["vaccine_code"], dose["dose_number"])
+                        for dose in get_immunizations_for_consultation(consultation_id)}
+        errors.update(check_given_today(
+            patient, [pair for pair in parse_dose_keys(ticked) if pair not in already_here],
+            before["consultation_date"], reported_entries))
     if errors:
         return None, consultation_form_context(
             patient, consultation=before, form=values, errors=errors, ticked=set(ticked),

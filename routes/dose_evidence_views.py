@@ -26,6 +26,7 @@ from models.immunizations import (
     validate_evidence,
     validate_reported_date,
 )
+from models.immunizations import get_immunization_status
 from models.patients import get_patient_by_id
 from routes.audit_entries import (
     elsewhere_dose_changed,
@@ -87,6 +88,17 @@ def _reopen(mode, form_data, errors, label, record_id=None, dose_key=""):
     }
 
 
+def _early_note(patient, code, dose_number):
+    """A sentence to add when the card date shows the dose was given too early (Task 13, D4):
+    it is on file, but it does not count, and the Doctor decides about a repeat."""
+    status = get_immunization_status(get_patient_by_id(patient["id"]))
+    item = next((i for i in status["schedule"]
+                 if i["code"] == code and i["dose_number"] == dose_number), None)
+    if item and item["too_early"]:
+        return " It was given too early, so it does not count. Ask the Doctor about a repeat."
+    return ""
+
+
 def process_record_elsewhere(patient_id, form_data, user_id, ip_address=None):
     """Record one dose given elsewhere. Returns (patient_id, reopen, message)."""
     patient = get_patient_by_id(patient_id)
@@ -109,13 +121,15 @@ def process_record_elsewhere(patient_id, form_data, user_id, ip_address=None):
     if outcome == "recorded":
         if values["evidence"] == EVIDENCE_CARD:
             return patient_id, None, (
-                f"{label} is recorded as given elsewhere for {name}. The card was seen.")
+                f"{label} is recorded as given elsewhere for {name}. The card was seen."
+                + _early_note(patient, code, dose_number))
         return patient_id, None, (
             f"{label} is recorded for {name} as: the parent says it was given, no card. "
             "It does not count as given until the card is shown.")
     if outcome == "upgraded":
         return patient_id, None, (
-            f"{label} for {name} is now recorded as given elsewhere. The card was seen.")
+            f"{label} for {name} is now recorded as given elsewhere. The card was seen."
+            + _early_note(patient, code, dose_number))
     if outcome == "unchanged":
         return patient_id, None, (
             f"{label} already has a parent's report for {name}. To add the card, choose "
@@ -148,11 +162,13 @@ def process_change_elsewhere(form_data, user_id, ip_address=None):
         record["id"], values["evidence"], values["date"], values["place"],
         audit=elsewhere_dose_changed(patient["id"], user_id, ip_address))
     name = patient["full_name"]
+    note = _early_note(patient, record["vaccine_code"], record["dose_number"])
     if outcome == "upgraded":
         return patient["id"], None, (
-            f"{label} for {name} is now recorded as given elsewhere. The card was seen.")
+            f"{label} for {name} is now recorded as given elsewhere. The card was seen." + note)
     if outcome == "updated":
-        return patient["id"], None, f"{label} for {name} is changed. The change is in the audit log."
+        return patient["id"], None, (
+            f"{label} for {name} is changed. The change is in the audit log." + note)
     if outcome == "unchanged":
         return patient["id"], None, f"No change. {label} for {name} is as it was."
     return patient["id"], None, "That dose record could not be changed."

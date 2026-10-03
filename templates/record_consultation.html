@@ -499,11 +499,16 @@
                        form add-only. -->
                   <span class="material-symbols-outlined" style="font-size:19px; color:{{ '#B45309' if item.reported else 'var(--success)' }};"
                         title="{% if item.reported %}{{ item.evidence_label }} ({% if item.date_known %}{{ item.date_administered | display_date }}{% else %}{{ unknown_date_text | lower }}{% endif %}){% else %}Recorded on {{ item.date_administered | display_date }}{% endif %} — a dose on file cannot be removed from this form">{{ 'history' if item.reported else 'task_alt' }}</span>
-{%- else %}
+{%- elif item.eligible %}
                   <input type="checkbox" class="form-check-input dose-today" name="{{ immunization_field }}"
                          value="{{ item.key }}" id="dose{{ loop.index }}"{% if item.checked %} checked{% endif %}
                          data-pair="{{ item.key }}"
                          aria-label="Record {{ item.label }} as given at this visit">
+{%- else %}
+                  {#- Not due: the one rule (models/immunizations.py dose_eligibility) says so,
+                      and the server refuses it too. Greyed out, with the reason beside the name. #}
+                  <span class="material-symbols-outlined" style="font-size:19px; color:#9CA3AF;"
+                        title="{{ item.eligibility_reason }}">schedule</span>
 {%- endif %}
                 </td>
                 <td>
@@ -542,7 +547,14 @@
 {%- endif %}
 {%- endif %}
                 </td>
-                <td><label for="dose{{ loop.index }}" style="font-weight:600; cursor:{{ 'default' if item.locked else 'pointer' }};">{{ item.label }}</label></td>
+                <td><label for="dose{{ loop.index }}" style="font-weight:600; cursor:{{ 'default' if item.locked or not item.eligible else 'pointer' }};{% if not item.locked and not item.eligible %} color:#9CA3AF;{% endif %}">{{ item.label }}</label>
+{%- if not item.locked and not item.eligible and item.eligibility_reason %}
+                  <div class="dose-not-due" style="font-size:12px; color:#6B7280;">{{ item.eligibility_reason }}</div>
+{%- endif %}
+{%- if errors.get(item.today_field) %}
+                  <div class="invalid-feedback d-block">{{ errors.get(item.today_field) }}</div>
+{%- endif %}
+                </td>
                 <td class="reason-text">{{ item.protects }}</td>
                 <td class="reason-text">{{ item.timing }}{% if item.due_date %} &middot; {{ item.due_date | display_date }}{% endif %}</td>
                 <td><span class="badge-status {{ item.badge_class }}">{{ item.status }}</span></td>
@@ -1162,7 +1174,7 @@
     Object.keys(pairs).forEach(function(key){
       var today = pairs[key].today;
       var elsewhere = pairs[key].elsewhere;
-      if(!today || !elsewhere){ return; }
+      if(!elsewhere){ return; }
       // The field name comes off the element, put there by
       // models.immunizations.reported_date_field(). Spelling it in JavaScript
       // would be a second copy of a name the parser actually reads.
@@ -1170,8 +1182,8 @@
       var proofBox = document.getElementById(elsewhere.getAttribute('data-proof-field'));
 
       function onChange(changed){
-        if(changed === today && today.checked){ elsewhere.checked = false; }
-        if(changed === elsewhere && elsewhere.checked){ today.checked = false; }
+        if(today && changed === today && today.checked){ elsewhere.checked = false; }
+        if(today && changed === elsewhere && elsewhere.checked){ today.checked = false; }
         if(proofBox){ proofBox.disabled = !elsewhere.checked; if(!elsewhere.checked){ proofBox.value = ''; } }
         if(!dateBox){ return; }
         dateBox.disabled = !elsewhere.checked;
@@ -1181,7 +1193,9 @@
         if(!elsewhere.checked){ dateBox.value = ''; }
       }
 
-      today.addEventListener('change', function(){ onChange(today); });
+      // A dose that is not due has no "given today" box (Task 13); its elsewhere box
+      // still works, because a card shows history, not a dose given now.
+      if(today){ today.addEventListener('change', function(){ onChange(today); }); }
       elsewhere.addEventListener('change', function(){ onChange(elsewhere); });
 
       // ON LOAD, NOTHING IS CLEARED. A form that bounced on "tick the box or

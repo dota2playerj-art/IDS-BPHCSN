@@ -7,6 +7,7 @@ This module is read back by the Patient Profile, the queue, the dashboards and t
 reports, and is the one place a dose's status is decided.
 """
 import sqlite3
+from collections import namedtuple
 from datetime import datetime, timedelta
 
 from database.connection import db_connection
@@ -60,6 +61,46 @@ EPI_SCHEDULE = (
     ("MMR",   "MMR",          "Measles, mumps, rubella",       1, 1, 12, "months", "12 to 15 months — 2nd measles dose"),
 )
 
+# WHEN A DOSE MAY BE GIVEN (Task 13). The recommended ages above say when a dose is DUE; this
+# table says when it is VALID. A dose given before its minimum age, before the previous dose
+# of its series, or too soon after it does not count and must be repeated, so the child
+# gets an extra injection. WHO routine immunization tables: Pentavalent, OPV and PCV start
+# at a minimum age of 6 weeks with at least 4 weeks between doses; measles-containing
+# vaccine dose 1 at 9 months and at least 4 weeks between MCV1 and MCV2. The values sit
+# here, next to the schedule, as named fields, one rule per scheduled dose.
+#
+#   min_age_value, min_age_unit   the child must have reached this age
+#   previous                      the dose of the same series that must be on file first
+#                                 ((code, dose) or None)
+#   min_interval_weeks            at least this long after that previous dose
+#
+# Pentavalent, OPV and PCV doses 2 and 3 keep the 6-week minimum age too: they inherit it
+# from dose 1 plus the interval. MR and MMR are two products, so MMR names MR as its
+# previous dose (the measles series). IPV has one dose, at 14 weeks, as the schedule lists it.
+DoseRule = namedtuple("DoseRule", "min_age_value min_age_unit previous min_interval_weeks")
+MIN_INTERVAL_WEEKS = 4
+MIN_AGE_PRIMARY_WEEKS = 6
+DOSE_RULES = {
+    ("BCG", 1): DoseRule(0, "weeks", None, 0),
+    ("HEPB", 1): DoseRule(0, "weeks", None, 0),
+    ("PENTA", 1): DoseRule(MIN_AGE_PRIMARY_WEEKS, "weeks", None, 0),
+    ("PENTA", 2): DoseRule(MIN_AGE_PRIMARY_WEEKS, "weeks", ("PENTA", 1), MIN_INTERVAL_WEEKS),
+    ("PENTA", 3): DoseRule(MIN_AGE_PRIMARY_WEEKS, "weeks", ("PENTA", 2), MIN_INTERVAL_WEEKS),
+    ("OPV", 1): DoseRule(MIN_AGE_PRIMARY_WEEKS, "weeks", None, 0),
+    ("OPV", 2): DoseRule(MIN_AGE_PRIMARY_WEEKS, "weeks", ("OPV", 1), MIN_INTERVAL_WEEKS),
+    ("OPV", 3): DoseRule(MIN_AGE_PRIMARY_WEEKS, "weeks", ("OPV", 2), MIN_INTERVAL_WEEKS),
+    ("PCV", 1): DoseRule(MIN_AGE_PRIMARY_WEEKS, "weeks", None, 0),
+    ("PCV", 2): DoseRule(MIN_AGE_PRIMARY_WEEKS, "weeks", ("PCV", 1), MIN_INTERVAL_WEEKS),
+    ("PCV", 3): DoseRule(MIN_AGE_PRIMARY_WEEKS, "weeks", ("PCV", 2), MIN_INTERVAL_WEEKS),
+    ("IPV", 1): DoseRule(14, "weeks", None, 0),
+    ("MR", 1): DoseRule(9, "months", None, 0),
+    ("MMR", 1): DoseRule(12, "months", ("MR", 1), MIN_INTERVAL_WEEKS),
+}
+# When checking a record of a dose given ELSEWHERE, a dose within this many days of the
+# minimum age or interval still counts (ACIP's 4-day grace period). A dose given HERE
+# gets no grace: the form does not offer it before its date.
+RECORD_GRACE_DAYS = 4
+
 # Every distinct vaccine in the schedule, in first-appearance order. Used by the
 # profile tab to group the doses of one vaccine together.
 VACCINE_ORDER = tuple(dict.fromkeys(row[0] for row in EPI_SCHEDULE))
@@ -70,6 +111,9 @@ VACCINE_PROTECTS = {row[0]: row[2] for row in EPI_SCHEDULE}
 # model is allowed to store -- so a POST cannot invent "Pentavalent dose 7".
 SCHEDULE_KEYS = frozenset((row[0], row[3]) for row in EPI_SCHEDULE)
 TOTAL_SCHEDULED_DOSES = len(EPI_SCHEDULE)
+# Every scheduled dose has exactly one rule, and every rule names a scheduled dose.
+assert set(DOSE_RULES) == set(SCHEDULE_KEYS), "DOSE_RULES must cover the schedule exactly"
+assert all(rule.previous is None or rule.previous in SCHEDULE_KEYS for rule in DOSE_RULES.values())
 
 # How long after the recommended age a dose is still "due" rather than "no record".
 #
@@ -89,12 +133,13 @@ GRACE_PERIOD_DAYS = 28
 # of birth. A dose with no evidence on file is a gap in OUR record, not proof the child
 # missed it, so the word says exactly that. Each such dose still shows its due date.
 NO_RECORD = "No record"
+TOO_EARLY = "Given too early — ask the Doctor about a repeat"
 DUE_NOW = "Due Now"
 PARENT_REPORT = "Parent says given — no card"
 UPCOMING = "Upcoming"
 GIVEN_ELSEWHERE = "Given elsewhere"
 COMPLETED = "Completed"
-STATUS_ORDER = (NO_RECORD, DUE_NOW, PARENT_REPORT, UPCOMING, GIVEN_ELSEWHERE, COMPLETED)
+STATUS_ORDER = (NO_RECORD, TOO_EARLY, DUE_NOW, PARENT_REPORT, UPCOMING, GIVEN_ELSEWHERE, COMPLETED)
 _STATUS_RANK = {status: index for index, status in enumerate(STATUS_ORDER)}
 
 # The two statuses that count as given: a dose given here, and a dose given elsewhere
@@ -109,6 +154,7 @@ GIVEN_STATUSES = (COMPLETED, GIVEN_ELSEWHERE)
 # vaccination card", not an emergency (Task 10).
 STATUS_BADGE_CLASS = {
     NO_RECORD: "badge-waiting",
+    TOO_EARLY: "badge-waiting",
     DUE_NOW: "badge-waiting",
     PARENT_REPORT: "badge-waiting",
     UPCOMING: "badge-scheduled",
@@ -119,7 +165,7 @@ STATUS_BADGE_CLASS = {
 # The statuses that mean somebody should act. Named once so the queue badge, the
 # check-in message and the dashboard card cannot each pick a different set. A parent's
 # report only needs action once the dose is due: ask for the card.
-NEEDS_ATTENTION = (NO_RECORD, DUE_NOW, PARENT_REPORT)
+NEEDS_ATTENTION = (NO_RECORD, TOO_EARLY, DUE_NOW, PARENT_REPORT)
 
 # WHAT A DOSE RECORD RESTS ON (Task 9, D2). The values the table's CHECK permits,
 # spelled here so no caller writes the string itself. FHIR Immunization mapping:
@@ -213,7 +259,140 @@ def due_date_for(birth_date, due_value, due_unit):
     return add_months(birth_date, due_value)
 
 
-def _dose_status(record, due_date, reference):
+def minimum_age_date(birth_date, code, dose_number):
+    """The first day a child born on birth_date may be given this dose, or None."""
+    rule = DOSE_RULES[(code, dose_number)]
+    return due_date_for(birth_date, rule.min_age_value, rule.min_age_unit)
+
+
+def _counts_as_given_row(record):
+    return bool(record) and record.get("evidence") in COUNTS_AS_GIVEN
+
+
+def _record_day(record):
+    return as_date(record["date_administered"]) if record and record.get("date_administered") else None
+
+
+def too_early_keys(birth_date, record_by_key):
+    """The (code, dose) pairs whose CARD record was given before it could count (D4).
+
+    Only a dose given elsewhere on a card is judged: the card is history with a real
+    date, and a dose given here is refused up front by dose_eligibility(). A card dose is
+    too early when its date is more than RECORD_GRACE_DAYS before the child's minimum age
+    for it, or before the minimum interval after the previous dose of its series (when
+    that dose is on file as given here or on a card). A dose with no previous dose on file
+    is not judged against one: nothing shows it was early.
+    """
+    grace = timedelta(days=RECORD_GRACE_DAYS)
+    early = set()
+    for key, record in record_by_key.items():
+        if record.get("evidence") != EVIDENCE_CARD or key not in DOSE_RULES:
+            continue
+        day = _record_day(record)
+        if day is None:
+            continue
+        rule = DOSE_RULES[key]
+        if birth_date is not None and day < minimum_age_date(birth_date, *key) - grace:
+            early.add(key)
+            continue
+        previous = record_by_key.get(rule.previous) if rule.previous else None
+        previous_day = _record_day(previous) if _counts_as_given_row(previous) else None
+        if previous_day is not None and day < previous_day + timedelta(
+                weeks=rule.min_interval_weeks) - grace:
+            early.add(key)
+    return early
+
+
+def dose_eligibility(code, dose_number, birth_date, record_by_key, on_date, invalid=None):
+    """THE ONE RULE for whether a scheduled dose may be given on on_date (Task 13, D1).
+
+    Returns {"eligible", "earliest", "reason"}. A dose is eligible only if (a) the child
+    has reached its minimum age, (b) the previous dose of the same series is on file as
+    given here or on a card and is valid, and (c) at least the minimum interval has passed
+    since that dose. A dose already validly recorded is never eligible again. A dose that
+    has only a parent's report on file is still eligible: it does not count as given.
+
+    `earliest` is the first day it can be given (None when it first needs another dose),
+    and `reason` is the plain sentence the form prints: "From Nov 14, 2026" or "Needs
+    Pentavalent dose 1 first". The consultation form, the server and every screen call
+    this, so they cannot disagree. `invalid` is too_early_keys() for the same records.
+    """
+    key = (code, dose_number)
+    rule = DOSE_RULES[key]
+    on_date = as_date(on_date)
+    if invalid is None:
+        invalid = too_early_keys(birth_date, record_by_key)
+    record = record_by_key.get(key)
+
+    if _counts_as_given_row(record):
+        if key in invalid:
+            return {"eligible": False, "earliest": None, "reason": TOO_EARLY}
+        return {"eligible": False, "earliest": None, "reason": "Already recorded"}
+    if birth_date is None:
+        return {"eligible": False, "earliest": None, "reason": "Birth date needed"}
+
+    earliest = minimum_age_date(birth_date, code, dose_number)
+    if rule.previous:
+        previous = record_by_key.get(rule.previous)
+        if not _counts_as_given_row(previous) or rule.previous in invalid:
+            return {"eligible": False, "earliest": None,
+                    "reason": f"Needs {dose_label(*rule.previous)} first"}
+        previous_day = _record_day(previous)
+        if previous_day is not None:
+            earliest = max(earliest, previous_day + timedelta(weeks=rule.min_interval_weeks))
+    if on_date < earliest:
+        return {"eligible": False, "earliest": earliest, "reason": f"From {display_date(earliest)}"}
+    return {"eligible": True, "earliest": earliest, "reason": None}
+
+
+def dose_today_field(key):
+    """'PENTA:2' -> 'dose_today_PENTA_2'. The key a refusal of a dose ticked as given today
+    is reported under, so the form can print it under that row."""
+    return "dose_today_" + str(key or "").replace(":", "_")
+
+
+def check_given_today(patient, dose_keys, visit_date, reported_entries=()):
+    """Refuse every ticked "given today" dose that is not eligible (Task 13, D3).
+
+    Returns {field: message}, empty when every dose may be given. The server runs this on
+    every save, so a forged POST for a dose that is not due is refused the same way the form
+    greys it out. Several eligible doses in one visit are fine (co-administration is normal).
+    A dose reported at this same visit on a card, with its date, counts as on file for the
+    doses after it in its series, so a child can have the card dose and the next dose in one
+    visit when the interval allows.
+    """
+    birth = as_date(patient["birth_date"]) if patient.get("birth_date") else None
+    records = {(r["vaccine_code"], r["dose_number"]): annotate_evidence(r)
+               for r in get_immunizations_for_patient(patient["id"])}
+    for entry in reported_entries or ():
+        key = (entry["code"], entry["dose_number"])
+        existing = records.get(key)
+        if entry.get("evidence") == EVIDENCE_CARD and entry.get("date") and (
+                existing is None or existing["evidence"] == EVIDENCE_PARENT):
+            records[key] = {"evidence": EVIDENCE_CARD, "date_administered": entry["date"]}
+    errors = {}
+    for code, dose_number in dose_keys:
+        message = not_due_message(code, dose_number, birth, records, visit_date)
+        if message:
+            errors[dose_today_field(f"{code}:{dose_number}")] = message
+    return errors
+
+
+def not_due_message(code, dose_number, birth_date, record_by_key, on_date):
+    """The one sentence the server refuses a non-eligible dose with, or None if eligible."""
+    verdict = dose_eligibility(code, dose_number, birth_date, record_by_key, on_date)
+    if verdict["eligible"]:
+        return None
+    if verdict["reason"] == "Already recorded":
+        return f"{dose_label(code, dose_number)} is already recorded. It cannot be given again."
+    if verdict["earliest"] is not None:
+        return f"This dose is not due yet. Earliest date: {display_date(verdict['earliest'])}."
+    if verdict["reason"] == TOO_EARLY:
+        return f"{dose_label(code, dose_number)} was recorded too early. Ask the Doctor about a repeat."
+    return f"This dose is not due yet. {verdict['reason']}."
+
+
+def _dose_status(record, due_date, reference, too_early=False):
     """Completed / Given elsewhere / Parent says given / No record / Due Now / Upcoming.
 
     A record counts only when its evidence does: given here is Completed, a card is
@@ -225,7 +404,7 @@ def _dose_status(record, due_date, reference):
         if evidence == EVIDENCE_GIVEN_HERE:
             return COMPLETED
         if evidence == EVIDENCE_CARD:
-            return GIVEN_ELSEWHERE
+            return TOO_EARLY if too_early else GIVEN_ELSEWHERE
         return PARENT_REPORT
     if due_date is None:
         # No birthdate on record, so no due date can be computed. Reported as
@@ -368,11 +547,16 @@ def get_immunization_status(patient, on_date=None, records=None):
         for record in records
     }
 
+    # Card doses given before they could count (D4), judged once for the whole child.
+    invalid = too_early_keys(birth_date, record_by_key)
+
     schedule = []
     for code, vaccine, protects, dose_number, total, value, unit, note in EPI_SCHEDULE:
         record = record_by_key.get((code, dose_number))
         due_date = due_date_for(birth_date, value, unit)
-        status = _dose_status(record, due_date, reference)
+        too_early = (code, dose_number) in invalid
+        status = _dose_status(record, due_date, reference, too_early)
+        verdict = dose_eligibility(code, dose_number, birth_date, record_by_key, reference, invalid)
         # Past the cohort the schedule describes, "No record" and "Due Now" stop being
         # useful readings -- the infant programme's window has closed, and flagging a
         # 30-year-old would be noise on every screen that counts them. What is on file
@@ -381,9 +565,12 @@ def get_immunization_status(patient, on_date=None, records=None):
             status = UPCOMING
         # A parent's report is only chased once the dose is due: ask for the card.
         needs_attention = status in (NO_RECORD, DUE_NOW) or (
+            status == TOO_EARLY and applicable) or (
             status == PARENT_REPORT and applicable
             and due_date is not None and reference >= due_date)
-        counts_as_given = bool(record and record["counts"])
+        # A card dose given too early does not count: not for completion, coverage or
+        # the next dose's eligibility.
+        counts_as_given = bool(record and record["counts"]) and not too_early
         schedule.append({
             "code": code,
             "vaccine": vaccine,
@@ -403,7 +590,12 @@ def get_immunization_status(patient, on_date=None, records=None):
             "on_file": record is not None,
             # The "Record dose given elsewhere" button is offered on exactly these:
             # nothing on file, or only a parent's report (which can be upgraded).
-            "can_record_elsewhere": not counts_as_given,
+            "can_record_elsewhere": not counts_as_given and not too_early,
+            # The one rule (D1): may this dose be given today? The form ticks only these.
+            "eligible": verdict["eligible"],
+            "earliest_date": verdict["earliest"],
+            "eligibility_reason": verdict["reason"],
+            "too_early": too_early,
             # The immunizations row behind this scheduled dose, when one exists.
             # Carried so the Patient Profile's Correct action can name the record
             # it means -- the (code, dose) pair identifies the dose in the
@@ -471,6 +663,7 @@ def get_immunization_status(patient, on_date=None, records=None):
         "parent_report_count": counts[PARENT_REPORT],
         "due_count": counts[DUE_NOW],
         "no_record_count": counts[NO_RECORD],
+        "too_early_count": counts[TOO_EARLY],
         "upcoming_count": counts[UPCOMING],
         "total_doses": TOTAL_SCHEDULED_DOSES,
         "attention_count": len(attention_items),
@@ -497,11 +690,13 @@ def _summarise(counts, applicable):
     if not applicable:
         parts.append("EPI infant schedule no longer applies at this age")
         return " · ".join(parts)
+    if counts[TOO_EARLY]:
+        parts.append(f"{counts[TOO_EARLY]} given too early, not counted")
     if counts[NO_RECORD]:
         parts.append(f"{counts[NO_RECORD]} with no record")
     if counts[DUE_NOW]:
         parts.append(f"{counts[DUE_NOW]} due now")
-    if not counts[NO_RECORD] and not counts[DUE_NOW]:
+    if not counts[NO_RECORD] and not counts[DUE_NOW] and not counts[TOO_EARLY]:
         parts.append("nothing due today" if given < TOTAL_SCHEDULED_DOSES
                      else "schedule complete")
     return " · ".join(parts)
@@ -647,45 +842,29 @@ def get_immunization_coverage(on_date=None, start=None, end=None, months=6):
     the DOH schedule does not have.
     """
     window = resolve_range(start=start, end=end, months=months, on_date=on_date)
-    with db_connection() as conn:
-        enrolled = conn.execute(
-            "SELECT COUNT(DISTINCT patient_id) FROM immunizations WHERE evidence <> ?",
-            (EVIDENCE_PARENT,)
-        ).fetchone()[0]
-        # Split by evidence, all time and in the window, because "doses given" and
-        # "doses this health center gave" are not the same number. A single total
-        # would credit another hospital's work to this one on the Barangay Official's
-        # dashboard, which is the one screen in the project a figure leaves the
-        # building from. Coverage is about the child and counts every dose that has
-        # written evidence; activity is about the health center and counts only its own.
-        by_evidence = {
-            row[0]: row[1]
-            for row in conn.execute(
-                "SELECT evidence, COUNT(*) FROM immunizations GROUP BY evidence"
-            )
-        }
-        # A dose with no date is in no window. That is arithmetic rather than a
-        # decision -- substr(NULL) is NULL and NULL BETWEEN anything is not true --
-        # but it is also the right answer: a dose whose date nobody knows cannot
-        # honestly be counted into a particular month.
-        scoped_by_evidence = {
-            row[0]: row[1]
-            for row in conn.execute(
-                """
-            SELECT evidence, COUNT(*) FROM immunizations
-            WHERE substr(date_administered, 1, 10) BETWEEN ? AND ?
-            GROUP BY evidence
-            """,
-                (window["start"].isoformat(), window["end"].isoformat()),
-            )
-        }
-        scoped_children = conn.execute(
-            """
-        SELECT COUNT(DISTINCT patient_id) FROM immunizations
-        WHERE evidence <> ? AND substr(date_administered, 1, 10) BETWEEN ? AND ?
-        """,
-            (EVIDENCE_PARENT, window["start"].isoformat(), window["end"].isoformat()),
-        ).fetchone()[0]
+    # A card dose given too early does not count (Task 13, D4), so it is left out of every
+    # figure below except the parent-report one, which never counted anyway.
+    rows = _valid_dose_rows()
+    lo, hi = window["start"].isoformat(), window["end"].isoformat()
+
+    def in_window(row):
+        day = (row["date_administered"] or "")[:10]
+        return bool(day) and lo <= day <= hi
+
+    # Split by evidence, all time and in the window, because "doses given" and "doses this
+    # health center gave" are not the same number. A single total would credit another
+    # hospital's work to this one on the Barangay Official's dashboard, which is the one
+    # screen in the project a figure leaves the building from. Coverage is about the child
+    # and counts every dose that has written evidence; activity is about the health center
+    # and counts only its own. A dose with no date is in no window.
+    by_evidence, scoped_by_evidence = {}, {}
+    for row in rows:
+        by_evidence[row["evidence"]] = by_evidence.get(row["evidence"], 0) + 1
+        if in_window(row):
+            scoped_by_evidence[row["evidence"]] = scoped_by_evidence.get(row["evidence"], 0) + 1
+    enrolled = len({row["patient_id"] for row in rows if row["evidence"] != EVIDENCE_PARENT})
+    scoped_children = len({row["patient_id"] for row in rows
+                           if row["evidence"] != EVIDENCE_PARENT and in_window(row)})
 
     here = by_evidence.get(EVIDENCE_GIVEN_HERE, 0)
     card = by_evidence.get(EVIDENCE_CARD, 0)
@@ -821,13 +1000,37 @@ def get_dose_coverage(on_date=None):
     }
 
 
-def _patients_with_doses():
-    """Patients with at least one dose that counts as given (not a parent's report)."""
+def _valid_dose_rows():
+    """Every dose row that is not a card dose given too early (Task 13, D4), as dicts.
+
+    The reports count doses in SQL-shaped questions; whether a card dose was early depends on
+    the child's birth date and the other doses of the series, so the rows are read once and
+    judged here with the same rule the profile uses.
+    """
     with db_connection() as conn:
-        ids = {row[0] for row in conn.execute(
-            "SELECT DISTINCT patient_id FROM immunizations WHERE evidence <> ?",
-            (EVIDENCE_PARENT,))}
-    return ids
+        rows = conn.execute(
+            """
+        SELECT i.id, i.patient_id, i.vaccine_code, i.dose_number, i.evidence,
+               i.date_administered, p.birth_date
+        FROM immunizations i JOIN patients p ON p.id = i.patient_id
+        """
+        ).fetchall()
+    by_patient = {}
+    for row in rows:
+        by_patient.setdefault(row["patient_id"], []).append(dict(row))
+    valid = []
+    for records in by_patient.values():
+        birth = as_date(records[0]["birth_date"]) if records[0]["birth_date"] else None
+        keyed = {(r["vaccine_code"], r["dose_number"]): r for r in records}
+        invalid = too_early_keys(birth, keyed)
+        valid.extend(r for r in records if (r["vaccine_code"], r["dose_number"]) not in invalid)
+    return valid
+
+
+def _patients_with_doses():
+    """Patients with at least one dose that counts as given (not a parent's report, not
+    a card dose given too early)."""
+    return {row["patient_id"] for row in _valid_dose_rows() if row["evidence"] != EVIDENCE_PARENT}
 
 
 def parse_dose_keys(raw_keys):
@@ -888,6 +1091,10 @@ REPORTED_DATE_LABELS = {
         f"{dose_label(row[0], row[3])} — date given elsewhere"
     for row in EPI_SCHEDULE
 }
+REPORTED_DATE_LABELS.update({
+    dose_today_field(f"{row[0]}:{row[3]}"): f"{dose_label(row[0], row[3])} — given today"
+    for row in EPI_SCHEDULE
+})
 REPORTED_DATE_LABELS.update({
     reported_proof_field(f"{row[0]}:{row[3]}"):
         f"{dose_label(row[0], row[3])} — proof of the dose given elsewhere"

@@ -436,7 +436,9 @@ check("ticking Given elsewhere with no proof is refused and nothing is saved",
       r.status_code == 200 and "proof" in flat(body(r)).lower()
       and q1("SELECT COUNT(*) FROM consultations WHERE appointment_id = ?", (visit,))[0] == 0)
 r = staff.post(f"/staff/consultation/record/{visit}", data=dict(
-    FORM, immunizations_elsewhere=["IPV:1", "PCV:1"], elsewhere_proof_IPV_1="card", elsewhere_date_IPV_1=date_ok,
+    FORM, immunizations_elsewhere=["IPV:1", "PCV:1"], elsewhere_proof_IPV_1="card",
+    # IPV's minimum age is 14 weeks (Task 13): a card date the day after birth would count as too early.
+    elsewhere_date_IPV_1=(BIRTH + timedelta(days=100)).isoformat(),
     elsewhere_proof_PCV_1="parent_report", elsewhere_date_PCV_1=""))
 check("a card dose and a parent report are both saved at the visit",
       dose(B, "IPV:1")["status"] == "Given elsewhere" and dose(B, "PCV:1")["status"] == "Parent says given — no card"
