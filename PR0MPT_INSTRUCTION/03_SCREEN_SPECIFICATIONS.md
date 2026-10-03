@@ -439,9 +439,13 @@ puts the visit back to its previous status; it is refused on a later day, and re
 in consultation if the visit was In Consultation. The Administrator's queue is read-only: no button, and the
 server refuses his POST. The table footer counts these visits.
 
-Under the table, Staff and the Doctor see **Still waiting from earlier days**: visits still Waiting from a
-day that has gone, oldest first, with a button to close them. Nothing closes a visit automatically. Visits
-that are Waiting for the Doctor are not here; they are on the Doctor's list.
+**Open visits from earlier days (Task 10, 2026-10-03).** Under the table: every visit from a day that has
+gone and is still Waiting, In Consultation or Waiting for the Doctor, oldest first, with a Status column. Its
+buttons come from the same status-by-role mapping as today's rows, so the Doctor sees **See patient** on a
+visit waiting for him, and Staff and the Doctor can mark a visit Left before being seen. The Administrator sees
+the list read-only. Nothing closes a visit automatically. The line under Today's table starts "Today:" and
+gives the five status counts; a line under this section, "Earlier days:", gives the three open ones. The
+Doctor's dashboard count, the Staff count and the queue (today plus earlier days) are the same number.
 
 Purpose
 
@@ -725,7 +729,7 @@ Dashboard for healthcare workers.
 the status Waiting for the Doctor, oldest first, across all days. Each row shows the patient's name and ID,
 the check-in date and time, the service, how long it has waited ("2 days"), and a button: See patient
 (the same one as on the Patient Queue: it opens the saved record, or a new consultation when there is none).
-A visit from an earlier day is marked "From an earlier day". Health Center Staff see one card, "Waiting for
+The list says "Patients who need a diagnosis, oldest first." Health Center Staff see one card, "Waiting for
 the Doctor: N", and no list. The Administrator's dashboard has the same card and no names. Immunization,
 prenatal and dental visits never get this status. A sealed visit is listed by name only and shows no sealed
 text.

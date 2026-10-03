@@ -1189,6 +1189,12 @@ The Doctor, Health Center Staff and the Barangay Official are unchanged.
   word: recorded, not counted). A dose with nothing on file reads **No record**, never Overdue. Staff and the
   Doctor record a dose given elsewhere from the Immunization Record tab, outside a consultation. Basis: CDC
   General Best Practices; FHIR `primarySource` and `reportOrigin`. See `01_PROJECT_BIBLE.md`.
+- *Task 10 (2026-10-03), open visits and plain screens.* The Patient Queue lists every open visit from an
+  earlier day ("Open visits from earlier days"), whatever its status, with the actions of the one mapping.
+  Screens carry no explanatory boxes: the "not tracked" and "does not do" notes, the design-reasoning
+  subtitles and the long tooltips were removed, and empty states are one short sentence. Immunization
+  reminders are amber. A server error or a missing page shows "Something went wrong" with a button back, and
+  the full error goes to `logs/errors.log`, which git ignores.
 - *Stock accountability.* Dispensing writes no stock entry. Accountability comes from the stock
   levels and the dispensed totals in Reports. The Doctor and Health Center Staff hold the full
   dispensing records.
