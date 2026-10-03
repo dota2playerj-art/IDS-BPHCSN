@@ -153,7 +153,7 @@
 
     <div class="eyebrow no-print">{{ health_center.name }}</div>
     <div class="page-title no-print">Reports &amp; Analytics</div>
-    <div class="page-desc no-print">Statistics on patients, appointments, medicine, SMS, and health programs for DOH reporting and clinic planning.</div>
+    <div class="page-desc no-print">Figures for DOH reports and planning.</div>
 
 {%- if selection.errors %}
     <div class="range-error no-print">
@@ -219,15 +219,15 @@
           <div class="d-flex justify-content-md-end gap-2 flex-wrap">
             <button class="btn-primary-teal" type="submit"><span class="material-symbols-outlined" style="font-size:18px;">insights</span>Generate</button>
             <button class="btn-ghost-ids" type="button" onclick="window.print()"
-                    title="Print this report — the sidebar, header and controls drop out, every chart prints as a data table, and the range above goes on the letterhead"><span class="material-symbols-outlined" style="font-size:18px;">print</span>Print</button>
+                    title="Print this report"><span class="material-symbols-outlined" style="font-size:18px;">print</span>Print</button>
           </div>
         </div>
         <div class="col-12">
           <div class="d-flex gap-2 flex-wrap">
             <a class="btn-outline-teal" href="{{ excel_url }}" download
-               title="Download this report as an Excel workbook — the same figures over the same range, one sheet per section, with every chart's numbers as rows"><span class="material-symbols-outlined" style="font-size:18px;">description</span>Export to Excel</a>
+               title="Download as Excel"><span class="material-symbols-outlined" style="font-size:18px;">description</span>Export to Excel</a>
             <a class="btn-outline-teal" href="{{ pdf_url }}" download
-               title="Download this report as a PDF: the same figures, with every chart's numbers as a table"><span class="material-symbols-outlined" style="font-size:18px;">picture_as_pdf</span>Export to PDF</a>
+               title="Download as PDF"><span class="material-symbols-outlined" style="font-size:18px;">picture_as_pdf</span>Export to PDF</a>
           </div>
         </div>
         <div class="col-12">
@@ -237,7 +237,6 @@
           <span class="panel-sub" style="margin-left:8px;">
 {%- if window.custom %}Generated range &middot; {{ selection.type_label }}.
 {%- else %}Default window &middot; the last {{ trend_months }} clinic months.{% endif %}
-            Activity is counted inside the range. Stock, rosters and programme memberships are as of one day.
           </span>
         </div>
       </div>
@@ -369,7 +368,6 @@
                either way, because a category of zero adds nothing. -->
           <div class="panel-sub">
             Monthly appointment outcomes &middot; {{ appt.total }} in this range
-            ({{ appt.walk_ins }} walk-in{% if appt.booked %}, {{ appt.booked }} from the earlier booking system{% endif %})
           </div>
           <div class="chart-wrap"><canvas id="chartAppt"></canvas></div>
 {{ ct.chart_table('Appointment outcomes, by month',
@@ -380,18 +378,12 @@
                    {'name': 'Cancelled / no-show', 'values': atrend | map(attribute='missed')   | list},
                    {'name': 'Left before being seen', 'values': atrend | map(attribute='left') | list}]) }}
           <div class="mini-legend no-print">
-            <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--success);"></span>Attended ({{ appt.attended }}) &mdash; completed, or in the clinic now</div>
-            <div class="mini-legend-item"><span class="mini-legend-dot" style="background:#6D28D9;"></span>Waiting for the Doctor ({{ appt.awaiting }}) &mdash; intake saved, no diagnosis yet</div>
+            <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--success);"></span>Attended ({{ appt.attended }})</div>
+            <div class="mini-legend-item"><span class="mini-legend-dot" style="background:#6D28D9;"></span>Waiting for the Doctor ({{ appt.awaiting }})</div>
             <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--info);"></span>Still expected ({{ appt.expected }})</div>
             <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--danger);"></span>Cancelled or no-show ({{ appt.missed }})</div>
-            <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--warning);"></span>Left before being seen ({{ appt.left }}) &mdash; checked in, then went home</div>
+            <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--warning);"></span>Left before being seen ({{ appt.left }})</div>
           </div>
-{%- if not appt.expected %}
-          <div class="panel-sub" style="margin-top:8px; line-height:1.55;">
-            <strong style="display:inline;">Still expected</strong> is zero. Patients are seen in the order they
-            arrive, so no visit is recorded before it happens. Older months can hold some, from the earlier booking system.
-          </div>
-{%- endif %}
         </div>
       </div>
 {%- endif %}
@@ -423,7 +415,6 @@
     number per item and nothing snapshots it -- so "what the shelf held in March"
     remains unanswerable and this panel answers today. Where the medicine went is
     on the Most Dispensed Items panel below, which is ranged. #}
-          <div class="snapshot-note">{{ snapshot_note }}<br>Dispensing over a range is under Most Dispensed Items.</div>
         </div>
       </div>
       <div class="col-lg-6">
@@ -447,7 +438,6 @@
             <div class="panel-sub">Every item is above its reorder level.</div>
 {%- endif %}
           </div>
-          <div class="snapshot-note">{{ snapshot_note }}</div>
         </div>
       </div>
     </div>
@@ -492,7 +482,7 @@
 {#- Ranked by units, with the issue count printed beside it, because the two are
     different supply questions: forty patients given ten tablets each and two
     patients given two hundred are not the same shelf problem. #}
-          <div class="snapshot-note">Most units dispensed first. A renamed item appears under both names.{% if disp.top_medicines | selectattr('confidential') | list %}<br>Items from Restricted consultations are counted under Confidential.{% endif %}{% if small_count_note(disp.top_medicines) %}<br>{{ small_count_note(disp.top_medicines) | trim }}{% endif %}</div>
+          <div class="snapshot-note">{% if disp.top_medicines | selectattr('confidential') | list %}<br>Items from Restricted consultations are counted under Confidential.{% endif %}{% if small_count_note(disp.top_medicines) %}<br>{{ small_count_note(disp.top_medicines) | trim }}{% endif %}</div>
         </div>
       </div>
       <div class="col-lg-5">
@@ -514,7 +504,6 @@
               <div class="stat-card"><div class="stat-value">{{ dispensing_stats.total_units }}</div><div class="stat-label">Units, all time</div><div class="stat-trend" style="color:var(--text-muted);">{{ dispensing_stats.total_events }} event{{ '' if dispensing_stats.total_events == 1 else 's' }} on record</div></div>
             </div>
           </div>
-          <div class="snapshot-note">Every issue was recorded during a consultation and came off Medicine Inventory at the same time.</div>
         </div>
       </div>
     </div>
@@ -552,11 +541,9 @@
                   [{'name': 'Patients', 'values': programs | map(attribute='count') | list}],
                   first_head='Programme') }}
 {%- for program in programs %}
-          <div class="basis-note"><strong>{{ program.name }} ({{ program.count }})</strong> &mdash; {{ program.basis }}.</div>
 {%- endfor %}
 {#- Both memberships are derived from the register as it stands and from the
     whole dose history, not from anything dated into a period. #}
-          <div class="snapshot-note">{{ snapshot_note }}</div>
         </div>
       </div>
 {%- endif %}
@@ -586,7 +573,6 @@
     would silently become "the age profile of people who happened to register in
     June", which is a different question from the one this heading asks. See
     get_patient_report(). #}
-          <div class="snapshot-note">{{ snapshot_note }}</div>
         </div>
       </div>
       <div class="col-lg-6">
@@ -609,7 +595,6 @@
             <div class="mini-legend-item"><span class="mini-legend-dot" style="background:#C7CBD1;"></span>Not recorded ({{ sexes.unrecorded }} &middot; {{ sexes.unrecorded_pct }}%)</div>
 {%- endif %}
           </div>
-          <div class="snapshot-note">{{ snapshot_note }}</div>
         </div>
       </div>
     </div>
@@ -647,13 +632,10 @@
                   [{'name': 'Seniors', 'values': seniors.counts | map(attribute='count') | list}],
                   first_head='Condition') }}
           <div class="basis-note">
-            Conditions are those on the Register Patient form
-            ({{ seniors.counts | rejectattr('other') | map(attribute='condition') | join(', ') }}).<br>A patient with two is
-            counted under each, so these do not sum to {{ seniors.cohort_size }}.{% if small_count_note(seniors.counts) %}<br>{{ small_count_note(seniors.counts) | trim }}{% endif %}
+            A patient with two conditions is counted under each.{% if small_count_note(seniors.counts) %}<br>{{ small_count_note(seniors.counts) | trim }}{% endif %}
 {%- if seniors.other_only %}<br>{{ seniors.other_only_shown }} senior{{ '' if seniors.other_only_shown == 1 else 's' }}
             recorded only free-text conditions and {{ 'is' if seniors.other_only_shown == 1 else 'are' }} not counted here.{% endif %}
           </div>
-          <div class="snapshot-note">{{ snapshot_note }}</div>
         </div>
       </div>
     </div>
@@ -680,7 +662,7 @@
                   first_head='Service') }}
       <div class="basis-note">{{ small_count_note(svc) | trim }}</div>
 {%- else %}
-      <div class="empty-note">No appointments fall in this range, so there is nothing to rank.</div>
+      <div class="empty-note">No appointments in this range.</div>
 {%- endif %}
     </div>
 {%- endif %}
@@ -759,8 +741,7 @@
                so entries are grouped case-insensitively and nothing is mapped
                onto ICD or any other classification the system does not hold. -->
           <div class="basis-note mt-2">
-            Grouped by the text entered, ignoring case. Free text is not coded, so two
-            spellings of one condition count separately.
+            Grouped by the text entered.
             {{- ranking_note(diags, withheld, 'diagnoses') }}
           </div>
 {%- endif %}
@@ -774,8 +755,6 @@
       
       {{ selection.type_label }} &middot; {{ window.start | long_date }} to {{ window.end | long_date }}
       &middot; generated from {{ health_center.name }} records by {{ system_short_name }}.<br>
-      Activity is counted in this range. Stock, rosters and programme memberships
-      are as of {{ report_date | long_date }}.
     
     </div>
 

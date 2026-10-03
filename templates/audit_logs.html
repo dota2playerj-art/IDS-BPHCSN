@@ -121,7 +121,7 @@
 {% block content %}
     <div class="eyebrow">{{ health_center.name }}</div>
     <div class="page-title">Audit Logs</div>
-    <div class="page-desc">Complete activity trail of all system actions, logins, and record changes for accountability and compliance.</div>
+    <div class="page-desc">Every action and sign-in, newest first.</div>
 
     <!-- STAT CARDS — all four are counted now, in
          models/audit.py::get_audit_stats(). The last two printed a dash and
@@ -150,7 +150,7 @@
         </div>
       </div>
       <div class="col-md-3 col-sm-6">
-        <div class="stat-card" title="Successful sign-ins, one row each time somebody signs in. Signing out is not recorded.">
+        <div class="stat-card" >
           <div class="stat-icon" style="background:#DBEAFE;"><span class="material-symbols-outlined" style="color:var(--info);">login</span></div>
           <div class="stat-value">{{ stats.logins }}</div>
           <div class="stat-label">Login Events</div>
@@ -175,7 +175,7 @@
           presented -- so they are called out rather than folded silently into a
           total that would read as ordinary mistyping. #}
       <div class="col-md-3 col-sm-6">
-        <div class="stat-card" title="Sign-ins refused on an account that exists: a wrong password or a deactivated account. The password is never recorded.">
+        <div class="stat-card" >
           <div class="stat-icon" style="background:#FEE2E2;"><span class="material-symbols-outlined" style="color:var(--danger);">gpp_maybe</span></div>
           <div class="stat-value"{% if stats.refused_logins %} style="color:var(--danger);"{% endif %}>{{ stats.refused_logins }}</div>
           <div class="stat-label">Security Events</div>
@@ -225,11 +225,11 @@
                   file is the screen's contents, and a download anyone could fetch
                   would be a hole the render route does not have. #}
               <a class="btn-outline-teal" href="{{ url_for('admin.export_audit_logs_excel', module=selected_module) }}" download
-                 title="Download the trail as an Excel workbook — every entry matching the module filter, newest first, with a sheet naming what the trail does not record">
+                 title="Download as Excel">
                 <span class="material-symbols-outlined" style="font-size:18px;">description</span>Export to Excel
               </a>
               <a class="btn-outline-teal" href="{{ url_for('admin.export_audit_logs_pdf', module=selected_module) }}" download
-                 title="Download the trail as a PDF — every entry matching the module filter on the health center's letterhead, with a sheet naming what the trail does not record">
+                 title="Download as PDF">
                 <span class="material-symbols-outlined" style="font-size:18px;">picture_as_pdf</span>Export to PDF
               </a>
             </div>
@@ -333,10 +333,6 @@
                   <td colspan="6" style="text-align:center; padding:38px 14px; color:var(--text-muted);">
                     <div class="material-symbols-outlined" style="font-size:34px; opacity:0.45;">fact_check</div>
                     <div style="font-weight:600; margin-top:8px; color:var(--text-dark);">No activity recorded yet</div>
-                    <div style="font-size:13px; margin-top:4px;">
-                      Entries appear here as soon as a consultation record is edited or an SMS
-                      broadcast is sent.
-                    </div>
                   </td>
                 </tr>
 {%- endfor %}
@@ -384,12 +380,8 @@
             <div class="detail-icon"><span class="material-symbols-outlined" style="color:var(--teal-dark); font-size:22px;">fact_check</span></div>
             <div>
               <div class="detail-title">No entry selected</div>
-              <div class="detail-sub">There is nothing in the trail yet</div>
+              
             </div>
-          </div>
-          <div class="mt-3" style="font-size:13px; color:var(--text-muted); line-height:1.6;">
-            Editing a saved consultation or sending an SMS broadcast writes an entry here,
-            naming who acted, what changed, and what the record said before.
           </div>
 {%- endif %}
 {%- for entry in entries %}

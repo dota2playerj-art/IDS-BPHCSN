@@ -586,7 +586,7 @@
               <span class="material-symbols-outlined" style="font-size:30px; color:var(--teal-dark);">medical_information</span>
             </div>
             <h5>No medical history yet</h5>
-            <p>Nothing has been recorded for this patient. Diagnoses entered during consultations will appear here.</p>
+            <p>No diagnoses recorded.</p>
           </div>
 {%- endif %}
         </div>
@@ -866,7 +866,7 @@
               <span class="material-symbols-outlined" style="font-size:30px; color:var(--teal-dark);">stethoscope</span>
             </div>
             <h5>No consultations yet</h5>
-            <p>This patient has no recorded consultations. Visits logged at the health center will appear here.</p>
+            <p>No consultations recorded.</p>
           </div>
 {%- endif %}
         </div>
@@ -949,7 +949,7 @@
               <span class="material-symbols-outlined" style="font-size:30px; color:var(--teal-dark);">pill</span>
             </div>
             <h5>Nothing dispensed yet</h5>
-            <p>Nothing has been issued to this patient from the health center's stock. Medicine, supplies and equipment recorded on the Record Consultation form appear here.</p>
+            <p>Nothing dispensed.</p>
           </div>
 {%- endif %}
         </div>
@@ -1235,11 +1235,7 @@
 {%- endif %}
 
           <div style="font-size:12px; color:var(--text-muted); margin-top:16px; padding-top:12px; border-top:1px dashed var(--border-color);">
-            <div>Doses given here are recorded during a consultation.</div>
-            <div>A dose given elsewhere counts when its vaccination card was seen. A parent's word alone does not count.</div>
-            <div>A dose is <strong style="display:inline;">Due Now</strong> from its recommended age.
-            With nothing on file {{ immunization.grace_period_days }} days later it reads
-            <strong style="display:inline;">No record</strong>. It may have been given elsewhere, so ask for the card.</div>
+            <div>A dose given elsewhere counts when its vaccination card was seen.</div>
 {%- if not immunization.applicable %}
             {{ patient.first_name }} is past the under-{{ immunization.pediatric_age_years }} cohort the infant schedule covers,
             so nothing here is flagged due or as having no record; the history is shown as recorded.
@@ -1280,7 +1276,7 @@
 {%- if general_vaccinations %}
                   {{ general_vaccinations | length }} vaccination{{ '' if general_vaccinations | length == 1 else 's' }} on file outside the EPI schedule &middot; recorded as given, not graded against a schedule
 {%- else %}
-                  Vaccinations given outside the DOH EPI schedule &mdash; any patient, any age
+                  Other vaccinations
 {%- endif %}
                 </div>
               </div>
@@ -1331,7 +1327,7 @@
             </div>
 {%- else %}
             <div style="border-radius:12px; border:1px dashed var(--border-color); background:var(--bg); color:var(--text-muted); padding:16px; font-size:13px;">
-              None on file. A vaccination outside the EPI schedule, such as a tetanus booster, is recorded on the consultation form and appears here.
+              None on file.
             </div>
 {%- endif %}
           </div>
@@ -1341,7 +1337,7 @@
               <span class="material-symbols-outlined" style="font-size:30px; color:var(--teal-dark);">vaccines</span>
             </div>
             <h5>No vaccination record</h5>
-            <p>The DOH EPI schedule covers children under {{ immunization.pediatric_age_years }}, and this patient has no doses on file. Anything given at a consultation appears here.</p>
+
           </div>
 {%- endif %}
         </div>
@@ -1405,7 +1401,7 @@
                           </div>
                         </div>
                         <div style="font-size:12px; color:var(--text-muted); margin-top:14px; padding-top:12px; border-top:1px dashed var(--border-color);">
-                          Written when the patient checked in (or, on an older row, when the visit was booked). It cannot be edited. What happened is in Consultation History.
+                          Written at check-in. It cannot be edited.
                         </div>
                       </div>
                     </div>
@@ -1421,7 +1417,7 @@
               <span class="material-symbols-outlined" style="font-size:30px; color:var(--teal-dark);">calendar_month</span>
             </div>
             <h5>No appointments yet</h5>
-            <p>This patient has no visits on record. Every visit checked in on the Patient Queue appears here once it is recorded.</p>
+            <p>No visits on record.</p>
           </div>
 {%- endif %}
         </div>
@@ -1501,10 +1497,6 @@
                 </div>
               </div>
 {%- endif %}
-              <p style="margin-bottom:10px; font-size:13.5px;">
-                This corrects what the record says. The record itself is kept &mdash; nothing is deleted,
-                and it stays on {{ patient.first_name }}'s file under the corrected details.
-              </p>
               <p id="correctSubject" style="margin-bottom:16px; font-size:13.5px; color:var(--text-muted);">
 {%- if cstate %}Correcting: {{ cstate.current.label }}{% if cstate.current.reported and cstate.current.source_label %} &mdash; {{ cstate.current.source_label }}{% endif %}{% if cstate.current.recorded_by %}, recorded by {{ cstate.current.recorded_by }}{% endif %}.{% endif %}
               </p>
@@ -1526,7 +1518,7 @@
 {%- if cerr.get(correction.vaccine_field) %}
                 <div class="field-error">{{ cerr.get(correction.vaccine_field) }}</div>
 {%- else %}
-                <div class="field-hint">The DOH Expanded Program on Immunization schedule. Changing this files the record under a different scheduled dose.</div>
+                
 {%- endif %}
               </div>
 
@@ -1544,7 +1536,7 @@
 {%- if cerr.get(correction.name_field) %}
                   <div class="field-error">{{ cerr.get(correction.name_field) }}</div>
 {%- else %}
-                  <div class="field-hint">The vaccines the health center gives most often are suggested; any other name can be typed.</div>
+                  
 {%- endif %}
                 </div>
                 <div style="margin-bottom:16px;">
@@ -1558,7 +1550,7 @@
 {%- if cerr.get(correction.dose_field) %}
                   <div class="field-error">{{ cerr.get(correction.dose_field) }}</div>
 {%- else %}
-                  <div class="field-hint">Optional. Leave it blank where the vaccine has no fixed dose count &mdash; most do not.</div>
+                  <div class="field-hint">Optional.</div>
 {%- endif %}
                 </div>
               </div>
@@ -1583,10 +1575,10 @@
                 <div class="field-error">{{ cerr.get(correction.date_field) }}</div>
 {%- else %}
                 <div class="field-hint" id="correctDateHint"
-                     data-hint-required="The day the vaccine was actually administered. It cannot be in the future or before {{ patient.first_name }} was born."
-                     data-hint-optional="This dose is recorded as given elsewhere, so the date belongs to another facility's records. Leave it blank if it is not known — it cannot be in the future or before {{ patient.first_name }} was born.">
-{%- if reported_now %}This dose was given elsewhere, so the date belongs to another facility. Leave it blank if unknown. It cannot be in the future or before {{ patient.first_name }} was born.
-{%- else %}The day the vaccine was actually administered. It cannot be in the future or before {{ patient.first_name }} was born.{% endif %}
+                     data-hint-required="The day it was given. Not in the future or before birth."
+                     data-hint-optional="Leave blank if not known. Not in the future or before birth.">
+{%- if reported_now %}Leave blank if not known. Not in the future or before birth.
+{%- else %}The day it was given. Not in the future or before birth.{% endif %}
                 </div>
 {%- endif %}
               </div>
@@ -1594,9 +1586,7 @@
               <div class="audit-notice">
                 <span class="material-symbols-outlined" style="font-size:18px; margin-top:1px;">history</span>
                 <div>
-                  <strong style="display:block; margin-bottom:2px;">This correction will be logged</strong>
-                  The audit trail will record your name, the time, and every field that changed
-                  with both its old and its new value. That entry cannot be edited or removed.
+                  <strong style="display:block; margin-bottom:2px;">This correction is recorded in the audit log.</strong>
                 </div>
               </div>
             </div>
@@ -1647,7 +1637,7 @@
               </div>
 {%- endif %}
               <p id="elsewhereSubject" style="margin-bottom:14px; font-size:13.5px; color:var(--text-muted);">{% if estate %}{{ estate.label }} for {{ patient.first_name }}.{% endif %}</p>
-              <p style="margin-bottom:14px; font-size:13.5px;">Ask for {{ patient.first_name }}'s vaccination card or record book. Say how you know the dose was given.</p>
+              <p style="margin-bottom:14px; font-size:13.5px;">Ask for the vaccination card or record book.</p>
               <div style="margin-bottom:16px;">
                 <div class="field-label">How do you know?</div>
 {%- for value, text in elsewhere.choices %}
@@ -1666,20 +1656,12 @@
 {%- if eerr.get(elsewhere.date_field) %}
                 <div class="field-error">{{ eerr.get(elsewhere.date_field) }}</div>
 {%- else %}
-                <div class="field-hint">The date on the card. For the parent's word it can be left blank if not known. It cannot be in the future or before {{ patient.first_name }} was born.</div>
+                <div class="field-hint">The date on the card. Not in the future or before birth.</div>
 {%- endif %}
               </div>
               <div style="margin-bottom:16px;">
                 <label class="field-label" for="elsewherePlace">Place given <span style="font-weight:500; color:var(--text-muted);">(optional)</span></label>
                 <input type="text" class="form-control" id="elsewherePlace" name="{{ elsewhere.place_field }}" maxlength="{{ elsewhere.max_place_length }}" autocomplete="off" value="{{ eform.get(elsewhere.place_field, '') }}">
-                <div class="field-hint">For example, the hospital or health center named on the card.</div>
-              </div>
-              <div class="audit-notice">
-                <span class="material-symbols-outlined" style="font-size:18px; margin-top:1px;">history</span>
-                <div>
-                  <strong style="display:block; margin-bottom:2px;">This will be logged</strong>
-                  The audit log records your name and the time. It does not name the vaccine.
-                </div>
               </div>
             </div>
             <div class="modal-footer">

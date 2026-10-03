@@ -395,7 +395,7 @@
 
     <div class="eyebrow">{{ health_center.name }}</div>
     <div class="page-title">Patient Queue</div>
-    <div class="page-desc">Check patients in as they arrive, work today's queue in order, and see what each day of the month held.</div>
+    <div class="page-desc">Check in patients and work today's queue.</div>
 
 {#- SERVICES TODAY, from the Service Schedule (routes/appointment_views.py
     _services_today()). This is the schedule's daily use: the desk sees what is
@@ -424,12 +424,10 @@
           <div class="st-item" title="{{ entry.days_text }}">{{ entry.service }}{% if entry.note %}<span class="st-note">{{ entry.note }}</span>{% endif %}</div>
 {%- endfor %}
         </div>
-        <div class="st-body">Walk-ins for anything else are checked in and seen as usual.</div>
 {%- elif st.total == 0 %}
-        <div class="st-body">No service days have been entered yet. The Administrator enters them on the Service Schedule. Patients are seen as they arrive either way.</div>
+        <div class="st-body">No service days entered yet.</div>
 {%- else %}
-        <div class="st-body">Nothing on the service schedule runs on this {{ st.date.strftime('%A') }}.
-          Patients are checked in and seen as usual.</div>
+        <div class="st-body">Nothing is scheduled today.</div>
 {%- endif %}
       </div>
     </div>
@@ -577,7 +575,7 @@
       <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-2">
         <div>
           <div class="panel-title">Today's Queue</div>
-          <div class="panel-sub">{{ queue_date | display_date }} &middot; in arrival order, patients in consultation first</div>
+          <div class="panel-sub">{{ queue_date | display_date }}</div>
         </div>
       </div>
 
@@ -670,9 +668,9 @@
     _appointment_export(), which says why an empty sheet would have been worse
     than no sheet. #}
           <a class="btn-outline-teal" href="{{ url_for(appointments_excel_endpoint, month=calendar.month_start.strftime('%Y-%m')) }}" download
-             title="Download today's queue and this calendar month as an Excel workbook — the full lists, not as filtered on screen"><span class="material-symbols-outlined" style="font-size:18px;">description</span>Export Excel</a>
+             title="Download as Excel"><span class="material-symbols-outlined" style="font-size:18px;">description</span>Export Excel</a>
           <a class="btn-outline-teal" href="{{ url_for(appointments_pdf_endpoint, month=calendar.month_start.strftime('%Y-%m')) }}" download
-             title="Download today's queue and this calendar month as a PDF on the health center's letterhead — the full lists, not as filtered on screen"><span class="material-symbols-outlined" style="font-size:18px;">picture_as_pdf</span>Export PDF</a>
+             title="Download as PDF"><span class="material-symbols-outlined" style="font-size:18px;">picture_as_pdf</span>Export PDF</a>
 {%- if care_team_view %}
           <!-- The one thing a desk does here: record somebody who is standing at
                it now. New Appointment stood beside this and is gone with advance
@@ -726,8 +724,7 @@
           <div class="col-md-4 col-sm-6">
             <label>Date</label>
             <div style="font-size:12.5px; color:var(--text-muted); line-height:1.5; padding-top:6px;">
-              {{ queue_date | display_date }} &mdash; this panel filters today's queue only.
-              Other days are on the calendar above.
+              {{ queue_date | display_date }}
             </div>
           </div>
         </div>
@@ -932,7 +929,7 @@
             <div class="modal-body">
               <p style="font-size:13.5px; margin-bottom:6px;"><strong id="leftPatientName"></strong></p>
               <p style="font-size:13.5px; color:var(--text-muted); margin:0;">
-                Use this when the patient went home before the Doctor saw them. You can undo it today.
+                You can undo this today.
               </p>
             </div>
             <div class="modal-footer">
@@ -971,7 +968,7 @@
 {%- endfor %}
               </select>
               <p style="font-size:12.5px; color:var(--text-muted); margin:10px 0 0;">
-                Use this only to correct a mistake. The change is recorded.
+                The change is recorded.
               </p>
             </div>
             <div class="modal-footer">
@@ -1050,10 +1047,6 @@
             <div id="checkInExistingPane">
               <form id="checkInExistingForm" method="post" action="{{ url_for(check_in_patient_endpoint) }}">
                 {{ csrf_field() }}
-                <div class="mode-hint">
-                  Records their arrival and puts them in today's queue, in the order
-                  they got here.
-                </div>
 
                 <label class="field-label" for="checkInSearch">Patient</label>
                 <div class="toolbar-search mb-2">
@@ -1092,12 +1085,11 @@
                   <option value="{{ service }}">{{ service }}</option>
 {%- endfor %}
                 </select>
-                <div class="form-text-hint">What the patient came for. It decides whether the visit waits for the Doctor.</div>
+                <div class="form-text-hint">What the patient came for.</div>
 
                 <label class="field-label mt-3" for="checkInReason">Reason for visit</label>
                 <input type="text" class="form-control" id="checkInReason" name="reason" maxlength="200"
                        placeholder="e.g. Fever and cough for three days" required>
-                <div class="form-text-hint">Recorded against the visit. The full consultation record is entered once the patient is seen.</div>
               </form>
             </div>
 
@@ -1109,10 +1101,6 @@
               <form id="checkInNewForm" method="post" action="{{ url_for(register_patient_endpoint) }}">
                 {{ csrf_field() }}
                 <input type="hidden" name="check_in_start" value="1">
-                <div class="mode-hint">
-                  Opens the Register Patient form. Saving it registers the patient
-                  <em>and</em> places them in today's queue in one step.
-                </div>
 
                 <label class="field-label" for="newPatientService">Service<span class="req">*</span></label>
                 <select class="form-select" id="newPatientService" name="check_in_service" required>
@@ -1121,12 +1109,11 @@
                   <option value="{{ service }}">{{ service }}</option>
 {%- endfor %}
                 </select>
-                <div class="form-text-hint">What the patient came for. It decides whether the visit waits for the Doctor.</div>
+                <div class="form-text-hint">What the patient came for.</div>
 
                 <label class="field-label mt-3" for="newPatientReason">Reason for visit</label>
                 <input type="text" class="form-control" id="newPatientReason" name="check_in_reason" maxlength="200"
                        placeholder="e.g. First prenatal check-up" required>
-                <div class="form-text-hint">Carried through the registration form and recorded against today's visit.</div>
               </form>
             </div>
           </div>

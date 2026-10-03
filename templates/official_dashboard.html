@@ -131,7 +131,7 @@
         Removed rather than reworded, for the same reason the header's "Synced just
         now" pill and the SMS "Connected" badge went before them: an honest version
         of either would need a real check behind it, and there is none to attach. #}
-    <div style="font-size:14px; color:var(--text-muted); margin-bottom:20px;">{{ clinic_today | full_date }} &middot; Community health overview for {{ health_center.barangay }}.</div>
+    <div style="font-size:14px; color:var(--text-muted); margin-bottom:20px;">{{ clinic_today | full_date }} </div>
 
     <!-- STAT CARDS — every value below is read from a call this role already
          reads elsewhere: get_broadcast_stats() behind Screen 09's cards,
@@ -285,7 +285,7 @@
         <!-- HEALTH PROGRAM PROGRESS -->
         <div class="panel-card">
           <div class="panel-title mb-1">Health Programme Membership</div>
-          <div class="panel-sub mb-3">Counted from stored records, as a share of the {{ patient_report.total }} registered patients</div>
+          <div class="panel-sub mb-3">Share of {{ patient_report.total }} registered patients</div>
 
 {#- Five progress bars against invented 2026 targets stood here. There is no
     enrolment table and no target anywhere, so a percentage "vs. target" cannot

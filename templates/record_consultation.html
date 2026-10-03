@@ -209,7 +209,7 @@
     <div class="eyebrow">{{ health_center.name }}</div>
     <div class="page-title">{% if consultation %}Edit Consultation{% else %}Record Consultation{% endif %}</div>
     {%- if consultation %}
-    <div class="page-desc">Correct what was written about this visit. The patient and the visit date cannot be changed. Every change is audited.</div>
+    <div class="page-desc">Every change is recorded in the audit log.</div>
     {%- else %}
     <div class="page-desc">Write up what happened during this visit. Saving marks the patient's queue entry Completed and frees the clinician for whoever is next. Fields marked with <span style="color:var(--danger);">*</span> are required.</div>
     {%- endif %}
@@ -336,7 +336,6 @@
           <div class="section-icon"><span class="material-symbols-outlined">assignment</span></div>
           <div>
             <div class="section-title">Presenting Complaint</div>
-            <div class="section-sub">What the patient came in for, in their own words where possible</div>
           </div>
         </div>
         <label class="field-label">{{ field_labels.chief_complaint }}{% if not (intake_text_withheld or sealed_unopenable) %}<span class="req">*</span>{% endif %}</label>
@@ -366,7 +365,6 @@
           <div class="section-icon"><span class="material-symbols-outlined">monitor_heart</span></div>
           <div>
             <div class="section-title">Vital Signs</div>
-            <div class="section-sub">Leave a field blank if it was not measured — do not estimate</div>
           </div>
         </div>
 
@@ -405,9 +403,6 @@
           <div class="section-icon"><span class="material-symbols-outlined">child_care</span></div>
           <div>
             <div class="section-title">Growth Measurements</div>
-            <div class="section-sub">
-              Shown because {{ patient.first_name }} is {{ age_context.age_display }} old
-            </div>
           </div>
         </div>
 
@@ -420,8 +415,8 @@
                    name="{{ field }}" value="{{ form[field] or '' }}"
                    placeholder="{{ low | round(1) }}–{{ high | round(1) }}">
             {%- if errors[field] %}<div class="invalid-feedback d-block">{{ errors[field] }}</div>
-            {%- elif field == 'height' %}<div class="form-text-hint">Recumbent length for infants; standing height once the child can stand.</div>
-            {%- else %}<div class="form-text-hint">Measured at the widest point, above the brow.</div>{% endif %}
+            {%- elif field == 'height' %}
+            {%- else %}{% endif %}
           </div>
 {%- endif %}
 {%- endfor %}
@@ -431,14 +426,6 @@
     boundary follows DOH Operation Timbang Plus and the WHO growth standards and
     head circumference's follows the age display; both are recorded in
     models/consultations.py, which is where someone asking why will be. #}
-        <div class="cohort-note">
-          Height is asked for under {{ pediatric_age_years }} (0&ndash;59 months).
-{%- if age_context.is_infant %}
-          Head circumference is asked for under {{ infant_age_years }} year.
-{%- else %}
-          Head circumference is asked for only under {{ infant_age_years }} year, so it is not here.
-{%- endif %}
-        </div>
       </div>
 
       <!-- IMMUNIZATIONS GIVEN TODAY — the Pass 3b section the hook above
@@ -459,9 +446,6 @@
           <div class="section-icon"><span class="material-symbols-outlined">vaccines</span></div>
           <div>
             <div class="section-title">Immunizations Given Today</div>
-            <div class="section-sub">
-              DOH Expanded Program on Immunization &middot; {{ immunization.summary }}
-            </div>
           </div>
         </div>
 
@@ -588,12 +572,8 @@
     in the comment on the locked cell above. The operator at the form is asking
     what this screen will let them do, so that is all it now says. #}
         <div class="cohort-note">
-          Doses ticked <strong style="display:inline;">Given today</strong> are recorded against this
-          consultation and dated {{ visit_date | display_date }}, with your name as the person who gave them.
-          Doses ticked <strong style="display:inline;">Given elsewhere</strong> need proof. A card you saw counts as given. A parent's word alone does not. A dose already on file cannot be changed here.
-{%- if consultation %}
-          You can still add a dose that was missed. Every addition is written to the audit log.
-{%- endif %}
+          Given elsewhere needs proof: a card you saw counts as given, a parent's word does not.
+          A dose already on file cannot be changed here.
         </div>
       </div>
 {%- endif %}
@@ -629,11 +609,9 @@
           <div class="section-icon"><span class="material-symbols-outlined">syringe</span></div>
           <div>
             <div class="section-title">Other Vaccinations Given</div>
-            <div class="section-sub">
-              Any patient, any age &middot; recorded as given, not measured against a schedule
-            </div>
           </div>
         </div>
+        <div class="cohort-note" style="margin:0 0 12px; padding:0; border:0;">Tick what was given today. Add a dose number only where the vaccine has one.</div>
 
 {%- if general_vaccination.recorded %}
         <!-- Already on file for this visit. Shown as fact rather than as ticked
@@ -706,18 +684,6 @@
     worse than a blank, why nothing here is graded due or missing -- which is
     reasoning that belonged in this comment rather than under the form. Every
     rule it stated is still stated. #}
-        <div class="cohort-note">
-          Tick what was given today. Doses are dated {{ visit_date | display_date }} and appear under Other Vaccinations on
-          {{ patient.first_name }}'s profile. Add a dose number only where the vaccine has one.
-{%- if age_context.is_infant %}
-          Under {{ infant_age_years }} year old, so this list shows only the vaccines
-          {{ patient.first_name }} can be given at this age &mdash; anything else that was
-          given goes in Other vaccine, by name.
-{%- endif %}
-{%- if consultation %}
-          A vaccination already on file for this visit cannot be removed here.
-{%- endif %}
-        </div>
       </div>
 
 {#- ONE definition of an item line, rendered twice: once for each line the
@@ -801,11 +767,9 @@
           <div class="section-icon"><span class="material-symbols-outlined">pill</span></div>
           <div>
             <div class="section-title">Items Dispensed</div>
-            <div class="section-sub">
-              Medicine, supplies or equipment taken off the shelf at this visit &middot; updates Medicine Inventory
-            </div>
           </div>
         </div>
+        <div class="cohort-note" style="margin:0 0 12px; padding:0; border:0;">Each line comes off Medicine Inventory at once. It is refused if the shelf holds less or the item has expired.</div>
 
 {%- if dispensing.recorded %}
         <!-- Already dispensed at this visit. Shown as fact rather than as
@@ -889,13 +853,6 @@
     out at length in models/dispensing.py and in the comments on this section,
     which is where someone asking "why" is; the operator at the form is asking
     "what happens if I type this". #}
-        <div class="cohort-note">
-          Each line comes off Medicine Inventory at once and appears in {{ patient.first_name }}'s Dispensing History.
-          It is refused if the shelf holds less or the item has expired.
-{%- if consultation %}
-          Anything already dispensed at this visit cannot be removed here.
-{%- endif %}
-        </div>
       </div>
 
       <!-- ASSESSMENT AND PLAN -->
@@ -920,7 +877,6 @@
           <div>
 {%- if can_diagnose %}
             <div class="section-title">Assessment &amp; Plan</div>
-            <div class="section-sub">What it was judged to be, and what was done about it</div>
 {%- else %}
 {#- Retitled rather than kept as "Assessment & Plan" with two thirds of it
     missing. A panel headed with the name of a thing it does not contain reads as
@@ -929,7 +885,6 @@
     would put the clinical judgement in the one box on this panel that is not
     restricted. It is named for what it actually collects. #}
             <div class="section-title">Notes &amp; Follow-up</div>
-            <div class="section-sub">Anything worth recording, and when the patient should come back</div>
 {%- endif %}
           </div>
         </div>
@@ -989,7 +944,7 @@
     "three times a day for five days" is written here; the fifteen tablets handed
     over are recorded there. Saying so stops the two being filled in as though
     either one were the other. #}
-          {%- else %}<div class="form-text-hint">The instruction itself &mdash; what to take, how much, how often, for how long. The amount handed over goes under Items Dispensed above.</div>{% endif %}
+          {%- else %}<div class="form-text-hint">What to take, how much and how often.</div>{% endif %}
 {%- if sealed_on_screen %}
           <div class="sealed-print-note">Sealed — not printed</div>
 {%- endif %}
@@ -1050,7 +1005,7 @@
 {#- Said only to the role that has the choice. A sealed visit encrypts this box
     along with the diagnosis, so the hint says who can read it either way. #}
 {%- if can_diagnose %}
-          <div class="form-text-hint">Visible to Health Center Staff and the Administrator unless this consultation is Restricted. If it is, only the Doctor can read it.</div>
+          
 {%- endif %}
 {%- endif %}
         </div>

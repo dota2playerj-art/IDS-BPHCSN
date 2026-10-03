@@ -140,7 +140,7 @@
     <div class="no-print">
       <div class="eyebrow">{{ health_center.name }}</div>
       <div class="page-title">Community Reports</div>
-      <div class="page-desc">{{ clinic_today | full_date }} &middot; Community-wide health statistics and reports for {{ health_center.barangay }}.</div>
+      <div class="page-desc">{{ clinic_today | full_date }}</div>
     </div>
     {#- WAS "All Systems Operational" (green dot) and "Secure Connection" (wifi
         icon) here. Both were fixed text, on this screen and six others. Nothing in
@@ -156,12 +156,6 @@
         of either would need a real check behind it, and there is none to attach. #}
 
     <div style="height:24px;" class="no-print"></div>
-
-    <div class="scope-note no-print">
-      <strong>Every figure on this screen is read from stored records.</strong>
-      Two figures have no source and say so: how many reports were generated, and coverage against the whole barangay.
-    </div>
-
 {%- if selection.errors %}
     <div class="range-error no-print">
       <strong>That range was not used.</strong> The report covers the default window instead.
@@ -202,7 +196,7 @@
     <form method="get" class="panel-card no-print" id="generateForm">
       <div class="panel-title mb-0">Generate a Community Report</div>
       <div class="panel-sub mb-0">
-        Choose a report and the days it should cover. Every figure below is recounted for that range.
+        Choose a report and a date range.
       </div>
       <div style="height:24px;"></div>
 
@@ -234,11 +228,11 @@
           <div class="d-flex gap-2 flex-wrap">
             <button type="submit" class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">insights</span>Generate</button>
             <button type="button" class="btn-outline-teal" onclick="window.print()"
-                    title="Print this report — the sidebar, header and controls drop out, the charts print as data tables, and the range above goes on the letterhead"><span class="material-symbols-outlined" style="font-size:18px;">print</span>Print</button>
+                    title="Print this report"><span class="material-symbols-outlined" style="font-size:18px;">print</span>Print</button>
             <a class="btn-outline-teal" href="{{ pdf_url }}" download
-               title="Download this report as a PDF: the same figures, with every chart's numbers as a table"><span class="material-symbols-outlined" style="font-size:18px;">picture_as_pdf</span>Export PDF</a>
+               title="Download as PDF"><span class="material-symbols-outlined" style="font-size:18px;">picture_as_pdf</span>Export PDF</a>
             <a class="btn-outline-teal" href="{{ excel_url }}" download
-               title="Download this report as an Excel workbook — the same figures over the same range, one sheet per section, with every chart's numbers as rows"><span class="material-symbols-outlined" style="font-size:18px;">description</span>Export Excel</a>
+               title="Download as Excel"><span class="material-symbols-outlined" style="font-size:18px;">description</span>Export Excel</a>
           </div>
         </div>
         <div class="col-12">
@@ -340,7 +334,7 @@
           <div class="stat-label">Children Up to Date on the DOH Schedule</div>
           <div class="stat-trend" style="color:var(--text-muted);">
             {{ immunization_coverage.up_to_date_children }} of {{ immunization_coverage.eligible_children }} registered children
-            as of {{ window.end | display_date }} &middot; not a barangay-wide rate
+            as of {{ window.end | display_date }}
           </div>
 {%- else %}
           <div class="stat-value" style="font-size:16px; color:var(--text-muted);">No children</div>
@@ -419,16 +413,14 @@
                   [{'name': 'Patients', 'values': top_conditions | map(attribute='count') | list}],
                   first_head='Condition') }}
           <div class="basis-note mt-3">
-            A patient with two conditions is counted under each, so these do not sum to the roster.{{ small_count_note(top_conditions) }}
+            A patient with two conditions is counted under each.{{ small_count_note(top_conditions) }}
 {%- if conditions.other_only %}
             {{ conditions.other_only_shown }} patient{{ '' if conditions.other_only_shown == 1 else 's' }}
             recorded only free-text conditions and {{ 'is' if conditions.other_only_shown == 1 else 'are' }} not counted here.
 {%- endif %}
           </div>
 {%- else %}
-          <div class="empty-note">
-            No patient has a recorded chronic condition yet. The four conditions on the registration form are counted as entered.
-          </div>
+          <div class="empty-note">No chronic conditions recorded.</div>
 {%- endif %}
 {#- The honest half of this panel. "Top health concerns" over a date range has
     two answers and they are different questions: what people were diagnosed with
@@ -437,11 +429,6 @@
     registered today, not who was ill during the range. Showing one without
     saying which it is would let a reader take the standing register for the
     period's illness. #}
-          <div class="snapshot-note">
-            The chart above is the whole register as it stands today.<br>{{ snapshot_note }}<br>
-            What <em>was</em> recorded between {{ window.start | display_date }} and
-            {{ window.end | display_date }} is listed beside it.
-          </div>
         </div>
       </div>
       <div class="col-lg-6">
@@ -466,8 +453,7 @@
 {%- endfor %}
 {%- if consultation_report_stats.window.top_diagnoses %}
           <div class="basis-note mt-3">
-            Grouped by the text entered, ignoring case. Free text is not coded, so two
-            spellings of one condition count separately.
+            Grouped by the text entered.
             {{- ranking_note(consultation_report_stats.window.top_diagnoses, withheld, 'diagnoses') }}
           </div>
 {%- endif %}
@@ -498,11 +484,11 @@
           </div>
           <div style="height:16px;"></div>
           <div class="fig-row">
-            <span class="fig-name">Attended<span class="fig-note">Completed visits, plus those in the clinic right now</span></span>
+            <span class="fig-name">Attended</span>
             <span class="fig-value">{{ appt.attended }}</span>
           </div>
           <div class="fig-row">
-            <span class="fig-name">Waiting for the Doctor<span class="fig-note">Intake saved, no diagnosis yet</span></span>
+            <span class="fig-name">Waiting for the Doctor</span>
             <span class="fig-value">{{ appt.awaiting }}</span>
           </div>
           <div class="fig-row">
@@ -510,24 +496,16 @@
             <span class="fig-value">{{ appt.missed }}</span>
           </div>
           <div class="fig-row">
-            <span class="fig-name">Left before being seen<span class="fig-note">Checked in, then went home</span></span>
+            <span class="fig-name">Left before being seen</span>
             <span class="fig-value">{{ appt.left }}</span>
           </div>
           <div class="fig-row">
-            <span class="fig-name">Still expected<span class="fig-note">From the earlier booking system, never closed</span></span>
-            <span class="fig-value">{{ appt.expected }}</span>
-          </div>
-          <div class="fig-row">
-            <span class="fig-name">Attendance rate<span class="fig-note">Of the {{ appt.resolved }} that have resolved &mdash; a visit still to happen has not yet succeeded or failed</span></span>
+            <span class="fig-name">Attendance rate<span class="fig-note">Of the {{ appt.resolved }} that have resolved</span></span>
 {%- if appt.attendance_pct is not none %}
             <span class="fig-value">{{ appt.attendance_pct }}%</span>
 {%- else %}
             <span class="fig-value muted">No resolved visits</span>
 {%- endif %}
-          </div>
-          <div class="fig-row">
-            <span class="fig-name">Walk-ins<span class="fig-note">Of {{ appt.total }} appointments in this range</span></span>
-            <span class="fig-value">{{ appt.walk_ins }}</span>
           </div>
         </div>
       </div>
@@ -562,7 +540,7 @@
     today's roster; the system keeps no history of who was reachable in March, so
     a ranged version of it would be asserting a roster it does not hold. #}
           <div class="fig-row">
-            <span class="fig-name">Contacts reachable by SMS<span class="fig-note">Patients with a usable mobile number on file, today</span></span>
+            <span class="fig-name">Contacts reachable by SMS</span>
             <span class="fig-value">{{ broadcast_stats.reachable_contacts }}</span>
           </div>
         </div>

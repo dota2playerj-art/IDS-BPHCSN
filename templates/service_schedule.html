@@ -109,7 +109,7 @@
 {% block content %}
     <div class="eyebrow">{{ health_center.name }}</div>
     <div class="page-title">Service Schedule</div>
-    <div class="page-desc">Which services run on which days. Patients are still seen in the order they walk in, whatever the day.</div>
+    <div class="page-desc">Which services run on which days.</div>
 
     <div class="row g-4 mt-1">
       <div class="{{ 'col-lg-8' if panel else 'col-12' }}">
@@ -122,18 +122,7 @@
         <div class="untracked mb-4" id="scheduleEmpty">
           <span class="material-symbols-outlined">event_busy</span>
           <div>
-            <div class="untracked-title">No service days have been entered yet</div>
-            <div class="untracked-body">
-              The health center has not confirmed which services run on which
-              days, so the schedule is empty. It has not been filled with a guess.<br>
-{%- if panel %}
-              Add each service with the panel on the right once its days are known.
-{%- else %}
-              The Administrator will enter the days once they are confirmed.
-{%- endif %}
-              Until then, patients are checked in and seen as they arrive, as they
-              always have been.
-            </div>
+            <div class="untracked-title">No service days have been entered yet.</div>
           </div>
         </div>
 {%- else %}
@@ -162,8 +151,7 @@
           <div class="untracked mt-3">
             <span class="material-symbols-outlined">event_busy</span>
             <div>
-              <div class="untracked-title">Nothing on the schedule runs today</div>
-              <div class="untracked-body">None of the {{ total_entries }} service{{ '' if total_entries == 1 else 's' }} on the schedule falls on this {{ schedule_today.strftime('%A') }}. Patients are still checked in and seen as usual.</div>
+              <div class="untracked-title">Nothing on the schedule runs today.</div>
             </div>
           </div>
 {%- endif %}
@@ -301,7 +289,7 @@
 {%- if errors.service %}
               <div class="field-error">{{ errors.service }}</div>
 {%- endif %}
-              <div class="form-text-hint" id="scheduleServiceHint">Use the name the health center uses for it. {% if service_suggestions %}Names already on the schedule are suggested as you type, so each service is spelled one way.{% else %}The schedule is empty, so there are no names to suggest yet.{% endif %} Up to {{ service_max_length }} characters.</div>
+              <div class="form-text-hint" id="scheduleServiceHint">Up to {{ service_max_length }} characters.</div>
             </div>
 
             <div class="mb-3">
@@ -327,7 +315,7 @@
 {%- if errors.weeks %}
               <div class="field-error">{{ errors.weeks }}</div>
 {%- endif %}
-              <div class="form-text-hint">Leave these blank if it runs every week. Wednesday with the 2nd and 4th means the 2nd and 4th Wednesday of every month.</div>
+              <div class="form-text-hint">Leave blank if it runs every week.</div>
             </div>
 
             <div class="mb-3">
@@ -336,7 +324,7 @@
 {%- if errors.note %}
               <div class="field-error">{{ errors.note }}</div>
 {%- endif %}
-              <div class="form-text-hint">Anything that decides whether it actually runs, such as who has to request it or who has to be there. Up to {{ note_max_length }} characters.</div>
+              <div class="form-text-hint">Optional. Up to {{ note_max_length }} characters.</div>
             </div>
 
             <div class="d-flex gap-2 flex-wrap">
@@ -354,7 +342,4 @@
 {%- endif %}
     </div>
 
-    <div class="scope-note mt-2">
-      <strong>This schedule is information, not a rule.</strong> Nothing here stops a patient being checked in or seen on a day their service is not listed. It sends no SMS.
-    </div>
 {% endblock %}

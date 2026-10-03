@@ -131,14 +131,10 @@
     the panes this screen no longer has, and promised the reader could
     "configure" all of it -- which was true of none of it at the time and is now
     true of exactly one pane. #}
-    <div class="page-desc">Set the health center's name, location and clinic hours; read the security, password and database facts this system can report; and download a backup.</div>
+    <div class="page-desc">Health center details, security facts and backup.</div>
 
     <div style="height:16px;"></div>
 
-        <div class="scope-note">
-      <strong>Some of this screen is live, and each pane says which it is.</strong>
-      <strong style="display:inline; font-weight:600;">General Settings</strong> is saved and used across the system. The other panes are read from what the system does.
-    </div>
     <!-- SETTINGS PANEL -->
     <div class="panel-card">
       <div class="row g-0">
@@ -162,7 +158,6 @@
             <!-- GENERAL SETTINGS -->
             <div class="tab-pane fade{% if active_pane == 'pane-general' %} show active{% endif %}" id="pane-general">
               <div class="section-title">General Settings</div>
-              <div class="section-sub">The health center&#39;s own name, where it stands, and the hours it keeps</div>
 
               <form method="post" action="{{ url_for('admin.save_general_settings') }}" novalidate>
                 {{ csrf_field() }}
@@ -191,7 +186,7 @@
 {%- if general.errors.health_center_name %}
                   <div class="field-error">{{ general.errors.health_center_name }}</div>
 {%- endif %}
-                  <div class="form-text-hint">Printed at the top of every PDF and Excel export, and shown in the header of every screen.</div>
+                  <div class="form-text-hint">Shown on screens and exports.</div>
                 </div>
               </div>
 
@@ -255,7 +250,7 @@
               </div>
               <div class="form-text-hint" style="margin-top:8px;">
                 Currently {{ general.opening_label }} to {{ general.closing_label }}.
-                These hours appear on exports and printed records. They do not limit visits. The day must be at least 30 minutes long.
+                The day must be at least 30 minutes long.
               
               </div>
 
@@ -276,20 +271,18 @@
             <!-- HEALTH CENTER INFORMATION -->
             <div class="tab-pane fade{% if active_pane == 'pane-sms' %} show active{% endif %}" id="pane-sms">
               <div class="section-title">SMS</div>
-              <div class="section-sub">How community messages are sent</div>
               <div class="gateway-banner {{ 'live' if sms_mode.startswith('SMS mode: Live') else 'simulated' }}" style="margin-top:0;">
                 <span class="material-symbols-outlined">{{ 'cell_tower' if sms_mode.startswith('SMS mode: Live') else 'wifi_off' }}</span>
                 <div><span class="gw-title">{{ sms_mode }}</span></div>
               </div>
               <div class="scope-note">
-                The provider is Semaphore. Its key is read from the server (SEMAPHORE_API_KEY). Every broadcast is recorded either way.
+                Every broadcast is recorded either way.
               </div>
             </div>
 
             <!-- SECURITY SETTINGS -->
             <div class="tab-pane fade{% if active_pane == 'pane-security' %} show active{% endif %}" id="pane-security">
               <div class="section-title">Security Settings</div>
-              <div class="section-sub">What this system enforces and records about signing in</div>
 
               <div class="subsection-title"><span class="material-symbols-outlined" style="color:var(--teal-dark); font-size:18px;">verified_user</span>What is actually enforced</div>
               <div class="fact-row">
@@ -302,25 +295,20 @@
               <div class="fact-row">
                 <div>
                   <div class="fact-label">Every screen checks the role that opens it</div>
-                  <div class="fact-desc">Each route has its own guard, so a link typed by hand is refused too. User Management lists what each role may open.</div>
+                  <div class="fact-desc">Each screen checks the role.</div>
                 </div>
                 <div class="fact-value" style="color:#15803D;">Enforced</div>
               </div>
               <div class="fact-row">
                 <div>
                   <div class="fact-label">A deactivated account loses its session at the next click</div>
-                  <div class="fact-desc">The account is checked on every request, so switching it off ends a session already in use.</div>
+                  <div class="fact-desc">Switching an account off ends its session.</div>
                 </div>
                 <div class="fact-value" style="color:#15803D;">Enforced</div>
               </div>
 
                             <div class="subsection-divider"></div>
               <div class="subsection-title"><span class="material-symbols-outlined" style="color:var(--teal-dark); font-size:18px;">fact_check</span>What is actually recorded</div>
-              <div class="scope-note" style="margin-top:0;">
-                These figures are live. They are the same rows
-                <a href="{{ url_for('admin.audit_logs', module='Authentication') }}">Audit Logs</a>
-                lists under Authentication.
-              </div>
               <div class="backup-row">
                 <div class="backup-label">Sign-ins recorded</div>
                 <div class="backup-value">
@@ -345,30 +333,19 @@
                 {%- if security.most_recent_at %}
                 <div class="backup-value">{{ security.most_recent_at }} <span style="color:var(--text-muted); font-weight:400;">&middot; {{ security.most_recent_name }}</span></div>
                 {%- else %}
-                <div class="backup-value" style="color:var(--text-muted);" title="The trail holds no sign-in yet. This is a real state on a freshly seeded database, not a missing figure.">No sign-in recorded yet</div>
+                <div class="backup-value" style="color:var(--text-muted);" >No sign-in recorded yet</div>
                 {%- endif %}
-              </div>
-                            <div class="form-text-hint" style="margin-top:10px;">
-                A refused sign-in records the account, the time and the address, never the password. Signing out is not recorded.
               </div>
             </div>
 
             <!-- PASSWORD POLICY -->
             <div class="tab-pane fade{% if active_pane == 'pane-pwd' %} show active{% endif %}" id="pane-pwd">
               <div class="section-title">Password Policy</div>
-              <div class="section-sub">The rule enforced when an account is created or its password is reset</div>
-
-              <div class="scope-note" style="margin-top:0;">
-                <strong>This is a display, not a setting.</strong>
-                Nothing on this pane can be changed. The rule is read from the code that enforces it. It applies on
-                
-                <a href="{{ url_for('admin.user_management') }}">User Management</a>, to both Add User and Reset Password.
-              </div>
 
               <div class="fact-row">
                 <div>
                   <div class="fact-label">Minimum length</div>
-                  <div class="fact-desc">Refused below this. Length is the only one of these rules that costs an attacker anything, which is why it is the one set well above the usual eight.</div>
+                  <div class="fact-desc">Shorter passwords are refused.</div>
                 </div>
                 <div class="fact-value">{{ password_policy.min_length }} characters</div>
               </div>
@@ -376,8 +353,7 @@
                 <div>
                   <div class="fact-label">Kinds of character</div>
                   <div class="fact-desc">
-                    At least {{ password_policy.min_kinds }} of these {{ password_policy.kinds|length }} must appear. Not each one
-                    individually &mdash; a long passphrase with no symbol in it passes, and so does one with no capital letter.
+                    At least {{ password_policy.min_kinds }} of these {{ password_policy.kinds|length }} must appear.
                     <ul class="fact-list" style="margin-top:6px;">
 {%- for kind in password_policy.kinds %}
                       <li>{{ kind }}</li>
@@ -390,36 +366,21 @@
               <div class="fact-row">
                 <div>
                   <div class="fact-label">Must not contain the username or the person&#39;s name</div>
-                  <div class="fact-desc">Checked without regard to capitals, against the username and each part of the full name of {{ password_policy.min_banned_word }} letters or more.</div>
+                  <div class="fact-desc">Capitals do not matter.</div>
                 </div>
                 <div class="fact-value">Enforced</div>
               </div>
               <div class="fact-row">
                 <div>
                   <div class="fact-label">Must not be a commonly-guessed password</div>
-                  <div class="fact-desc">Compared after lower-casing and removing digits and punctuation from the end, so &ldquo;password2026&rdquo; is refused too. The list is short.</div>
+                  <div class="fact-desc">Numbers on the end do not help.</div>
                 </div>
                 <div class="fact-value">{{ password_policy.blocklist_size }} entries</div>
               </div>
 
-              <div class="subsection-divider"></div>
-              <div class="subsection-title"><span class="material-symbols-outlined" style="color:var(--teal-dark); font-size:18px;">info</span>What this rule does not do</div>
-{#- Said out loud rather than left out. Two of the four below are the features
-    the deleted switches claimed, and a pane that simply stopped mentioning them
-    would leave an administrator to assume they are handled somewhere else. They
-    are handled nowhere. Read from password_policy() like everything above it. #}
-{%- for heading, detail in password_policy.not_enforced %}
-              <div class="fact-row">
-                <div>
-                  <div class="fact-label">{{ heading }}</div>
-                  <div class="fact-desc">{{ detail }}</div>
-                </div>
-                <div class="fact-value" style="color:var(--text-muted); font-weight:500;">Not enforced</div>
-              </div>
-{%- endfor %}
+
 
               <div class="form-text-hint" style="margin-top:14px;">
-                The same rule Add User shows above its password box, and the one a refused password is given:<br>
                 {% set _rule = password_policy.rule_text.split('. ', 1) %}&ldquo;{{ _rule[0] }}.<br>{{ _rule[1] }}&rdquo;
               </div>
             </div>
@@ -427,11 +388,9 @@
             <!-- BACKUP & RESTORE -->
             <div class="tab-pane fade{% if active_pane == 'pane-backup' %} show active{% endif %}" id="pane-backup">
               <div class="section-title">Backup &amp; Restore</div>
-              <div class="section-sub">Take a copy of the database, now, from this screen</div>
 
               <div class="scope-note" style="margin-top:0;">
-                <strong>Download Backup takes a real copy, right now.</strong>
-                It is safe to press while others use the system, and the copy is checked before it is sent. Keep it safe: it holds patient records.
+                Keep the backup safe: it holds patient records.
               </div>
               <div class="scope-note">
                 <span class="material-symbols-outlined" style="font-size:16px; vertical-align:-3px;">lock</span>
@@ -441,9 +400,9 @@
               <div class="backup-row">
                 <div class="backup-label">Database size</div>
 {%- if backup.size %}
-                <div class="backup-value" title="Measured from the database file this system is serving your request from, at the moment this page was built.">{{ backup.size }}</div>
+                <div class="backup-value" >{{ backup.size }}</div>
 {%- else %}
-                <div class="backup-value" style="color:var(--text-muted);" title="The database file could not be measured. This does not mean a backup would fail — the copy is taken through SQLite rather than through the file system.">Could not be read</div>
+                <div class="backup-value" style="color:var(--text-muted);" >Could not be read</div>
 {%- endif %}
               </div>
               <div class="backup-row">
@@ -451,17 +410,17 @@
 {%- if backup.last_at %}
                 <div class="backup-value">{{ backup.last_at }}{% if backup.last_by %} <span style="color:var(--text-muted); font-weight:400;">&middot; {{ backup.last_by }}</span>{% endif %}</div>
 {%- else %}
-                <div class="backup-value" style="color:var(--text-muted);" title="No download has been recorded. Copies made by hand are not visible to this system.">None yet</div>
+                <div class="backup-value" style="color:var(--text-muted);" >None yet</div>
 {%- endif %}
               </div>
               <div class="backup-row">
                 <div class="backup-label">Backup schedule</div>
-                <div class="backup-value" style="color:var(--text-muted);" title="No backup runs on a timer. Nothing in this system schedules one; a backup happens when somebody presses Download Backup.">None &mdash; backups are taken by hand</div>
+                <div class="backup-value" style="color:var(--text-muted);" >None &mdash; backups are taken by hand</div>
               </div>
 
               <div class="d-flex gap-2 flex-wrap" style="margin-top:20px;">
                 <a class="btn-primary-teal" href="{{ url_for('admin.download_backup') }}" download
-                   title="Take a copy of the database now and download it. Safe while the system is in use. The download is recorded in Audit Logs.">
+                   title="Download a backup now">
                   <span class="material-symbols-outlined" style="font-size:18px;">download</span>Download Backup
                 </a>
               </div>
@@ -472,12 +431,11 @@
             <!-- SYSTEM MAINTENANCE -->
             <div class="tab-pane fade{% if active_pane == 'pane-maint' %} show active{% endif %}" id="pane-maint">
               <div class="section-title">System Maintenance</div>
-              <div class="section-sub">Tools for keeping the system running smoothly</div>
               <div class="toggle-row" style="align-items:flex-start;">
                 <div>
                   <div class="toggle-row-label">Maintenance Mode</div>
                   <div class="toggle-row-desc" style="max-width:560px;">
-                    Restrict access to Administrators only. Others see a closed page, stay signed in, and resume when you turn it off.
+                    Only Administrators can use the system while this is on.
                   </div>
                 </div>
 {%- if maintenance.on %}
@@ -516,7 +474,7 @@
                 and add nothing this pair of entries does not already say.
               </div>
 {%- else %}
-              <div class="form-text-hint" style="margin-top:10px;" title="No row has been written under this key. The system has been open since it was installed.">
+              <div class="form-text-hint" style="margin-top:10px;" >
                 Never used. The system has been open since it was installed.
               </div>
 {%- endif %}
@@ -525,14 +483,13 @@
             <!-- ABOUT SYSTEM -->
             <div class="tab-pane fade{% if active_pane == 'pane-about' %} show active{% endif %}" id="pane-about">
               <div class="section-title">About System</div>
-              <div class="section-sub">Version and institution information</div>
 
               <div class="about-item"><div class="about-label">System Name</div><div class="about-value">{{ system_short_name }}</div></div>
               <div class="about-item"><div class="about-label">System Version</div><div class="about-value">1.0.0</div></div>
-              <div class="about-item" title="Read from the server running this page rather than typed in. This system keeps all of its records in a single file.">
+              <div class="about-item" >
                 <div class="about-label">Database</div><div class="about-value">SQLite {{ system.sqlite_version }}</div>
               </div>
-              <div class="about-item" title="Nothing records when this system was last updated: there is no update mechanism, no deployment timestamp and no version history kept anywhere.">
+              <div class="about-item" >
                 <div class="about-label">Last Update</div><div class="about-value">Not tracked</div>
               </div>
               <div class="about-item"><div class="about-label">Developer</div><div class="about-value">BSIT Capstone Development Team</div></div>

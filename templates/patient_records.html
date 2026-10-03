@@ -276,9 +276,6 @@
               <button type="button" class="sort-option" role="menuitem" data-sort-key="visit">Last Visit<span class="dir"></span></button>
 {%- endif %}
               <button type="button" class="sort-option" role="menuitem" data-sort-key="status">Status<span class="dir"></span></button>
-              <div class="sort-menu-hint">
-                Choosing the column already in use reverses it. Sorting keeps the search and filters you have set.
-              </div>
             </div>
           </div>
         </div>
@@ -300,9 +297,9 @@
     these two titles say it before the file is even fetched, so the difference
     between the two controls is legible from the toolbar. #}
           <a class="btn-outline-teal" href="{{ url_for(patient_records_excel_endpoint) }}" download
-             title="Download the full patient roster as an Excel workbook — every registered patient, not the list as filtered on screen"><span class="material-symbols-outlined" style="font-size:18px;">description</span>Export Excel</a>
+             title="Download as Excel"><span class="material-symbols-outlined" style="font-size:18px;">description</span>Export Excel</a>
           <a class="btn-outline-teal" href="{{ url_for(patient_records_pdf_endpoint) }}" download
-             title="Download the full patient roster as a PDF on the health center's letterhead — every registered patient, not the list as filtered on screen"><span class="material-symbols-outlined" style="font-size:18px;">picture_as_pdf</span>Export PDF</a>
+             title="Download as PDF"><span class="material-symbols-outlined" style="font-size:18px;">picture_as_pdf</span>Export PDF</a>
 {#- Print the roster. The screen had no whole-list print control before -- the
     only two Print buttons here were the bulk bar's, which needs a selection,
     and the per-row icon -- so printing the list the operator is actually
@@ -310,7 +307,7 @@
     re-enable. It prints the table as currently narrowed: applyFilters() hides
     excluded rows with the `hidden` attribute and hidden rows do not print. #}
           <button class="btn-outline-teal" type="button" onclick="printRoster()"
-                  title="Print the patient list exactly as filtered on screen"><span class="material-symbols-outlined" style="font-size:18px;">print</span>Print List</button>
+                  title="Print the list"><span class="material-symbols-outlined" style="font-size:18px;">print</span>Print List</button>
 {%- if care_team_view %}
           <a href="{{ url_for(register_patient_endpoint) }}" class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">person_add</span>Add Patient</a>
 {%- endif %}
@@ -367,10 +364,6 @@
           </div>
 {%- endif %}
           <div class="col-12">
-            <div style="font-size:12.5px; color:var(--text-muted); line-height:1.5;">
-              Filters narrow the {{ patients|length }} record{{ '' if patients|length == 1 else 's' }} on
-              this page and combine with the search box. Purok is not offered: address is one free-text line.
-            </div>
           </div>
         </div>
         <div class="filter-actions">
@@ -429,10 +422,10 @@
     header the server sets is what makes these download. The page stays put. #}
           <button type="submit" formmethod="post"
                   formaction="{{ url_for(patient_selection_excel_endpoint) }}"
-                  title="Download only the selected patient records as an Excel workbook"><span class="material-symbols-outlined" style="font-size:16px;">description</span>Export Excel</button>
+                  title="Download as Excel"><span class="material-symbols-outlined" style="font-size:16px;">description</span>Export Excel</button>
           <button type="submit" formmethod="post"
                   formaction="{{ url_for(patient_selection_pdf_endpoint) }}"
-                  title="Download only the selected patient records as a PDF on the health center's letterhead"><span class="material-symbols-outlined" style="font-size:16px;">picture_as_pdf</span>Export PDF</button>
+                  title="Download as PDF"><span class="material-symbols-outlined" style="font-size:16px;">picture_as_pdf</span>Export PDF</button>
 {#- Prints the ticked records only, which is the one thing the bulk bar is for.
     Same page, same stylesheet as Print List; the difference is a class on the
     table that holds back every row the operator did not tick. #}
@@ -557,8 +550,7 @@
         <div class="icon-circle">
           <span class="material-symbols-outlined" style="font-size:34px; color:var(--teal-dark);">person_search</span>
         </div>
-        <h5>No patient records found</h5>
-        <p>We couldn't find any patients matching your search or filter criteria. Try adjusting your filters or search terms.</p>
+        <h5>No patients match.</h5>
         <div class="d-flex gap-2">
           <button class="btn-outline-teal" type="button" onclick="clearFilters()"><span class="material-symbols-outlined" style="font-size:18px;">restart_alt</span>Clear Filters</button>
 {%- if care_team_view %}
@@ -589,7 +581,7 @@
             #patientCount as the roster narrows, and the ordering does not change
             when it does. #}
         <div class="pg-info" id="sortSummary">Sorted by name, A&ndash;Z</div>
-        <div class="pg-info" title="{{ unavailable.pagination }}">Single page</div>
+        <div class="pg-info">Single page</div>
       </div>
 {%- endif %}
 
@@ -624,12 +616,12 @@
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
-            <p style="margin-bottom:10px;">This changes the record's status only. Nothing is deleted &mdash; medical records are retained, and the patient stays listed here under the new status.</p>
+            <p style="margin-bottom:10px;">Nothing is deleted. The patient stays listed under the new status.</p>
             <p id="archivePrompt" style="margin-bottom:0;">Mark <strong id="archiveTarget">this record</strong><span id="archiveCurrent"></span> as:</p>
             <!-- Shown only when a bulk selection spans more than one status; the
                  action buttons are hidden alongside it. -->
             <p id="archiveMixed" style="margin-bottom:0; display:none; color:var(--danger);">
-              The selected records are not all on the same status. Select patients that currently share one status, then set them together.
+              Select patients who have the same status.
             </p>
 {%- if not can_declare_death %}
             {#- Said rather than left as a dialog with no buttons in it. A record
@@ -852,7 +844,7 @@
           currentStatus = null;
           mixed.textContent = statuses.length === 0
             ? 'Select at least one patient record first.'
-            : 'The selected records are not all on the same status. Select patients that currently share one status, then set them together.';
+            : 'Select patients who have the same status.';
         }
       }
 

@@ -420,10 +420,8 @@ for phrase in REMOVED:
 
 KEPT = [
     "Tick what was given today",
-    "Other Vaccinations on",
     "dose number only where the vaccine has one",
     "comes off Medicine Inventory at once",
-    "Dispensing History",
     "refused if the shelf holds less",
     "the item has expired",
 ]
@@ -436,7 +434,7 @@ for phrase in KEPT:
 from utils.dates import display_date, today as _today
 check("the vaccination note still dates the doses", display_date(_today()) in text,
       display_date(_today()))
-notes = re.findall(r'<div class="cohort-note">(.*?)</div>', html, re.S)
+notes = re.findall(r'<div class="cohort-note"[^>]*>(.*?)</div>', html, re.S)
 lengths = [len(re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", n)).strip()) for n in notes]
 print("       cohort-note lengths on this page: %s" % lengths)
 check("the vaccination note is under 250 characters", lengths[-2] < 250, lengths[-2])

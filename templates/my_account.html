@@ -68,7 +68,7 @@
 {% block content %}
     <div class="eyebrow">{{ health_center.name }}</div>
     <div class="page-title">My Account</div>
-    <div class="page-desc">Your own account, and the one thing on it you can change yourself.</div>
+    <div class="page-desc">Your account.</div>
 
 {%- if must_change %}
     {#- Shown while users.must_change_password is set. utils/security.py keeps
@@ -84,36 +84,23 @@
     <!-- ACCOUNT DETAILS -->
     <div class="panel-card">
       <div class="section-title">Account Details</div>
-      <div class="section-sub">
-        What this system holds about your account. You cannot change these here; each row says who can.
-      </div>
 
 {%- if account %}
       <div class="fact-row">
         <div>
           <div class="fact-label">Full name</div>
-          <div class="fact-desc">
-            The name shown beside your work. Only an Administrator can correct it, from User Management, because the audit trail uses it.
-          </div>
         </div>
         <div class="fact-value">{{ account.full_name }}</div>
       </div>
       <div class="fact-row">
         <div>
           <div class="fact-label">Role</div>
-          <div class="fact-desc">
-            What you may open. Only an Administrator can change it: a role you could raise on
-            yourself would not be a restriction at all.
-          </div>
         </div>
         <div class="fact-value">{{ account.role_label }}</div>
       </div>
       <div class="fact-row">
         <div>
           <div class="fact-label">Username</div>
-          <div class="fact-desc">
-            What you sign in with. It is fixed for the life of the account, because the audit trail attributes every entry to it.
-          </div>
         </div>
         <div class="fact-value">{{ account.username }}</div>
       </div>
@@ -134,9 +121,6 @@
     <!-- CHANGE PASSWORD -->
     <div class="panel-card">
       <div class="section-title">Change Password</div>
-      <div class="section-sub">
-        Set your own password. You are asked for your current one to prove it is you at the keyboard.
-      </div>
 
 {%- if change_errors %}
       <div class="alert-ids alert-danger-ids">
@@ -156,7 +140,7 @@
             <div class="rule-box">
               <strong>The new password must meet these rules:</strong>
               {{ password_rule }}
-              The same rule applies to resets and new accounts. The password is stored as a hash and cannot be looked up, so remember it.
+              Remember it: it cannot be looked up.
             
             </div>
           </div>
@@ -174,8 +158,7 @@
 {%- if change_errors.current_password %}
             <div class="field-error">{{ change_errors.current_password }}</div>
 {%- else %}
-            <div class="form-text-hint">The password you sign in with today. It is checked against the stored one before anything is saved.</div>
-{%- endif %}
+            {%- endif %}
           </div>
 
           <div class="col-md-4">
@@ -196,8 +179,7 @@
 {%- if change_errors.confirm_new_password %}
             <div class="field-error">{{ change_errors.confirm_new_password }}</div>
 {%- else %}
-            <div class="form-text-hint">Typed twice because a mistyped password cannot be discovered later — it would simply refuse you at the login form with no way to find out why.</div>
-{%- endif %}
+            {%- endif %}
           </div>
         </div>
 

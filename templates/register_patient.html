@@ -94,11 +94,11 @@
     <div class="eyebrow">{{ health_center.name }}</div>
     <div class="page-title">{% if patient %}Edit Patient{% else %}Register Patient{% endif %}</div>
     {%- if patient %}
-    <div class="page-desc">Update {{ patient.full_name }}'s details below. Fields marked with <span style="color:var(--danger);">*</span> are required.</div>
+    <div class="page-desc">Fields marked with <span style="color:var(--danger);">*</span> are required.</div>
     {%- elif check_in %}
     <div class="page-desc">This is the same registration form as always — nothing is shortened or skipped. Saving it also checks the patient in for today. Fields marked with <span style="color:var(--danger);">*</span> are required.</div>
     {%- else %}
-    <div class="page-desc">Complete the form below to add a new patient to the health center's records. Fields marked with <span style="color:var(--danger);">*</span> are required.</div>
+    <div class="page-desc">Fields marked with <span style="color:var(--danger);">*</span> are required.</div>
     {%- endif %}
 
     <div style="height:20px;"></div>
@@ -165,7 +165,7 @@
           <div class="section-icon"><span class="material-symbols-outlined">badge</span></div>
           <div>
             <div class="section-title">Personal Information</div>
-            <div class="section-sub">Basic identity details of the patient</div>
+            
           </div>
         </div>
 
@@ -246,7 +246,7 @@
           <div class="section-icon"><span class="material-symbols-outlined">location_on</span></div>
           <div>
             <div class="section-title">Address Information</div>
-            <div class="section-sub">Current residential address of the patient</div>
+            
           </div>
         </div>
 
@@ -303,7 +303,7 @@
           <div class="section-icon"><span class="material-symbols-outlined">emergency</span></div>
           <div>
             <div class="section-title">Emergency Contact Information</div>
-            <div class="section-sub">Person to notify in case of emergency</div>
+            
           </div>
         </div>
 
@@ -344,7 +344,7 @@
           <div class="section-icon"><span class="material-symbols-outlined">medical_information</span></div>
           <div>
             <div class="section-title">Medical Information</div>
-            <div class="section-sub">Health background used by staff during consultations</div>
+            
           </div>
         </div>
 

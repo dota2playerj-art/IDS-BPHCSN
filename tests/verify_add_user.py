@@ -101,7 +101,8 @@ with app.test_client() as admin:
           "at least 12 characters" in body and "commonly-guessed password" in body)
     check("the last-Administrator rule is stated on the screen",
           "cannot be deactivated while it is the only one" in body
-          or "last Administrator account that can still sign in" in body)
+          or "last Administrator account that can still sign in" in body
+          or "last Administrator account that can sign in, so it cannot be deactivated" in body)
 
     # -----------------------------------------------------------------------
     # 2. Validation: every rule, each on its own submit

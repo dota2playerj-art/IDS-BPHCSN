@@ -149,7 +149,7 @@
 {% block content %}
     <div class="eyebrow">{{ health_center.name }}</div>
     <div class="page-title">User Management</div>
-    <div class="page-desc">Every account that can sign in to {{ system_short_name }}, with the roles and access each one carries.</div>
+    <div class="page-desc">Accounts and their roles.</div>
 
     {#- STAT CARDS — three real counts off the users table, and one card whose
         figure has no source. The mockup's fourth card was "Pending Invitation:
@@ -184,7 +184,7 @@
               never read is_active, so a deactivated account could still sign in
               with its old password. The login route checks it now, which is what
               turned this line from a label into a true statement. #}
-          <div class="stat-trend" style="color:var(--text-muted);" title="A deactivated account cannot sign in, even with the correct password. The attempt is recorded in the audit trail.">
+          <div class="stat-trend" style="color:var(--text-muted);" >
             {% if inactive_users %}Access revoked &mdash; refused at sign-in{% else %}No account has been disabled{% endif %}
           </div>
         </div>
@@ -237,11 +237,11 @@
                   possible export of this screen. No password and no hash is in
                   either file; get_all_users() does not select the column. #}
               <a class="btn-outline-teal" href="{{ url_for(users_excel_endpoint) }}" download
-                 title="Download every account as an Excel workbook — role, status, last login, and the screens each role can open">
+                 title="Download as Excel">
                 <span class="material-symbols-outlined" style="font-size:18px;">description</span>Export Excel
               </a>
               <a class="btn-outline-teal" href="{{ url_for(users_pdf_endpoint) }}" download
-                 title="Download every account as a PDF on the health center's letterhead — role, status, last login, and the screens each role can open">
+                 title="Download as PDF">
                 <span class="material-symbols-outlined" style="font-size:18px;">picture_as_pdf</span>Export PDF
               </a>
               {#- LIVE. This button was disabled for the project's whole life and
@@ -252,7 +252,7 @@
                   and its corollary is that a working one carries no excuse. #}
               <button class="btn-primary-teal" type="button"
                       data-bs-toggle="modal" data-bs-target="#addUserModal"
-                      title="Create an account that can sign in to this system — name, username, role, and a password you set here">
+                      >
                 <span class="material-symbols-outlined" style="font-size:18px;">person_add</span>Add User
               </button>
             </div>
@@ -284,15 +284,6 @@
               administrator needs before pressing anything on this screen: the
               password is set here and can never be read back, and the last
               administrator cannot be switched off. #}
-          <div class="scope-note">
-            <strong>Every account that can sign in is on this list, and it is managed from this screen.</strong>
-            Add User creates an account with a password you set.<br>Nobody can look the password up later, so tell the new holder. Reset Password sets a new one.<br>
-            {% if active_admins == 1 %}One Administrator account can currently sign in, and
-            it cannot be deactivated while it is the only one — see the note on its own
-            panel.{% else %}{{ active_admins }} Administrator accounts can currently sign
-            in; the last one to remain active cannot be deactivated.{% endif %}
-          </div>
-
           <div style="overflow-x:auto;">
             <table class="user-table" id="userTable">
               <thead>
@@ -363,7 +354,7 @@
                       is a sentence here and not an UNTRACKED reason. #}
                   <td>
                     {%- if user.last_login_display %}{{ user.last_login_display }}
-                    {%- else %}<span class="muted-cell" title="This account exists and can sign in, but no sign-in has ever been recorded against it.">Never signed in</span>{% endif %}
+                    {%- else %}<span class="muted-cell" >Never signed in</span>{% endif %}
                   </td>
                 </tr>
 {%- endfor %}
@@ -443,9 +434,9 @@
               <div class="detail-row">
                 <div class="detail-label">Last Login</div>
                 {%- if user.last_login_display %}
-                <div class="detail-value" title="The most recent successful sign-in recorded for this account. Every sign-in is kept — Audit Logs holds the full history, filtered to Authentication.">{{ user.last_login_display }}</div>
+                <div class="detail-value" >{{ user.last_login_display }}</div>
                 {%- else %}
-                <div class="detail-value muted" title="This account exists and can sign in, but no sign-in has ever been recorded against it.">Never signed in</div>
+                <div class="detail-value muted" >Never signed in</div>
                 {%- endif %}
               </div>
             </div>
@@ -460,11 +451,6 @@
 {%- else %}
             <div class="perm-note">This role has no role-restricted screen of its own.</div>
 {%- endfor %}
-            <div class="perm-note">
-              Read from each screen's own access guard, so this list is the rule that is
-              enforced, not a copy of it.
-            </div>
-
             {#- LIVE, BOTH OF THEM. These were the last two disabled controls
                 on this screen, sitting behind reasons that said editing an
                 account and resetting a password "is not built". Both are built,
@@ -480,12 +466,12 @@
             <div class="d-flex gap-2 mt-3">
               <button class="btn-ghost-ids" type="button" style="flex:1; justify-content:center;"
                       data-bs-toggle="modal" data-bs-target="#resetPasswordModal{{ user.id }}"
-                      title="Set a new password for this account. The current one is not needed and cannot be looked up — it is stored only as a hash.">
+                      title="Set a new password">
                 <span class="material-symbols-outlined" style="font-size:18px;">lock_reset</span>Reset Password
               </button>
               <button class="btn-primary-teal" type="button" style="flex:1; justify-content:center;"
                       data-bs-toggle="modal" data-bs-target="#editUserModal{{ user.id }}"
-                      title="Change this account's full name or role. The username is fixed for the life of the account and cannot be changed.">
+                      title="Change name or role">
                 <span class="material-symbols-outlined" style="font-size:18px;">edit</span>Edit User
               </button>
             </div>
@@ -516,18 +502,16 @@
             </button>
 {%- elif user.is_last_admin %}
             <button class="btn-danger-ids w-100 mt-1" type="button" disabled
-                    title="This is the last Administrator who can sign in. Create or reactivate another Administrator first.">
+                    title="This is the last Administrator who can sign in.">
               <span class="material-symbols-outlined" style="font-size:16px;">block</span>Deactivate Account
             </button>
             <div class="perm-note">
-              This is the only Administrator account that can sign in, so it cannot be
-              deactivated. Create another Administrator first and this one can then be
-              switched off.
+              This is the last Administrator account that can sign in, so it cannot be deactivated.
             </div>
 {%- else %}
             <button class="btn-danger-ids w-100 mt-1" type="button"
                     data-bs-toggle="modal" data-bs-target="#statusModal{{ user.id }}"
-                    title="Revoke this account's access. Nothing is deleted and it can be reactivated.">
+                    title="Revoke this account's access">
               <span class="material-symbols-outlined" style="font-size:16px;">person_off</span>Deactivate Account
             </button>
 {%- endif %}
@@ -576,7 +560,7 @@
 {%- endif %}
 
             <p style="font-size:13.5px; color:var(--text-muted); margin-bottom:14px;">
-              Creates an account that can sign in at once. You set its password and tell the person, because this system sends no email.
+              You set the password and tell the person.
             </p>
 
             <form id="addUserForm" method="POST" action="{{ url_for('add_user') }}" novalidate>
@@ -590,7 +574,6 @@
 {%- if add_errors.full_name %}
                   <div class="field-error">{{ add_errors.full_name }}</div>
 {%- else %}
-                  <div class="form-text-hint">Shown in the sidebar, on the roster, and against everything this account records in the audit trail.</div>
 {%- endif %}
                 </div>
                 <div class="col-md-6">
@@ -601,7 +584,7 @@
 {%- if add_errors.username %}
                   <div class="field-error">{{ add_errors.username }}</div>
 {%- else %}
-                  <div class="form-text-hint">3–30 characters. Letters, numbers, dot, underscore or hyphen, starting with a letter. It cannot be changed later, and it must not already be in use.</div>
+                  <div class="form-text-hint">3–30 characters: letters, numbers, dot, underscore or hyphen, starting with a letter.</div>
 {%- endif %}
                 </div>
 
@@ -622,7 +605,6 @@
 {%- if add_errors.role %}
                   <div class="field-error">{{ add_errors.role }}</div>
 {%- else %}
-                  <div class="form-text-hint">Decides which screens the account can open. The list under each account on the right shows exactly what each role reaches.</div>
 {%- endif %}
                 </div>
                 <div class="col-md-6 d-flex align-items-end">
@@ -644,7 +626,7 @@
                       <li>it must not contain the username or any part of the person's name;</li>
                       <li>it must not be a commonly-guessed password, with or without numbers on the end.</li>
                     </ul>
-                    A long phrase meets all four rules, such as &ldquo;the blue jeepney leaves at Six&rdquo;. Tell the person the password before you close this dialog.
+                    Tell the person the password before you close this dialog.
                   </div>
                 </div>
 
@@ -666,7 +648,6 @@
 {%- if add_errors.confirm_password %}
                   <div class="field-error">{{ add_errors.confirm_password }}</div>
 {%- else %}
-                  <div class="form-text-hint">Typed twice because a mistyped password cannot be discovered later — it would simply refuse the person at the login form with no way to find out why.</div>
 {%- endif %}
                 </div>
               </div>
@@ -719,7 +700,7 @@
               ({{ user.username }}, {{ user.role }})?
             </p>
             <p style="margin-bottom:0; font-size:13px; color:var(--text-muted);">
-              They will be refused at sign-in from now on, and any open session ends at their next click. Nothing is deleted; reactivating restores the same password.
+              They cannot sign in until you reactivate the account.
             </p>
           </div>
           <div class="modal-footer">
@@ -749,7 +730,7 @@
               ({{ user.username }}, {{ user.role }}) sign in again?
             </p>
             <p style="margin-bottom:0; font-size:13px; color:var(--text-muted);">
-              The password this account had before works again. If it was forgotten, Reset Password on this account sets a new one.
+              Reset Password sets a new one if it was forgotten.
             </p>
           </div>
           <div class="modal-footer">
@@ -841,8 +822,7 @@
 {%- endif %}
 
             <p style="font-size:13.5px; color:var(--text-muted); margin-bottom:14px;">
-              Changes the name this account is known by and the role that decides what it can
-              open. It does not touch the password, and it does not sign anybody out.
+              Changes the name and the role of this account.
             </p>
 
             <form id="editUserForm{{ user.id }}" method="POST" action="{{ url_for('edit_user') }}" novalidate>
@@ -857,8 +837,7 @@
 {%- if eerr.full_name %}
                   <div class="field-error">{{ eerr.full_name }}</div>
 {%- else %}
-                  <div class="form-text-hint">Shown in the sidebar, on this roster and on everything this account records from now on. Earlier audit entries keep the old name.</div>
-{%- endif %}
+                  {%- endif %}
                 </div>
                 <div class="col-md-6">
                   {#- READ-ONLY, AND SAID SO RATHER THAN ONLY ENFORCED.
@@ -874,7 +853,7 @@
                          value="{{ user.username }}" readonly disabled
                          style="background:var(--bg); color:var(--text-muted);">
                   <div class="form-text-hint">
-                    Fixed for the life of the account, because the audit trail uses it. For a different username, create a new account and deactivate this one.
+                    The username cannot be changed.
                   </div>
                 </div>
 
@@ -888,16 +867,13 @@
 {%- if eerr.role %}
                   <div class="field-error">{{ eerr.role }}</div>
 {%- else %}
-                  <div class="form-text-hint">Takes effect immediately. The list of screens on this panel is read from each screen's own access guard, so it will show exactly what the new role reaches.</div>
-{%- endif %}
+                  {%- endif %}
                 </div>
                 <div class="col-md-6 d-flex align-items-end">
                   <div class="alert-ids alert-warning-ids" style="margin-bottom:0; width:100%;">
                     <span class="material-symbols-outlined">history</span>
                     <div>
-                      <strong>A role change is recorded in full</strong>
-                      The audit trail keeps the role held before and the role held after, side by
-                      side, with your name and the time.
+                      <strong>A role change is recorded in the audit log.</strong>
                     </div>
                   </div>
                 </div>
@@ -940,10 +916,8 @@
               ({{ user.username }}, {{ user.role }}).
             </p>
             <p style="font-size:13.5px; color:var(--text-muted); margin-bottom:14px;">
-              You are not asked for the current password: nobody can read it back.<br>The account keeps its username, role and access; only the password changes, when you save.
-{%- if user.is_self %}<br>
-              This is the account you are signed in as: your current session stays open, but
-              the new password is what you will need next time.
+{%- if user.is_self %}
+              This is your own account. Your session stays open.
 {%- endif %}
 {%- if not user.is_active %}
               This account is deactivated, so it is still refused at the login form whatever
@@ -968,7 +942,7 @@
                       <li>it must not contain the username or any part of the person's name;</li>
                       <li>it must not be a commonly-guessed password, with or without numbers on the end.</li>
                     </ul>
-                    The same rule as Add User. Once saved it is stored as a hash: write it down or tell the person before you close this dialog.
+                    Tell the person the password before you close this dialog.
                   </div>
                 </div>
 
@@ -990,7 +964,6 @@
 {%- if rerr.confirm_password %}
                   <div class="field-error">{{ rerr.confirm_password }}</div>
 {%- else %}
-                  <div class="form-text-hint">Typed twice because a mistyped password cannot be discovered later — it would simply refuse the person at the login form with no way to find out why.</div>
 {%- endif %}
                 </div>
               </div>

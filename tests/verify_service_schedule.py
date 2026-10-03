@@ -124,7 +124,7 @@ for role, account in ACCOUNTS.items():
     page = visible(text(r))
     check(f"{role}: schedule screen renders (200)", r.status_code == 200, r.status_code)
     check(f"{role}: empty state says no days have been entered",
-          "No service days have been entered yet" in page and "has not been filled with a guess" in page, page[:400])
+          "No service days have been entered yet." in page, page[:400])
     check(f"{role}: empty screen draws no week of blank days",
           'id="scheduleWeek"' not in text(r) and "Nothing scheduled" not in page)
     check(f"{role}: sidebar carries Service Schedule", "Service Schedule" in page)
@@ -133,7 +133,7 @@ for role, account in ACCOUNTS.items():
         qp = visible(text(q))
         check(f"{role}: Patient Queue shows the empty services strip",
               q.status_code == 200 and "Services today" in qp
-              and "No service days have been entered yet. The Administrator enters them on the Service Schedule" in qp, qp[:600])
+              and "No service days entered yet." in qp, qp[:600])
 
 admin_page = text(admin.get("/admin/service_schedule"))
 check("Admin: empty screen still offers the Add form", 'action="/admin/service_schedule/add"' in admin_page)
@@ -450,10 +450,10 @@ for label, d, want_fp in (
 set_clock(date(2026, 10, 18))  # a Sunday: nothing on the schedule runs
 strip = visible(text(admin.get("/admin/appointment_scheduling"))).split("Services today", 1)[1][:400]
 check("Sunday Oct 18: honest 'nothing runs on this Sunday', distinct from the never-filled message",
-      "Nothing on the service schedule runs on this Sunday." in strip and "No service days have been entered" not in strip, strip)
+      "Nothing is scheduled today." in strip and "No service days entered" not in strip, strip)
 page = visible(text(admin.get("/admin/service_schedule")))
 check("Sunday Oct 18: schedule screen says nothing runs today, with the count",
-      "Nothing on the schedule runs today" in page and "None of the 3 services on the schedule falls on this Sunday" in page, page[:900])
+      "Nothing on the schedule runs today." in page, page[:900])
 reset_clock()
 
 # ===========================================================================

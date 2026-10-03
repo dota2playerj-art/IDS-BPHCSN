@@ -108,7 +108,7 @@
         Removed rather than reworded, for the same reason the header's "Synced just
         now" pill and the SMS "Connected" badge went before them: an honest version
         of either would need a real check behind it, and there is none to attach. #}
-    <div style="font-size:14px; color:var(--text-muted); margin-bottom:20px;">{{ clinic_today | full_date }} &middot; Welcome back, {{ sidebar_user_name }}. Here's today's overview.</div>
+    <div style="font-size:14px; color:var(--text-muted); margin-bottom:20px;">{{ clinic_today | full_date }} &middot; Welcome back, {{ sidebar_user_name }}.</div>
 
     <!-- STAT CARDS (6, matching original IA) -->
     <div class="row g-3 mb-4">
@@ -322,7 +322,7 @@
 {%- if not immunization_alert.child_count %}
             <div class="panel-sub">Every child under {{ pediatric_age_years }} is up to date with the DOH schedule.</div>
 {%- else %}
-            <div class="panel-sub">Health Center Staff see which children and which doses on their dashboard.</div>
+            
 {%- endif %}
           </div>
         </div>
@@ -379,8 +379,7 @@
           </div>
 {%- else %}
           <div class="panel-sub">
-            Nothing has been recorded yet. Editing a consultation or sending a broadcast
-            writes an entry here.
+            Nothing recorded yet.
           </div>
 {%- endfor %}
 

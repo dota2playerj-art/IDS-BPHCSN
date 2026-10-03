@@ -376,7 +376,7 @@
     responses are sent no-store for that reason), so the honest answer is the
     moment this page was rendered. Reload and it changes, which is what makes it
     checkable rather than another sentence to take on trust. #}
-      <div class="sync-pill" title="This page was built from the database at {{ rendered_at | clock_time }} on {{ clinic_today | full_date }}. Nothing on it updates until you reload it — this system has no background sync.">
+      <div class="sync-pill" title="Loaded at {{ rendered_at | clock_time }}. Reload to update.">
         <span class="material-symbols-outlined" style="font-size:16px;">schedule</span>Loaded {{ rendered_at | clock_time }}
       </div>
       <div class="dropdown">
