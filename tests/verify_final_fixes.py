@@ -534,6 +534,42 @@ check("... and a baby born on a leap day (Feb 29, 2024)",
       and format_age("2020-02-29", date(2025, 2, 28)) == "4 years 11 months"
       and format_age("2020-02-29", date(2025, 3, 1)) == "5 years")
 check("a missing or unusable birth date has no age", format_age(None, NOW) is None and format_age("nonsense", NOW) is None)
+import json as _json
+import random as _random
+import shutil as _shutil
+import tempfile as _tempfile
+
+_node = _shutil.which("node")
+if _node is None:
+    check("the registration page's age preview (JavaScript) matches the helper (skipped: node is not installed)", True)
+else:
+    _src = (REPO / "templates" / "register_patient.html").read_text(encoding="utf-8")
+    _js = _src[_src.index("  function addMonths(value, months){"):_src.index("  if(birthDate){ birthDate.addEventListener")]
+    _js = (_js.replace("function refreshAge(){", "function refreshAge(birthValue, nowValue){")
+           .replace("if(!birthDate || !ageDisplay){ return; }", "var ageDisplay={value:''};")
+           .replace("var value = birthDate.value;", "var value = birthValue;")
+           .replace("var now = new Date();", "var now = new Date(nowValue + 'T12:00:00');")
+           .replace("return; }", "return ageDisplay.value; }").replace("      return;\n", "      return ageDisplay.value;\n")
+           .replace("    ageDisplay.value = plural(years, 'year');\n  }",
+                    "    ageDisplay.value = plural(years, 'year'); return ageDisplay.value;\n  }")
+           + "\nreturn refreshAge(birthValue, nowValue);\n")
+    _random.seed(15)
+    _cases = [(NOW - timedelta(days=_random.randint(0, 365 * 9))).isoformat() for _ in range(600)]
+    _cases += [(NOW - timedelta(days=d)).isoformat() for d in range(0, 141)]   # every day of the first 20 weeks
+    _cases += ["2026-01-31", "2024-02-29", "2025-08-31", "2026-08-31", "2020-02-29", "2026-09-03"]
+    _script = ("function run(birthValue, nowValue){" + _js + "}\nconst cases=" + _json.dumps(_cases) +
+               ";\nconsole.log(JSON.stringify(cases.map(c=>run(c,'2026-10-03'))));")
+    _file = Path(_tempfile.mkdtemp(prefix="ids-age-", dir=str(_support.TEST_DIR))) / "age.js"
+    _file.write_text(_script, encoding="utf-8")
+    _run = subprocess.run([_node, str(_file)], capture_output=True, text=True)
+    try:
+        _out = _json.loads(_run.stdout)
+    except ValueError:
+        _out = []
+    _bad = [(c, o, format_age(c, NOW)) for c, o in zip(_cases, _out) if o != format_age(c, NOW)]
+    check(f"the registration page's age preview (JavaScript) gives the same text as the helper for {len(_cases)} birth dates",
+          len(_out) == len(_cases) and not _bad, (_run.stderr[:200], _bad[:3]))
+
 with _support.frozen_today(NOW):
     conn = sqlite3.connect(TEST_DB)
     baby = conn.execute("SELECT MAX(id) FROM patients").fetchone()[0] + 1

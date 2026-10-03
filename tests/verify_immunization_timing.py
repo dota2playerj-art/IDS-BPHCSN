@@ -831,6 +831,51 @@ with _support.frozen_today(SCENE_DAY):
                                       "If the card shows the dose")))
     check("the baby's age reads '4 weeks 2 days' on the profile", "4 weeks 2 days / Female" in text)
 
+# the 4-day boundary, a parent's word on a dose the child is too young for, and the consultation form's own rule
+with _support.frozen_today(SCENE_DAY):
+    open_day = (child_born("TB", SCENE_DAY - timedelta(days=38)),)   # Pentavalent dose 1: minimum age 42 days
+    shut_day = (child_born("TC", SCENE_DAY - timedelta(days=37)),)
+    check("the button opens 4 days before the minimum age: shown at 38 days, not at 37",
+          has_record_button(body(client_as(STAFF_ID).get(PROFILE.format(open_day[0]))), "PENTA:1")
+          and not has_record_button(body(client_as(STAFF_ID).get(PROFILE.format(shut_day[0]))), "PENTA:1"))
+    r = client_as(STAFF_ID).post(URL.format(shut_day[0]), data={
+        "dose_key": "PENTA:1", "evidence": "card", "date_given": SCENE_DAY.isoformat(), "place_given": ""},
+        follow_redirects=True)
+    check("... and the server agrees at the same boundary: 37 days refused, 38 days accepted",
+          "not old enough" in flat(body(r)) and n_doses(shut_day[0]) == 0)
+    r = client_as(STAFF_ID).post(URL.format(open_day[0]), data={
+        "dose_key": "PENTA:1", "evidence": "card", "date_given": SCENE_DAY.isoformat(), "place_given": ""})
+    check("... (accepted: the card is on file)", n_doses(open_day[0]) == 1)
+    young_parent = child_born("TD", SCENE_DAY - timedelta(days=30))
+    run_sql("INSERT INTO immunizations (patient_id, vaccine_code, dose_number, evidence, administered_by) "
+            "VALUES (?, 'OPV', 1, 'parent_report', ?)", (young_parent, STAFF_ID))
+    page = body(client_as(STAFF_ID).get(PROFILE.format(young_parent)))
+    check("a parent's report keeps its button even on a dose the child is too young for (to upgrade it to a card)",
+          has_record_button(page, "OPV:1") and not has_record_button(page, "OPV:2"))
+    r = client_as(STAFF_ID).post(URL.format(young_parent), data={
+        "dose_key": "OPV:1", "evidence": "card", "date_given": SCENE_DAY.isoformat(), "place_given": ""})
+    check("... and the upgrade is accepted", item(young_parent, "OPV:1")["evidence"] == "card")
+    visit2 = run_sql(
+        "INSERT INTO appointments (patient_id, scheduled_by, appointment_type, appointment_date, status, "
+        "is_walkin, checked_in_at) VALUES (?, ?, 'Consultation', ?, 'In Consultation', 1, ?)",
+        (scene, STAFF_ID, SCENE_DAY.isoformat(), "2026-10-03 08:00:00"))
+    r = client_as(STAFF_ID).post(f"/staff/consultation/record/{visit2}", data=dict(
+        FORM, immunizations_elsewhere=["OPV:1"], elsewhere_proof_OPV_1="card", elsewhere_date_OPV_1="2026-10-01"))
+    check("the consultation form's own 'given elsewhere' tick is refused for a dose the child is too young for, "
+          "with the same message, and nothing is saved",
+          "not old enough for OPV dose 1 yet" in flat(body(r)) and not rows_of(scene, "OPV:1"))
+    run_sql("UPDATE appointments SET status = 'Completed' WHERE id = ?", (visit2,))
+
+# a dose is not due until it can be given
+with app.app_context():
+    later = imm.get_immunization_status(get_patient_by_id(scene), on_date=date(2026, 11, 20))
+laterd = {i["key"]: i for i in later["schedule"]}
+check("on Nov 20 (the repeat still not given) Pentavalent dose 2 is not Due Now: it is due Dec 18, 4 weeks after "
+      "the repeat could be given today; its recommended date (Nov 12) has passed",
+      laterd["PENTA:2"]["due_date"] == date(2026, 12, 18) and laterd["PENTA:2"]["status"] == "Upcoming"
+      and laterd["PENTA:2"]["recommended_date"] == date(2026, 11, 12), (laterd["PENTA:2"]["status"],
+                                                                         laterd["PENTA:2"]["due_date"]))
+
 # the Administrator and Official do not reach any of it
 check("the Administrator cannot record a dose (no route), so none of it applies to him",
       admin.post(f"/admin/consultation/record/{open_visit(infant)}", data=dict(FORM, immunizations=["BCG:1"])).status_code == 404)
