@@ -417,7 +417,7 @@ Completed.
 **Wording (Task 6d).** The colour legend lists the five statuses: Waiting, In Consultation, Waiting for the
 Doctor, Completed, Left before being seen, each with the colour of its badge; the calendar's dots use them.
 The summary line under the table uses the same five names. There is no Walk-in tag (every visit is a
-walk-in). The vaccine badge says what is overdue ("2 vaccines overdue") or due ("1 vaccine due").
+walk-in). The vaccine badge says "2 vaccines: no record", or "1 vaccine: due" when none lacks a record.
 
 **Change service never completes a visit (Task 6e).** If a visit that is Waiting for the Doctor is changed
 to a service that does not need him, it goes to In Consultation, so the service is recorded first (refused
@@ -897,6 +897,19 @@ Backend Notes
 Context built in `routes/official_views.py::vaccination_campaigns_context()`.
 
 Figures come from `get_immunization_coverage()` and `get_dose_coverage()`, the same calls behind Screen 10 and the Barangay Official Dashboard.
+
+**Honest status (Task 9, 2026-10-03).** "Overdue" is gone from every screen, badge, report and export. A dose
+with nothing on file reads **No record** and still shows its due date. The dose table has the columns Given,
+Given Elsewhere (Card), Parent Says Given, No Record, Due Now, Not Yet Due and Coverage. Coverage counts a dose
+given here or seen on a card; a parent's word is its own column and is not counted. The Immunization Record tab
+of the Patient Profile (Staff and the Doctor) has a **Record dose given elsewhere** button on every scheduled
+dose that has no given-here or card record: a dialog asks for the proof (card seen, or the parent's word), the
+date (required for a card, never in the future or before birth), and the place (optional). A card shows
+"Given elsewhere" (green) with its date and place; a parent's report shows "Parent says given — no card"
+(amber). Either can be changed or removed from the same row; a parent's report is upgraded by recording the card.
+The profile alert reads: "<N> doses have no record here. Ask for the child's vaccination card. If the card shows
+the dose, record it as given elsewhere." The Administrator and the Official have no such button or route. The
+reasoning, the CDC basis and the FHIR mapping are in `01_PROJECT_BIBLE.md`.
 
 Named campaigns are declared untracked. Nothing in the schema groups doses into a campaign — there is no campaign table, no target group and no coverage goal.
 

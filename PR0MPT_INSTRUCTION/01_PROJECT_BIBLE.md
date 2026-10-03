@@ -584,6 +584,49 @@ in Reports & Analytics. The Doctor and Health Center Staff hold the full dispens
 
 ---
 
+# Decision Record — Honest Immunization Status (2026-10-03, Task 9)
+
+**The concern (raised by the capstone adviser).** The profile marked a dose "Overdue" when no dose was
+recorded here. But the child may have been vaccinated elsewhere, for example BCG and Hepatitis B at the
+hospital of birth. The system cannot know that, and "Overdue" claimed that it did. There was also no way to
+record a dose given elsewhere outside a consultation.
+
+**The basis.** CDC General Best Practices for Immunization: only written, dated records are accepted as
+evidence of vaccination (self-report is accepted for only a few adult vaccines); vaccination is not
+postponed when records are missing, staff try to find the records, and without records the person is
+treated as unvaccinated. HL7 FHIR R4 Immunization: `primarySource = false` for a dose recorded from another
+source, and `reportOrigin` tells a written record from recall.
+
+**What a dose rests on.** Every dose record has one evidence type:
+
+| Evidence | Meaning | FHIR | Counts as given? |
+|---|---|---|---|
+| `given_here` | Given at this health center during a consultation | `primarySource` true | Yes |
+| `card` | Given elsewhere; the vaccination card or record book was **seen**. Date required | `primarySource` false, `reportOrigin` "record" | Yes ("Given elsewhere", green) |
+| `parent_report` | The parent or guardian says it was given and has no card. Date optional | `primarySource` false, `reportOrigin` "recall" | No ("Parent says given — no card", amber) |
+
+A dose with nothing on file reads **No record** (it used to read Overdue) and still shows its due date.
+Completion, the follow-up lists and every coverage figure count `given_here` and `card` only; a parent's
+report has its own line ("Parent says given, no card: N"). One function, `get_immunization_status()`,
+decides all of it, so no screen can disagree.
+
+**Recording a dose given elsewhere.** A **Record dose given elsewhere** button on every scheduled dose that
+has no `given_here` or `card` record, on the Immunization Record tab. Health Center Staff and the Doctor only;
+it works outside a consultation. The person must choose the proof (card seen, or the parent's word); a card
+needs a date; no date is in the future or before birth; the place is optional. A parent's report can be
+upgraded to a card when the card is shown, or removed. A dose given here is never replaced or removed this
+way. The consultation form asks for the same proof on its Given elsewhere column. The Administrator and
+the Barangay Official have no route to any of it.
+
+**Audit.** Entries name no vaccine: "Recorded 1 dose given elsewhere for <Name> (PAT-008).", "Recorded a
+parent report of 1 dose for <Name> (PAT-008).", "Upgraded a parent report to a card record for <Name>
+(PAT-008)."
+
+**Existing data.** `migrations/migrate_immunization_evidence.py` set every earlier dose given here to
+`given_here` and every earlier dose reported as given elsewhere to `card`. That second step was a decision of
+the brief: those doses were recorded before proof was asked for, so a team that wants certainty should check
+them against the cards.
+
 # Sample Development Workflow
 
 Research

@@ -340,7 +340,7 @@ Staff's in every row below.
 | Add/Edit Medicine | Form, Modal (if inline) or standalone page, Button, Alert (validation) |
 | Patient Queue | Calendar (custom component, not native Bootstrap), List Group (today's queue), Badge (status), Modal (check in) |
 | SMS Notifications | Form (message editor), Dropdown/Checkbox group (recipients), Badge (delivery status), Table (history), Toast (send confirmation) |
-| Record / Edit Consultation | Form (vitals + clinical record), Card (sectioned: patient banner / vitals / record / immunisations / follow-up), Checkbox group (EPI doses), Badge (dose status: Completed / Due Now / Upcoming / Overdue), Alert (validation) |
+| Record / Edit Consultation | Form (vitals + clinical record), Card (sectioned: patient banner / vitals / record / immunisations / follow-up), Checkbox group (EPI doses), Badge (dose status: Completed / Given elsewhere / Parent says given — no card / Due Now / No record / Upcoming), Alert (validation) |
 | Health Programs | Card, Table (programme membership), Badge, Alert (untracked notice) |
 | Vaccination Campaigns | Card, Table (per-dose coverage), Chart (Chart.js donuts), Badge, Alert (untracked notice) |
 | Community Reports | Card, Chart (Chart.js), Table, Button Group (export) — data-driven from `reports_analytics_context()` |
@@ -396,7 +396,7 @@ Community Reports was built as UI alongside the Barangay Official Dashboard and 
 
 - **`EPI_SCHEDULE`**, a code constant in `models/immunizations.py`: the Department of Health Expanded Program on Immunization infant schedule — 14 scheduled doses across 8 vaccines (BCG, Hepatitis B, Pentavalent, OPV, PCV, IPV, MR, MMR), each with the age it is due and the dose number in its series.
 - **The `immunizations` table**: this child's actual history — which dose, on what date, given by whom, during which consultation. `UNIQUE (patient_id, vaccine_code, dose_number)` so one dose cannot be recorded twice.
-- **`get_immunization_status()`**: the single place that decides whether a dose is Completed, Due Now, Upcoming, or Overdue, resolved against the child's real birthday. The Patient Profile tab, the queue badge, the check-in message, the dashboard card, and Screen 17's coverage table all read its output; none recomputes it.
+- **`get_immunization_status()`**: the single place that decides whether a dose is Completed, Given elsewhere, Parent says given, Due Now, No record or Upcoming, resolved against the child's real birthday. The Patient Profile tab, the queue badge, the check-in message, the dashboard card, and Screen 17's coverage table all read its output; none recomputes it.
 - **Capture on Screen 20**, the consultation form, for patients under 5 — because a dose is administered during a visit, which is where a health worker actually holds the syringe.
 
 **Why the schedule is code and the doses are a table.** The EPI schedule is national policy: identical for every barangay, changed by DOH circular, and never by anything a user of this system does. There is deliberately no screen to edit it — a health worker who could redefine the national schedule from the UI could make a defaulting child look up to date. A child's doses are the opposite: a per-patient clinical fact that exists only because someone recorded it, so it is stored.
@@ -1184,6 +1184,11 @@ The Doctor, Health Center Staff and the Barangay Official are unchanged.
   the server. The queue legend and summary use only the five real statuses; no Walk-in tag.
 - *Task 6e (2026-10-03).* A service correction never completes a visit: Waiting for the Doctor changed to
   a service that needs no Doctor goes to In Consultation. The "Ready to Consult" badge is now "Next in line".
+- *Task 9 (2026-10-03), honest immunization status.* A dose says what its record rests on:
+  `given_here`, `card` (the vaccination card was seen: counts as given) or `parent_report` (the parent's
+  word: recorded, not counted). A dose with nothing on file reads **No record**, never Overdue. Staff and the
+  Doctor record a dose given elsewhere from the Immunization Record tab, outside a consultation. Basis: CDC
+  General Best Practices; FHIR `primarySource` and `reportOrigin`. See `01_PROJECT_BIBLE.md`.
 - *Stock accountability.* Dispensing writes no stock entry. Accountability comes from the stock
   levels and the dispensed totals in Reports. The Doctor and Health Center Staff hold the full
   dispensing records.
