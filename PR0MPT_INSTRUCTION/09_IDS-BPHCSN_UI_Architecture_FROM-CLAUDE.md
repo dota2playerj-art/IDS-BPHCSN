@@ -1195,6 +1195,9 @@ The Doctor, Health Center Staff and the Barangay Official are unchanged.
   subtitles and the long tooltips were removed, and empty states are one short sentence. Immunization
   reminders are amber. A server error or a missing page shows "Something went wrong" with a button back, and
   the full error goes to `logs/errors.log`, which git ignores.
+- *Task 11 (2026-10-03).* The booking-era figures are gone from every screen and file; "Older records: N"
+  appears only when a visit still has an old status (Scheduled, Confirmed, Cancelled, No-show). Start is
+  offered only on a visit checked in today (the day rule in `models/queue_actions.py`, also enforced in the SQL).
 - *Stock accountability.* Dispensing writes no stock entry. Accountability comes from the stock
   levels and the dispensed totals in Reports. The Doctor and Health Center Staff hold the full
   dispensing records.

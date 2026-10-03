@@ -447,6 +447,14 @@ the list read-only. Nothing closes a visit automatically. The line under Today's
 gives the five status counts; a line under this section, "Earlier days:", gives the three open ones. The
 Doctor's dashboard count, the Staff count and the queue (today plus earlier days) are the same number.
 
+**Start is for today (Task 11, 2026-10-03).** A visit from an earlier day with status Waiting offers only Left
+before being seen (and Change service); Start is not shown, and a Start POST on it is refused by the server
+and by the SQL. A visit Waiting for the Doctor keeps See patient for the Doctor, whatever its day. The
+mapping holds the day rule. **Older records:** the figures no longer show "Still expected", "Cancelled or
+no-show", "Never closed" or "not yet arrived". A visit still carrying one of those four old statuses is
+counted in one line, "Older records: N", on the reports, the community report and the files, and only when N
+is above 0.
+
 Purpose
 
 Work today's queue: record who has arrived, in the order they arrived, and see
