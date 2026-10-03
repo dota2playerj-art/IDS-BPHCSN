@@ -977,12 +977,15 @@ def change_visit_service(appointment_id, service, audit=None):
         return "invalid"
     with db_connection() as conn:
         row = conn.execute(
-            "SELECT status, appointment_type FROM appointments WHERE id = ?",
+            "SELECT status, appointment_type, appointment_date FROM appointments WHERE id = ?",
             (appointment_id,),
         ).fetchone()
         if row is None:
             return "missing"
         if row["status"] not in CORRECTABLE_STATUSES:
+            return "not-allowed"
+        # An earlier day's Waiting visit offers only Left before being seen (Task 13, D6).
+        if row["status"] == WAITING and not is_today(row["appointment_date"], today()):
             return "not-allowed"
         old = (row["appointment_type"] or "").strip() or WALK_IN_TYPE
         if old == chosen:

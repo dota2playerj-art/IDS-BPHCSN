@@ -1662,9 +1662,10 @@ section("20. START ONLY ON A VISIT CHECKED IN TODAY (Task 11, L49)")
 from models.queue_actions import allowed_actions as _allowed  # noqa: E402
 
 run_sql("UPDATE appointments SET status = 'Completed' WHERE status = 'In Consultation'")
-check("the mapping holds the day rule: an earlier day's Waiting visit allows only Left and Change service",
-      _allowed("staff", "Waiting", on_today=False) == ("mark_left", "change_service")
-      and _allowed("doctor", "Waiting", on_today=False) == ("mark_left", "change_service")
+check("the mapping holds the day rule: an earlier day's Waiting visit allows only Left (Task 13: "
+      "not Start, not Change service)",
+      _allowed("staff", "Waiting", on_today=False) == ("mark_left",)
+      and _allowed("doctor", "Waiting", on_today=False) == ("mark_left",)
       and "start" in _allowed("staff", "Waiting") and "start" in _allowed("doctor", "Waiting", on_today=True)
       and "see_patient" in _allowed("doctor", "Waiting for the Doctor", on_today=False))
 name_patient(21, "T11A")
@@ -1709,6 +1710,54 @@ staff.post(MARK, data={"appointment_id": str(old_wfd)})
 check("Left before being seen still works on an earlier day's Waiting visit and on one waiting for the Doctor",
       status_of(old_wait) == LEFT and status_of(old_wfd) == LEFT)
 run_sql("UPDATE appointments SET status = 'Completed' WHERE id IN (?, ?, ?)", (old_wait, old_wfd, today_wait))
+
+# ---------------------------------------------------------------------------
+section("21. NO CHANGE SERVICE ON AN EARLIER DAY'S WAITING VISIT (Task 13, D6)")
+name_patient(24, "T13A")
+name_patient(25, "T13B")
+name_patient(26, "T13C")
+d6_old_wait = add_visit(24, "T13A", 6, "Waiting", time="08:00")[0]
+d6_old_wfd = add_visit(25, "T13B", 5, WFD, time="08:30")[0]
+d6_today_wait = add_visit(26, "T13C", 0, "Waiting", time="09:00")[0]
+d6_pages = {n: body(c.get(u)) for n, c, u in (("staff", staff, "/staff/appointment_scheduling"),
+                                             ("doctor", doctor, "/staff/appointment_scheduling"))}
+for who in ("staff", "doctor"):
+    old_row = row_in(section_of(d6_pages[who]), f"APT-{d6_old_wait:05d}")
+    check(f"{who}: an earlier day's Waiting visit offers Left before being seen and no Change service",
+          old_row and 'data-bs-target="#leftModal"' in old_row and 'data-bs-target="#serviceModal"' not in old_row,
+          old_row[-300:])
+    today_row = row_in(d6_pages[who], f"APT-{d6_today_wait:05d}")
+    check(f"{who}: today's Waiting visit still offers Change service",
+          'data-bs-target="#serviceModal"' in today_row)
+    wfd_row = row_in(section_of(d6_pages[who]), f"APT-{d6_old_wfd:05d}")
+    check(f"{who}: an earlier day's visit Waiting for the Doctor keeps Change service",
+          'data-bs-target="#serviceModal"' in wfd_row, wfd_row[-200:])
+for who, client in (("Staff", staff), ("the Doctor", doctor), ("the Administrator", admin), ("the Official", official)):
+    n_before = len(audits("Changed the service of a visit"))
+    client.post(CHANGE, data={"appointment_id": str(d6_old_wait), "service": PRENATAL})
+    check(f"{who}: a Change service POST (valid token) on an earlier day's Waiting visit is refused: "
+          "service unchanged, nothing written",
+          q1("SELECT appointment_type FROM appointments WHERE id = ?", (d6_old_wait,))[0] != PRENATAL
+          and len(audits("Changed the service of a visit")) == n_before)
+staff.post(CHANGE, data={"appointment_id": str(d6_old_wait), "service": PRENATAL})
+check("the refusal says why, in plain words",
+      "from an earlier day" in body(staff.get("/staff/appointment_scheduling")))
+with app.app_context():
+    from models.appointments import change_visit_service as _change
+    check("the model itself refuses it too (the rule is in the SQL, not only in the buttons)",
+          _change(d6_old_wait, PRENATAL) == "not-allowed"
+          and q1("SELECT appointment_type FROM appointments WHERE id = ?", (d6_old_wait,))[0] != PRENATAL)
+staff.post(CHANGE, data={"appointment_id": str(d6_today_wait), "service": PRENATAL})
+check("today's Waiting visit can still have its service changed",
+      q1("SELECT appointment_type FROM appointments WHERE id = ?", (d6_today_wait,))[0] == PRENATAL)
+staff.post(CHANGE, data={"appointment_id": str(d6_old_wfd), "service": PRENATAL})
+check("an earlier day's visit Waiting for the Doctor can still have its service changed",
+      q1("SELECT appointment_type FROM appointments WHERE id = ?", (d6_old_wfd,))[0] == PRENATAL)
+staff.post(MARK, data={"appointment_id": str(d6_old_wait)})
+check("and the earlier day's Waiting visit can still be marked Left before being seen",
+      status_of(d6_old_wait) == LEFT)
+run_sql("UPDATE appointments SET status = 'Completed' WHERE id IN (?, ?, ?)",
+        (d6_old_wait, d6_old_wfd, d6_today_wait))
 
 # ---------------------------------------------------------------------------
 passed = sum(1 for _, ok in results if ok)

@@ -221,8 +221,9 @@ def _refused(appointment, action):
     if action_allowed(current_role(), appointment["status"], action, on_today):
         return None
     if not on_today and action_allowed(current_role(), appointment["status"], action):
+        what = "It cannot be started." if action == START else "This cannot be done."
         return (f"{queue_display_name(appointment)}'s visit is from an earlier day. "
-                "It cannot be started. Mark it left before being seen.")
+                f"{what} Mark it left before being seen.")
     return (f"{queue_display_name(appointment)}'s visit is marked {appointment['status']}, "
             "so this cannot be done now.")
 

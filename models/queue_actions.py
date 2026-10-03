@@ -76,6 +76,10 @@ RECORD_ACTION_BY_STATUS = {
 # seen. The other actions work on a visit of any day: the Doctor still sees a patient who
 # has waited for him since earlier, and an open visit can always be closed.
 TODAY_ONLY = (START,)
+# A Waiting visit from an earlier day offers only "Left before being seen" (Task 13, D6): its
+# patient is probably home, so changing the service of that visit helps nobody. Visits in the
+# other statuses keep Change service on any day.
+EARLIER_DAY_WAITING_REMOVED = (CHANGE_SERVICE,)
 
 
 def is_today(visit_date, today):
@@ -90,7 +94,10 @@ def allowed_actions(role, status, on_today=True):
     in TODAY_ONLY from an earlier day's visit.
     """
     actions = QUEUE_ACTIONS.get(status, {}).get(normalize_role(role), ())
-    return actions if on_today else tuple(a for a in actions if a not in TODAY_ONLY)
+    if on_today:
+        return actions
+    removed = TODAY_ONLY + (EARLIER_DAY_WAITING_REMOVED if status == WAITING else ())
+    return tuple(a for a in actions if a not in removed)
 
 
 def action_allowed(role, status, action, on_today=True):
