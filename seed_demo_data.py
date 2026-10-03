@@ -481,6 +481,24 @@ def plan_visits(rng, today, people):
         if not dates and given_elsewhere:
             add(person, register_on, rng.choice(("ari", "fever")), doses=[], elsewhere=given_elsewhere)
 
+    # One child shows the repeat of a dose given too early (Task 14). At the first visit the
+    # card shows Pentavalent dose 1 given 7 days before its minimum age, so it does not count
+    # and stays on file as history. Five weeks later the repeat is given here and counts. This
+    # takes no random numbers, so the rest of the data is built as before.
+    for person in people:
+        if person["kind"] not in ("infant", "toddler") or person["status_event"]:
+            continue
+        early_day = person["birth"] + timedelta(days=DOSE_RULES[("PENTA", 1)].min_age_value * 7 - 7)
+        first_visit = weekday_on_or_after(max(first_day, person["birth"] + timedelta(days=63)))
+        repeat_visit = weekday_on_or_after(first_visit + timedelta(days=35))
+        if repeat_visit > last_day:
+            continue
+        person["visits"] = []
+        person["register_on"] = first_visit
+        add(person, first_visit, "immun", doses=[], elsewhere=[("PENTA", 1, early_day, "card")])
+        add(person, repeat_visit, "immun", doses=[("PENTA", 1)], elsewhere=[])
+        break
+
     # Chronic follow-up visits.
     for person in people:
         for condition, case in (("Hypertension", "htn"), ("Diabetes", "dm"), ("Asthma", "asthma")):
@@ -1195,6 +1213,9 @@ def build(path, say=print, show_passwords=True, today_override=None):
         "doses given here": rows(path, "SELECT COUNT(*) FROM immunizations WHERE evidence = 'given_here'")[0][0],
         "doses given elsewhere, card seen": rows(path, "SELECT COUNT(*) FROM immunizations WHERE evidence = 'card'")[0][0],
         "doses the parent says were given, no card": rows(path, "SELECT COUNT(*) FROM immunizations WHERE evidence = 'parent_report'")[0][0],
+        "doses repeated after one given too early": rows(
+            path, "SELECT COUNT(*) FROM (SELECT 1 FROM immunizations GROUP BY patient_id, "
+                  "vaccine_code, dose_number HAVING COUNT(*) > 1)")[0][0],
         "dispensing issues": rows(path, "SELECT COUNT(*) FROM medicine_dispensing")[0][0],
         "inventory items": rows(path, "SELECT COUNT(*) FROM inventory_items")[0][0],
         "inventory batches": rows(path, "SELECT COUNT(*) FROM inventory_batches")[0][0],

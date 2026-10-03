@@ -469,7 +469,7 @@ from models.immunizations import EPI_SCHEDULE, due_date_for  # noqa: E402
 
 offsets = {(code, dose): (value, unit) for code, _n, _p, dose, _t, value, unit, _note in EPI_SCHEDULE}
 born = {p["id"]: date.fromisoformat(p["birth_date"]) for p in patients}
-doses = db.execute("SELECT * FROM immunizations ORDER BY patient_id, vaccine_code, dose_number").fetchall()
+doses = db.execute("SELECT * FROM immunizations ORDER BY patient_id, vaccine_code, dose_number, id").fetchall()
 early, before_birth, close, future = [], [], [], []
 last_seen = {}
 for row in doses:
@@ -493,49 +493,63 @@ check("no dose is dated before the child was born, or in the future",
       not before_birth and not future)
 check("doses of one vaccine are at least four weeks apart", not close, close[:5])
 
-# Task 13: every dose follows the WHO minimum ages and intervals, with the previous dose of its
-# series on file first. The demo data never makes a dose the rule would refuse.
+# Task 13 and 14: every dose is judged by the one rule (models/immunizations.py judge_records):
+# minimum age, the previous dose of its series, the minimum interval, and the 4-day grace. The
+# demo data holds exactly one dose that does not count, a card dose given too early, and its
+# repeat given here, which counts. Nothing else breaks the rule.
 import models.immunizations as _imm  # noqa: E402
 from datetime import timedelta as _td  # noqa: E402
 
 
 def rule_breaks_in(by_child, birth_of):
-    breaks = {"too_young": [], "no_previous": [], "interval": [], "card_too_early": []}
-    for pid, keyed in by_child.items():
-        for k in _imm.too_early_keys(birth_of[pid], {k: dict(v) for k, v in keyed.items()}):
-            breaks["card_too_early"].append((pid, k))
-        for key, row in keyed.items():
-            if row["evidence"] != "given_here" or not row["date_administered"]:
-                continue
-            day = date.fromisoformat(row["date_administered"])
-            rule = _imm.DOSE_RULES[key]
-            if day < _imm.minimum_age_date(birth_of[pid], *key):
-                breaks["too_young"].append((pid, key))
-            if rule.previous:
-                previous = keyed.get(rule.previous)
-                if previous is None or previous["evidence"] == "parent_report":
-                    breaks["no_previous"].append((pid, key))
-                elif previous["date_administered"] and day < date.fromisoformat(
-                        previous["date_administered"]) + _td(weeks=rule.min_interval_weeks):
-                    breaks["interval"].append((pid, key))
+    """by_child: {patient id: [record dicts]}. Returns what does not count, and what is wrong."""
+    breaks = {"too_early": [], "extra": [], "repeated_dose_not_counting": []}
+    for pid, records in by_child.items():
+        records = [dict(r) for r in records]
+        verdicts = _imm.judge_records(birth_of[pid], records)
+        for record, verdict in zip(records, verdicts):
+            key = (record["vaccine_code"], record["dose_number"])
+            if verdict == _imm.VERDICT_EARLY:
+                breaks["too_early"].append((pid, key))
+            elif verdict == _imm.VERDICT_EXTRA:
+                breaks["extra"].append((pid, key))
+        groups = _imm.dose_groups(birth_of[pid], records)
+        for key, group in groups.items():
+            if len(group["invalid"]) + (group["counting"] is not None) > 1 and group["counting"] is None:
+                breaks["repeated_dose_not_counting"].append((pid, key))
     return breaks
 
 
 by_child = {}
 for row in doses:
-    by_child.setdefault(row["patient_id"], {})[(row["vaccine_code"], row["dose_number"])] = row
+    by_child.setdefault(row["patient_id"], []).append(row)
 found_breaks = rule_breaks_in(by_child, born)
-check("no dose given here is before its minimum age, before the previous dose of its series is on file, or "
-      "too soon after it; no card dose is too early", not any(found_breaks.values()),
-      {k: v[:3] for k, v in found_breaks.items() if v})
+check("the demo data holds exactly one dose that does not count: a card dose given too early, "
+      "and it is the only one",
+      len(found_breaks["too_early"]) == 1 and not found_breaks["extra"]
+      and all(r["evidence"] == "card" for r in doses
+              if (r["patient_id"], (r["vaccine_code"], r["dose_number"])) in found_breaks["too_early"]
+              and r["id"] == min(x["id"] for x in doses if x["patient_id"] == r["patient_id"]
+                                 and (x["vaccine_code"], x["dose_number"]) == (r["vaccine_code"], r["dose_number"]))),
+      found_breaks)
+_child, _key = found_breaks["too_early"][0]
+_same = [r for r in doses if r["patient_id"] == _child and (r["vaccine_code"], r["dose_number"]) == _key]
+check("... its dose was repeated: the child has two records of it, the early card dose and a dose given here "
+      "that counts, at least four weeks later; the dose has a valid record",
+      len(_same) == 2 and [r["evidence"] for r in _same] == ["card", "given_here"]
+      and not found_breaks["repeated_dose_not_counting"]
+      and (date.fromisoformat(_same[1]["date_administered"])
+           - date.fromisoformat(_same[0]["date_administered"])).days >= 28, _same and [dict(r) for r in _same])
 _baby = date(2026, 1, 1)
-_bad = {1: {("PENTA", 1): {"evidence": "given_here", "date_administered": "2026-01-11"},
-            ("PENTA", 2): {"evidence": "given_here", "date_administered": "2026-01-20"},
-            ("MMR", 1): {"evidence": "given_here", "date_administered": "2027-02-01"}}}
+_bad = {1: [{"id": 1, "vaccine_code": "PENTA", "dose_number": 1, "evidence": "given_here", "date_administered": "2026-01-11"},
+            {"id": 2, "vaccine_code": "PENTA", "dose_number": 2, "evidence": "given_here", "date_administered": "2026-01-20"},
+            {"id": 3, "vaccine_code": "MMR", "dose_number": 1, "evidence": "card", "date_administered": "2026-12-20"},
+            {"id": 4, "vaccine_code": "PENTA", "dose_number": 1, "evidence": "card", "date_administered": "2026-03-01"},
+            {"id": 5, "vaccine_code": "PENTA", "dose_number": 1, "evidence": "card", "date_administered": "2026-04-01"}]}
 _found = rule_breaks_in(_bad, {1: _baby})
-check("negative control: the same check flags a dose before its minimum age, one too soon after the "
-      "previous dose, and one with no previous dose on file",
-      _found["too_young"] and _found["interval"] and _found["no_previous"], _found)
+check("negative control: the same check flags a dose before its minimum age and one too soon after the "
+      "previous dose, and a second valid record of a dose",
+      len(_found["too_early"]) == 3 and _found["extra"] == [(1, ("PENTA", 1))], _found)
 check("some doses were given here and some were given elsewhere",
       any(r["evidence"] == "given_here" for r in doses) and any(r["evidence"] != "given_here" for r in doses))
 check("the demo data holds all three kinds of evidence: given here, a card seen, and a parent's word",
