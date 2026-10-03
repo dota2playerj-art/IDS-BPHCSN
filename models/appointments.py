@@ -17,7 +17,7 @@ from models.doctor_worklist import (
 )
 from models.queue_actions import (
     CHANGE_SERVICE, MARK_COMPLETED, MARK_LEFT, SEND_TO_DOCTOR, START, UNDO_LEFT,
-    allowed_actions, statuses_allowing,
+    allowed_actions, is_today, statuses_allowing,
 )
 from utils.dates import now, recent_months, resolve_range, today
 from utils.roles import is_care_team
@@ -710,6 +710,7 @@ def start_consultation(appointment_id, audit=None):
         "busy"         someone else is In Consultation; nothing changed
         "already"      this row is already In Consultation
         "not-waiting"  the row is Scheduled/Completed/... , so it cannot start
+        "earlier-day"  the visit was checked in on an earlier day (Task 11, L49)
         "missing"      no such appointment
 
     WHY THE GUARD IS IN THE SQL
@@ -739,11 +740,12 @@ def start_consultation(appointment_id, audit=None):
            SET status = ?, updated_at = CURRENT_TIMESTAMP
          WHERE id = ?
            AND status = ?
+           AND date(appointment_date) = ?
            AND NOT EXISTS (
                  SELECT 1 FROM appointments busy WHERE busy.status = ?
                )
         """,
-            (IN_CONSULTATION, appointment_id, WAITING, IN_CONSULTATION),
+            (IN_CONSULTATION, appointment_id, WAITING, today().isoformat(), IN_CONSULTATION),
         )
         # The audit entry commits with the move, and only when the move happened.
         if cursor.rowcount == 1 and audit:
@@ -755,13 +757,15 @@ def start_consultation(appointment_id, audit=None):
 
         # Nothing was written, so say which of the WHERE's conditions refused.
         row = conn.execute(
-            "SELECT status FROM appointments WHERE id = ?", (appointment_id,)
+            "SELECT status, appointment_date FROM appointments WHERE id = ?", (appointment_id,)
         ).fetchone()
 
     if row is None:
         return "missing"
     if row["status"] == IN_CONSULTATION:
         return "already"
+    if row["status"] == WAITING and not is_today(row["appointment_date"], today()):
+        return "earlier-day"
     if row["status"] != WAITING:
         return "not-waiting"
     # Still Waiting and still not started: the only remaining refusal is the
@@ -1187,7 +1191,8 @@ def attach_actions(entries, role):
     """
     entries = list(entries)
     for entry in entries:
-        actions = allowed_actions(role, entry["status"])
+        actions = allowed_actions(role, entry["status"],
+                                  is_today(entry.get("appointment_date"), today()))
         entry["actions"] = actions
         entry["shown"] = tuple(
             action for action in actions

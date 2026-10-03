@@ -1658,6 +1658,59 @@ run_sql("DELETE FROM appointments WHERE status IN ('No-show', 'Cancelled', 'Sche
 check("once they are gone the line is gone", not any(older_everywhere().values()))
 
 # ---------------------------------------------------------------------------
+section("20. START ONLY ON A VISIT CHECKED IN TODAY (Task 11, L49)")
+from models.queue_actions import allowed_actions as _allowed  # noqa: E402
+
+run_sql("UPDATE appointments SET status = 'Completed' WHERE status = 'In Consultation'")
+check("the mapping holds the day rule: an earlier day's Waiting visit allows only Left and Change service",
+      _allowed("staff", "Waiting", on_today=False) == ("mark_left", "change_service")
+      and _allowed("doctor", "Waiting", on_today=False) == ("mark_left", "change_service")
+      and "start" in _allowed("staff", "Waiting") and "start" in _allowed("doctor", "Waiting", on_today=True)
+      and "see_patient" in _allowed("doctor", "Waiting for the Doctor", on_today=False))
+name_patient(21, "T11A")
+name_patient(22, "T11B")
+old_wait = add_visit(21, "T11A", 5, "Waiting", time="08:00")[0]
+old_wfd = add_visit(22, "T11B", 4, WFD, time="08:30")[0]
+today_wait = add_visit(23, "T11C", 0, "Waiting", time="09:00")[0]
+pages = {n: body(c.get(u)) for n, c, u in (("staff", staff, "/staff/appointment_scheduling"),
+                                          ("doctor", doctor, "/staff/appointment_scheduling"),
+                                          ("admin", admin, "/admin/appointment_scheduling"))}
+for who in ("staff", "doctor"):
+    row = row_in(section_of(pages[who]), f"APT-{old_wait:05d}")
+    check(f"{who}: an earlier day's Waiting visit offers only Left before being seen (no Start, not even a "
+          "disabled one)", row and "Start Consultation" not in row and 'data-bs-target="#leftModal"' in row, row[-300:])
+today_row = row_in(pages["staff"], f"APT-{today_wait:05d}")
+check("today's Waiting visit still offers Start", "Start Consultation" in today_row)
+check("the Administrator sees no Start and no button on an earlier visit",
+      "Start Consultation" not in section_of(pages["admin"]) and f"APT-{old_wait:05d}" in section_of(pages["admin"]))
+START_URL = "/staff/appointment_scheduling/start-consultation"
+for who, client in (("Staff", staff), ("the Doctor", doctor), ("the Administrator", admin), ("the Official", official)):
+    n_before = len(audits("Started consultation"))
+    r = client.post(START_URL, data={"appointment_id": str(old_wait)})
+    check(f"{who}: a Start POST (valid token) on an earlier day's visit is refused: still Waiting, nothing written",
+          status_of(old_wait) == "Waiting" and len(audits("Started consultation")) == n_before
+          and q1("SELECT COUNT(*) FROM appointments WHERE status = 'In Consultation'")[0] == 0, status_of(old_wait))
+staff.post(START_URL, data={"appointment_id": str(old_wait)})
+check("the refusal says why, in plain words",
+      "from an earlier day" in body(staff.get("/staff/appointment_scheduling")))
+with app.app_context():
+    from models.appointments import start_consultation as _start
+    check("the model itself refuses it too (the rule is in the SQL, not only in the buttons)",
+          _start(old_wait) == "earlier-day" and status_of(old_wait) == "Waiting")
+r = staff.post(START_URL, data={"appointment_id": str(today_wait)})
+check("a visit checked in today still starts", status_of(today_wait) == "In Consultation")
+run_sql("UPDATE appointments SET status = 'Completed' WHERE id = ?", (today_wait,))
+# See patient and Left still work on an earlier day's visits.
+r = doctor.get(f"/staff/appointment_scheduling/see-patient/{old_wfd}")
+check("See patient still works on an earlier day's visit waiting for the Doctor",
+      r.status_code == 302 and f"/consultation/record/{old_wfd}" in r.headers.get("Location", ""))
+staff.post(MARK, data={"appointment_id": str(old_wait)})
+staff.post(MARK, data={"appointment_id": str(old_wfd)})
+check("Left before being seen still works on an earlier day's Waiting visit and on one waiting for the Doctor",
+      status_of(old_wait) == LEFT and status_of(old_wfd) == LEFT)
+run_sql("UPDATE appointments SET status = 'Completed' WHERE id IN (?, ?, ?)", (old_wait, old_wfd, today_wait))
+
+# ---------------------------------------------------------------------------
 passed = sum(1 for _, ok in results if ok)
 print("\n" + "=" * 78)
 print(f"RESULT: {passed}/{len(results)} checks passed")

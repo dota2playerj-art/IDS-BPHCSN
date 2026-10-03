@@ -38,6 +38,7 @@ from models.queue_actions import (
     LEGEND_STATUSES,
     CHANGE_SERVICE, MARK_COMPLETED, MARK_LEFT, SEE_PATIENT, SEND_TO_DOCTOR, START, UNDO_LEFT,
     action_allowed,
+    is_today,
 )
 from models.service_schedule import get_entries as get_schedule_entries, services_on
 from routes.audit_entries import (
@@ -216,8 +217,12 @@ def _refused(appointment, action):
     from (models/queue_actions.py, Task 6d). Whatever the page showed, a forged or stale
     POST gets the same answer.
     """
-    if action_allowed(current_role(), appointment["status"], action):
+    on_today = is_today(appointment.get("appointment_date"), today())
+    if action_allowed(current_role(), appointment["status"], action, on_today):
         return None
+    if not on_today and action_allowed(current_role(), appointment["status"], action):
+        return (f"{queue_display_name(appointment)}'s visit is from an earlier day. "
+                "It cannot be started. Mark it left before being seen.")
     return (f"{queue_display_name(appointment)}'s visit is marked {appointment['status']}, "
             "so this cannot be done now.")
 
@@ -422,6 +427,9 @@ def process_start_consultation(form_data, user_id=None, ip_address=None):
         return f"{name} is already in consultation."
     if outcome == "missing":
         return "That queue entry could not be found."
+    if outcome == "earlier-day":
+        return (f"{name}'s visit is from an earlier day. It cannot be started. "
+                "Mark it left before being seen.")
     if outcome == "busy":
         # The page the button was clicked on had already gone stale. Name who
         # actually holds the room, and what has to happen before this patient

@@ -71,14 +71,31 @@ RECORD_ACTION_BY_STATUS = {
 }
 
 
-def allowed_actions(role, status):
-    """The actions this role may do on a visit with this status. A tuple, maybe empty."""
-    return QUEUE_ACTIONS.get(status, {}).get(normalize_role(role), ())
+# THE DAY RULE (Task 11, L49). Start brings a patient in now, so it is offered only on a
+# visit checked in TODAY. A Waiting visit from an earlier day offers only Left before being
+# seen. The other actions work on a visit of any day: the Doctor still sees a patient who
+# has waited for him since earlier, and an open visit can always be closed.
+TODAY_ONLY = (START,)
 
 
-def action_allowed(role, status, action):
-    """Whether this role may do this action on a visit with this status."""
-    return action in allowed_actions(role, status)
+def is_today(visit_date, today):
+    """Whether a stored visit date ('YYYY-MM-DD', maybe with a time) is the given day."""
+    return str(visit_date or "")[:10] == today.isoformat()
+
+
+def allowed_actions(role, status, on_today=True):
+    """The actions this role may do on a visit with this status. A tuple, maybe empty.
+
+    `on_today` is whether the visit was checked in today; the day rule removes the actions
+    in TODAY_ONLY from an earlier day's visit.
+    """
+    actions = QUEUE_ACTIONS.get(status, {}).get(normalize_role(role), ())
+    return actions if on_today else tuple(a for a in actions if a not in TODAY_ONLY)
+
+
+def action_allowed(role, status, action, on_today=True):
+    """Whether this role may do this action on a visit with this status and day."""
+    return action in allowed_actions(role, status, on_today)
 
 
 def statuses_allowing(action):
