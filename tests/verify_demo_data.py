@@ -417,6 +417,15 @@ check("no dose is dated before the child was born, or in the future",
 check("doses of one vaccine are at least four weeks apart", not close, close[:5])
 check("some doses were given here and some were given elsewhere",
       any(r["evidence"] == "given_here" for r in doses) and any(r["evidence"] != "given_here" for r in doses))
+check("the demo data holds all three kinds of evidence: given here, a card seen, and a parent's word",
+      {r["evidence"] for r in doses} == {"given_here", "card", "parent_report"})
+check("every card dose has a date, some parent reports have none, and every dose given here has one",
+      all(r["date_administered"] for r in doses if r["evidence"] != "parent_report")
+      and any(r["date_administered"] is None for r in doses if r["evidence"] == "parent_report"))
+check("some doses given elsewhere were recorded from the profile with no consultation, with a place",
+      any(r["evidence"] != "given_here" and r["consultation_id"] is None and r["place_given"] for r in doses))
+check("a dose given here is always tied to a consultation",
+      all(r["consultation_id"] for r in doses if r["evidence"] == "given_here"))
 check("every dose is a pair the schedule lists",
       all((r["vaccine_code"], r["dose_number"]) in offsets for r in doses))
 check("every dose given here is tied to its consultation, on that visit's date",
@@ -470,6 +479,8 @@ with flask_app.app_context():
           len(listed))
     check("all of them are from earlier days (the demo ends yesterday)",
           all(v["from_earlier_day"] for v in listed))
+    check("some children have a dose with no record at all, so the 'No record' wording has something to say",
+          get_immunization_alert()["no_record_child_count"] > 0)
     alert = get_immunization_alert(limit=50)
     check("the immunization alert shows children who are due or overdue",
           alert.get("needs_attention_count", alert.get("count", 0)) > 0

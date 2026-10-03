@@ -134,13 +134,13 @@ def run(db_path, backup_dir=BACKUP_DIR):
         conn.execute("BEGIN")
         try:
             conn.execute(NEW_TABLE_SQL)
-            conn.execute(f"INSERT INTO immunizations_migrated ({columns}) "
-                         f"SELECT {columns} FROM immunizations")
-            # Same ids on both sides, so the evidence is set from the old column by id.
+            # The evidence is set in the INSERT itself: a reported dose with no date is a
+            # valid card row, and it would break the given-here CHECK if it were copied
+            # first with the default and changed afterwards.
             conn.execute(
-                "UPDATE immunizations_migrated SET evidence = CASE "
-                "(SELECT o.source FROM immunizations o WHERE o.id = immunizations_migrated.id) "
-                "WHEN 'reported' THEN 'card' ELSE 'given_here' END")
+                f"INSERT INTO immunizations_migrated ({columns}, evidence) "
+                f"SELECT {columns}, CASE source WHEN 'reported' THEN 'card' ELSE 'given_here' END "
+                "FROM immunizations")
             conn.execute("DROP TABLE immunizations")
             conn.execute("ALTER TABLE immunizations_migrated RENAME TO immunizations")
             for statement in INDEXES:
