@@ -290,6 +290,9 @@ TEST_DIR, _OWN_DIR = _make_test_dir()
 DB_PATH = guard_path(os.path.join(TEST_DIR, "test.db"))
 build_fixture_database(DB_PATH)
 
+# The error log goes in the temporary folder too, not in the project (Task 10, D8).
+os.environ["IDS_LOG_DIR"] = os.path.join(TEST_DIR, "logs")
+
 # Point the app at the test database BEFORE any app module is imported.
 import config  # noqa: E402
 

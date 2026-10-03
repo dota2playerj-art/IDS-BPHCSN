@@ -22,6 +22,7 @@ from routes import register_blueprints
 from utils.context import inject_role_context, inject_system_name
 from utils.csrf import init_csrf
 from utils.dates import register_date_filters
+from utils.errors import init_error_pages
 from utils.small_counts import register_small_count_helpers
 from utils.endpoints import register_flat_endpoint_aliases
 from utils.sealed_crypto import key_problem as sealed_key_problem
@@ -79,6 +80,7 @@ def create_app():
     # ensure_db_ready, so the database exists before the check runs.
     init_csrf(app)
     app.after_request(no_store)
+    init_error_pages(app)
 
     return app
 

@@ -43,6 +43,11 @@ SESSION_COOKIE_SAMESITE = "Lax"
 SESSION_COOKIE_HTTPONLY = True
 
 DATABASE = os.path.join(BASE_DIR, "app.db")
+
+# Where errors are written (Task 10, D8). The folder is ignored by git: an error trace can
+# quote what a person typed, so it stays on this computer. The tests point it at a temporary
+# folder through IDS_LOG_DIR.
+LOG_DIR = os.environ.get("IDS_LOG_DIR") or os.path.join(BASE_DIR, "logs")
 SCHEMA = os.path.join(BASE_DIR, "schema.sql")
 
 # Session limits. The server enforces them on every request (utils/security.py).

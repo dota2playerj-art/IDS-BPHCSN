@@ -115,3 +115,7 @@ desktop.ini
 # routes/ models/ utils/ database/ templates/ static/ PR0MPT_INSTRUCTION/.
 # static/ in particular is vendored on purpose -- Bootstrap, Chart.js and the
 # Inter/Material fonts are committed so the app runs with no network at all.
+
+# --- Error log (Task 10) --------------------------------------------------------
+# Error traces can quote what a person typed, so they stay on this computer.
+logs/
