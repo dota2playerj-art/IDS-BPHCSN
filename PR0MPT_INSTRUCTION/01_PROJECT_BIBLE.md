@@ -723,8 +723,8 @@ reported at the same visit, with its date, does.
 than 4 days before the minimum age, or more than 4 days before the minimum interval after the previous dose
 on file, reads **Given too early — ask the Doctor about a repeat** (amber). It stays on file but does not
 count for completion, coverage or the next dose's eligibility, and the child stays on the follow-up list.
-Within the 4-day grace it counts. A dose given here gets no grace, because the form does not offer it before
-its date. Staff and the Doctor can change or remove such a card record from its row; the Doctor decides about
+Within the 4-day grace it counts. (From Task 14 a dose given here is judged by the same rule; the form still
+offers a dose only from its date.) Staff and the Doctor can change or remove such a card record from its row; the Doctor decides about
 a repeat.
 
 **What this version does not do (D5).** There is no override. The system follows the routine DOH schedule;
@@ -733,6 +733,38 @@ outbreak campaigns that use other ages are outside its scope.
 **Queue (D6).** An earlier day's Waiting visit no longer offers Change service; only Left before being seen.
 
 **Existing data.** A record that breaks the rule is not changed. The counts found are in the tracker.
+
+# Decision Record — Every Dose Judged, and Repeats (2026-10-03, Task 14)
+
+**The concern.** Task 13 judged only a dose given elsewhere on a card. A dose given here before its minimum age
+(recorded before the rule existed) still counted, and a dose given too early could not be repeated: the table
+held one record per dose, so the early record had to be removed first.
+
+**One validity rule.** `judge_records()` in `models/immunizations.py` judges every recorded dose, whatever its
+evidence (given here or card). A dose given more than 4 days before its minimum age, or before the minimum
+interval after the previous VALID dose of its series, is invalid (ACIP 4-day grace). An invalid dose reads
+**Given too early — ask the Doctor about a repeat** (amber), stays in the history, and does not count for
+completion, coverage or eligibility. A dose whose previous dose is on file but does not count is invalid too.
+Parent reports are not judged and never count. Every screen, report and write path reads this one rule.
+
+**Repeats.** A dose may have more than one record. When a dose has only invalid records, it is eligible again
+from the later of its minimum age and (the last invalid date + the series' minimum interval; 4 weeks when the
+series has none). A repeat recorded at a consultation, or from the profile as a dose given elsewhere, is a NEW
+record. A repeat dated too soon after the invalid dose is itself invalid. The dose's row shows the record that
+counts; earlier invalid records show under it ("Earlier dose on Nov 14, 2026 was too early"), each with its
+Correct or Change button. Only one VALID record per dose can exist: a second is refused. The next dose of the
+series is judged from the repeat, not from the invalid dose.
+
+**Corrections.** A corrected date is checked for sense (not in the future, not before birth), then judged by the
+same rule. A correction to a too-early date makes the dose invalid, and the message says so. The correction keeps
+its audit entry.
+
+**Table.** The one-record-per-dose constraint is gone (`migrations/migrate_immunization_repeats.py`: backup first,
+every record kept with its id, safe to run twice, one audit entry). The table keeps one rule: a dose has at most
+one parent's report.
+
+**Existing data.** The one dose given here before its minimum age in `app.db` (id 302) is now judged by the rule:
+it reads Given too early and does not count. It was not changed.
 
 # Sample Development Workflow
 
@@ -929,3 +961,6 @@ Version 3.4 (2026-10-03)
 Task 13, vaccines only when due: a dose needs the minimum age, the previous dose of its series and the
 minimum interval (WHO routine immunization tables; ACIP 4-day grace for cards). See "Decision Record —
 Vaccines Only When Due".
+
+Task 14, every dose judged, and repeats: one validity rule for every recorded dose, and a dose given too early
+can be repeated as a new record. See "Decision Record — Every Dose Judged, and Repeats".

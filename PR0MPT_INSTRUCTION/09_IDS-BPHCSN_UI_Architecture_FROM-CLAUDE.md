@@ -1207,6 +1207,11 @@ The Doctor, Health Center Staff and the Barangay Official are unchanged.
   interval. The consultation form greys out a dose that is not eligible, with its earliest date or reason; the
   server refuses it too. A card dose given too early is amber and does not count. Basis: WHO routine
   immunization tables and ACIP's 4-day grace. No override in this version. See `01_PROJECT_BIBLE.md`.
+- *Task 14 (2026-10-03), every dose judged, and repeats.* One rule (`judge_records()`) judges every
+  recorded dose, given here or on a card; a dose more than 4 days too early is invalid, stays as history and
+  does not count. A dose may have more than one record, so the same dose can be repeated as a new record
+  (migration `migrate_immunization_repeats.py`); only one valid record per dose can exist. Corrections are
+  checked for sense and judged by the same rule. See `01_PROJECT_BIBLE.md`.
 - *Task 10 (2026-10-03), open visits and plain screens.* The Patient Queue lists every open visit from an
   earlier day ("Open visits from earlier days"), whatever its status, with the actions of the one mapping.
   Screens carry no explanatory boxes: the "not tracked" and "does not do" notes, the design-reasoning

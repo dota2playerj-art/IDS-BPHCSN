@@ -1075,7 +1075,11 @@ minimum age, the previous dose of the same series is on file (given here or a ca
 interval has passed. A dose that is not eligible is greyed out, with the earliest date ("From Nov 14, 2026")
 or the reason ("Needs Pentavalent dose 1 first"). The server refuses any non-eligible dose with one message
 ("This dose is not due yet. Earliest date: Nov 14, 2026."). Several eligible doses at one visit are allowed.
-A card dose given too early reads "Given too early — ask the Doctor about a repeat" (amber) and does not count.
+A dose given too early, whether given here or seen on a card, reads "Given too early — ask the Doctor about a repeat"
+(amber) and does not count (Task 14). Its record stays on file. The same dose is eligible again from the later of its
+minimum age and the invalid date plus 4 weeks, and the repeat is a new record. On the Immunization Record tab the
+dose's row shows the record that counts; earlier records show under it ("Earlier dose on Nov 14, 2026 was too
+early"), each with its Correct or Change button.
 The table of minimum ages and intervals, the WHO and ACIP basis, and the note that there is no override
 (outbreak campaigns that use other ages are outside this version) are in `01_PROJECT_BIBLE.md`.
 
