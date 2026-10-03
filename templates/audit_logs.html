@@ -251,12 +251,6 @@
 {%- endfor %}
                   </select>
                 </div>
-                <div class="col-md-8">
-                  <label>Other filters</label>
-                  <div class="form-text-hint" style="font-size:12.5px; color:var(--text-muted); line-height:1.5;">
-                    {{ untracked.filters }}
-                  </div>
-                </div>
               </div>
               <div class="filter-actions">
                 <a class="btn-reset" href="{{ url_for('admin.audit_logs') }}">Reset Filters</a>

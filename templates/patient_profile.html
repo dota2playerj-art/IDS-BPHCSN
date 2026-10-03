@@ -516,7 +516,7 @@
     the tab having to be opened first -- the point of tracking defaulters is that
     nobody has to go looking. #}
 {%- if immunization and immunization.needs_attention %}
-            <span class="badge-status {{ 'badge-cancelled' if immunization.no_record_count else 'badge-waiting' }}" style="margin-left:6px; font-size:11px; padding:2px 8px;">{{ immunization.attention_count }}</span>
+            <span class="badge-status badge-waiting" style="margin-left:6px; font-size:11px; padding:2px 8px;">{{ immunization.attention_count }}</span>
 {%- endif %}
           </button>
         </li>
@@ -989,7 +989,7 @@
             <div class="d-flex gap-2 flex-wrap">
               <span class="badge-status badge-completed">{{ immunization.completed_count }} given</span>
 {%- if immunization.no_record_count %}
-              <span class="badge-status badge-cancelled">{{ immunization.no_record_count }} no record</span>
+              <span class="badge-status badge-waiting">{{ immunization.no_record_count }} no record</span>
 {%- endif %}
 {%- if immunization.parent_report_count %}
               <span class="badge-status badge-waiting">{{ immunization.parent_report_count }} parent says given</span>
@@ -1005,7 +1005,7 @@
 {%- if immunization.attention_items %}
           <!-- Same amber/red split the Medicine Stock Alerts panel uses: red once
                it is past the grace period, amber while it is merely due. -->
-          <div style="border-radius:12px; border:1px solid {{ '#FECACA' if immunization.no_record_count else '#FDE68A' }}; background:{{ '#FEF2F2' if immunization.no_record_count else '#FFFBEB' }}; color:{{ '#B91C1C' if immunization.no_record_count else '#92400E' }}; padding:14px 16px; font-size:13.5px; display:flex; gap:12px; align-items:flex-start; margin-bottom:18px;">
+          <div style="border-radius:12px; border:1px solid #FDE68A; background:#FFFBEB; color:#92400E; padding:14px 16px; font-size:13.5px; display:flex; gap:12px; align-items:flex-start; margin-bottom:18px;">
             <span class="material-symbols-outlined" style="font-size:20px; margin-top:1px;">{{ 'warning' if immunization.no_record_count else 'event_available' }}</span>
             <div>
 {%- if immunization.no_record_count %}

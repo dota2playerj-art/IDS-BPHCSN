@@ -91,22 +91,6 @@
           <div class="stat-trend" style="color:var(--text-muted);">Across {{ patient_report.total }} registered patients &middot; a patient in both programmes counts twice</div>
         </div>
       </div>
-      <div class="col-md-3 col-sm-6">
-        <div class="stat-card">
-          <div class="stat-icon" style="background:#EDE9FE;"><span class="material-symbols-outlined" style="color:var(--purple);">how_to_reg</span></div>
-          <div class="stat-value" style="font-size:16px; color:var(--text-muted);">Not tracked</div>
-          <div class="stat-label">Programme Enrolment</div>
-          <div class="stat-trend" style="color:var(--text-muted);" title="{{ untracked.programs }}">Nothing links a patient to a programme</div>
-        </div>
-      </div>
-      <div class="col-md-3 col-sm-6">
-        <div class="stat-card">
-          <div class="stat-icon" style="background:#FEF3C7;"><span class="material-symbols-outlined" style="color:var(--warning);">event_upcoming</span></div>
-          <div class="stat-value" style="font-size:16px; color:var(--text-muted);">Not tracked</div>
-          <div class="stat-label">Programme Schedule</div>
-          <div class="stat-trend" style="color:var(--text-muted);" title="{{ untracked.program_schedule }}">No programme has a start or end date</div>
-        </div>
-      </div>
     </div>
 
     <div class="row g-3">
@@ -137,11 +121,6 @@
           </div>
 {%- endfor %}
 
-          <div class="untracked-block">
-            <div class="untracked-head"><span class="material-symbols-outlined" style="font-size:18px;">query_stats</span>Every other programme: not tracked</div>
-            <div class="untracked-body">{{ untracked.programs }}</div>
-            <div class="untracked-body">{{ untracked.program_schedule }}</div>
-          </div>
         </div>
       </div>
 

@@ -338,7 +338,7 @@
 {%- if immunization_coverage.up_to_date_pct is not none %}
           <div class="stat-value">{{ immunization_coverage.up_to_date_pct }}%</div>
           <div class="stat-label">Children Up to Date on the DOH Schedule</div>
-          <div class="stat-trend" style="color:var(--text-muted);" title="{{ untracked.population }}">
+          <div class="stat-trend" style="color:var(--text-muted);">
             {{ immunization_coverage.up_to_date_children }} of {{ immunization_coverage.eligible_children }} registered children
             as of {{ window.end | display_date }} &middot; not a barangay-wide rate
           </div>
@@ -372,16 +372,6 @@
             <span style="display:block;">Parent says given, no card: {{ immunization_coverage.window.doses_parent_report }}</span>
 {%- endif %}
           </div>
-        </div>
-      </div>
-{%- endif %}
-{%- if selection.type == 'all' %}
-      <div class="col-md-3 col-sm-6">
-        <div class="stat-card">
-          <div class="stat-icon" style="background:rgba(245,158,11,0.15);"><span class="material-symbols-outlined" style="color:var(--warning);">summarize</span></div>
-          <div class="stat-value" style="font-size:16px; color:var(--text-muted);">Not tracked</div>
-          <div class="stat-label">Community Reports Generated Year-to-Date</div>
-          <div class="stat-trend" style="color:var(--text-muted);" title="{{ untracked.generated_reports }}">Nothing writes a row when a report is produced</div>
         </div>
       </div>
 {%- endif %}
@@ -575,13 +565,6 @@
             <span class="fig-name">Contacts reachable by SMS<span class="fig-note">Patients with a usable mobile number on file, today</span></span>
             <span class="fig-value">{{ broadcast_stats.reachable_contacts }}</span>
           </div>
-          <div class="untracked mt-3">
-            <span class="material-symbols-outlined">query_stats</span>
-            <div>
-              <div class="untracked-title">Delivery is not among these figures &mdash; it is not recorded</div>
-              <div class="untracked-body">{{ untracked.delivery }}</div>
-            </div>
-          </div>
         </div>
       </div>
 {%- endif %}
@@ -589,36 +572,6 @@
 
     <div style="height:24px;"></div>
 
-    <!-- RECENT COMMUNITY REPORTS — the table here listed seven reports, with
-         names, date ranges, "Ready" badges and a View and a Download button
-         each, attributed to the two real account holders. None of them existed:
-         no report is generated, stored or downloadable anywhere in this
-         project, and nothing writes a row when one is asked for. Fourteen
-         buttons that could not open anything have gone with the rows that
-         invented their subjects, which is the same treatment Screen 10's
-         "Recent Generated Reports" panel already carries for this exact gap. -->
-{#- Still not tracked, and generating a report on this screen has not changed
-    that: nothing writes a row when one is produced. Kept off the printout --
-    a sheet handed to the RHU has no use for a note about this application's
-    internal history. #}
-    <div class="panel-card mb-0 no-print">
-      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-        <div>
-          <div class="panel-title">Recent Community Reports<span class="untracked-tag">Not tracked</span></div>
-          <div class="panel-sub">Previously generated reports</div>
-        </div>
-      </div>
-      <div class="untracked">
-        <span class="material-symbols-outlined">summarize</span>
-        <div>
-          <div class="untracked-title">No report history is recorded</div>
-          <!-- Screen 10's own reason, reused rather than restated: its "Recent
-               Generated Reports" panel is empty for exactly this gap. Generating
-               a report is real now; recording that one was generated is not. -->
-          <div class="untracked-body">{{ untracked.generated_reports }}</div>
-        </div>
-      </div>
-    </div>
 
 {#- The sheet says what produced it and over what. Without this a printed page
     of barangay figures is a page of numbers with no provenance. #}

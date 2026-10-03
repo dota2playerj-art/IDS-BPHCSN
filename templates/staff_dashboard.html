@@ -163,13 +163,13 @@
            card beside it, reading from get_immunization_alert(). -->
       <div class="col-xl col-md-4 col-sm-6">
         <div class="stat-card">
-          <div class="stat-icon" style="background:{{ '#FEE2E2' if immunization_alert.no_record_child_count else '#DBEAFE' }};"><span class="material-symbols-outlined" style="color:{{ 'var(--danger)' if immunization_alert.no_record_child_count else 'var(--info)' }};">vaccines</span></div>
+          <div class="stat-icon" style="background:{{ '#FEF3C7' if immunization_alert.child_count else '#DBEAFE' }};"><span class="material-symbols-outlined" style="color:{{ 'var(--warning)' if immunization_alert.child_count else 'var(--info)' }};">vaccines</span></div>
           <div class="stat-value">{{ immunization_alert.child_count }}</div>
           <div class="stat-label">Children Due for Immunization</div>
           {%- if immunization_alert.no_record_child_count %}
-          <div class="stat-trend" style="color:var(--danger);">{{ immunization_alert.no_record_child_count }} with no record &middot; {{ immunization_alert.due_dose_count }} dose{{ '' if immunization_alert.due_dose_count == 1 else 's' }} to follow up</div>
+          <div class="stat-trend" style="color:var(--warning);">{{ immunization_alert.no_record_child_count }} child{{ ' has' if immunization_alert.no_record_child_count == 1 else 'ren have' }} doses with no record</div>
           {%- elif immunization_alert.child_count %}
-          <div class="stat-trend" style="color:var(--warning);">{{ immunization_alert.due_dose_count }} dose{{ '' if immunization_alert.due_dose_count == 1 else 's' }} due</div>
+          <div class="stat-trend" style="color:var(--warning);">{{ immunization_alert.child_count }} child{{ ' has' if immunization_alert.child_count == 1 else 'ren have' }} doses to check</div>
           {%- else %}
           <div class="stat-trend" style="color:var(--success);">Every child up to date</div>
           {%- endif %}
@@ -198,7 +198,7 @@
       <div class="d-flex align-items-center justify-content-between mb-2">
         <div>
           <div class="panel-title">Waiting for the Doctor</div>
-          <div class="panel-sub">Visits that need a diagnosis. With an intake or without one. Oldest first.</div>
+          <div class="panel-sub">Patients who need a diagnosis, oldest first.</div>
         </div>
         <span class="badge-status badge-waiting">{{ waiting_for_doctor_count }}</span>
       </div>
@@ -219,7 +219,7 @@
             <tr>
               <td class="pat-name">{{ visit.name }}<div class="panel-sub" style="margin:0;">{{ visit.patient_reference }}</div></td>
               <td>{{ (visit.checked_in.strftime('%b %d, %Y') ~ ' · ' ~ visit.checked_in.strftime('%I:%M %p').lstrip('0')) if visit.checked_in else '—' }}
-{%- if visit.from_earlier_day %}<div><span class="walkin-tag" style="background:#FEF3C7; color:#92400E;">From an earlier day</span></div>{% endif %}</td>
+</td>
               <td>{{ visit.service }}</td>
               <td>{{ visit.waiting }}</td>
               <td style="text-align:right;">
@@ -283,12 +283,7 @@
         </a>
       </div>
 {%- else %}
-      <div class="panel-title" style="font-size:15px;">No active consultation right now</div>
-      <div class="panel-sub">
-        Nobody is currently being seen. A consultation starts from
-        <a href="{{ url_for(appointment_scheduling_endpoint) }}" style="color:var(--teal-dark); font-weight:600;">Patient Queue</a>,
-        by calling in a patient who has checked in; it will appear here while it is open.
-      </div>
+      <div class="panel-title" style="font-size:15px;">No one is being seen right now.</div>
 {%- endif %}
     </div>
 
@@ -428,7 +423,7 @@
 {%- for child in immunization_alert.children %}
 {%- set no_record = child.no_record_count > 0 %}
             <div class="alert-row">
-              <div class="alert-icon" style="background:{{ '#FEE2E2' if no_record else '#FEF3C7' }};"><span class="material-symbols-outlined" style="color:{{ 'var(--danger)' if no_record else 'var(--warning)' }}; font-size:18px;">vaccines</span></div>
+              <div class="alert-icon" style="background:#FEF3C7;"><span class="material-symbols-outlined" style="color:var(--warning); font-size:18px;">vaccines</span></div>
               <div>
                 <div class="alert-title"><a href="{{ url_for(patient_profile_endpoint, patient_id=child.patient.id) }}" style="color:inherit; text-decoration:none;">{{ child.patient.full_name }}</a></div>
                 <div class="alert-sub">{{ child.patient.age or 'age unknown' }} &middot; {{ child.next_label }}{% if child.attention_count > 1 %} and {{ child.attention_count - 1 }} more{% endif %} &middot; {{ child.next_status | lower }}</div>
@@ -476,7 +471,6 @@
           <div class="quick-stat-row"><div class="qs-label">Consultations this month</div><div class="qs-value">{{ consultation_stats.recorded_this_month }}</div></div>
           <div class="quick-stat-row"><div class="qs-label">New registrations this month</div><div class="qs-value">{{ patient_stats.new_this_month }}</div></div>
           <div class="quick-stat-row"><div class="qs-label">SMS messages sent</div><div class="qs-value">{{ broadcast_stats.messages_sent }}</div></div>
-          <div class="panel-sub" style="margin-top:10px; line-height:1.55;">{{ untracked.staff_activity }}</div>
         </div>
 
       </div>

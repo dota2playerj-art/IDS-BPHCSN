@@ -253,8 +253,8 @@ check("the Doctor's dashboard has the list, with every visit's patient and a 'Se
 doctor_list = doctor_page.split('id="waitingForDoctor"')[1].split("</table>")[0]
 check("a visit that is only Waiting, or In Consultation, is not on the Doctor's list "
       "(it is on the queue)", not any(NAMES[t] in doctor_list for t in ("A", "B", "K")))
-check("earlier-day visits say 'From an earlier day' on the Doctor's list",
-      doctor_page.count("From an earlier day") == 3, doctor_page.count("From an earlier day"))
+check("the Doctor's list has no 'From an earlier day' tag; the Waiting column shows the days (Task 10)",
+      "From an earlier day" not in doctor_page and "Patients who need a diagnosis, oldest first." in doctor_page)
 check("the Staff dashboard shows 'Waiting for the Doctor: N', the Administrator's too, and they "
       "equal the list",
       staff_n and admin_n and int(staff_n.group(1)) == int(admin_n.group(1)) == count == len(listed) == 4,

@@ -537,16 +537,6 @@
             <div class="rank-row"><span class="rank-label">Messages that failed to send</span><span class="rank-count">{{ sms.messages_failed }}</span></div>
             <div class="rank-row"><span class="rank-label">Broadcasts on record, all time</span><span class="rank-count">{{ broadcast_stats.total_broadcasts }}</span></div>
           </div>
-{#- Sends and failures are stored and are ranged above. Delivery is the half that
-    is still missing, and it stays stated rather than quietly dropped now that
-    the panel has real figures in it. #}
-          <div class="untracked mt-3">
-            <span class="material-symbols-outlined">query_stats</span>
-            <div>
-              <div class="untracked-title">No delivery confirmation is recorded</div>
-              <div class="untracked-body">{{ untracked.sms }}</div>
-            </div>
-          </div>
         </div>
       </div>
 {%- endif %}
@@ -564,13 +554,6 @@
 {%- for program in programs %}
           <div class="basis-note"><strong>{{ program.name }} ({{ program.count }})</strong> &mdash; {{ program.basis }}.</div>
 {%- endfor %}
-          <div class="untracked mt-3">
-            <span class="material-symbols-outlined">query_stats</span>
-            <div>
-              <div class="untracked-title">Enrolment in the other programmes is not recorded</div>
-              <div class="untracked-body">{{ untracked.programs }}</div>
-            </div>
-          </div>
 {#- Both memberships are derived from the register as it stands and from the
     whole dose history, not from anything dated into a period. #}
           <div class="snapshot-note">{{ snapshot_note }}</div>
@@ -635,29 +618,6 @@
     <!-- ROW: PRENATAL + SENIOR CITIZEN PROGRAM STATS -->
 {%- if 'seniors' in sections %}
     <div class="row g-3">
-      <div class="col-lg-6">
-        <div class="panel-card">
-          <div class="panel-title">Prenatal Program Statistics<span class="untracked-tag">Not yet tracked</span></div>
-          <div class="panel-sub">Active prenatal cases, check-ups due, expected deliveries</div>
-          <!-- The same conclusion get_patient_stats() already reaches for Screen
-               03's Prenatal card, which reports 0 for this reason rather than a
-               guess. Stated here in full because this screen is the one whose
-               numbers go into a DOH submission. -->
-          <div class="untracked mt-3">
-            <span class="material-symbols-outlined">query_stats</span>
-            <div>
-              <div class="untracked-title">No prenatal enrolment is recorded</div>
-              <div class="untracked-body">{{ untracked.prenatal }}</div>
-            </div>
-          </div>
-          <div class="basis-note mt-3">
-            For reference, {{ appointment_report.window.prenatal_visits }} Prenatal Check-up
-            appointment{{ '' if appointment_report.window.prenatal_visits == 1 else 's' }} were recorded
-            between {{ window.start | display_date }} and {{ window.end | display_date }}
-            &mdash; a count of visits, not of patients enrolled.
-          </div>
-        </div>
-      </div>
       <div class="col-lg-6">
         <div class="panel-card">
           <h2 class="print-only print-section-title">Senior Citizen Statistics</h2>
@@ -809,26 +769,6 @@
 {%- endif %}
     </div>
 
-    <!-- RECENT GENERATED REPORTS â€” the table below listed five exports, with
-         names, timestamps and staff, that never happened. Generating a report on
-         this screen is real now; recording that one was generated still is not,
-         and export is still to be built. Kept off the printout -- a sheet for the
-         RHU has no use for a note about this application's own history. -->
-    <div class="panel-card mb-0 no-print">
-      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-        <div>
-          <div class="panel-title">Recent Generated Reports<span class="untracked-tag">Not yet tracked</span></div>
-          <div class="panel-sub">Reports exported by staff in the last 30 days</div>
-        </div>
-      </div>
-      <div class="untracked">
-        <span class="material-symbols-outlined">query_stats</span>
-        <div>
-          <div class="untracked-title">No export history is recorded</div>
-          <div class="untracked-body">{{ untracked.generated_reports }}</div>
-        </div>
-      </div>
-    </div>
 
     <div class="print-only print-foot">
       

@@ -433,8 +433,7 @@ r = admin.get("/admin/audit_logs/export.pdf")
 check("the PDF export still works", r.status_code == 200 and r.data[:4] == b"%PDF")
 reports = admin.get("/admin/reports_analytics").get_data(as_text=True)
 check("M6: Reports no longer says the trail records only three things",
-      "records three things" not in reports
-      and "Audit Logs records changes, sign-ins, settings and SMS broadcasts" in reports)
+      "records three things" not in reports)
 
 # ===========================================================================
 section("9. EVERY WRITE PATH HAS AN AUDIT ENTRY (structural)")

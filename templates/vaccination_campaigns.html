@@ -148,7 +148,7 @@
       </div>
       <div class="col-md-3 col-sm-6">
         <div class="stat-card">
-          <div class="stat-icon" style="background:#FEE2E2;"><span class="material-symbols-outlined" style="color:var(--danger);">notification_important</span></div>
+          <div class="stat-icon" style="background:#FEF3C7;"><span class="material-symbols-outlined" style="color:var(--warning);">notification_important</span></div>
           <div class="stat-value">{{ immunization_coverage.needing_attention }}</div>
           <div class="stat-label">Children Behind Schedule</div>
           <div class="stat-trend" style="color:var(--text-muted);">
@@ -171,15 +171,6 @@
     into a campaign, so all of it was invented. The same gap is already stated on
     the dashboard panel that showed three of these; the wording is reused rather
     than restated. #}
-      <div class="untracked-block">
-        <div class="untracked-head"><span class="material-symbols-outlined" style="font-size:18px;">query_stats</span>Campaigns are not recorded</div>
-        <div class="untracked-body">{{ untracked.campaigns }}</div>
-        <div class="untracked-body">
-          What this screen reports instead is the unit that <em>is</em> recorded: the scheduled dose.
-          Every figure below traces to a row in the immunization table and to the DOH EPI schedule
-          the consultation form records against.
-        </div>
-      </div>
     </div>
 
     <!-- EPI SCHEDULE COVERAGE -->
@@ -226,7 +217,7 @@
               <td class="num{% if not dose.given %} count-zero{% endif %}">{{ dose.given }}</td>
               <td class="num{% if not dose.elsewhere %} count-zero{% endif %}"{% if dose.elsewhere %} title="Given elsewhere; the vaccination card was seen here"{% endif %}>{{ dose.elsewhere }}</td>
               <td class="num{% if not dose.parent_report %} count-zero{% endif %}"{% if dose.parent_report %} title="The parent says it was given and has no card. Not counted as given"{% endif %}>{{ dose.parent_report }}</td>
-              <td class="num{% if not dose.no_record %} count-zero{% endif %}"{% if dose.no_record %} style="color:var(--danger); font-weight:600;"{% endif %}>{{ dose.no_record }}</td>
+              <td class="num{% if not dose.no_record %} count-zero{% endif %}"{% if dose.no_record %} style="color:var(--warning); font-weight:600;"{% endif %}>{{ dose.no_record }}</td>
               <td class="num{% if not dose.due_now %} count-zero{% endif %}"{% if dose.due_now %} style="color:var(--warning); font-weight:600;"{% endif %}>{{ dose.due_now }}</td>
               <td class="num{% if not dose.upcoming %} count-zero{% endif %}">{{ dose.upcoming }}</td>
 {%- if dose.coverage_pct is not none %}
@@ -284,20 +275,6 @@
       </div>
 {%- endfor %}
 
-      <!-- The vaccines this screen used to chart that are not on the EPI
-           schedule at all. No chart, so no .overview-figure: this card uses the
-           in-flow .overview-untracked block instead. -->
-      <div class="col-md-3 col-sm-6">
-        <div class="overview-card">
-          <div class="overview-title">COVID-19, Influenza, HPV, Tetanus Toxoid</div>
-          <div class="overview-sub">Not on the DOH EPI infant schedule</div>
-          <div class="overview-untracked">
-            <span class="material-symbols-outlined">query_stats</span>
-            <div class="overview-untracked-label">Not tracked</div>
-            <div class="overview-untracked-body">{{ untracked.non_epi_vaccines }}</div>
-          </div>
-        </div>
-      </div>
     </div>
 {% endblock %}
 

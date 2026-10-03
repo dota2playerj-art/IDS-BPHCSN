@@ -161,7 +161,7 @@
     background:#FEF3C7; color:#B45309; font-size:10.5px; font-weight:700; text-transform:uppercase;
     letter-spacing:0.03em; white-space:nowrap;
   }
-  .immun-tag.immun-norecord{background:#FEE2E2; color:#B91C1C;}
+  .immun-tag.immun-norecord{background:#FEF3C7; color:#92400E;}
   /* Start Consultation while somebody else is in the room. Kept visible rather
      than removed so the reason it cannot be pressed is on the screen, in its
      tooltip, next to the patient it refers to. */
@@ -836,8 +836,7 @@
         <div class="icon-circle">
           <span class="material-symbols-outlined" style="font-size:34px; color:var(--teal-dark);">event_busy</span>
         </div>
-        <h5>{% if queue %}No matching patients{% else %}Nobody in today's queue yet{% endif %}</h5>
-        <p>{% if queue %}No one in today's queue matches your search. Try a different name or patient ID.{% elif care_team_view %}Nobody has checked in yet. Use Check In Patient when the first patient arrives.{% else %}Nobody has checked in yet. Health Center Staff check patients in at the desk.{% endif %}</p>
+        <h5>{% if queue %}No one matches your search.{% else %}No one has checked in yet.{% endif %}</h5>
         <!-- One action, and it is the one this empty state's own sentence names:
              "Use Check In Patient when the first patient arrives." A second
              button offering a different action was never what an empty queue is
@@ -915,21 +914,6 @@
       </div>
 {%- endif %}
 
-      {#- WHAT THIS SCREEN DOES NOT DO, SAID ON IT. The sentence comes from
-          utils/unavailable.py. It is here because this screen used to book:
-          somebody who used that last week has no way to tell a deliberate
-          removal from a fault unless the screen says which. (The second sentence
-          that stood here, about closing a patient who left, went with Task 6:
-          "Left before being seen" is that status.) #}
-      <div class="untracked mt-3">
-        <span class="material-symbols-outlined">event_busy</span>
-        <div>
-          <div class="untracked-title">One thing this screen does not do</div>
-          <div class="untracked-body">
-            {{ unavailable.advance_booking }}
-          </div>
-        </div>
-      </div>
 
     </div>
 

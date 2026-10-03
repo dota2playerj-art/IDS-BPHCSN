@@ -153,8 +153,8 @@
           <div class="stat-icon" style="background:#DCFCE7;"><span class="material-symbols-outlined" style="color:var(--success);">volunteer_activism</span></div>
           <div class="stat-value">{{ programs | length }}</div>
           <div class="stat-label">Health Programmes with Recorded Membership</div>
-          <div class="stat-trend" style="color:var(--text-muted);" title="{{ untracked.programs }}">
-            {{ programs | map(attribute='name') | join(', ') }} &middot; others not tracked
+          <div class="stat-trend" style="color:var(--text-muted);">
+            {{ programs | map(attribute='name') | join(', ') }}
           </div>
         </div>
       </div>
@@ -179,17 +179,6 @@
           </div>
         </div>
       </div>
-      <div class="col-md-3 col-sm-6">
-        <!-- "12 Community Health Reports, year to date" stood here. Nothing
-             writes a row when a report is printed or exported, so there is no
-             count to give. -->
-        <div class="stat-card">
-          <div class="stat-icon" style="background:#EDE9FE;"><span class="material-symbols-outlined" style="color:var(--purple);">summarize</span></div>
-          <div class="stat-value" style="font-size:16px; color:var(--text-muted);">Not tracked</div>
-          <div class="stat-label">Community Health Reports Generated</div>
-          <div class="stat-trend" style="color:var(--text-muted);" title="{{ untracked.generated_reports }}">Report exports are not recorded</div>
-        </div>
-      </div>
     </div>
 
     <!-- QUICK ACTIONS — the four screens this role actually holds. All four
@@ -212,28 +201,6 @@
            against the patient roster, not against the barangay -- said out loud
            in each sub-line, because "87% of all eligible residents" was the most
            misleading number on this screen. -->
-      <div class="col-md-3 col-sm-6">
-        <div class="overview-card">
-          <div class="overview-title">Vaccination Coverage</div>
-          <div class="overview-sub">All eligible residents</div>
-          <div class="overview-untracked">
-            <span class="material-symbols-outlined">query_stats</span>
-            <div class="overview-untracked-label">Not tracked</div>
-            <div class="overview-untracked-body">{{ untracked.population }}</div>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-3 col-sm-6">
-        <div class="overview-card">
-          <div class="overview-title">Maternal Health</div>
-          <div class="overview-sub">Prenatal patients with 4+ check-ups</div>
-          <div class="overview-untracked">
-            <span class="material-symbols-outlined">query_stats</span>
-            <div class="overview-untracked-label">Not tracked</div>
-            <div class="overview-untracked-body">{{ untracked.prenatal }}</div>
-          </div>
-        </div>
-      </div>
       <div class="col-md-3 col-sm-6">
         <div class="overview-card">
           <div class="overview-title">Child Immunization</div>
@@ -291,46 +258,27 @@
             </div>
 {%- endfor %}
 {%- if not announcements %}
-            <div class="panel-sub" style="line-height:1.55;">Nothing has been published yet. {{ untracked.announcements }}</div>
+            <div class="panel-sub" style="line-height:1.55;">Nothing has been sent yet.</div>
 {%- endif %}
           </div>
-        </div>
-
-        <!-- UPCOMING HEALTH EVENTS -->
-        <div class="panel-card">
-          <div class="d-flex align-items-center justify-content-between mb-2">
-            <div>
-              <div class="panel-title">Upcoming Health Events</div>
-              <div class="panel-sub">Not tracked</div>
-            </div>
-          </div>
-{#- Three invented events sat here with invented venues and July dates. #}
-          <div class="panel-sub" style="line-height:1.55;">{{ untracked.events }}</div>
         </div>
 
         <!-- VACCINATION CAMPAIGN SCHEDULE -->
         <div class="panel-card">
           <div class="d-flex align-items-center justify-content-between mb-2">
             <div>
-              <div class="panel-title">Vaccination Campaign Schedule</div>
-              <div class="panel-sub">Not tracked</div>
+              <div class="panel-title">Vaccinations Recorded</div>
             </div>
             <a href="{{ url_for('vaccination_campaigns') }}" class="panel-link">Vaccination Campaigns<span class="material-symbols-outlined" style="font-size:15px;">chevron_right</span></a>
           </div>
 {#- Three invented campaigns sat here, with coverage goals quoted against the
     invented barangay population. Doses are recorded; campaigns are not. #}
-          <div class="panel-sub" style="line-height:1.55;">{{ untracked.campaigns }}</div>
           <div class="panel-sub" style="margin-top:10px;">
-            What is recorded: {{ immunization_coverage.doses_given }} dose{{ '' if immunization_coverage.doses_given == 1 else 's' }}
-            across {{ immunization_coverage.enrolled }} patient{{ '' if immunization_coverage.enrolled == 1 else 's' }},
-{%- if immunization_coverage.doses_elsewhere %}
-            of which {{ immunization_coverage.doses_administered }} were given at this health center and
-            {{ immunization_coverage.doses_elsewhere }} were given elsewhere (card seen),
-{%- endif %}
+            {{ immunization_coverage.doses_given }} dose{{ '' if immunization_coverage.doses_given == 1 else 's' }}
+            across {{ immunization_coverage.enrolled }} patient{{ '' if immunization_coverage.enrolled == 1 else 's' }}.
 {%- if immunization_coverage.doses_parent_report %}
-            and a parent says {{ immunization_coverage.doses_parent_report }} more {{ 'was' if immunization_coverage.doses_parent_report == 1 else 'were' }} given, with no card (not counted),
+            Parent says given, no card: {{ immunization_coverage.doses_parent_report }}.
 {%- endif %}
-            with {{ immunization_coverage.needing_attention }} child{{ 'ren' if immunization_coverage.needing_attention != 1 }} with a dose due, with no record, or with only a parent's word.
           </div>
         </div>
 
@@ -351,22 +299,6 @@
             <div class="panel-sub" style="margin-top:4px;">{{ program.basis }}</div>
           </div>
 {%- endfor %}
-          <div class="panel-sub" style="margin-top:12px; line-height:1.55;">{{ untracked.programs }}</div>
-        </div>
-
-        <!-- RECENT REPORTS -->
-        <div class="panel-card mb-0">
-          <div class="d-flex align-items-center justify-content-between mb-2">
-            <div>
-              <div class="panel-title">Recent Reports</div>
-              <div class="panel-sub">Not tracked</div>
-            </div>
-            <a href="{{ url_for(reports_analytics_endpoint) }}" class="panel-link">Reports &amp; Analytics<span class="material-symbols-outlined" style="font-size:15px;">chevron_right</span></a>
-          </div>
-{#- Three invented PDF/XLSX exports with invented generation dates stood here.
-    Export is not implemented and nothing records one, so the list has no
-    source. Reports & Analytics is live and is where the figures are. #}
-          <div class="panel-sub" style="line-height:1.55;">{{ untracked.generated_reports }}</div>
         </div>
 
       </div>
@@ -387,7 +319,6 @@
             <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--success);"></span>Sent ({{ broadcast_stats.messages_sent }})</div>
             <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--danger);"></span>Failed ({{ broadcast_stats.messages_failed }})</div>
           </div>
-          <div class="panel-sub" style="margin-top:10px; line-height:1.55;">{{ untracked.delivery }}</div>
         </div>
 
         <!-- MONTHLY COMMUNITY STATISTICS -->

@@ -103,11 +103,12 @@ _STATUS_RANK = {status: index for index, status in enumerate(STATUS_ORDER)}
 GIVEN_STATUSES = (COMPLETED, GIVEN_ELSEWHERE)
 
 # Reuses the badge classes the profile, queue and dashboard stylesheets already
-# define -- no new visual vocabulary. Red for no record, amber for something needing
+# define -- no new visual vocabulary. Amber for no record or something needing
 # action today or a report nobody has seen written down, blue for planned, green for
-# a dose with evidence.
+# a dose with evidence. Amber for every reminder, never red: "No record" means "check the
+# vaccination card", not an emergency (Task 10).
 STATUS_BADGE_CLASS = {
-    NO_RECORD: "badge-cancelled",
+    NO_RECORD: "badge-waiting",
     DUE_NOW: "badge-waiting",
     PARENT_REPORT: "badge-waiting",
     UPCOMING: "badge-scheduled",
