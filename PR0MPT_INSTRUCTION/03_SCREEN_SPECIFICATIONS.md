@@ -14,7 +14,7 @@ The system has 21 screens. Screen 19, Notifications, was a placeholder with no d
 
 Screens 01 to 15 are the original approved specifications and are unchanged below. Screens 16 to 20 were built after this document was first written and are specified here for the first time. Screen 21, My Account, was built on 4 September 2026, and Screen 22, Service Schedule, on 26 September 2026; both are specified at the end.
 
-`templates/` holds 27 `.html` files. Twenty-two of them belong to the 21 screens (Patient Profile has a second file, `patient_profile_demographics.html`, the Administrator's demographics-only copy). The other five are not screens, and are not screens for two different reasons:
+`templates/` holds 29 `.html` files. Twenty-three of them belong to the 21 screens (Patient Profile has a second file, `patient_profile_demographics.html`, the Administrator's demographics-only copy; Medicine Inventory has a second file, `inventory_item.html`, the item page). The other six are not screens, and are not screens for two different reasons (the sixth, `error.html`, is the plain page shown for a 404 or 500):
 
 - **`base.html`** is the shared layout — sidebar, header, content region — that every screen renders inside.
 - **`_print.html`** and **`_chart_table.html`** are partials, included by the screens that print and the screens that render a chart's underlying figures as a table.
@@ -322,29 +322,39 @@ Medicine Table
 
 Low Stock Widget
 
-Expiration Widget
+Expiring Soon and Expired Widgets
 
 Buttons
 
 Add Medicine
 
-Update Stock
-
-Print Inventory
+Export Excel and Export PDF
 
 Columns
 
-Medicine Name
+Item (the display name: generic name, strength and form)
 
 Category
 
-Quantity
+Usable Stock
 
-Expiration Date
+Reorder Level
 
-Supplier
+Nearest Expiry
+
+Expiring Soon (number of batches)
+
+Expired (number of batches)
 
 Status
+
+**Stock is kept in batches (Task 12, 2026-10-03).** Usable stock is the sum of the item's batches that are
+not expired. The Expiring Soon card counts batches that expire within 90 days and still hold stock; the
+Expired card counts expired batches that still hold stock. Neither is part of any item's stock. A row opens
+the **item page** (a second template of this screen, `inventory_item.html`): the item's details, a table of
+its batches (lot, brand, source, date received, expiry, quantity received, quantity left, status), the
+Receive stock form, a Remove from stock button on every batch that holds stock (an expired batch is
+prompted), and the latest removals. The row's other actions are Edit details and Archive.
 
 ---
 
@@ -356,37 +366,43 @@ Purpose
 
 Manage medicine details.
 
-Fields
+Fields (a medicine)
 
-Medicine Name
+Generic Name (required)
 
-Generic Name
+Strength (required; free text such as "500 mg" or "250 mg/5 mL")
 
-Category
+Dosage Form (required; one list: tablet, capsule, syrup, suspension, drops, sachet, injection, cream,
+ointment, inhaler, other)
 
-Quantity
+Category (the drug class)
 
-Unit
+Unit, Reorder Level, Unit Cost, Manufacturer, Supplier, Storage Location, Notes, Status
 
-Expiration Date
+Fields (a supply or equipment item)
 
-Supplier
-
-Storage Location
+Item Name (required) and Size or Specification, then the same unit, reorder level and the rest.
 
 Buttons
 
 Save
 
-Update
-
 Cancel
 
 Validation
 
-No negative quantity.
+There is no separate Medicine Name: the display name is built, for example "Paracetamol 500 mg tablet". Two
+items with the same generic name, strength and form are refused. There is no quantity and no expiry date
+on this screen: Edit details never changes stock. The brand name is entered when stock is received.
 
-Expiration date required.
+**Receive stock (Task 12).** On the item page. Lot number (required, or tick "No lot number"), expiry date
+(required for a medicine, optional for a supply, not already past), quantity received (a whole number of 1
+or more), date received (default today, not in the future), source (DOH, Municipal Health Office / RHU,
+Barangay purchase, Donation, Other), optional brand name. It adds one batch and writes one audit entry.
+
+**Remove from stock (Task 12).** On the item page, per batch. An amount from 1 up to what the batch holds,
+a required reason (Expired, Damaged, Lost, Returned, Count correction) and an optional note. It takes the
+amount out of that one batch and writes one audit entry (item, lot, amount, reason; the note is not copied).
 
 ---
 
@@ -1436,7 +1452,7 @@ a reconciliation section that under-reports the system is as misleading as one t
 it. Screens 01 to 20 above are left exactly as approved; this section records only where the built
 system differs from them.
 
-The system has **21 screens**. `templates/` holds 27 `.html` files, of which five are not screens:
+The system has **21 screens**. `templates/` holds 29 `.html` files, of which six are not screens (`error.html`, the plain 404 and 500 page, is the sixth), and two screens have a second file (`patient_profile_demographics.html` and `inventory_item.html`):
 `base.html` (the shared layout), the `_print.html` and `_chart_table.html` partials,
 `maintenance.html` — a response page rendered with a 503 in place of the screen that was asked for,
 with no route and nothing navigating to it — and `session_expired.html`, shown when a form token is refused. See the note under "Purpose" at the top of this
@@ -1487,8 +1503,8 @@ working control is the worst kind this project keeps.
 
 **Column sorting — built on Screens 03 and 06; deliberately absent on Screen 08.**
 
-Patient Records sorts by Name, Age, Last Visit and Status; Medicine Inventory sorts by Medicine
-Name, Current Stock, Expiration Date and Status. Both run over the rows already rendered, the way
+Patient Records sorts by Name, Age, Last Visit and Status; Medicine Inventory sorts by Item
+name, Usable stock, Nearest expiry and Status. Both run over the rows already rendered, the way
 their search boxes and Advanced Filter panels do, so sorting composes with a narrowed list instead
 of resetting it. One comparator serves both (`static/js/table-sort.js`); each screen supplies only
 its own column list. The order in force is named on the Sort button, on the chosen option, and in
@@ -1578,19 +1594,19 @@ table, each role's screen list is derived from the actual `role_required()` guar
 **Screen 12 — the trail is read, not just written.** Audit Logs reads real entries, filters them
 by module, and exports them.
 
-**Screen 06 — View and Archive are real; Print was removed.**
+**Screen 06 — View and Archive are real; Print was removed (View now opens the item page, Task 12).**
 
-- **View** opens a read-only panel in the row, showing the eight stored fields that previously had
-  no reader outside the editable form.
+- **View** (Task 12) opens the item page: details, batches, Receive stock and Remove from stock. The
+  read-only panel in the row that it replaces held fields that now live on the batches.
 - **Archive** opens a confirmation dialog offering only the transitions the item's stored status
   permits, and the server re-derives that list from the database before writing. It works in both
   directions, so retiring the wrong item is a correctable mis-click. It writes the same status
   column the Add/Edit form writes, so the stat cards, the low-stock alert, both dashboards, the
   sidebar badge and Reports & Analytics all respect a retirement the moment it commits.
 - **"Print Inventory" per row was removed rather than built**, and this is a deliberate decision
-  rather than an outstanding gap. A stock item has no page of its own and a printed copy of one
-  table row is not a document anybody keeps — unlike a patient's record, which is a page in its own
-  right. The inventory document a reader actually wants is Export PDF in the toolbar, which is
+  rather than an outstanding gap. A printed copy of one table row is not a document anybody keeps —
+  unlike a patient's record, which is a page in its own right. (The item page added in Task 12 is where
+  batches are received and removed, not a document to print.) The inventory document a reader actually wants is Export PDF in the toolbar, which is
   built. See `09_IDS-BPHCSN_UI_Architecture_FROM-CLAUDE.md` §12.
 
 **Screen 08 — advance booking retired, and the screen renamed Patient Queue.** This entry used to

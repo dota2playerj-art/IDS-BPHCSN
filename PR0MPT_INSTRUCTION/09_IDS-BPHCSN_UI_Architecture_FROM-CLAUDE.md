@@ -30,7 +30,7 @@ All future UI generation and frontend development must follow this document unle
 
 **The system has 21 screens.** (Screen 19, Notifications, a placeholder, was removed in Task 7.) Screens 1–15 were the original inventory; screens 16–20 were built afterwards and are added here in Version 2.0; screen 21, My Account, was built on 2026-09-04 and added here on 2026-09-05; screen 22, Service Schedule, was built on 2026-09-26 (§19).
 
-`templates/` holds 27 `.html` files, of which five are not screens (the fifth is `session_expired.html`, a response page for a refused form token). `base.html` is the shared layout — sidebar, header, content region. `_print.html` and `_chart_table.html` are partials included by the screens that print and the screens that render a chart's underlying figures as a table. And `maintenance.html` is a **response page rather than a screen**: it has no route and no sidebar entry, and `utils/security.py::_maintenance_response()` renders it with a 503 *in place of* whatever screen the request asked for while maintenance mode is on. Nothing navigates to it, so counting it as a screen would imply somewhere to click that does not exist. The other 22 files are the 21 screens below (Patient Profile has two files: the Administrator's copy is demographics only).
+`templates/` holds 29 `.html` files, of which six are not screens (the fifth is `session_expired.html`, a response page for a refused form token; the sixth is `error.html`, the plain page for a 404 or 500). `base.html` is the shared layout — sidebar, header, content region. `_print.html` and `_chart_table.html` are partials included by the screens that print and the screens that render a chart's underlying figures as a table. And `maintenance.html` is a **response page rather than a screen**: it has no route and no sidebar entry, and `utils/security.py::_maintenance_response()` renders it with a 503 *in place of* whatever screen the request asked for while maintenance mode is on. Nothing navigates to it, so counting it as a screen would imply somewhere to click that does not exist. The other 23 files are the 21 screens below (Patient Profile has two files: the Administrator's copy is demographics only; Medicine Inventory has two: the list and the item page).
 
 The **Primary Role(s)** column is not a description kept in step by hand. It is the set of roles each view's own `role_required()` guard admits, read off `utils/security.py` and confirmed against the live `url_map` by `routes/user_views.py::accessible_screens()` — the same function that prints the permission list on Screen 11. If this column and the code ever disagree, the code is right and this table is stale.
 
@@ -41,8 +41,8 @@ The **Primary Role(s)** column is not a description kept in step by hand. It is 
 | 3 | Patient Records | `patient_records.html` | Administrator, Doctor, Health Center Staff | Browse, search, filter, and manage all registered patients. The Administrator's copy is read-only and demographics only (Task 5c, §20). |
 | 4 | Register Patient | `register_patient.html` | Doctor, Health Center Staff | Capture new patient personal, emergency contact, and medical information. |
 | 5 | Patient Profile | `patient_profile.html`; `patient_profile_demographics.html` | Doctor, Health Center Staff (full record); Administrator (demographics only) | A single patient's full record across six tabs (personal, medical, consultation, medicine, vaccination, appointment history). The Administrator gets the second template: demographics and one plain line (§20). |
-| 6 | Medicine Inventory | `medicine_inventory.html` | Administrator, Doctor, Health Center Staff | Track medicine stock, expiration, and low-stock/near-expiry status. |
-| 7 | Add/Edit Medicine | `add_edit_medicine.html` | Administrator, Doctor, Health Center Staff | Create or update a medicine record's details and stock. |
+| 6 | Medicine Inventory | `medicine_inventory.html` | Administrator, Doctor, Health Center Staff | Track usable stock by batch, the nearest expiry, and low-stock, expiring-soon and expired batches. Opens the item page (`inventory_item.html`: batches, Receive stock, Remove from stock). |
+| 7 | Add/Edit Medicine | `add_edit_medicine.html` | Administrator, Doctor, Health Center Staff | Create an item or edit its details. Medicines are named by generic name, strength and dosage form; there is no quantity or expiry on this screen (stock is received as batches on the item page). |
 | 8 | Patient Queue | `appointment_scheduling.html` | Administrator (read-only), Doctor, Health Center Staff | Check patients in as they arrive, work the live consultation queue, and read the month's calendar. Renamed from Appointment Scheduling on 2026-09-05; the file name is unchanged. |
 | 9 | SMS Notifications | `sms_notifications.html` | Administrator, Doctor, Health Center Staff, Barangay Official | Compose, send, and record SMS broadcasts to a real recipient audience. Specified as "Community Notifications" in `03_SCREEN_SPECIFICATIONS.md`; same screen. |
 | 10 | Reports & Analytics | `reports_analytics.html` | Administrator, Doctor, Barangay Official | Consultation, inventory, registration, and immunisation reporting, over a selectable date range. Export Excel, Export PDF and Print are all built. |
@@ -514,6 +514,19 @@ badge and Reports & Analytics — respects a retirement made this way the moment
 none of them touched. Retiring is an UPDATE of one flag: no row is removed, and the stock figure,
 batch number, expiry date and identifiers are unchanged, which is why marking it Active again
 restores it everywhere.
+
+### The item page and the three stock actions (Task 12)
+
+A stock item now has a page of its own, `inventory_item.html`, opened from the View icon. Stock is kept in
+batches, so a row that held one quantity and one expiry date could not say which boxes expire when. The
+page lists the batches and offers the three separate actions the adviser asked for: **Edit details**
+(item fields only, never a quantity), **Receive stock** (adds a batch) and **Remove from stock** (takes an
+amount out of one batch, with a reason). A medicine is defined by generic name, strength and dosage form
+(RA 6675, the Generics Act); the display name is built from them. Dispensing takes from the usable batch
+with the earliest expiry first (FEFO). A batch past its expiry date is Expired: not counted, never
+dispensed, and shown with a Remove from stock prompt. A batch expiring within 90 days (`config.EXPIRING_SOON_DAYS`)
+is Expiring soon. The row's actions are View, Edit details and Archive; the sentence below about the page
+that a stock item does not have is kept for the record of why Print went.
 
 ### Print was removed, and removal was the finished outcome
 

@@ -580,7 +580,9 @@ service.
 
 **Stock accountability.** Dispensing writes no stock entry, because an entry per issue would tie a
 medicine to a visit time. Accountability comes from the stock levels and from the dispensed totals
-in Reports & Analytics. The Doctor and Health Center Staff hold the full dispensing records.
+in Reports & Analytics. The Doctor and Health Center Staff hold the full dispensing records. Receiving
+stock and removing it from a batch are not patient events, so each writes an audit entry that names the
+item, the lot and the amount (Task 12).
 
 ---
 
@@ -626,6 +628,58 @@ parent report of 1 dose for <Name> (PAT-008).", "Upgraded a parent report to a c
 `given_here` and every earlier dose reported as given elsewhere to `card`. That second step was a decision of
 the brief: those doses were recorded before proof was asked for, so a team that wants certainty should check
 them against the cards.
+
+# Decision Record — Stock in Batches, Named by Generic Name (2026-10-03, Task 12)
+
+**The two concerns (raised with the capstone adviser).** First, restocking edited one quantity and one
+expiry date per medicine. A new delivery has a different expiry from the old stock, so the system lost
+which boxes expire when. Second, the add-medicine form had a separate "Medicine name" next to the generic
+and brand names. RA 6675 (the Generics Act) asks government health agencies to use generic names in
+purchasing, prescribing and dispensing; the brand name is optional and the generic name comes first.
+
+**The item.** An item is a kind of thing the health center stocks, and it holds no quantity and no expiry
+date. A medicine is defined by three required fields: **generic name**, **strength** (free text, for
+example "500 mg" or "250 mg/5 mL") and **dosage form** (one list, `DOSAGE_FORMS`: tablet, capsule, syrup,
+suspension, drops, sachet, injection, cream, ointment, inhaler, other). Its display name is built from them
+and never typed: "Paracetamol 500 mg tablet". Two items with the same generic name, strength and form are
+refused as duplicates (case and spaces ignored). A medical supply or equipment item (`category` Supply or
+Equipment; Medicine is the only drug) keeps a simple item name and a size or specification instead. The
+brand name is not an item field.
+
+**The batch.** Each delivery is one batch: lot number (required; "No lot number" only with a tick box),
+expiry date (required for a medicine, optional for a supply), quantity received, date received (default
+today), source (DOH, Municipal Health Office / RHU, Barangay purchase, Donation, Other) and an optional
+brand name, which belongs to the batch because deliveries of the same generic can come from different
+makers. An item's stock is the sum of its usable batches.
+
+**Three separate actions.** *Edit details* changes item fields only, never a quantity. *Receive stock* adds
+a batch. *Remove from stock* takes an amount out of ONE batch, with a required reason (Expired, Damaged,
+Lost, Returned, Count correction) and an optional note. Each writes one short audit entry: who, the item
+display name, the lot number and the amount. No patient is involved, so the medicine name is allowed there
+(inventory entries have always named items). Whoever could manage inventory before can do all three: the
+Administrator, Health Center Staff and the Doctor; the Barangay Official still cannot.
+
+**FEFO (First Expiry, First Out).** Dispensing takes automatically from the usable batch with the earliest
+expiry, splits across batches when one runs out, and records which batch or batches each dispensing used
+(`medicine_dispensing_batches`). A batch with no expiry date is used last. Staff do not pick batches. An
+expired batch is never used. If usable stock is not enough, dispensing is refused with one plain message
+showing the amount available. The Administrator still never sees which patient received which medicine:
+the batch links sit with the dispensing records, which only the care team reads.
+
+**Expiry handling.** A batch past its expiry date is *Expired*: not usable, not counted in stock, shown with
+a "Remove from stock" prompt. A batch expiring within 90 days (`EXPIRING_SOON_DAYS` in `config.py`, the one
+constant) is *Expiring soon*. A batch is usable through the whole of its expiry date. The inventory list
+shows, per item, usable stock, the nearest expiry, and the numbers of expiring-soon and expired batches. The
+item page lists its batches. The low-stock alert counts usable stock only. The dashboards and the inventory
+report show the two batch counts, and the report lists the batches (item, lot, expiry, amount) with Excel
+and PDF. These are stock facts with no patient link, so the small-count rule does not apply to them.
+
+**Migration.** `migrations/migrate_inventory_batches.py` makes one opening batch (lot "Opening stock") from
+each item's old quantity and expiry, links every earlier dispensing row to it, splits each medicine's name
+into generic name, strength and form where it can, and lists the rest (counts only) for staff to fix with
+Edit details. It backs up first, is safe to run twice and writes one audit entry about itself.
+
+---
 
 # Sample Development Workflow
 
@@ -810,3 +864,9 @@ Version 3.2 (2026-10-02)
 
 Task 6c, no skipping the Doctor: a visit that needs him cannot be Completed without a diagnosis, and no
 audit entry names a visit's service.
+
+Version 3.3 (2026-10-03)
+
+Task 12, stock in batches and medicines named by generic name (RA 6675). Each delivery is a batch with its
+own lot, expiry, source and brand; dispensing is FEFO; a batch past its expiry date is never used or
+counted. See "Decision Record — Stock in Batches, Named by Generic Name".
