@@ -372,7 +372,7 @@ def months_to_days(value, unit):
 
 def plan_visits(rng, today, people):
     """Fill each person's visits: [{'date', 'case', ...}], sorted by date."""
-    from models.immunizations import EPI_SCHEDULE, due_date_for
+    from models.immunizations import DOSE_RULES, EPI_SCHEDULE, due_date_for
 
     last_day = today - timedelta(days=1)
     while last_day.weekday() >= 5:
@@ -408,6 +408,18 @@ def plan_visits(rng, today, people):
         stop_after = rng.randint(1, 4)
         dates, given_elsewhere, visited = {}, [], 0
         last_by_code = {}
+        # The doses on file that COUNT (given here, or seen on a card), and when. The
+        # schedule's rules (Task 13) need the previous dose of a series on file before the
+        # next one, so a visit never gives a dose whose previous dose is not counted: the
+        # earlier dose is given first, as a health worker catching a child up would.
+        counted = {}
+
+        def first_missing(key):
+            """The earliest dose of this dose's series that is not on file as counted."""
+            previous = DOSE_RULES[key].previous
+            while previous is not None and previous not in counted:
+                key, previous = previous, DOSE_RULES[previous].previous
+            return key
         for group in ordered:
             due = due_date_for(person["birth"], *group)
             delay = rng.randint(0, 5) if behaviour != "late" else rng.randint(20, 55)
@@ -426,6 +438,7 @@ def plan_visits(rng, today, people):
                     for code, dose in groups[group]:
                         given_elsewhere.append((code, dose, day, "card"))
                         last_by_code[code] = day
+                        counted[(code, dose)] = day
                 elif chance < 0.82:
                     for code, dose in groups[group]:
                         given_elsewhere.append((code, dose, day, "parent_report"))
@@ -434,9 +447,25 @@ def plan_visits(rng, today, people):
             if behaviour == "dropout" and visited >= stop_after:
                 break
             visited += 1
-            dates[day] = [(code, dose) for code, dose in groups[group]]
+            given_now = []
             for code, dose in groups[group]:
+                if (code, dose) in counted:
+                    continue
+                key = first_missing((code, dose))
+                previous = DOSE_RULES[key].previous
+                # If an earlier dose of the series is missing, that one is given now and this
+                # one waits for a later visit. Either way, the dose given must respect the
+                # minimum interval after its own previous dose.
+                if previous is not None and day < counted[previous] + timedelta(
+                        weeks=DOSE_RULES[key].min_interval_weeks):
+                    continue
+                if key not in given_now:
+                    given_now.append(key)
+            if given_now:
+                dates[day] = given_now
+            for code, dose in given_now:
                 last_by_code[code] = day
+                counted[(code, dose)] = day
         first_visit_day = min(dates) if dates else None
         if first_visit_day is None:
             first_visit_day = random_day(span // 3, span)
