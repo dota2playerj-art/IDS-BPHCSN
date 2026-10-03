@@ -52,6 +52,7 @@ SUITES = [
     ("verify_final_fixes.py", "(new in the final fixes)"),
     ("verify_immunization_evidence.py", "(new in Task 9)"),
     ("verify_inventory_batches.py", "(new in Task 12)"),
+    ("verify_immunization_timing.py", "(new in Task 13)"),
 ]
 
 # The suites were written at different times and end with different summary
