@@ -472,7 +472,7 @@
   // models/patients.py format_age() stays the authority: it is what Screens 03
   // and 04 render once the record exists, and the rules below are a deliberate
   // mirror of it. Change that function and this has to move with it, or an
-  // infant would preview as "0" here and as "4 months, 6 days" on the profile
+  // infant would preview one way here and another on the profile
   // the save redirects to.
   var birthDate = document.getElementById('birthDate');
   var ageDisplay = document.getElementById('ageDisplay');
@@ -507,17 +507,29 @@
     if(beforeBirthday){ years -= 1; }
 
     if(years < 0 || years >= 150){ ageDisplay.value = ''; return; }
-    if(years !== 0){ ageDisplay.value = String(years); return; }
 
-    // Under one year: months with the leftover days, and days alone under a
-    // month, so a newborn never previews as "0".
+    // Mirrors format_age() (Task 15, D3): days under 28 days, weeks and days under 16 weeks,
+    // months and days under 24 months, years and months under 5 years, then years.
+    var totalDays = Math.round((today - born) / 86400000);
+    function withRest(first, rest, restNoun){ return first + (rest ? ' ' + plural(rest, restNoun) : ''); }
+    if(totalDays < 28){ ageDisplay.value = plural(totalDays, 'day'); return; }
+    if(totalDays < 112){
+      ageDisplay.value = withRest(plural(Math.floor(totalDays / 7), 'week'), totalDays % 7, 'day');
+      return;
+    }
     var months = (today.getFullYear() - born.getFullYear()) * 12 +
       (today.getMonth() - born.getMonth());
     if(today.getDate() < born.getDate()){ months -= 1; }
-    var days = Math.round((today - addMonths(born, months)) / 86400000);
-
-    if(months === 0){ ageDisplay.value = plural(days, 'day'); return; }
-    ageDisplay.value = plural(months, 'month') + (days ? ', ' + plural(days, 'day') : '');
+    if(months < 24){
+      var days = Math.round((today - addMonths(born, months)) / 86400000);
+      ageDisplay.value = withRest(plural(months, 'month'), days, 'day');
+      return;
+    }
+    if(months < 60){
+      ageDisplay.value = withRest(plural(Math.floor(months / 12), 'year'), months % 12, 'month');
+      return;
+    }
+    ageDisplay.value = plural(years, 'year');
   }
   if(birthDate){ birthDate.addEventListener('change', refreshAge); refreshAge(); }
 </script>

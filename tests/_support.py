@@ -426,3 +426,35 @@ def live_db_counts():
         )
     finally:
         conn.close()
+
+
+# ---------------------------------------------------------------------------
+# A frozen "today" (Task 15). The real date moves on; a scenario written for one
+# day (a baby born Sep 3, 2026, seen on Oct 3, 2026) needs the same day every run.
+# utils.dates.now() and today() are replaced in every module that imported them,
+# for the length of the `with` block, and put back after it.
+# ---------------------------------------------------------------------------
+import contextlib  # noqa: E402
+
+
+@contextlib.contextmanager
+def frozen_today(day, hour=10):
+    import sys as _sys
+    from datetime import datetime as _dt
+
+    import utils.dates as dates
+
+    moment = _dt(day.year, day.month, day.day, hour, 0, tzinfo=dates.CLINIC_TIMEZONE)
+    originals = {"now": dates.now, "today": dates.today}
+    fakes = {"now": lambda: moment, "today": lambda: moment.date()}
+    swapped = []
+    for module in list(_sys.modules.values()):
+        for name in ("now", "today"):
+            if getattr(module, name, None) is originals[name]:
+                setattr(module, name, fakes[name])
+                swapped.append((module, name))
+    try:
+        yield
+    finally:
+        for module, name in swapped:
+            setattr(module, name, originals[name])

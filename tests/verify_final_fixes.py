@@ -501,6 +501,67 @@ check("logs/ is ignored by git", ignored and "\nlogs/" in (REPO / ".gitignore").
 check("the test run wrote its log in its own temporary folder, not in the project",
       str(log_file).startswith(str(Path(_support.TEST_DIR))) and not (REPO / "logs").exists())
 
+section("Task 15: THE AGE IS SHOWN IN WEEKS FOR A BABY, FROM ONE HELPER (format_age)")
+from datetime import date, timedelta  # noqa: E402
+
+from models.patients import format_age  # noqa: E402
+
+NOW = date(2026, 10, 3)
+by_days = {0: "0 days", 1: "1 day", 12: "12 days", 27: "27 days", 28: "4 weeks", 30: "4 weeks 2 days",
+           111: "15 weeks 6 days", 112: "3 months 20 days"}
+got = {d: format_age((NOW - timedelta(days=d)).isoformat(), NOW) for d in by_days}
+check("under 28 days it reads days; from 28 days to 16 weeks, weeks and days ('0 days' dropped)",
+      got == by_days, got)
+by_birth = {"2024-11-03": "23 months", "2024-11-04": "22 months 29 days", "2024-10-03": "2 years",
+            "2024-09-03": "2 years 1 month", "2021-11-03": "4 years 11 months", "2021-10-03": "5 years",
+            "2021-10-04": "4 years 11 months", "2019-10-03": "7 years", "1963-05-20": "63 years",
+            "2026-05-03": "5 months", "2026-04-30": "5 months 3 days"}
+got = {b: format_age(b, NOW) for b in by_birth}
+check("16 weeks to under 24 months reads months and days; 24 months to under 5 years, years and months; "
+      "5 years and over, years", got == by_birth, {b: (got[b], v) for b, v in by_birth.items() if got[b] != v})
+check("exact calendar arithmetic: a baby born Jan 31 (not 30-day months)",
+      format_age("2026-01-31", date(2026, 3, 1)) == "4 weeks 1 day"
+      and format_age("2026-01-31", date(2026, 5, 30)) == "3 months 30 days"
+      and format_age("2026-01-31", date(2026, 5, 31)) == "4 months"
+      and format_age("2026-01-31", date(2026, 2, 27)) == "27 days"
+      and format_age("2026-01-31", date(2026, 2, 28)) == "4 weeks")
+check("... and a baby born on a leap day (Feb 29, 2024)",
+      format_age("2024-02-29", date(2025, 2, 28)) == "11 months 30 days"
+      and format_age("2024-02-29", date(2025, 3, 1)) == "12 months 1 day"
+      and format_age("2024-02-29", date(2026, 2, 28)) == "23 months 30 days"
+      and format_age("2024-02-29", date(2026, 3, 1)) == "2 years"
+      and format_age("2024-02-29", date(2028, 2, 29)) == "4 years"
+      and format_age("2020-02-29", date(2025, 2, 28)) == "4 years 11 months"
+      and format_age("2020-02-29", date(2025, 3, 1)) == "5 years")
+check("a missing or unusable birth date has no age", format_age(None, NOW) is None and format_age("nonsense", NOW) is None)
+with _support.frozen_today(NOW):
+    conn = sqlite3.connect(TEST_DB)
+    baby = conn.execute("SELECT MAX(id) FROM patients").fetchone()[0] + 1
+    conn.execute("INSERT INTO patients (id, patient_id, first_name, last_name, birth_date, sex, civil_status, "
+                 "address, municipality, province, contact_number, status) VALUES (?, ?, 'Zzage', 'Baby', "
+                 "'2026-09-03', 'Female', 'Single', 'Purok 1', 'San Francisco', 'Surigao del Norte', "
+                 "'09000008888', 'Active')", (baby, f"PAT-{baby:03d}"))
+    visit = conn.execute("INSERT INTO appointments (patient_id, scheduled_by, appointment_type, appointment_date, "
+                         "status, is_walkin, checked_in_at) VALUES (?, ?, 'Consultation', '2026-10-03', "
+                         "'In Consultation', 1, '2026-10-03 08:00:00')", (baby, STAFF_ID)).lastrowid
+    conn.commit()
+    conn.close()
+    for label, client, url in (
+            ("the patient list", None, "/staff/patient_records"),
+            ("the profile", None, f"/staff/patient_profile/{baby}"),
+            ("the consultation form", None, f"/staff/consultation/record/{visit}"),
+            ("the Administrator's patient list", ADMIN_ID, "/admin/patient_records")):
+        c = app.test_client()
+        with c.session_transaction() as sess:
+            sess["user_id"] = client or STAFF_ID
+            _support.open_session(sess)
+        page = c.get(url).get_data(as_text=True)
+        check(f"{label} shows the baby's age as '4 weeks 2 days'", "4 weeks 2 days" in re.sub(r"\s+", " ", page))
+    with app.app_context():
+        from models.patients import get_patient_by_id  # noqa: E402
+        check("the patient record carries the same text (it feeds the queue, the exports and the prints)",
+              get_patient_by_id(baby)["age"] == "4 weeks 2 days")
+
 # ==== END ====
 passed = sum(1 for _, ok in results if ok)
 print("\n" + "=" * 78)

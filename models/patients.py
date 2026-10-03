@@ -241,48 +241,53 @@ def calculate_age(birth_date, on_date=None):
     )
 
 
+def _unit(count, noun):
+    return f"{count} {noun}{'' if count == 1 else 's'}"
+
+
 def format_age(birth_date, on_date=None):
-    """Age as every screen prints it, or None when birth_date is unusable.
+    """Age as every screen prints it, or None when birth_date is unusable (Task 15, D3).
 
-    The one place patient age is turned into text. Screens 03 and 04 render this
-    string directly, so their Age column, header meta grid and Personal
-    Information grid cannot drift apart.
+    The ONE place patient age is turned into text: the profile, the patient list, the queue,
+    the consultation form, the prints and the exports all read it. The vaccine schedule works
+    in weeks, so a baby's age shows in weeks and days, exactly counted from the birth date:
 
-    One year and over returns the same whole-year count those screens have
-    always shown ("63"), so no existing record's display changes. Under one year
-    returns months with the leftover days ("4 months, 6 days"), and under one
-    month returns days alone ("21 days") so a newborn never reads as "0 months".
+        under 28 days               "12 days"
+        28 days to under 16 weeks   "4 weeks 2 days"      ("0 days" is dropped)
+        16 weeks to under 24 months "5 months 3 days"
+        24 months to under 5 years  "2 years 6 months"    ("0 months" is dropped)
+        5 years and over            "7 years"
 
-    The days are carried alongside the months on purpose. The instructor's point
-    was vaccination scheduling, and the Philippine EPI schedule places doses at
-    6, 10 and 14 weeks -- month-only precision cannot tell those apart, and all
-    three would otherwise read as "1 month" or "2 months".
-
-    A birthdate in the future keeps its existing negative-year rendering rather
-    than being reinterpreted as an infant; validate_patient_form() already
-    refuses to store one, so this only concerns hand-edited rows.
+    Months are calendar months (add_months(), the same helper the vaccine due dates use), not
+    30-day blocks, so a baby born on the 31st is counted correctly. A birth date in the
+    future keeps its negative-year rendering rather than being read as an infant;
+    validate_patient_form() already refuses to store one.
     """
     years = calculate_age(birth_date, on_date)
     if years is None:
         return None
-    if years != 0:
+    if years < 0:
         return str(years)
 
     born = _parse_birth_date(birth_date)
     reference = on_date or today()
+    total_days = (reference - born).days
+    if total_days < 28:
+        return _unit(total_days, "day")
+    if total_days < 16 * 7:
+        weeks, days = divmod(total_days, 7)
+        return _unit(weeks, "week") + (f" {_unit(days, 'day')}" if days else "")
 
     months = (reference.year - born.year) * 12 + (reference.month - born.month)
     if reference.day < born.day:
         months -= 1
-    days = (reference - add_months(born, months)).days
-
-    if months == 0:
-        return f"{days} day{'' if days == 1 else 's'}"
-
-    text = f"{months} month{'' if months == 1 else 's'}"
-    if days:
-        text += f", {days} day{'' if days == 1 else 's'}"
-    return text
+    if months < 24:
+        days = (reference - add_months(born, months)).days
+        return _unit(months, "month") + (f" {_unit(days, 'day')}" if days else "")
+    if months < 60:
+        rest = months % 12
+        return _unit(months // 12, "year") + (f" {_unit(rest, 'month')}" if rest else "")
+    return _unit(years, "year")
 
 
 def parse_list_field(raw):
