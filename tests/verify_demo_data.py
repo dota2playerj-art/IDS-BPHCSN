@@ -404,7 +404,7 @@ for row in doses:
         before_birth.append(row["id"])
     if given > today:
         future.append(row["id"])
-    if row["source"] == "administered" and given < due_date_for(born[row["patient_id"]], *offsets[key]):
+    if row["evidence"] == "given_here" and given < due_date_for(born[row["patient_id"]], *offsets[key]):
         early.append(row["id"])
     previous = last_seen.get((row["patient_id"], row["vaccine_code"]))
     if previous and (given - previous).days < 28:
@@ -415,14 +415,14 @@ check("every dose given here was given on or after the day the schedule says it 
 check("no dose is dated before the child was born, or in the future",
       not before_birth and not future)
 check("doses of one vaccine are at least four weeks apart", not close, close[:5])
-check("some doses were given here and some were reported as given elsewhere",
-      any(r["source"] == "administered" for r in doses) and any(r["source"] == "reported" for r in doses))
+check("some doses were given here and some were given elsewhere",
+      any(r["evidence"] == "given_here" for r in doses) and any(r["evidence"] != "given_here" for r in doses))
 check("every dose is a pair the schedule lists",
       all((r["vaccine_code"], r["dose_number"]) in offsets for r in doses))
 check("every dose given here is tied to its consultation, on that visit's date",
       all(db.execute("SELECT substr(consultation_date,1,10) FROM consultations WHERE id = ?",
                      (r["consultation_id"],)).fetchone()[0] == r["date_administered"]
-          for r in doses if r["source"] == "administered"))
+          for r in doses if r["evidence"] == "given_here"))
 
 # ===========================================================================
 section("7. THE REPORTS SHOW REAL, NAMED ROWS")

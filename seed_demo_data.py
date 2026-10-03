@@ -334,8 +334,10 @@ def plan_visits(rng, today, people):
         person["visits"].append(visit)
         return visit
 
-    # Children: the DOH EPI schedule. Doses due before the first visit here are
-    # reported as given elsewhere; doses that fall due later are given at a visit.
+    # Children: the DOH EPI schedule. Doses due before the first visit here were given
+    # elsewhere, and the family may or may not have the card: most show it (card), some
+    # only say so (parent report, no date), and the rest leave no record at all.
+    # Doses that fall due later are given at a visit.
     groups = {}
     for code, _name, _protects, dose, _total, value, unit, _note in EPI_SCHEDULE:
         groups.setdefault((value, unit), []).append((code, dose))
@@ -361,10 +363,16 @@ def plan_visits(rng, today, people):
             if day > last_day:
                 break
             if day < first_day:
-                # Before the window: given at the hospital, if the parents have the record.
-                if rng.random() < 0.8:
+                # Before the window: given at the hospital. The parents have the card
+                # (80%), or only say so (a share of the rest), or nothing is on file.
+                chance = rng.random()
+                if chance < 0.7:
                     for code, dose in groups[group]:
-                        given_elsewhere.append((code, dose, day))
+                        given_elsewhere.append((code, dose, day, "card"))
+                        last_by_code[code] = day
+                elif chance < 0.82:
+                    for code, dose in groups[group]:
+                        given_elsewhere.append((code, dose, day, "parent_report"))
                         last_by_code[code] = day
                 continue
             if behaviour == "dropout" and visited >= stop_after:
@@ -382,7 +390,7 @@ def plan_visits(rng, today, people):
             # Doses reported from before the window go on the first visit only.
             elsewhere = []
             if day == first_visit_day and given_elsewhere:
-                elsewhere = [(c, n, d) for c, n, d in given_elsewhere if d <= day]
+                elsewhere = [(c, n, d, e) for c, n, d, e in given_elsewhere if d <= day]
                 given_elsewhere = []
             add(person, day, "immun", doses=doses, elsewhere=elsewhere)
         if not dates and given_elsewhere:
@@ -785,9 +793,11 @@ def consult_form(details, doses, elsewhere, with_diagnosis=False, dispense=()):
     if doses:
         data["immunizations"] = [f"{code}:{dose}" for code, dose in doses]
     if elsewhere:
-        data["immunizations_elsewhere"] = [f"{code}:{dose}" for code, dose, _ in elsewhere]
-        for code, dose, day in elsewhere:
-            data[f"elsewhere_date_{code}_{dose}"] = day.isoformat()
+        data["immunizations_elsewhere"] = [f"{code}:{dose}" for code, dose, _, _ in elsewhere]
+        for code, dose, day, evidence in elsewhere:
+            data[f"elsewhere_proof_{code}_{dose}"] = evidence
+            # A parent's word has no date to read off a card.
+            data[f"elsewhere_date_{code}_{dose}"] = day.isoformat() if evidence == "card" else ""
     if with_diagnosis:
         data["diagnosis"] = details["diagnosis"]
         data["treatment_plan"] = details["plan"]
@@ -1030,6 +1040,37 @@ def build(path, say=print, show_passwords=True, today_override=None):
                                  {"message": message, "audience": audience, "category": category})
                 stamper.stamp(_clock["now"])
                 counters["broadcasts"] += 1
+
+        # ---- doses given elsewhere, recorded from the Immunization Record tab with no
+        # consultation (Task 9): the first children left with a dose that has no record
+        # show a card (with the place), the next few only have the parent's word.
+        from models.immunizations import get_immunization_alert
+
+        with flask_app.app_context():
+            behind = [child for child in get_immunization_alert()["children"]
+                      if child["no_record_count"]]
+        set_clock(events[-1][0] + timedelta(hours=1))
+        # Only a dose whose vaccine has no other dated dose on file, so the dates stay four
+        # weeks apart.
+        candidates = []
+        for child in behind:
+            schedule = child["status"]["schedule"]
+            item = next((i for i in child["status"]["attention_items"]
+                         if i["status"] == "No record"
+                         and not any(o["code"] == i["code"] and o["on_file"]
+                                     and o["date_administered"] for o in schedule)), None)
+            if item is not None:
+                candidates.append((child, item))
+        for number, (child, item) in enumerate(candidates[:9]):
+            form = {"dose_key": item["key"], "place_given": ""}
+            if number < 6:
+                form.update({"evidence": "card", "place_given": "District hospital",
+                             "date_given": (item["due_date"] + timedelta(days=3)).isoformat()})
+            else:
+                form.update({"evidence": "parent_report", "date_given": ""})
+            actors["staff1"].post(
+                f"/staff/patient_profile/{child['patient']['id']}/dose-elsewhere", form)
+            stamper.stamp(_clock["now"])
     finally:
         unfreeze_clock()
 
@@ -1050,6 +1091,9 @@ def build(path, say=print, show_passwords=True, today_override=None):
         "services used": rows(
             path, "SELECT COUNT(DISTINCT appointment_type) FROM appointments")[0][0],
         "immunizations": rows(path, "SELECT COUNT(*) FROM immunizations")[0][0],
+        "doses given here": rows(path, "SELECT COUNT(*) FROM immunizations WHERE evidence = 'given_here'")[0][0],
+        "doses given elsewhere, card seen": rows(path, "SELECT COUNT(*) FROM immunizations WHERE evidence = 'card'")[0][0],
+        "doses the parent says were given, no card": rows(path, "SELECT COUNT(*) FROM immunizations WHERE evidence = 'parent_report'")[0][0],
         "dispensing issues": rows(path, "SELECT COUNT(*) FROM medicine_dispensing")[0][0],
         "inventory items": rows(path, "SELECT COUNT(*) FROM inventory_items")[0][0],
         "broadcasts": rows(path, "SELECT COUNT(*) FROM sms_broadcasts")[0][0],
