@@ -1519,6 +1519,84 @@ check("every badge on the queue is one of the five statuses or 'Next in line'",
 run_sql("UPDATE appointments SET status = 'Completed' WHERE id IN (?, ?)", (first, second))
 
 # ---------------------------------------------------------------------------
+section("18. OPEN VISITS, THE SUMMARY LINES AND AMBER REMINDERS (Task 10)")
+# An earlier-day visit Waiting for the Doctor, set up on its own, with and without an intake.
+name_patient(21, "T10A")
+name_patient(22, "T10B")
+earlier_no = add_visit(21, "T10A", 4, WFD, time="08:00")[0]
+earlier_rec = add_visit(22, "T10B", 3, WFD, consultation=True, time="08:30")[0]
+run_sql("UPDATE appointments SET status = 'Completed' WHERE status = 'In Consultation'")
+queue = {name: body(client.get(url)) for name, client, url in (
+    ("staff", staff, "/staff/appointment_scheduling"), ("doctor", doctor, "/staff/appointment_scheduling"),
+    ("admin", admin, "/admin/appointment_scheduling"))}
+rows = {name: {i: row_in(section_of(page), f"APT-{i:05d}") for i in (earlier_no, earlier_rec)}
+        for name, page in queue.items()}
+check("an earlier-day visit Waiting for the Doctor is in 'Open visits from earlier days', with and without an intake",
+      all(rows["doctor"][i] and rows["staff"][i] and rows["admin"][i] for i in (earlier_no, earlier_rec)))
+check("the Doctor sees 'See patient' on both, and the link is the same one the dashboard uses",
+      all(f"see-patient/{i}" in rows["doctor"][i] and "See patient" in rows["doctor"][i]
+          for i in (earlier_no, earlier_rec))
+      and f"see-patient/{earlier_no}" in body(doctor.get("/staff/dashboard")))
+check("Staff see 'Left before being seen' on both, and no 'See patient'",
+      all('data-bs-target="#leftModal"' in rows["staff"][i] and "See patient" not in rows["staff"][i]
+          for i in (earlier_no, earlier_rec)))
+check("the Administrator sees neither a Left button nor See patient on them, and no check-in reason column",
+      all('data-bs-target="#leftModal"' not in rows["admin"][i] and "See patient" not in rows["admin"][i]
+          and "see-patient" not in rows["admin"][i] for i in (earlier_no, earlier_rec))
+      and "Service" not in section_of(queue["admin"]).split("</thead>")[0])
+r = staff.post(MARK, data={"appointment_id": str(earlier_no)})
+check("Staff can mark it left from there, and the server accepts it",
+      status_of(earlier_no) == LEFT)
+staff.post(UNDO, data={"appointment_id": str(earlier_no)})
+check("(a left visit from an earlier day is closed: the same-day undo does not apply)",
+      status_of(earlier_no) in (LEFT, WFD))
+run_sql("UPDATE appointments SET status = ?, status_before_left = NULL, left_by = NULL, left_at = NULL "
+        "WHERE id = ?", (WFD, earlier_no))
+# The dashboard count equals the queue: today plus earlier days, for every open waiting-for-the-Doctor visit.
+page = body(doctor.get("/staff/appointment_scheduling"))
+t_n = int(re.search(r"Waiting for the Doctor (\d+)", flat(page.split('id="queueSummary"')[1].split("</div>")[0])).group(1))
+e_n = int(re.search(r"Waiting for the Doctor (\d+)", flat(page.split('id="earlierSummary"')[1].split("</div>")[0])).group(1))
+with app.app_context():
+    from models.doctor_worklist import count_waiting_for_doctor as _cwd, get_waiting_for_doctor as _gwd
+    listed = len(_gwd())
+    counted = _cwd()
+check("the Doctor's list, the dashboard count and the queue (today + earlier days) all agree",
+      listed == counted == t_n + e_n, (listed, counted, t_n, e_n))
+check("the summary starts with 'Today:' and the earlier-days line counts by status",
+      "Today: Waiting" in flat(page) and "Earlier days: Waiting" in flat(page))
+# No leftover boxes or tags.
+leftovers = ("does not do", "From an earlier day", "Still waiting from earlier days", "advance_booking",
+             "Visits cannot be booked ahead")
+check("no 'does not do' box, no 'From an earlier day' tag and no booking note on the queue or the dashboards",
+      not [w for page in list(queue.values()) + [body(doctor.get("/staff/dashboard")), body(staff.get("/staff/dashboard"))]
+           for w in leftovers if w in page])
+# Amber, not red, for every immunization reminder.
+css = re.search(r"\.immun-tag\.immun-norecord\{[^}]*\}", queue["staff"]).group(0)
+check("the queue badge for 'no record' is amber (#FEF3C7 / #92400E), not red",
+      "#FEF3C7" in css and "#92400E" in css and "#FEE2E2" not in css and "#B91C1C" not in css, css)
+profile = body(staff.get(f"/staff/patient_profile/17"))
+alert = profile.split("have no record here")[0].rsplit("<div style=", 1)[-1] if "have no record here" in profile \
+    else profile.split("has no record here")[0].rsplit("<div style=", 1)[-1]
+check("the profile alert is amber, not red",
+      "#FFFBEB" in alert and "#FEF2F2" not in alert and "#FECACA" not in alert and "#B91C1C" not in alert, alert[-250:])
+dash = body(staff.get("/staff/dashboard"))
+label_at = dash.index("Children Due for Immunization")
+card = dash[dash.rfind('<div class="stat-card">', 0, label_at):label_at + 600].split("</div>\n      </div>")[0]
+follow = dash.split("Immunization Follow-up")[1].split("Immunization Follow-up")[0]
+follow = follow[:follow.find("panel-card")] if "panel-card" in follow else follow[:2500]
+check("the Staff dashboard's immunization card and list use amber, not red",
+      "#FEE2E2" not in card and "var(--danger)" not in card and "#FEE2E2" not in follow
+      and "var(--danger)" not in follow, card[-300:])
+check("the dashboard card says it in plain words: '<N> children have doses with no record', and has no "
+      "'doses to follow up' figure",
+      re.search(r"\d+ child(?:ren)? ha(?:s|ve) doses with no record", flat(dash)) is not None
+      and "to follow up" not in flat(dash).split("Children Due for Immunization")[1][:200])
+check("the Administrator's dashboard says 'with no record' in amber, not red",
+      "with no record" in body(admin.get("/admin/dashboard"))
+      and "var(--danger); font-weight:600;\">" not in body(admin.get("/admin/dashboard")).split("with no record")[0][-120:])
+run_sql("UPDATE appointments SET status = 'Completed' WHERE id IN (?, ?)", (earlier_no, earlier_rec))
+
+# ---------------------------------------------------------------------------
 passed = sum(1 for _, ok in results if ok)
 print("\n" + "=" * 78)
 print(f"RESULT: {passed}/{len(results)} checks passed")

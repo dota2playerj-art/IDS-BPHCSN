@@ -436,6 +436,71 @@ named_docs = [str(p.relative_to(REPO)) for p in (REPO / "docs" / "verification")
               and re.search(r"Acido|Antonio A", p.read_text(encoding="utf-8", errors="replace"))]
 check("the real Administrator's name is not in docs/verification/", not named_docs, named_docs)
 
+# ==========================================================================
+section("Task 10: PLAIN SCREENS AND A FRIENDLY ERROR PAGE")
+import config  # noqa: E402
+from unittest import mock  # noqa: E402
+
+REMOVED_PHRASES = ["One thing this screen does not do", "This is a display, not a setting",
+                   "What this rule does not do", "Delivery is not recorded", "Report exports are not recorded",
+                   "Not tracked", "Not yet tracked", "No export history", "No report history",
+                   "Some of this screen is live", "Visits cannot be booked ahead", "From an earlier day",
+                   "Still waiting from earlier days", "Paging is not implemented",
+                   "Choosing the column already in use reverses it"]
+role_pages = {1: ["/admin/dashboard", "/admin/appointment_scheduling", "/admin/reports_analytics", "/admin/settings",
+                  "/admin/user_management", "/admin/audit_logs", "/admin/service_schedule", "/admin/sms_notifications",
+                  "/admin/medicine_inventory", "/admin/patient_records"],
+              2: ["/staff/dashboard", "/staff/appointment_scheduling", "/staff/service_schedule",
+                  "/staff/sms_notifications", "/staff/patient_records", "/staff/medicine_inventory"],
+              3: ["/official/dashboard", "/official/community-reports", "/official/health-programs",
+                  "/official/vaccination-campaigns", "/official/reports_analytics", "/official/sms_notifications"],
+              5: ["/staff/dashboard", "/staff/reports_analytics", "/staff/patient_profile/1"]}
+leftover = []
+for uid, urls in role_pages.items():
+    c = client_as(uid)
+    for url in urls:
+        r = c.get(url)
+        text = r.get_data(as_text=True)
+        if r.status_code != 200:
+            leftover.append((url, r.status_code))
+        leftover += [(url, phrase) for phrase in REMOVED_PHRASES if phrase in text]
+check(f"no helper box or leftover note is on any of {sum(len(v) for v in role_pages.values())} screens "
+      "(the 'does not do' boxes, the Not tracked panels, booking notes)", not leftover, leftover[:6])
+staff_c = client_as(STAFF_ID)
+audit_before = q("SELECT COUNT(*) FROM audit_logs")[0][0]
+log_file = Path(config.LOG_DIR) / "errors.log"
+with mock.patch("routes.staff.dashboard_context", side_effect=RuntimeError("SECRET-DETAIL-4417")):
+    r = staff_c.get("/staff/dashboard")
+page = r.get_data(as_text=True)
+check("a forced error shows the friendly page: title, one line and a button to the person's dashboard",
+      r.status_code == 500 and "Something went wrong" in page
+      and "Please go back and try again. If this keeps happening, tell the system administrator." in page
+      and 'href="/staff/dashboard"' in page or 'href="/dashboard"' in page, page[:300])
+check("... with no traceback, no error text and no Flask page",
+      not any(w in page for w in ("Traceback", "SECRET-DETAIL-4417", "RuntimeError", "Internal Server Error",
+                                  "werkzeug", "File \"")))
+log_text = log_file.read_text(encoding="utf-8") if log_file.exists() else ""
+check("the full error is written to logs/errors.log (the trace, the address and the account ID, no name)",
+      "SECRET-DETAIL-4417" in log_text and "Traceback" in log_text and "GET /staff/dashboard" in log_text
+      and f"account={STAFF_ID}" in log_text, log_text[:300])
+check("no audit entry is written for an error", q("SELECT COUNT(*) FROM audit_logs")[0][0] == audit_before)
+r = staff_c.get("/staff/no-such-page")
+check("a missing page shows the same friendly page, with the dashboard button",
+      r.status_code == 404 and "Something went wrong" in r.get_data(as_text=True)
+      and "Go to my dashboard" in r.get_data(as_text=True))
+r = app.test_client().get("/no-such-page")
+check("signed out, the button goes to the sign-in page",
+      r.status_code == 404 and "Go to sign in" in r.get_data(as_text=True) and "/login" in r.get_data(as_text=True))
+r = staff_c.post("/session/keep-alive", headers={"X-Requested-With": "fetch"}, data={})
+with mock.patch("routes.staff.dashboard_context", side_effect=RuntimeError("SECRET-DETAIL-4417")):
+    r = staff_c.get("/staff/dashboard", headers={"X-Requested-With": "fetch"})
+check("a script request gets a short JSON answer, with no detail",
+      r.status_code == 500 and r.get_json() == {"error": "Something went wrong"})
+ignored = subprocess.run(["git", "check-ignore", "-q", "logs/errors.log"], cwd=str(REPO)).returncode == 0
+check("logs/ is ignored by git", ignored and "\nlogs/" in (REPO / ".gitignore").read_text(encoding="utf-8"))
+check("the test run wrote its log in its own temporary folder, not in the project",
+      str(log_file).startswith(str(Path(_support.TEST_DIR))) and not (REPO / "logs").exists())
+
 # ==== END ====
 passed = sum(1 for _, ok in results if ok)
 print("\n" + "=" * 78)

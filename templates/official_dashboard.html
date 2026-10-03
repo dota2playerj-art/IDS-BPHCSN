@@ -366,7 +366,7 @@
   // Every series below is emitted through | tojson from the same context the
   // figures beside the charts are printed from, so a chart cannot disagree with
   // the number under it. Two donuts were removed rather than re-pointed: their
-  // panels now say "Not tracked" and have no value to draw.
+  // panels have no value to draw.
   function miniDonut(id, value, color){
     new Chart(document.getElementById(id), {
       type: 'doughnut',

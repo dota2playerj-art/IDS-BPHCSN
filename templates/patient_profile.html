@@ -465,14 +465,6 @@
       </div>
       <div class="col-md-4 col-sm-6">
         <div class="stat-card">
-          <div class="stat-icon" style="background:#DBEAFE;"><span class="material-symbols-outlined" style="color:var(--info);">stethoscope</span></div>
-          <div class="stat-value">Not assigned</div>
-          <div class="stat-label">Assigned Health Worker</div>
-          <div class="stat-trend" style="color:var(--text-muted);">Not yet tracked</div>
-        </div>
-      </div>
-      <div class="col-md-4 col-sm-6">
-        <div class="stat-card">
 {#- Was "Active Prescriptions — Not tracked". The card is now real, but it is
     deliberately not headed with the old label: this system records that medicine
     was handed over, not a course with a duration, so "active" is a fact it does
@@ -545,7 +537,6 @@
             <div class="info-item"><div class="info-label">Address</div><div class="info-value">{{ patient.display_address or 'Not recorded' }}</div></div>
             <div class="info-item"><div class="info-label">Emergency Contact</div><div class="info-value">{{ patient.emergency_contact_name or 'Not recorded' }}{% if patient.emergency_contact_relationship %} ({{ patient.emergency_contact_relationship }}){% endif %}</div></div>
             <div class="info-item"><div class="info-label">Emergency Contact No.</div><div class="info-value">{{ patient.emergency_contact_number or 'Not recorded' }}</div></div>
-            <div class="info-item"><div class="info-label">Assigned Health Worker</div><div class="info-value">Not assigned</div></div>
             <div class="info-item"><div class="info-label">Date Registered</div><div class="info-value">{{ patient.created_at | long_date }}</div></div>
           </div>
         </div>
