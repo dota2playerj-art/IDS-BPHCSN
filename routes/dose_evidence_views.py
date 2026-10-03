@@ -171,6 +171,9 @@ def process_change_elsewhere(form_data, user_id, ip_address=None):
             f"{label} for {name} is changed. The change is in the audit log." + note)
     if outcome == "unchanged":
         return patient["id"], None, f"No change. {label} for {name} is as it was."
+    if outcome == "duplicate":
+        return patient["id"], None, (
+            f"{label} for {name} already has a dose that counts. Nothing was changed.")
     return patient["id"], None, "That dose record could not be changed."
 
 

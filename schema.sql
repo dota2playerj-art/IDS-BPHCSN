@@ -305,12 +305,13 @@ CREATE TABLE appointments (
 -- the Immunization Record tab with no consultation; consultation_id is nullable
 -- for that, and because a deleted consultation sets it NULL.
 --
--- UNIQUE (patient_id, vaccine_code, dose_number) is the clinically important
--- constraint. A child cannot receive the same dose twice, and a schema that
--- permits it will eventually hold it -- which would make a defaulting child look
--- up to date. It is also what lets a double-submitted form be absorbed by
--- INSERT OR IGNORE instead of duplicating a dose, and what stops a dose recorded
--- as given elsewhere being recorded a second time as given here.
+-- A dose may have more than one record (Task 14): a dose given before its minimum age or
+-- interval does not count and must be repeated, and the repeat is a new record beside the
+-- early one, which stays as history. Whether a record counts is judged on every read by
+-- models/immunizations.py (judge_records), not stored. Only ONE valid record per dose can
+-- exist; the model refuses a second. The table holds the one rule it can: a dose has at most
+-- one parent's report (the partial unique index below), because a parent's word is replaced
+-- by a card or a dose given here, never stacked.
 --
 -- consultation_id is SET NULL rather than CASCADE on purpose: the vaccination
 -- happened whether or not its paperwork survives.
@@ -328,7 +329,6 @@ CREATE TABLE immunizations (
     notes TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CHECK (evidence <> 'given_here' OR date_administered IS NOT NULL),
-    UNIQUE (patient_id, vaccine_code, dose_number),
     FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
     FOREIGN KEY (consultation_id) REFERENCES consultations(id) ON DELETE SET NULL,
     FOREIGN KEY (administered_by) REFERENCES users(id) ON DELETE RESTRICT
@@ -356,8 +356,8 @@ CREATE TABLE immunizations (
 -- dose_number is nullable, unlike the EPI table's. Most of these have no fixed
 -- dose count, and requiring a number would force a health worker to invent one.
 --
--- UNIQUE (patient_id, vaccine_name, date_administered) rather than the EPI
--- table's UNIQUE across dose numbers. Influenza is one shot every year for life
+-- UNIQUE (patient_id, vaccine_name, date_administered) rather than a constraint
+-- across dose numbers. Influenza is one shot every year for life
 -- and a Td booster a decade later is a new dose, not a duplicate, so a
 -- dose-spanning constraint would refuse real events. The same vaccine to the
 -- same patient on the same day is still one event however often the form is
@@ -629,6 +629,9 @@ CREATE INDEX idx_appointments_queue ON appointments(appointment_date, status, ch
 -- consultation form reads back what was given during one visit.
 CREATE INDEX idx_immunizations_patient ON immunizations(patient_id, date_administered);
 CREATE INDEX idx_immunizations_consultation ON immunizations(consultation_id);
+CREATE INDEX idx_immunizations_dose ON immunizations(patient_id, vaccine_code, dose_number);
+CREATE UNIQUE INDEX idx_immunizations_one_parent_report
+    ON immunizations(patient_id, vaccine_code, dose_number) WHERE evidence = 'parent_report';
 -- The Patient Profile reads one patient's non-EPI vaccination history, newest
 -- first; the consultation form reads back what was given during one visit.
 CREATE INDEX idx_general_vaccinations_patient ON general_vaccinations(patient_id, date_administered);

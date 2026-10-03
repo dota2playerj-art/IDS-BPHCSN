@@ -6,7 +6,6 @@ actually holds the syringe. Doses given elsewhere are recorded with their EVIDEN
 This module is read back by the Patient Profile, the queue, the dashboards and the
 reports, and is the one place a dose's status is decided.
 """
-import sqlite3
 from collections import namedtuple
 from datetime import datetime, timedelta
 
@@ -96,14 +95,22 @@ DOSE_RULES = {
     ("MR", 1): DoseRule(9, "months", None, 0),
     ("MMR", 1): DoseRule(12, "months", ("MR", 1), MIN_INTERVAL_WEEKS),
 }
-# When checking a record of a dose given ELSEWHERE, a dose within this many days of the
-# minimum age or interval still counts (ACIP's 4-day grace period). A dose given HERE
-# gets no grace: the form does not offer it before its date.
+# When judging any RECORDED dose, a dose within this many days of the minimum age or
+# interval still counts (ACIP's 4-day grace period). It is the same for a dose given here
+# and one seen on a card (Task 14, D1). The form itself still offers a dose only from its
+# date: the grace is for judging records, not for scheduling.
 RECORD_GRACE_DAYS = 4
 
 # Every distinct vaccine in the schedule, in first-appearance order. Used by the
 # profile tab to group the doses of one vaccine together.
 VACCINE_ORDER = tuple(dict.fromkeys(row[0] for row in EPI_SCHEDULE))
+# After a dose that did not count, the same dose may be repeated at least this long later
+# (Task 14, D2): the series' own minimum interval, or 4 weeks when the series has none.
+REPEAT_INTERVAL_WEEKS = {
+    code: max((rule.min_interval_weeks for (c, _), rule in DOSE_RULES.items() if c == code),
+              default=0) or MIN_INTERVAL_WEEKS
+    for code in VACCINE_ORDER
+}
 VACCINE_NAMES = {row[0]: row[1] for row in EPI_SCHEDULE}
 VACCINE_PROTECTS = {row[0]: row[2] for row in EPI_SCHEDULE}
 
@@ -273,73 +280,152 @@ def _record_day(record):
     return as_date(record["date_administered"]) if record and record.get("date_administered") else None
 
 
-def too_early_keys(birth_date, record_by_key):
-    """The (code, dose) pairs whose CARD record was given before it could count (D4).
+# THE ONE VALIDITY RULE (Task 14, D1). Every recorded dose is judged here, whatever its
+# evidence (given here or seen on a card), and every screen, report and write path reads
+# the answer from this module. A dose is INVALID ("given too early") when its date is more
+# than RECORD_GRACE_DAYS before
+#   - the child's minimum age for it,
+#   - the minimum interval after the previous VALID dose of its series, or
+#   - (for a repeat) the series' interval after an earlier invalid record of the same dose.
+# An invalid dose stays on file as history. It does not count for completion, coverage or
+# eligibility. A dose whose previous dose is on file but does not count is also invalid:
+# it was not spaced from a valid dose. A dose with no previous dose on file at all is not
+# judged against one: nothing shows it was early. A parent's report is never judged: it
+# never counts. Only one valid record per dose counts; any other is "extra".
+VERDICT_VALID = "valid"
+VERDICT_EARLY = "too_early"
+VERDICT_EXTRA = "extra"
+VERDICT_REPORT = "parent_report"
 
-    Only a dose given elsewhere on a card is judged: the card is history with a real
-    date, and a dose given here is refused up front by dose_eligibility(). A card dose is
-    too early when its date is more than RECORD_GRACE_DAYS before the child's minimum age
-    for it, or before the minimum interval after the previous dose of its series (when
-    that dose is on file as given here or on a card). A dose with no previous dose on file
-    is not judged against one: nothing shows it was early.
+
+def judge_records(birth_date, records):
+    """Judge every record of ONE child. Returns a list of verdicts, aligned with `records`.
+
+    `records` are dicts with vaccine_code, dose_number, evidence, date_administered and
+    (for a stable order of same-day records) id. The verdicts are VERDICT_VALID,
+    VERDICT_EARLY, VERDICT_EXTRA (a second valid record of a dose that already counts) and
+    VERDICT_REPORT (a parent's report, which is not judged and never counts).
     """
     grace = timedelta(days=RECORD_GRACE_DAYS)
-    early = set()
-    for key, record in record_by_key.items():
-        if record.get("evidence") != EVIDENCE_CARD or key not in DOSE_RULES:
+    verdicts = [None] * len(records)
+    by_key = {}
+    for index, record in enumerate(records):
+        if (record.get("evidence") or EVIDENCE_GIVEN_HERE) not in COUNTS_AS_GIVEN:
+            verdicts[index] = VERDICT_REPORT
             continue
-        day = _record_day(record)
-        if day is None:
-            continue
-        rule = DOSE_RULES[key]
-        if birth_date is not None and day < minimum_age_date(birth_date, *key) - grace:
-            early.add(key)
-            continue
-        previous = record_by_key.get(rule.previous) if rule.previous else None
-        previous_day = _record_day(previous) if _counts_as_given_row(previous) else None
-        if previous_day is not None and day < previous_day + timedelta(
-                weeks=rule.min_interval_weeks) - grace:
-            early.add(key)
-    return early
+        by_key.setdefault((record["vaccine_code"], record["dose_number"]), []).append(index)
+
+    # Schedule order puts every previous dose before the dose that needs it.
+    order = [(row[0], row[3]) for row in EPI_SCHEDULE]
+    order += [key for key in by_key if key not in DOSE_RULES]
+    valid_day = {}   # key -> the date of its valid record (None when the record has no date)
+    for key in order:
+        rule = DOSE_RULES.get(key)
+        invalid_days = []
+        indexes = sorted(by_key.get(key, ()), key=lambda i: (
+            _record_day(records[i]) or datetime.min.date(), records[i].get("id") or 0))
+        for index in indexes:
+            if key in valid_day:
+                verdicts[index] = VERDICT_EXTRA
+                continue
+            day = _record_day(records[index])
+            valid = True
+            if rule is not None and day is not None:
+                gate = minimum_age_date(birth_date, *key) if birth_date is not None else None
+                if rule.previous in valid_day:
+                    previous_day = valid_day[rule.previous]
+                    if previous_day is not None:
+                        after = previous_day + timedelta(weeks=rule.min_interval_weeks)
+                        gate = after if gate is None else max(gate, after)
+                elif rule.previous in by_key:
+                    valid = False   # the previous dose is on file, but it does not count
+                for earlier in invalid_days:
+                    after = earlier + timedelta(weeks=REPEAT_INTERVAL_WEEKS[key[0]])
+                    gate = after if gate is None else max(gate, after)
+                if valid and gate is not None and day < gate - grace:
+                    valid = False
+            if valid:
+                verdicts[index] = VERDICT_VALID
+                valid_day[key] = day
+            else:
+                verdicts[index] = VERDICT_EARLY
+                if day is not None:
+                    invalid_days.append(day)
+    return verdicts
 
 
-def dose_eligibility(code, dose_number, birth_date, record_by_key, on_date, invalid=None):
+def dose_groups(birth_date, records):
+    """The records of one child, grouped by dose: {(code, dose): group}, each group
+    {"counting", "invalid", "parent", "extra"}. `counting` is the one valid record (or None),
+    `invalid` the records given too early (oldest first), `parent` a parent's report, `extra`
+    any other valid record of the same dose. Each record gets its verdict as `record["verdict"]`.
+    """
+    verdicts = judge_records(birth_date, records)
+    groups = {}
+    for record, verdict in zip(records, verdicts):
+        record["verdict"] = verdict
+        group = groups.setdefault((record["vaccine_code"], record["dose_number"]),
+                                  {"counting": None, "invalid": [], "parent": None, "extra": []})
+        if verdict == VERDICT_VALID:
+            group["counting"] = record
+        elif verdict == VERDICT_EARLY:
+            group["invalid"].append(record)
+        elif verdict == VERDICT_EXTRA:
+            group["extra"].append(record)
+        else:
+            group["parent"] = record
+    return groups
+
+
+def too_early_keys(birth_date, records):
+    """The (code, dose) pairs that are on file only as doses given too early: no valid record,
+    so the dose must be repeated. `records` is a list, as judge_records() takes."""
+    groups = dose_groups(birth_date, [dict(r) for r in records])
+    return {key for key, group in groups.items() if group["counting"] is None and group["invalid"]}
+
+
+_NO_RECORDS = {"counting": None, "invalid": [], "parent": None, "extra": []}
+
+
+def dose_eligibility(code, dose_number, birth_date, groups, on_date):
     """THE ONE RULE for whether a scheduled dose may be given on on_date (Task 13, D1).
 
-    Returns {"eligible", "earliest", "reason"}. A dose is eligible only if (a) the child
-    has reached its minimum age, (b) the previous dose of the same series is on file as
-    given here or on a card and is valid, and (c) at least the minimum interval has passed
-    since that dose. A dose already validly recorded is never eligible again. A dose that
-    has only a parent's report on file is still eligible: it does not count as given.
+    `groups` is dose_groups() for the child. Returns {"eligible", "earliest", "reason"}. A dose
+    is eligible only if (a) the child has reached its minimum age, (b) the previous dose of the
+    same series is on file and counts, (c) at least the minimum interval has passed since that
+    dose, and (d) if the dose was given before and did not count, the series' interval has
+    passed since the last such dose (Task 14, D2). A dose that already has a valid record is
+    never eligible again. A dose that has only a parent's report on file is still eligible: it
+    does not count as given.
 
     `earliest` is the first day it can be given (None when it first needs another dose),
     and `reason` is the plain sentence the form prints: "From Nov 14, 2026" or "Needs
     Pentavalent dose 1 first". The consultation form, the server and every screen call
-    this, so they cannot disagree. `invalid` is too_early_keys() for the same records.
+    this, so they cannot disagree.
     """
     key = (code, dose_number)
     rule = DOSE_RULES[key]
     on_date = as_date(on_date)
-    if invalid is None:
-        invalid = too_early_keys(birth_date, record_by_key)
-    record = record_by_key.get(key)
+    group = groups.get(key, _NO_RECORDS)
 
-    if _counts_as_given_row(record):
-        if key in invalid:
-            return {"eligible": False, "earliest": None, "reason": TOO_EARLY}
+    if group["counting"] is not None:
         return {"eligible": False, "earliest": None, "reason": "Already recorded"}
     if birth_date is None:
         return {"eligible": False, "earliest": None, "reason": "Birth date needed"}
 
     earliest = minimum_age_date(birth_date, code, dose_number)
     if rule.previous:
-        previous = record_by_key.get(rule.previous)
-        if not _counts_as_given_row(previous) or rule.previous in invalid:
+        previous = groups.get(rule.previous, _NO_RECORDS)["counting"]
+        if previous is None:
             return {"eligible": False, "earliest": None,
                     "reason": f"Needs {dose_label(*rule.previous)} first"}
         previous_day = _record_day(previous)
         if previous_day is not None:
             earliest = max(earliest, previous_day + timedelta(weeks=rule.min_interval_weeks))
+    for early in group["invalid"]:
+        early_day = _record_day(early)
+        if early_day is not None:
+            earliest = max(earliest, early_day + timedelta(weeks=REPEAT_INTERVAL_WEEKS[code]))
     if on_date < earliest:
         return {"eligible": False, "earliest": earliest, "reason": f"From {display_date(earliest)}"}
     return {"eligible": True, "earliest": earliest, "reason": None}
@@ -362,49 +448,51 @@ def check_given_today(patient, dose_keys, visit_date, reported_entries=()):
     visit when the interval allows.
     """
     birth = as_date(patient["birth_date"]) if patient.get("birth_date") else None
-    records = {(r["vaccine_code"], r["dose_number"]): annotate_evidence(r)
-               for r in get_immunizations_for_patient(patient["id"])}
+    records = [annotate_evidence(r) for r in get_immunizations_for_patient(patient["id"])]
+    on_file = dose_groups(birth, [dict(r) for r in records])
     for entry in reported_entries or ():
         key = (entry["code"], entry["dose_number"])
-        existing = records.get(key)
         if entry.get("evidence") == EVIDENCE_CARD and entry.get("date") and (
-                existing is None or existing["evidence"] == EVIDENCE_PARENT):
-            records[key] = {"evidence": EVIDENCE_CARD, "date_administered": entry["date"]}
+                on_file.get(key, _NO_RECORDS)["counting"] is None):
+            records.append({"vaccine_code": entry["code"], "dose_number": entry["dose_number"],
+                            "evidence": EVIDENCE_CARD, "date_administered": entry["date"]})
+    groups = dose_groups(birth, records)
     errors = {}
     for code, dose_number in dose_keys:
-        message = not_due_message(code, dose_number, birth, records, visit_date)
+        message = not_due_message(code, dose_number, birth, groups, visit_date)
         if message:
             errors[dose_today_field(f"{code}:{dose_number}")] = message
     return errors
 
 
-def not_due_message(code, dose_number, birth_date, record_by_key, on_date):
+def not_due_message(code, dose_number, birth_date, groups, on_date):
     """The one sentence the server refuses a non-eligible dose with, or None if eligible."""
-    verdict = dose_eligibility(code, dose_number, birth_date, record_by_key, on_date)
+    verdict = dose_eligibility(code, dose_number, birth_date, groups, on_date)
     if verdict["eligible"]:
         return None
     if verdict["reason"] == "Already recorded":
         return f"{dose_label(code, dose_number)} is already recorded. It cannot be given again."
     if verdict["earliest"] is not None:
         return f"This dose is not due yet. Earliest date: {display_date(verdict['earliest'])}."
-    if verdict["reason"] == TOO_EARLY:
-        return f"{dose_label(code, dose_number)} was recorded too early. Ask the Doctor about a repeat."
     return f"This dose is not due yet. {verdict['reason']}."
 
 
 def _dose_status(record, due_date, reference, too_early=False):
-    """Completed / Given elsewhere / Parent says given / No record / Due Now / Upcoming.
+    """Completed / Given elsewhere / Parent says given / Given too early / No record / Due Now / Upcoming.
 
     A record counts only when its evidence does: given here is Completed, a card is
     Given elsewhere, and a parent's report is its own status and does NOT count as
-    given. Without any record, the status comes from the due date.
+    given. A dose on file only as doses given too early reads Given too early, whatever
+    its evidence (Task 14). Without any record, the status comes from the due date.
     """
+    if too_early:
+        return TOO_EARLY
     if record is not None:
         evidence = record.get("evidence")
         if evidence == EVIDENCE_GIVEN_HERE:
             return COMPLETED
         if evidence == EVIDENCE_CARD:
-            return TOO_EARLY if too_early else GIVEN_ELSEWHERE
+            return GIVEN_ELSEWHERE
         return PARENT_REPORT
     if due_date is None:
         # No birthdate on record, so no due date can be computed. Reported as
@@ -499,6 +587,28 @@ def dose_label(code, dose_number):
     return f"{name} dose {dose_number}"
 
 
+def _dose_history(group, shown):
+    """The records of one dose that are not the one its row shows, as screen-ready lines.
+
+    A dose given too early reads "Earlier dose on <date> was too early" (Task 14, D2). A
+    parent's report beside a record that counts, or any other valid record, is named too,
+    so nothing on file is hidden. Each line carries its record, for the Change or Correct
+    button.
+    """
+    lines = []
+    for record in group["invalid"]:
+        if record is not shown:
+            lines.append({"record": record, "kind": "too_early", "text": (
+                f"Earlier dose on {display_date(record['date_administered'])} was too early")})
+    if group["parent"] is not None and group["parent"] is not shown:
+        lines.append({"record": group["parent"], "kind": "parent_report",
+                      "text": EVIDENCE_LABELS[EVIDENCE_PARENT]})
+    for record in group["extra"]:
+        lines.append({"record": record, "kind": "extra", "text": (
+            f"Another dose on {display_date(record['date_administered'])} is on file")})
+    return lines
+
+
 def get_immunization_status(patient, on_date=None, records=None):
     """Where one child stands against the DOH EPI schedule.
 
@@ -538,25 +648,27 @@ def get_immunization_status(patient, on_date=None, records=None):
     if records is None:
         records = get_immunizations_for_patient(patient["id"]) if patient else []
 
-    # Keyed by (code, dose) so a scheduled dose can find its record in one look.
     # Annotated on the way in, so a caller that handed `records` in -- the roster
     # readers below do, to avoid a query per child -- gets provenance on those
     # rows too rather than only on the schedule built from them.
-    record_by_key = {
-        (record["vaccine_code"], record["dose_number"]): annotate_evidence(record)
-        for record in records
-    }
-
-    # Card doses given before they could count (D4), judged once for the whole child.
-    invalid = too_early_keys(birth_date, record_by_key)
+    for record in records:
+        annotate_evidence(record)
+    # Every recorded dose judged once for the whole child (Task 14, D1), then grouped by dose.
+    groups = dose_groups(birth_date, records)
 
     schedule = []
     for code, vaccine, protects, dose_number, total, value, unit, note in EPI_SCHEDULE:
-        record = record_by_key.get((code, dose_number))
+        group = groups.get((code, dose_number), _NO_RECORDS)
+        counting = group["counting"]
+        # A dose on file only as doses given too early must be repeated (D2).
+        too_early = counting is None and bool(group["invalid"])
+        # The row shows the record that counts; with none, the latest dose given too early,
+        # then a parent's report. Every other record of the dose is history under it.
+        record = counting or (group["invalid"][-1] if group["invalid"] else None) or group["parent"]
+        history = _dose_history(group, record)
         due_date = due_date_for(birth_date, value, unit)
-        too_early = (code, dose_number) in invalid
         status = _dose_status(record, due_date, reference, too_early)
-        verdict = dose_eligibility(code, dose_number, birth_date, record_by_key, reference, invalid)
+        verdict = dose_eligibility(code, dose_number, birth_date, groups, reference)
         # Past the cohort the schedule describes, "No record" and "Due Now" stop being
         # useful readings -- the infant programme's window has closed, and flagging a
         # 30-year-old would be noise on every screen that counts them. What is on file
@@ -568,9 +680,7 @@ def get_immunization_status(patient, on_date=None, records=None):
             status == TOO_EARLY and applicable) or (
             status == PARENT_REPORT and applicable
             and due_date is not None and reference >= due_date)
-        # A card dose given too early does not count: not for completion, coverage or
-        # the next dose's eligibility.
-        counts_as_given = bool(record and record["counts"]) and not too_early
+        counts_as_given = counting is not None
         schedule.append({
             "code": code,
             "vaccine": vaccine,
@@ -583,19 +693,24 @@ def get_immunization_status(patient, on_date=None, records=None):
             "status": status,
             "badge_class": STATUS_BADGE_CLASS[status],
             "needs_attention": needs_attention,
-            # Counts as given for completion and coverage: given here, or a card seen.
-            # A parent's report is on file but is NOT given.
+            # Counts as given for completion and coverage: a valid dose given here, or seen
+            # on a card. A parent's report is on file but is NOT given; a dose given too
+            # early is on file and does not count.
             "given": counts_as_given,
             # A record exists for this dose, of any evidence.
             "on_file": record is not None,
             # The "Record dose given elsewhere" button is offered on exactly these:
-            # nothing on file, or only a parent's report (which can be upgraded).
-            "can_record_elsewhere": not counts_as_given and not too_early,
+            # nothing that counts on file (a repeat can be recorded after a dose given too
+            # early, and a card can upgrade a parent's report).
+            "can_record_elsewhere": not counts_as_given,
             # The one rule (D1): may this dose be given today? The form ticks only these.
             "eligible": verdict["eligible"],
             "earliest_date": verdict["earliest"],
             "eligibility_reason": verdict["reason"],
             "too_early": too_early,
+            # The other records of this dose, shown under its row: doses given too early
+            # and a parent's report, each {"record", "kind", "text"}.
+            "history": history,
             # The immunizations row behind this scheduled dose, when one exists.
             # Carried so the Patient Profile's Correct action can name the record
             # it means -- the (code, dose) pair identifies the dose in the
@@ -1001,10 +1116,11 @@ def get_dose_coverage(on_date=None):
 
 
 def _valid_dose_rows():
-    """Every dose row that is not a card dose given too early (Task 13, D4), as dicts.
+    """Every dose row that counts toward a figure (Task 14, D1), as dicts: valid doses and
+    parent's reports. A dose given too early, whatever its evidence, is left out.
 
-    The reports count doses in SQL-shaped questions; whether a card dose was early depends on
-    the child's birth date and the other doses of the series, so the rows are read once and
+    The reports count doses in SQL-shaped questions; whether a dose was early depends on the
+    child's birth date and the other doses of the series, so the rows are read once and
     judged here with the same rule the profile uses.
     """
     with db_connection() as conn:
@@ -1021,9 +1137,8 @@ def _valid_dose_rows():
     valid = []
     for records in by_patient.values():
         birth = as_date(records[0]["birth_date"]) if records[0]["birth_date"] else None
-        keyed = {(r["vaccine_code"], r["dose_number"]): r for r in records}
-        invalid = too_early_keys(birth, keyed)
-        valid.extend(r for r in records if (r["vaccine_code"], r["dose_number"]) not in invalid)
+        verdicts = judge_records(birth, records)
+        valid.extend(r for r, v in zip(records, verdicts) if v in (VERDICT_VALID, VERDICT_REPORT))
     return valid
 
 
@@ -1258,15 +1373,39 @@ def parse_reported_doses(form_data, patient, visit_date=None, given_today=()):
     return entries, errors
 
 
+def _records_in(conn, patient_id):
+    """Every dose record of one child, read through `conn`, plus the child's birth date."""
+    rows = conn.execute(
+        "SELECT id, patient_id, vaccine_code, dose_number, evidence, date_administered, "
+        "place_given FROM immunizations WHERE patient_id = ? ORDER BY date_administered, id",
+        (patient_id,)).fetchall()
+    birth = conn.execute("SELECT birth_date FROM patients WHERE id = ?", (patient_id,)).fetchone()
+    return [dict(row) for row in rows], (
+        as_date(birth["birth_date"]) if birth and birth["birth_date"] else None)
+
+
+def _groups_in(conn, patient_id):
+    """dose_groups() for one child, read through `conn` so the answer is true at the moment
+    the write happens (the same reason correct_immunization() checks inside its transaction)."""
+    records, birth = _records_in(conn, patient_id)
+    return dose_groups(birth, records)
+
+
+def _same_record_on_file(group, evidence, day):
+    """True when the dose already has a record with this evidence and this date."""
+    others = group["invalid"] + group["extra"] + ([group["parent"]] if group["parent"] else [])
+    return any(r["evidence"] == evidence and r["date_administered"] == day for r in others)
+
+
 def record_immunizations(patient_id, dose_keys, administered_by, date_administered,
                          consultation_id=None, audit=None):
     """Write the doses THIS HEALTH CENTER gave at one visit. Returns the pairs stored.
 
-    INSERT OR IGNORE against the table's UNIQUE (patient_id, vaccine_code,
-    dose_number): a dose already on file is left exactly as it was rather than
-    being re-dated to today. Double-clicking Save must not rewrite the history of
-    when a child was actually vaccinated, and a dose recorded earlier on a card is
-    not superseded by a tick box.
+    A dose that already counts (a valid record on file) is left exactly as it was rather than
+    being re-dated to today, and a second valid record is refused: double-clicking Save must
+    not rewrite the history of when a child was actually vaccinated. A dose that is on file
+    only as a record given too early gets a NEW record: the repeat (Task 14, D2). The earlier
+    record stays as history.
 
     ONE EXCEPTION: a dose on file only as a parent's report (no card) is not given as
     far as the schedule is concerned, and the child now really did get it here. That row
@@ -1286,30 +1425,32 @@ def record_immunizations(patient_id, dose_keys, administered_by, date_administer
     stored = []
     with db_connection() as conn:
         for code, dose_number in dose_keys:
-            cursor = conn.execute(
-                """
-            INSERT OR IGNORE INTO immunizations
-                (patient_id, consultation_id, vaccine_code, dose_number,
-                 evidence, date_administered, administered_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            """,
-                (patient_id, consultation_id, code, dose_number,
-                 EVIDENCE_GIVEN_HERE, day, administered_by),
-            )
-            if not cursor.rowcount:
-                cursor = conn.execute(
+            group = _groups_in(conn, patient_id).get((code, dose_number), _NO_RECORDS)
+            if group["counting"] is not None:
+                continue
+            if group["parent"] is not None:
+                conn.execute(
                     """
                 UPDATE immunizations
                    SET evidence = ?, consultation_id = ?, date_administered = ?,
                        administered_by = ?, place_given = NULL
-                 WHERE patient_id = ? AND vaccine_code = ? AND dose_number = ?
-                   AND evidence = ?
+                 WHERE id = ? AND evidence = ?
                 """,
                     (EVIDENCE_GIVEN_HERE, consultation_id, day, administered_by,
-                     patient_id, code, dose_number, EVIDENCE_PARENT),
+                     group["parent"]["id"], EVIDENCE_PARENT),
                 )
-            if cursor.rowcount:
-                stored.append((code, dose_number))
+            else:
+                conn.execute(
+                    """
+                INSERT INTO immunizations
+                    (patient_id, consultation_id, vaccine_code, dose_number,
+                     evidence, date_administered, administered_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                    (patient_id, consultation_id, code, dose_number,
+                     EVIDENCE_GIVEN_HERE, day, administered_by),
+                )
+            stored.append((code, dose_number))
         if audit and stored:
             audit(conn, stored)
         conn.commit()
@@ -1329,9 +1470,11 @@ def record_reported_immunizations(patient_id, entries, recorded_by,
     form's path. Doses given elsewhere are also recorded with no consultation, from the
     Immunization Record tab (record_elsewhere_dose() below).
 
-    A dose already on file is left exactly as it is, with one exception: a parent's
+    A dose that already counts is left exactly as it is, with one exception: a parent's
     report is upgraded when this visit sees the card. A child who really was given
     Pentavalent 1 here last month does not have that record overwritten by a recollection.
+    A dose on file only as a record given too early takes the card as a new record (a
+    repeat given elsewhere, Task 14), unless the same card record is already on file.
 
     `recorded_by` goes into administered_by, the one column whose name reads slightly
     wide of what it holds. It is not renamed: it is a foreign key on every dose ever
@@ -1348,29 +1491,29 @@ def record_reported_immunizations(patient_id, entries, recorded_by,
             if day is not None and hasattr(day, "isoformat"):
                 day = day.isoformat()
             evidence = entry.get("evidence") or EVIDENCE_CARD
-            cursor = conn.execute(
-                """
-            INSERT OR IGNORE INTO immunizations
-                (patient_id, consultation_id, vaccine_code, dose_number,
-                 evidence, date_administered, administered_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            """,
-                (patient_id, consultation_id, entry["code"], entry["dose_number"],
-                 evidence, day, recorded_by),
-            )
-            if not cursor.rowcount and evidence == EVIDENCE_CARD:
-                cursor = conn.execute(
+            group = _groups_in(conn, patient_id).get((entry["code"], entry["dose_number"]),
+                                                     _NO_RECORDS)
+            if group["counting"] is not None or _same_record_on_file(group, evidence, day):
+                continue
+            if evidence == EVIDENCE_CARD and group["parent"] is not None:
+                conn.execute(
+                    "UPDATE immunizations SET evidence = ?, date_administered = ?, "
+                    "administered_by = ? WHERE id = ? AND evidence = ?",
+                    (EVIDENCE_CARD, day, recorded_by, group["parent"]["id"], EVIDENCE_PARENT))
+            elif evidence == EVIDENCE_PARENT and group["parent"] is not None:
+                continue
+            else:
+                conn.execute(
                     """
-                UPDATE immunizations
-                   SET evidence = ?, date_administered = ?, administered_by = ?
-                 WHERE patient_id = ? AND vaccine_code = ? AND dose_number = ?
-                   AND evidence = ?
+                INSERT INTO immunizations
+                    (patient_id, consultation_id, vaccine_code, dose_number,
+                     evidence, date_administered, administered_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                    (EVIDENCE_CARD, day, recorded_by, patient_id, entry["code"],
-                     entry["dose_number"], EVIDENCE_PARENT),
+                    (patient_id, consultation_id, entry["code"], entry["dose_number"],
+                     evidence, day, recorded_by),
                 )
-            if cursor.rowcount:
-                stored.append((entry["code"], entry["dose_number"], day))
+            stored.append((entry["code"], entry["dose_number"], day))
         if audit and stored:
             audit(conn, stored)
         conn.commit()
@@ -1384,6 +1527,15 @@ def _valid_evidence_row(evidence, day):
     return not (evidence == EVIDENCE_CARD and not day)
 
 
+def _would_double_count(records, birth, record_id, new_values, key):
+    """True if changing record `record_id` to `new_values` would leave the dose `key` with
+    two valid records. Only one valid record per dose can exist (Task 14, D2)."""
+    changed = [dict(r, **new_values) if r["id"] == record_id else dict(r) for r in records]
+    groups = dose_groups(birth, changed)
+    group = groups.get(key)
+    return bool(group and group["extra"])
+
+
 def record_elsewhere_dose(patient_id, code, dose_number, evidence, date_given, place,
                           recorded_by, audit=None):
     """Record one dose given elsewhere, outside a consultation (Task 9, D3).
@@ -1392,46 +1544,43 @@ def record_elsewhere_dose(patient_id, code, dose_number, evidence, date_given, p
 
         "recorded"       a new record was written
         "upgraded"       a parent's report is now a card record (the card was shown)
-        "unchanged"      the same parent's report was already on file; nothing changed
+        "unchanged"      the same record was already on file; nothing changed
         "already-given"  the dose already counts as given (here, or a card): refused
         "invalid"        not a dose of the schedule, bad evidence, or a card with no date
 
-    `audit(conn, outcome, evidence)` is called before the commit when something was
-    written. The caller has already validated the date against the patient; this re-checks only
-    what the table's rules need.
+    A dose on file only as a record given too early takes the new record beside it: the
+    repeat (Task 14, D2). `audit(conn, outcome, evidence)` is called before the commit when
+    something was written. The caller has already validated the date against the patient;
+    this re-checks only what the table's rules need.
     """
     day = date_given.isoformat() if hasattr(date_given, "isoformat") else (date_given or None)
     if (code, dose_number) not in SCHEDULE_KEYS or not _valid_evidence_row(evidence, day):
         return "invalid"
     place = clean_place(place)
     with db_connection() as conn:
-        existing = conn.execute(
-            "SELECT id, evidence FROM immunizations WHERE patient_id = ? "
-            "AND vaccine_code = ? AND dose_number = ?",
-            (patient_id, code, dose_number)).fetchone()
-        if existing is None:
-            try:
-                conn.execute(
-                    """
-                INSERT INTO immunizations
-                    (patient_id, consultation_id, vaccine_code, dose_number, evidence,
-                     date_administered, place_given, administered_by)
-                VALUES (?, NULL, ?, ?, ?, ?, ?, ?)
-                """,
-                    (patient_id, code, dose_number, evidence, day, place, recorded_by))
-            except sqlite3.IntegrityError:
-                conn.rollback()
-                return "already-given"
-            outcome = "recorded"
-        elif existing["evidence"] != EVIDENCE_PARENT:
+        group = _groups_in(conn, patient_id).get((code, dose_number), _NO_RECORDS)
+        if group["counting"] is not None:
             return "already-given"
+        if _same_record_on_file(group, evidence, day):
+            return "unchanged"
+        parent = group["parent"]
+        if parent is None:
+            conn.execute(
+                """
+            INSERT INTO immunizations
+                (patient_id, consultation_id, vaccine_code, dose_number, evidence,
+                 date_administered, place_given, administered_by)
+            VALUES (?, NULL, ?, ?, ?, ?, ?, ?)
+            """,
+                (patient_id, code, dose_number, evidence, day, place, recorded_by))
+            outcome = "recorded"
         elif evidence == EVIDENCE_PARENT:
             return "unchanged"
         else:
             conn.execute(
                 "UPDATE immunizations SET evidence = ?, date_administered = ?, "
                 "place_given = ?, administered_by = ? WHERE id = ? AND evidence = ?",
-                (EVIDENCE_CARD, day, place, recorded_by, existing["id"], EVIDENCE_PARENT))
+                (EVIDENCE_CARD, day, place, recorded_by, parent["id"], EVIDENCE_PARENT))
             outcome = "upgraded"
         if audit:
             audit(conn, outcome, evidence)
@@ -1445,6 +1594,7 @@ def update_elsewhere_dose(record_id, evidence, date_given, place, audit=None):
         "updated"      evidence, date or place changed
         "upgraded"     a parent's report became a card record
         "unchanged"    nothing differed
+        "duplicate"    the change would leave the dose with two valid records
         "not-allowed"  the record was given here: it is corrected on its own path
         "invalid"      bad evidence, or a card with no date
         "missing"      no such record
@@ -1457,14 +1607,19 @@ def update_elsewhere_dose(record_id, evidence, date_given, place, audit=None):
     place = clean_place(place)
     with db_connection() as conn:
         row = conn.execute(
-            "SELECT evidence, date_administered, place_given FROM immunizations WHERE id = ?",
-            (record_id,)).fetchone()
+            "SELECT patient_id, vaccine_code, dose_number, evidence, date_administered, "
+            "place_given FROM immunizations WHERE id = ?", (record_id,)).fetchone()
         if row is None:
             return "missing"
         if row["evidence"] == EVIDENCE_GIVEN_HERE:
             return "not-allowed"
         if (row["evidence"], row["date_administered"], row["place_given"]) == (evidence, day, place):
             return "unchanged"
+        records, birth = _records_in(conn, row["patient_id"])
+        key = (row["vaccine_code"], row["dose_number"])
+        if _would_double_count(records, birth, record_id,
+                               {"evidence": evidence, "date_administered": day}, key):
+            return "duplicate"
         conn.execute(
             "UPDATE immunizations SET evidence = ?, date_administered = ?, place_given = ? "
             "WHERE id = ? AND evidence <> ?",
@@ -1520,23 +1675,44 @@ def get_immunization_by_id(record_id):
         """,
             (record_id,),
         ).fetchone()
+    if row is None:
+        return None
     # Annotated like every other dose this module hands out, so the correction
     # dialog reads `record["reported"]` rather than comparing the stored string.
-    return annotate_evidence(dict(row)) if row else None
+    record = annotate_evidence(dict(row))
+    # And judged like every other dose (Task 14): the correction says what its result was.
+    record["verdict"] = record_verdict(record["id"])
+    return record
+
+
+def record_verdict(record_id):
+    """How the one validity rule judges one record: a VERDICT_* value, or None if missing."""
+    with db_connection() as conn:
+        row = conn.execute("SELECT patient_id FROM immunizations WHERE id = ?",
+                           (record_id,)).fetchone()
+        if row is None:
+            return None
+        records, birth = _records_in(conn, row["patient_id"])
+    verdicts = judge_records(birth, records)
+    return next(v for r, v in zip(records, verdicts) if r["id"] == record_id)
 
 
 def correct_immunization(record_id, vaccine_code, dose_number, date_administered):
     """Correct one recorded dose's vaccine, dose number and date. Deliberate path.
 
-    Returns "corrected", "missing", "duplicate" or "date_required". Never removes the
-    row: a correction moves a record's field values rather than making the record go
+    Returns "corrected", "missing", "duplicate", "date_required" or "bad_date". Never removes
+    the row: a correction moves a record's field values rather than making the record go
     away (removing a card or parent's-report record is remove_elsewhere_dose()).
 
-    THE DUPLICATE CHECK AND THE UPDATE SHARE ONE CONNECTION ON PURPOSE.
-    The table's UNIQUE (patient_id, vaccine_code, dose_number) means correcting
-    a dose onto a (vaccine, dose) the same child already has on file is a
-    collision, and it is a collision worth naming rather than letting SQLite
-    raise. Checking in the same connection that then writes is what keeps the answer
+    A date is checked for basic sense (not in the future, not before the child was born:
+    "bad_date") and then judged by the one validity rule like any other dose (Task 14, D3):
+    a correction to a too-early date makes the dose invalid, and that shows from then on.
+
+    THE DUPLICATE CHECK AND THE UPDATE SHARE ONE CONNECTION ON PURPOSE. Only one VALID
+    record per dose can exist, so correcting a dose onto a (vaccine, dose) that already has a
+    valid record is a collision, and it is a collision worth naming rather than letting SQLite
+    raise. A dose that has only records given too early can take the corrected record (it is
+    a repeat). Checking in the same connection that then writes is what keeps the answer
     true at the moment the write happens rather than a moment before it.
 
     The patient is never moved. A record that was filed against the wrong *patient* is
@@ -1560,14 +1736,19 @@ def correct_immunization(record_id, vaccine_code, dose_number, date_administered
         if day is None and row["evidence"] != EVIDENCE_PARENT:
             return "date_required"
 
-        clash = conn.execute(
-            """
-        SELECT id FROM immunizations
-         WHERE patient_id = ? AND vaccine_code = ? AND dose_number = ? AND id <> ?
-        """,
-            (row["patient_id"], vaccine_code, dose_number, record_id),
-        ).fetchone()
-        if clash is not None:
+        records, birth = _records_in(conn, row["patient_id"])
+        if day is not None:
+            if as_date(day) > today() or (birth is not None and as_date(day) < birth):
+                return "bad_date"
+
+        key = (vaccine_code, dose_number)
+        new_values = {"vaccine_code": vaccine_code, "dose_number": dose_number,
+                      "date_administered": day}
+        if _would_double_count(records, birth, record_id, new_values, key):
+            return "duplicate"
+        if row["evidence"] == EVIDENCE_PARENT and any(
+                r["id"] != record_id and r["evidence"] == EVIDENCE_PARENT
+                and (r["vaccine_code"], r["dose_number"]) == key for r in records):
             return "duplicate"
 
         conn.execute(

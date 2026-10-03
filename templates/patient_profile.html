@@ -1046,6 +1046,31 @@
           </div>
 {%- endif %}
 
+{#- The buttons for an EARLIER record of a dose, shown under its row (Task 14). A dose given
+    too early stays on file as history; its record can still be corrected (given here) or
+    changed or removed (a card or a parent's word), exactly like the record the row shows. #}
+{%- macro history_button(line, item) %}
+{%- set r = line.record %}
+{%- if r.reported and record_elsewhere_endpoint is defined %}
+                      <button type="button" class="action-icon" title="Change or remove the earlier record — {{ item.label }}, {{ r.evidence_label | lower }}"
+                              data-bs-toggle="modal" data-bs-target="#elsewhereModal"
+                              data-mode="change" data-record-id="{{ r.id }}" data-label="{{ item.label }}"
+                              data-dose-key="{{ item.key }}" data-evidence="{{ r.evidence }}"
+                              data-date="{{ r.date_administered or '' }}" data-place="{{ r.place_given or '' }}"><span class="material-symbols-outlined" style="font-size:18px;">edit</span></button>
+{%- elif not r.reported %}
+                      <button type="button" class="action-icon" title="Correct the earlier record — {{ item.label }}, given {{ r.date_administered | display_date }}"
+                              data-bs-toggle="modal" data-bs-target="#correctVaccinationModal"
+                              data-kind="{{ correction.epi_kind }}"
+                              data-record-id="{{ r.id }}"
+                              data-label="{{ item.label }}"
+                              data-vaccine="{{ item.key }}"
+                              data-date="{{ r.date_administered or '' }}"
+                              data-source="{{ r.evidence }}"
+                              data-source-label="{{ r.evidence_label }}"
+                              data-date-optional="0"
+                              data-recorded-by="{{ r.administered_by_name or '' }}"><span class="material-symbols-outlined" style="font-size:18px;">edit</span></button>
+{%- endif %}
+{%- endmacro %}
           <div style="overflow-x:auto;">
             <table class="history-table">
               <thead>
@@ -1094,6 +1119,9 @@
 {%- if item.reported and item.place_given %}
                     <span style="display:block; margin-top:4px; font-size:11.5px; color:var(--text-muted);">{{ item.place_given }}</span>
 {%- endif %}
+{%- for line in item.history %}
+                    <span class="dose-history" style="display:block; margin-top:4px; font-size:11.5px; color:{{ '#B45309' if line.kind == 'too_early' else 'var(--text-muted)' }};">{{ line.text }}</span>
+{%- endfor %}
                   </td>
 {%- if can_correct %}
                   <td class="text-end">
@@ -1117,7 +1145,7 @@
                             data-mode="record" data-label="{{ item.label }}" data-dose-key="{{ item.key }}">
                       <span class="material-symbols-outlined" style="font-size:15px;">history_edu</span>Record dose given elsewhere</button>
 {%- endif %}
-{%- if item.given and not item.reported %}
+{%- if item.on_file and not item.reported %}
                     <button type="button" class="action-icon" title="Correct this record — {{ item.label }}, {% if item.reported %}{{ item.evidence_label | lower }}{% if item.date_known %} on {{ item.date_administered | display_date }}{% else %}, {{ immunization_unknown_date_text | lower }}{% endif %}{% else %}given {{ item.date_administered | display_date }}{% endif %}"
                             data-bs-toggle="modal" data-bs-target="#correctVaccinationModal"
                             data-kind="{{ correction.epi_kind }}"
@@ -1130,6 +1158,7 @@
                             data-date-optional="{{ '1' if item.reported else '0' }}"
                             data-recorded-by="{{ item.administered_by_name or '' }}"><span class="material-symbols-outlined" style="font-size:18px;">edit</span></button>
 {%- endif %}
+{%- for line in item.history %}{{ history_button(line, item) }}{%- endfor %}
 {%- if item.needs_attention and not item.given and immunization_next_step %}
 {#- A Due or No-record row still has no action beside the buttons above -- there is nothing recorded to
     correct, and a dose cannot be created from a static profile screen with no

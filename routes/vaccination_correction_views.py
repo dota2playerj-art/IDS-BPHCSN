@@ -297,8 +297,8 @@ KINDS = {
         ),
         "submitted_label": _epi_corrected_label,
         "duplicate": (
-            "{patient} already has {label} recorded. Correct that record, or choose a different "
-            "dose."
+            "{patient} already has a dose of {label} that counts. Correct that record, or choose "
+            "a different dose."
         ),
         # The field the duplicate message tells the operator to change.
         "duplicate_field": VACCINE_FIELD,
@@ -494,6 +494,17 @@ def process_vaccination_correction(form_data, user_id, ip_address=None):
             kind, record_id, before_record, form_data,
             {DATE_FIELD: refusal}, refusal,
         ), None
+    if outcome == "bad_date":
+        # The model's own sense check (not in the future, not before birth), reached only
+        # by a POST that skipped the parse. Reopened like any other date error.
+        refusal = (
+            "The date cannot be in the future or before the child was born. "
+            "Nothing has been saved."
+        )
+        return patient_id, _reopen(
+            kind, record_id, before_record, form_data,
+            {DATE_FIELD: refusal}, refusal,
+        ), None
     if outcome == "duplicate":
         # A conflict, not a mistyping -- but it is fixed the same way the field
         # errors above are, by changing what is in the dialog and saving again.
@@ -553,6 +564,10 @@ def process_vaccination_correction(form_data, user_id, ip_address=None):
 
     field_names = ", ".join(labels[field].lower() for field in changed)
     corrected_label = spec["label"](after_record)
+    # A corrected date is judged by the one validity rule like any other dose (Task 14, D3).
+    early_note = ""
+    if kind == EPI_KIND and after_record.get("verdict") == "too_early":
+        early_note = " It was given too early, so it does not count. Ask the Doctor about a repeat."
     subject = original_label
     if corrected_label != original_label:
         subject = f"{original_label} corrected to {corrected_label}"
@@ -561,5 +576,5 @@ def process_vaccination_correction(form_data, user_id, ip_address=None):
     return patient_id, None, (
         f"{subject} for {patient['full_name']} — {len(changed)} field"
         f"{'s' if len(changed) != 1 else ''} changed ({field_names}). "
-        "The correction has been recorded in the audit log."
+        "The correction has been recorded in the audit log." + early_note
     )

@@ -563,12 +563,17 @@
     whole feature is that this cell never reads the same for a dose given here
     and a dose given somewhere else, and putting the badge after the date would
     let a hurried reader take the first thing in the cell for the whole answer. #}
-{%- if item.reported %}
+{%- if item.too_early %}
+                  <span style="color:#B45309;">Earlier dose on {{ item.date_administered | display_date }} was too early</span>
+{%- elif item.reported %}
                   <span class="badge-source badge-reported">{{ item.evidence_short_label }}</span>
                   <span style="display:block; margin-top:3px;">{% if item.date_known %}{{ item.date_administered | display_date }}{% else %}{{ unknown_date_text }}{% endif %}{% if item.given_here %} &middot; reported at this visit{% endif %}</span>
 {%- elif item.given_here %}Recorded at this visit{% if item.date_administered %} &middot; {{ item.date_administered | display_date }}{% endif %}
 {%- elif item.given %}{{ item.date_administered | display_date }}{% if item.administered_by_name %} &middot; {{ item.administered_by_name }}{% endif %}
 {%- else %}&mdash;{% endif %}
+{%- for line in item.history %}
+                  <span style="display:block; margin-top:3px; font-size:11.5px; color:{{ '#B45309' if line.kind == 'too_early' else '#6B7280' }};">{{ line.text }}</span>
+{%- endfor %}
                 </td>
               </tr>
 {%- endfor %}
