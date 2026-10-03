@@ -769,13 +769,11 @@ def get_dispensing_stats(months=6, limit=TOP_MEDICINE_LIMIT, on_date=None,
     different one on the card, and nothing on the sheet would say which answered
     the range that was asked for.
 
-    THE RANKING IS BY medicine_name, THE SNAPSHOT, NOT BY ITEM. Two rows share a
-    line only if they say the same thing. If an inventory row is renamed
-    mid-range -- which the Edit Medicine form allows and which is how the supplier
-    and location corrections in this project were made -- the issues before and
-    after appear under the names they were actually recorded with, rather than
-    being pooled under whichever name the item happens to carry today. A report
-    of what was dispensed should read back what the records say.
+    THE RANKING IS BY ITEM (inventory_item_id), NOT BY THE NAME TEXT STORED ON THE
+    ROW. An item renamed by Edit details, or by the Task 12 migration, is still one
+    medicine: its issues before and after are one line, with its current display
+    name. Each dispensing row keeps its stored name as its historical record (the
+    profile's Dispensing History still shows it); only the totals group by item.
 
     date_dispensed is clinic-local date text, exactly as consultation_date is, so
     the range compares against its leading ten characters with no timezone
@@ -805,10 +803,12 @@ def get_dispensing_stats(months=6, limit=TOP_MEDICINE_LIMIT, on_date=None,
         # under one Confidential row instead of by name (Task 5c, M25).
         scoped = conn.execute(
             """
-        SELECT d.medicine_name, d.unit, d.quantity_dispensed, d.patient_id,
+        SELECT COALESCE(i.name, d.medicine_name) AS medicine_name,
+               COALESCE(i.unit, d.unit) AS unit, d.quantity_dispensed, d.patient_id,
                d.inventory_item_id, substr(d.date_dispensed, 1, 7) AS month,
                COALESCE(c.is_restricted, 0) AS sealed
         FROM medicine_dispensing d
+        LEFT JOIN inventory_items i ON i.id = d.inventory_item_id
         LEFT JOIN consultations c ON c.id = d.consultation_id
         WHERE substr(d.date_dispensed, 1, 10) BETWEEN ? AND ?
         """,
@@ -833,7 +833,7 @@ def get_dispensing_stats(months=6, limit=TOP_MEDICINE_LIMIT, on_date=None,
             )
         else:
             entry = by_medicine.setdefault(
-                row["medicine_name"],
+                row["inventory_item_id"],
                 {"medicine_name": row["medicine_name"], "unit": row["unit"],
                  "units": 0, "events": 0},
             )
@@ -889,7 +889,7 @@ def get_dispensing_stats(months=6, limit=TOP_MEDICINE_LIMIT, on_date=None,
             "patients": len({row["patient_id"] for row in scoped}),
             # Distinct items handed over, sealed visits included. A count names
             # nothing.
-            "medicines": len({row["medicine_name"] for row in scoped}),
+            "medicines": len({row["inventory_item_id"] for row in scoped}),
             "trend": trend,
             "top_medicines": top,
             "all_medicines": ranked,

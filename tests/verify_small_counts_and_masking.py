@@ -185,8 +185,27 @@ patient_ids = [r[0] for r in db().execute("SELECT id FROM patients ORDER BY id")
 _n = [0]
 
 
+_items = {}
+
+
+def item_named(name):
+    """One inventory item per test medicine name. Rankings group by item (L50), so each
+    medicine the suite ranks has to be its own item, named as the suite expects."""
+    if name not in _items:
+        _items[name] = run_sql(
+            "INSERT INTO inventory_items (item_code, name, generic_name, category, unit) "
+            "VALUES (?, ?, ?, 'Medicine', 'tablet')", (f"ZZ-{len(_items) + 1}", name, name))
+        # Well stocked, so it never shows on a low-stock alert.
+        run_sql("INSERT INTO inventory_batches (inventory_item_id, lot_number, quantity_received, "
+                "quantity_remaining, date_received, source) VALUES (?, 'ZZ', 1000, 1000, "
+                "'2026-01-01', 'Other')", (_items[name],))
+    return _items[name]
+
+
 def add_visit(day, sealed, diagnosis=None, complaint=None, medicine=None, item=1):
     _n[0] += 1
+    if medicine:
+        item = item_named(medicine)
     cid = run_sql(
         "INSERT INTO consultations (patient_id, recorded_by, consultation_date, "
         "chief_complaint, diagnosis, is_restricted, restricted_by) VALUES (?,?,?,?,?,?,?)",
@@ -521,6 +540,10 @@ for who, client, prefix in (("Administrator", admin, "/admin"),
     found, pages = [], 0
     for url in plain_gets:
         if not url.startswith(prefix):
+            continue
+        # The stock list names every item by design (stock facts, no patient link); the
+        # suite's test medicines are items now, because rankings group by item (L50).
+        if "/medicine_inventory" in url:
             continue
         for suffix in ("", RANGE1, RANGE2):
             text = readable(client.get(url + suffix))

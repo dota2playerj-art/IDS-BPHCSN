@@ -769,6 +769,33 @@ check("schema.sql matches the migrated tables: batches, removals and dispensing 
       {"inventory_batches", "inventory_removals", "medicine_dispensing_batches"}
       <= {r[0] for r in qall("SELECT name FROM sqlite_master WHERE type='table'")})
 
+# ===========================================================================
+section("8. THE MOST-DISPENSED LIST GROUPS BY ITEM, NOT BY THE NAME STORED ON THE ROW (L50)")
+from models.dispensing import get_dispensing_stats  # noqa: E402
+
+renamed = new_item("Renamedtest", "25 mg")
+for quantity, stored_name in ((10, "Renamedtest 25mg"), (5, "Renamedtest 25 mg tablet")):
+    run_sql("INSERT INTO medicine_dispensing (patient_id, inventory_item_id, medicine_name, unit, "
+            "quantity_dispensed, date_dispensed, dispensed_by) VALUES (8, ?, ?, 'tablet', ?, ?, ?)",
+            (renamed, stored_name, quantity, day(0), STAFF_ID))
+run_sql("UPDATE inventory_items SET name = 'Renamedtest 25 mg capsule', dosage_form = 'capsule' WHERE id = ?",
+        (renamed,))
+with app.app_context():
+    window = get_dispensing_stats(viewer_role="Doctor")["window"]
+rows_for = [e for e in window["all_medicines"] if e["medicine_name"].startswith("Renamedtest")]
+check("after the item is renamed, its two rows (old name and new name) are ONE line with the summed "
+      "amount and the item's current display name",
+      len(rows_for) == 1 and rows_for[0]["units"] == 15 and rows_for[0]["events"] == 2
+      and rows_for[0]["medicine_name"] == "Renamedtest 25 mg capsule", rows_for)
+check("the old dispensing rows keep the name they were recorded with",
+      sorted(r[0] for r in qall("SELECT medicine_name FROM medicine_dispensing WHERE inventory_item_id = ?",
+                                (renamed,))) == ["Renamedtest 25 mg tablet", "Renamedtest 25mg"])
+report = flat(body(doctor.get("/staff/reports_analytics")))
+check("the report screen and its Excel file show the one line under the current name",
+      report.count("Renamedtest 25 mg capsule") >= 1 and "Renamedtest 25mg" not in report
+      and "Renamedtest 25 mg tablet" not in report
+      and "Renamedtest 25 mg capsule" in xlsx_text(doctor.get("/staff/reports_analytics/export.xlsx").data))
+
 # ---------------------------------------------------------------------------
 passed = sum(1 for _, ok in results if ok)
 print("\n" + "=" * 78)
