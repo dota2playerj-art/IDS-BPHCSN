@@ -999,15 +999,8 @@
           <div style="border-radius:12px; border:1px solid #FDE68A; background:#FFFBEB; color:#92400E; padding:14px 16px; font-size:13.5px; display:flex; gap:12px; align-items:flex-start; margin-bottom:18px;">
             <span class="material-symbols-outlined" style="font-size:20px; margin-top:1px;">{{ 'warning' if immunization.no_record_count else 'event_available' }}</span>
             <div>
-{%- if immunization.no_record_count %}
-              <strong style="display:block; margin-bottom:2px;">{{ immunization.no_record_count }} dose{{ ' has' if immunization.no_record_count == 1 else 's have' }} no record here</strong>
-{%- else %}
-              <strong style="display:block; margin-bottom:2px;">{{ immunization.attention_count }} dose{{ '' if immunization.attention_count == 1 else 's' }} to follow up</strong>
-{%- endif %}
-              {% for item in immunization.attention_items %}{{ item.label }} ({{ item.status | lower }}{% if item.due_date %}, due {{ item.due_date | display_date }}{% endif %}){{ "; " if not loop.last else "" }}{% endfor %}.
-{%- if immunization.no_record_count or immunization.parent_report_count %}
-              Ask for the child's vaccination card. If the card shows the dose, record it as given elsewhere.
-{%- endif %}
+              <strong style="display:block; margin-bottom:2px;">{{ immunization.follow_up_title }}</strong>
+              {{ immunization.follow_up_line }}
 {#- The line under the list used to read "Record these during the child's next
     consultation" on every render, which is wrong on the one render where it
     matters most: if the child is with a clinician right now, the next
@@ -1027,8 +1020,6 @@
                  title="{{ immunization_next_step.detail }}">Open today's queue
                 <span class="material-symbols-outlined" style="font-size:16px;">arrow_forward</span></a>
 {%- endif %}
-{%- else %}
-              Record these during the child's next consultation.
 {%- endif %}
             </div>
           </div>
@@ -1038,7 +1029,7 @@
             <div>
               <strong style="display:block; margin-bottom:2px;">Nothing outstanding today</strong>
 {%- if immunization.next_due %}
-              Next scheduled: {{ immunization.next_due.label }}{% if immunization.next_due.due_date %} on {{ immunization.next_due.due_date | display_date }}{% endif %}.
+              Next scheduled: {{ immunization.next_due.label }}{% if immunization.next_due.due_date %} on {{ immunization.next_due.due_date | display_date }}{% else %} ({{ immunization.next_due.due_text | lower }}){% endif %}.
 {%- else %}
               Every dose in the schedule has been recorded.
 {%- endif %}
@@ -1093,7 +1084,7 @@
                   <td style="font-weight:600;">{{ item.label }}</td>
                   <td style="color:var(--text-muted); font-size:12.5px;">{{ item.protects }}</td>
                   <td style="color:var(--text-muted); font-size:12.5px;">{{ item.timing }}</td>
-                  <td>{{ item.due_date | display_date if item.due_date else '—' }}</td>
+                  <td>{{ item.due_text }}</td>
 {#- THREE CELLS SAY WHERE A DOSE CAME FROM, AND THAT IS DELIBERATE REDUNDANCY.
     A dose given elsewhere counts as given ONLY when its card was seen --
     then the child is protected and must stop showing as No record. The risk that
@@ -1177,9 +1168,6 @@
                        style="font-size:12px; font-weight:600; color:#B45309; text-decoration:none; white-space:nowrap;"
                        title="{{ immunization_next_step.detail }}">{{ immunization_next_step.label }}
                       <span class="material-symbols-outlined" style="font-size:14px; vertical-align:-2px;">arrow_forward</span></a>
-{%- else %}
-                    <span style="color:var(--text-muted); font-size:12px; white-space:nowrap;"
-                          title="{{ immunization_next_step.detail }}">{{ immunization_next_step.label }}</span>
 {%- endif %}
 {%- endif %}
                   </td>

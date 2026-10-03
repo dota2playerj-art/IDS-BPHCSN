@@ -453,11 +453,8 @@
         <div class="alert-ids {% if immunization.no_record_count %}alert-warning-ids{% else %}alert-info-ids{% endif %}" style="margin-bottom:18px;">
           <span class="material-symbols-outlined">{% if immunization.no_record_count %}warning{% else %}event_available{% endif %}</span>
           <div>
-            <strong>{% if immunization.no_record_count %}{{ immunization.no_record_count }} dose{{ ' has' if immunization.no_record_count == 1 else 's have' }} no record here for {{ patient.first_name }}{% else %}{{ immunization.attention_count }} dose{{ '' if immunization.attention_count == 1 else 's' }} to follow up for {{ patient.first_name }}{% endif %}</strong>
-            {% for item in immunization.attention_items %}{{ item.label }} ({{ item.status | lower }}{% if item.due_date %}, due {{ item.due_date | display_date }}{% endif %}){{ "; " if not loop.last else "" }}{% endfor %}.
-{%- if immunization.no_record_count or immunization.parent_report_count %}
-            Ask for the child's vaccination card. If the card shows the dose, tick Given elsewhere and choose the card.
-{%- endif %}
+            <strong>{{ immunization.follow_up_title }}</strong>
+            {{ immunization.follow_up_line }}
           </div>
         </div>
 {%- endif %}
@@ -512,7 +509,7 @@
 {%- endif %}
                 </td>
                 <td>
-{%- if item.locked %}
+{%- if item.locked or not item.elsewhere_ok %}
                   <span class="reason-text">&mdash;</span>
 {%- else %}
                   {#- The box and its date live in one cell so they read as one

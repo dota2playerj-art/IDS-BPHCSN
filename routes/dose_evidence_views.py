@@ -21,11 +21,13 @@ from models.immunizations import (
     get_immunization_by_id,
     parse_dose_keys,
     record_elsewhere_dose,
+    too_young_message,
     remove_elsewhere_dose,
     update_elsewhere_dose,
     validate_evidence,
     validate_reported_date,
 )
+from models.consultations import as_date
 from models.immunizations import get_immunization_status
 from models.patients import get_patient_by_id
 from routes.audit_entries import (
@@ -118,6 +120,9 @@ def process_record_elsewhere(patient_id, form_data, user_id, ip_address=None):
         values["place"], user_id,
         audit=elsewhere_dose_recorded(patient["id"], user_id, ip_address))
     name = patient["full_name"]
+    if outcome == "too-young":
+        birth = as_date(patient["birth_date"]) if patient.get("birth_date") else None
+        return patient_id, None, too_young_message(patient, code, dose_number, birth)
     if outcome == "recorded":
         if values["evidence"] == EVIDENCE_CARD:
             return patient_id, None, (

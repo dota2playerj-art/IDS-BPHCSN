@@ -512,12 +512,11 @@ def immunization_next_step(patient, immunization):
                             hand over an error message. The row links to the
                             queue, where the consultation is started, which is
                             the real next action.
-        "none"             they are not at the health center, and no link could
-                            be honest about a visit that is not happening. The
-                            row says to record it at the next consultation.
+        "none"             they are not at the health center: nothing is said, and
+                            no link could be honest about a visit that is not happening.
 
-    Returns None when nothing is outstanding, so the template renders nothing
-    rather than an empty panel.
+    Returns None when nothing is outstanding or the child is not at the health center,
+    so the template renders nothing rather than an empty panel.
     """
     if not immunization["attention_count"]:
         return None
@@ -556,19 +555,8 @@ def immunization_next_step(patient, immunization):
             ),
         }
 
-    return {
-        "state": "none",
-        "appointment_id": None,
-        "label": "At next visit",
-        "detail": (
-            f"{name} is not at the health center today. Record this during their "
-            "next consultation."
-        ),
-        "banner": (
-            f"{name} is not in today's queue. A dose given here is recorded during a "
-            "consultation, so give it at the next visit."
-        ),
-    }
+    # Not at the health center today: there is nothing to say (Task 15, D4).
+    return None
 
 
 def _log_withheld_consultations(patient, withheld, viewer_role):

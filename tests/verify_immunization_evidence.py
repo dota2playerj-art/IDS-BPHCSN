@@ -166,7 +166,7 @@ def alert_ids():
 start = status_of(A)
 check("a child with nothing on file: every due dose reads 'No record' (not 'Overdue'), with its due date",
       start["no_record_count"] >= 8 and start["completed_count"] == 0
-      and all(i["due_date"] for i in start["schedule"])
+      and all(i["due_date"] or i["due_text"].startswith("After ") for i in start["schedule"])
       and {i["status"] for i in start["schedule"]} <= {"No record", "Upcoming"}, start["summary"])
 check("the child is on the follow-up list", A in alert_ids())
 
@@ -228,8 +228,9 @@ check("the BCG dose is no longer on the child's no-record list",
 # The button is on every scheduled dose that has no given_here or card record.
 buttons = len(re.findall(r'data-mode="record"', page))
 expected_buttons = sum(1 for i in status_of(A)["schedule"] if i["can_record_elsewhere"])
-check("the 'Record dose given elsewhere' button is on every dose with no given-here or card record",
-      buttons == expected_buttons and buttons == len(status_of(A)["schedule"]) - 2
+check("the 'Record dose given elsewhere' button is on every dose with no given-here or card record that the child "
+      "is old enough for (Task 15: the child is 150 days old, so not on MR or MMR)",
+      buttons == expected_buttons and buttons == len(status_of(A)["schedule"]) - 4
       and "Record dose given elsewhere" in page, (buttons, expected_buttons))
 
 # ---------------------------------------------------------------------------
@@ -315,11 +316,11 @@ for label_text, data, word in cases:
               and n_doses() == n and len(audit_rows(*IMM_AUDIT)) == audits_before, (r.status_code, word))
 r = staff.post(URL.format(C), data={"dose_key": "PENTA:9", "evidence": "card", "date_given": date_ok})
 check("a dose the schedule does not list is refused", r.status_code == 302 and n_doses() == n)
-r = staff.post(URL.format(C), data={"dose_key": "MR:1", "evidence": "card", "date_given": date_ok,
+r = staff.post(URL.format(C), data={"dose_key": "IPV:1", "evidence": "card", "date_given": date_ok,
                                     "place_given": "x" * 400})
-placed = q1("SELECT place_given FROM immunizations WHERE patient_id = ? AND vaccine_code = 'MR'", (C,))
+placed = q1("SELECT place_given FROM immunizations WHERE patient_id = ? AND vaccine_code = 'IPV'", (C,))
 check("an over-long place is cut, not stored whole", placed and len(placed["place_given"]) == 120)
-run_sql("DELETE FROM immunizations WHERE patient_id = ? AND vaccine_code = 'MR'", (C,))
+run_sql("DELETE FROM immunizations WHERE patient_id = ? AND vaccine_code = 'IPV'", (C,))
 with app.app_context():
     check("the model refuses a card with no date and an unknown proof, called directly",
           record_elsewhere_dose(C, "MR", 1, "card", None, None, STAFF_ID) == "invalid"
@@ -495,11 +496,10 @@ queue = body(staff.get("/staff/appointment_scheduling"))
 check("the queue badge for a child with doses with no record says '<n> vaccines: no record'",
       re.search(r"\d+ vaccines?: no record", queue) is not None and "immun-norecord" in queue)
 no_record_page = body(staff.get(f"/staff/patient_profile/{A}"))
-check("the profile alert reads as decided: '<N> doses have no record here. Ask for the child's vaccination card. "
-      "If the card shows the dose, record it as given elsewhere.'",
-      re.search(r"\d+ doses? ha(?:s|ve) no record here", flat(no_record_page))
-      and "Ask for the child's vaccination card. If the card shows the dose, record it as given elsewhere."
-      in flat(no_record_page))
+check("the profile alert reads (Task 15): '<N> doses to follow up', one line with 'no record', and 'Ask for the "
+      "vaccination card.'",
+      re.search(r"\d+ doses? to follow up", flat(no_record_page))
+      and re.search(r"\(no record\)[^<]*?Ask for the vaccination card\.", flat(no_record_page)))
 check("the staff dashboard card and Administrator's say 'no record'",
       "with no record" in body(staff.get("/staff/dashboard"))
       and "with no record" in body(admin.get("/admin/dashboard")))

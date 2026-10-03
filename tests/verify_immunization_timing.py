@@ -736,6 +736,101 @@ check("a dose given here before its minimum age (the kind record 302 is: Pentava
 verdict_rows.close()
 
 
+# ---------------------------------------------------------------------------
+# TASK 15: DUE DATES THAT CAN BE GIVEN, THE BUTTON ONLY WHEN THE CHILD IS OLD ENOUGH, SHORT TEXT
+# Found in real use: a baby born Sep 3, 2026, 30 days old on Oct 3, 2026, with an early Pentavalent dose 1
+# recorded on Oct 3 (so it does not count), and a parent's word for BCG and Hepatitis B.
+# ---------------------------------------------------------------------------
+from datetime import date  # noqa: E402
+
+section("10. TASK 15: THE 30-DAY-OLD INFANT (BORN SEP 3, 2026), SEEN ON OCT 3, 2026")
+SCENE_DAY = date(2026, 10, 3)
+
+
+def row_text(page, label):
+    """The flat text of the profile table row whose first cell is `label`."""
+    for match in re.finditer(r"<tr>(.*?)</tr>", page, re.S):
+        if re.search(r">\s*%s\s*</td>" % re.escape(label), match.group(1)):
+            return flat(match.group(0))
+    return ""
+
+
+def has_record_button(page, key):
+    return re.search(r'data-mode="record"[^>]*data-dose-key="%s"' % re.escape(key), page) is not None
+
+
+with _support.frozen_today(SCENE_DAY):
+    scene_birth = date(2026, 9, 3)
+    scene = child_born("TA", scene_birth)
+    put_dose(scene, "PENTA:1", SCENE_DAY)
+    for parent_key in ("BCG", "HEPB"):
+        run_sql("INSERT INTO immunizations (patient_id, vaccine_code, dose_number, evidence, administered_by) "
+                "VALUES (?, ?, 1, 'parent_report', ?)", (scene, parent_key, STAFF_ID))
+    st = {i["key"]: i for i in status(scene)["schedule"]}
+    check("the early Pentavalent dose 1 needs a repeat, and its due date is Oct 31 (the early dose + 4 weeks), "
+          "not Oct 15", st["PENTA:1"]["too_early"] and st["PENTA:1"]["due_date"] == date(2026, 10, 31),
+          st["PENTA:1"]["due_date"])
+    check("OPV and PCV dose 1 are due Oct 15 (their minimum age)",
+          st["OPV:1"]["due_date"] == date(2026, 10, 15) and st["PCV:1"]["due_date"] == date(2026, 10, 15))
+    check("Pentavalent dose 2 is due Nov 28: 4 weeks after the repeat can first be given",
+          st["PENTA:2"]["due_date"] == date(2026, 11, 28), st["PENTA:2"]["due_date"])
+    check("Pentavalent dose 3, whose previous dose (dose 2) has no record, reads 'After Pentavalent dose 2'",
+          st["PENTA:3"]["due_date"] is None and st["PENTA:3"]["due_text"] == "After Pentavalent dose 2")
+    check("a dose whose previous dose has no record shows 'After <previous dose>' and no date",
+          st["OPV:2"]["due_date"] is None and st["OPV:2"]["due_text"] == "After OPV dose 1")
+    check("IPV is due at 14 weeks (Dec 10) and MR at 9 months (Jun 3, 2027)",
+          st["IPV:1"]["due_date"] == date(2026, 12, 10) and st["MR:1"]["due_date"] == date(2027, 6, 3))
+    page = body(client_as(STAFF_ID).get(PROFILE.format(scene)))
+    check("the profile's Due column shows those dates, and the recommended age column is as it was",
+          "Oct 31, 2026" in row_text(page, "Pentavalent dose 1") and "6 weeks" in row_text(page, "Pentavalent dose 1")
+          and "Nov 28, 2026" in row_text(page, "Pentavalent dose 2") and "10 weeks" in row_text(page, "Pentavalent dose 2")
+          and "Oct 15, 2026" in row_text(page, "OPV dose 1") and "After OPV dose 1" in row_text(page, "OPV dose 2"),
+          [row_text(page, "Pentavalent dose 1"), row_text(page, "OPV dose 2")])
+    allowed = {"BCG:1", "HEPB:1", "PENTA:1"}   # parent reports, and the dose that needs a repeat
+    shown = {k for k in st if has_record_button(page, k)}
+    check("'Record dose given elsewhere' shows only on the parent-report rows and the repeat: none on a dose whose "
+          "minimum age is after Oct 7", shown == allowed, sorted(shown ^ allowed))
+    before = n_doses(scene)
+    refused = []
+    for key in ("PENTA:2", "PENTA:3", "OPV:1", "PCV:1", "OPV:2", "IPV:1", "MR:1", "MMR:1"):
+        for proof in ("card", "parent_report"):
+            r = client_as(STAFF_ID).post(URL.format(scene), data={
+                "dose_key": key, "evidence": proof, "date_given": "2026-10-01" if proof == "card" else "",
+                "place_given": ""}, follow_redirects=True)
+            refused.append("not old enough" in flat(body(r)))
+    check("a POST to record any of those doses as given elsewhere is refused, with a valid token, one plain message",
+          all(refused) and n_doses(scene) == before, refused)
+    r = client_as(STAFF_ID).post(URL.format(scene), data={
+        "dose_key": "BCG:1", "evidence": "card", "date_given": "2026-09-04", "place_given": ""})
+    check("a parent's report can still be upgraded to a card (BCG)", item(scene, "BCG:1")["given"])
+    visit = run_sql(
+        "INSERT INTO appointments (patient_id, scheduled_by, appointment_type, appointment_date, status, "
+        "is_walkin, checked_in_at) VALUES (?, ?, 'Consultation', ?, 'In Consultation', 1, ?)",
+        (scene, STAFF_ID, SCENE_DAY.isoformat(), "2026-10-03 08:00:00"))
+    form = body(client_as(STAFF_ID).get(f"/staff/consultation/record/{visit}"))
+    ftext = flat(form)
+    check("the consultation form has no tick box for Pentavalent, OPV or PCV dose 1 (D5: no form defect)",
+          not any(tick_markup(form, k) for k in ("PENTA:1", "OPV:1", "PCV:1")))
+    check("... it greys OPV and PCV dose 1 with 'From Oct 15, 2026' and the Pentavalent repeat with "
+          "'From Oct 31, 2026'", ftext.count("From Oct 15, 2026") >= 2 and "From Oct 31, 2026" in ftext,
+          [m for m in re.findall(r"From [A-Z][a-z]{2} \d+, \d{4}", ftext)])
+    check("... and no 'given elsewhere' box is offered for a dose the child is too young for",
+          not re.search(r'name="immunizations_elsewhere"\s+value="(OPV:1|PCV:1|PENTA:2|IPV:1)"', form))
+    run_sql("UPDATE appointments SET status = 'Completed' WHERE id = ?", (visit,))
+    client_as(STAFF_ID)  # (a new session each time keeps the checks apart)
+    # the alert
+    run_sql("UPDATE immunizations SET evidence = 'parent_report', date_administered = NULL "
+            "WHERE patient_id = ? AND vaccine_code = 'BCG'", (scene,))
+    text = flat(body(client_as(STAFF_ID).get(PROFILE.format(scene))))
+    check("the alert is a title and one short line, ending with the card request",
+          "3 doses to follow up" in text and "Pentavalent dose 1 (repeat from Oct 31, 2026); BCG and Hepatitis B "
+          "(parent says given, no card). Ask for the vaccination card." in text, text[text.find("to follow up") - 40:][:300])
+    check("... with no 'not in today's queue', no 'next visit' and no 'recorded during a consultation' text",
+          not any(t in text for t in ("not in today's queue", "At next visit", "give it at the next visit",
+                                      "next consultation", "is recorded during a consultation",
+                                      "If the card shows the dose")))
+    check("the baby's age reads '4 weeks 2 days' on the profile", "4 weeks 2 days / Female" in text)
+
 # the Administrator and Official do not reach any of it
 check("the Administrator cannot record a dose (no route), so none of it applies to him",
       admin.post(f"/admin/consultation/record/{open_visit(infant)}", data=dict(FORM, immunizations=["BCG:1"])).status_code == 404)

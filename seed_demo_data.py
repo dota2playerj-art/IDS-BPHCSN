@@ -1184,7 +1184,7 @@ def build(path, say=print, show_passwords=True, today_override=None):
             form = {"dose_key": item["key"], "place_given": ""}
             if number < 6:
                 form.update({"evidence": "card", "place_given": "District hospital",
-                             "date_given": (item["due_date"] + timedelta(days=3)).isoformat()})
+                             "date_given": (item["recommended_date"] + timedelta(days=3)).isoformat()})
             else:
                 form.update({"evidence": "parent_report", "date_given": ""})
             actors["staff1"].post(

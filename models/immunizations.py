@@ -431,6 +431,83 @@ def dose_eligibility(code, dose_number, birth_date, groups, on_date):
     return {"eligible": True, "earliest": earliest, "reason": None}
 
 
+def _due_parts(key, birth_date, groups, today_date):
+    """(earliest date, None), or (None, the dose that must come first), for one dose that does
+    not count yet. Shared by dose_due(); it follows a chain of repeats forward."""
+    group = groups.get(key, _NO_RECORDS)
+    if group["counting"] is not None or birth_date is None:
+        return None, None
+    rule = DOSE_RULES[key]
+    earliest = minimum_age_date(birth_date, *key)
+    if rule.previous:
+        previous = groups.get(rule.previous, _NO_RECORDS)
+        if previous["counting"] is not None:
+            previous_day = _record_day(previous["counting"])
+            if previous_day is not None:
+                earliest = max(earliest, previous_day + timedelta(weeks=rule.min_interval_weeks))
+        elif previous["invalid"]:
+            # The previous dose will be repeated. This one follows the repeat, which cannot
+            # be given before its own earliest date, nor before today.
+            previous_date, missing = _due_parts(rule.previous, birth_date, groups, today_date)
+            if previous_date is None:
+                return None, missing or rule.previous
+            earliest = max(earliest, max(previous_date, today_date)
+                           + timedelta(weeks=rule.min_interval_weeks))
+        else:
+            return None, rule.previous
+    for early in group["invalid"]:
+        early_day = _record_day(early)
+        if early_day is not None:
+            earliest = max(earliest, early_day + timedelta(weeks=REPEAT_INTERVAL_WEEKS[key[0]]))
+    return earliest, None
+
+
+def dose_due(code, dose_number, birth_date, groups, on_date):
+    """What a screen prints as a dose's DUE date (Task 15, D2): the earliest date the dose can
+    actually be given, never a date counted from birth that the child cannot reach.
+
+    Returns {"date", "text"}. `date` is the later of the dose's minimum age date, the previous
+    valid dose + the minimum interval, and (for a repeat) the last invalid dose + the series'
+    interval. When the previous dose will be repeated, the date follows the repeat. When a
+    previous dose has no record at all, there is no date and `text` reads "After <that dose>".
+    A dose that already counts has nothing due ("—"). The recommended age is a different
+    column and is not touched.
+    """
+    on_date = as_date(on_date)
+    due, missing = _due_parts((code, dose_number), birth_date, groups, on_date)
+    if due is not None:
+        return {"date": due, "text": display_date(due)}
+    if missing is not None:
+        return {"date": None, "text": f"After {dose_label(*missing)}"}
+    return {"date": None, "text": "—"}
+
+
+def too_young_message(patient, code, dose_number, birth_date):
+    """The one sentence a dose given elsewhere is refused with when the child is too young."""
+    name = (patient or {}).get("first_name") or "This child"
+    opens = elsewhere_opens_on(birth_date, code, dose_number)
+    return (f"{name} is not old enough for {dose_label(code, dose_number)} yet. "
+            f"It can be recorded from {display_date(opens)}.")
+
+
+def elsewhere_opens_on(birth_date, code, dose_number):
+    """The first day a dose can be recorded as given elsewhere (Task 15, D1): its minimum age
+    date minus the 4-day grace. None when the child has no birth date on file."""
+    if birth_date is None:
+        return None
+    return minimum_age_date(birth_date, code, dose_number) - timedelta(days=RECORD_GRACE_DAYS)
+
+
+def may_record_elsewhere(birth_date, group, code, dose_number, on_date):
+    """May this dose be recorded as given elsewhere on on_date? (Task 15, D1.) Not before the
+    child is old enough for it. A dose that has a parent's report (to upgrade it to a card) or
+    needs a repeat is always open."""
+    opens = elsewhere_opens_on(birth_date, code, dose_number)
+    if opens is None or group["parent"] is not None or group["invalid"]:
+        return True
+    return as_date(on_date) >= opens
+
+
 def dose_today_field(key):
     """'PENTA:2' -> 'dose_today_PENTA_2'. The key a refusal of a dose ticked as given today
     is reported under, so the form can print it under that row."""
@@ -666,7 +743,11 @@ def get_immunization_status(patient, on_date=None, records=None):
         # then a parent's report. Every other record of the dose is history under it.
         record = counting or (group["invalid"][-1] if group["invalid"] else None) or group["parent"]
         history = _dose_history(group, record)
-        due_date = due_date_for(birth_date, value, unit)
+        recommended = due_date_for(birth_date, value, unit)
+        due = dose_due(code, dose_number, birth_date, groups, reference)
+        # A dose is "due" only from the day it can actually be given, so one that must wait for
+        # another dose does not read Due Now or No record before then (Task 15, D2).
+        due_date = max(recommended, due["date"]) if (recommended and due["date"]) else recommended
         status = _dose_status(record, due_date, reference, too_early)
         verdict = dose_eligibility(code, dose_number, birth_date, groups, reference)
         # Past the cohort the schedule describes, "No record" and "Due Now" stop being
@@ -681,6 +762,7 @@ def get_immunization_status(patient, on_date=None, records=None):
             status == PARENT_REPORT and applicable
             and due_date is not None and reference >= due_date)
         counts_as_given = counting is not None
+        elsewhere_ok = may_record_elsewhere(birth_date, group, code, dose_number, reference)
         schedule.append({
             "code": code,
             "vaccine": vaccine,
@@ -689,7 +771,12 @@ def get_immunization_status(patient, on_date=None, records=None):
             "total_doses": total,
             "label": dose_label(code, dose_number),
             "timing": note,
-            "due_date": due_date,
+            # What the screens print as Due: the earliest date the dose can actually be given
+            # (None with "After <dose>" when a previous dose has no record, "—" when it counts).
+            "due_date": due["date"],
+            "due_text": due["text"],
+            # The date the schedule recommends, counted from birth. Kept for the status.
+            "recommended_date": recommended,
             "status": status,
             "badge_class": STATUS_BADGE_CLASS[status],
             "needs_attention": needs_attention,
@@ -702,7 +789,10 @@ def get_immunization_status(patient, on_date=None, records=None):
             # The "Record dose given elsewhere" button is offered on exactly these:
             # nothing that counts on file (a repeat can be recorded after a dose given too
             # early, and a card can upgrade a parent's report).
-            "can_record_elsewhere": not counts_as_given,
+            "can_record_elsewhere": not counts_as_given and elsewhere_ok,
+            # May a dose given elsewhere be recorded for it today (Task 15, D1)? The child must
+            # be old enough, unless the dose has a parent's report or needs a repeat.
+            "elsewhere_ok": elsewhere_ok,
             # The one rule (D1): may this dose be given today? The form ticks only these.
             "eligible": verdict["eligible"],
             "earliest_date": verdict["earliest"],
@@ -756,17 +846,20 @@ def get_immunization_status(patient, on_date=None, records=None):
     given_count = counts[COMPLETED] + counts[GIVEN_ELSEWHERE]
     attention_items = sorted(
         (item for item in schedule if item["needs_attention"]),
-        key=lambda item: (_STATUS_RANK[item["status"]], item["due_date"] or reference),
+        key=lambda item: (_STATUS_RANK[item["status"]], item["due_date"] or item["recommended_date"] or reference),
     )
     next_due = next(
         (item for item in schedule if not item["given"]
          and item["due_date"] is not None),
         None,
-    )
+    ) or next((item for item in schedule if not item["given"]), None)
 
+    follow_up_title, follow_up_line = follow_up_text(attention_items, reference)
     return {
         "applicable": applicable,
         "age_years": age_years,
+        "follow_up_title": follow_up_title,
+        "follow_up_line": follow_up_line,
         "schedule": schedule,
         "attention_items": attention_items,
         "extra_records": extra_records,
@@ -788,6 +881,45 @@ def get_immunization_status(patient, on_date=None, records=None):
         "pediatric_age_years": PEDIATRIC_AGE_YEARS,
         "grace_period_days": GRACE_PERIOD_DAYS,
     }
+
+
+def _join_names(names):
+    """'A', 'A and B', 'A, B and C'."""
+    if len(names) <= 2:
+        return " and ".join(names)
+    return ", ".join(names[:-1]) + " and " + names[-1]
+
+
+def follow_up_text(attention_items, reference):
+    """The short alert the profile and the consultation form print (Task 15, D4).
+
+    Returns (title, line). The title is "<N> doses to follow up". The line lists the doses,
+    grouped by what is wrong with them, for example "Pentavalent dose 1 (repeat from Oct 31,
+    2026); BCG and Hepatitis B (parent says given, no card). Ask for the vaccination card."
+    """
+    reference = as_date(reference)
+    groups = {}
+    for item in attention_items:
+        status = item["status"]
+        if status == TOO_EARLY:
+            if item["due_date"] is None:
+                phrase = "repeat needed"
+            elif item["due_date"] > reference:
+                phrase = f"repeat from {display_date(item['due_date'])}"
+            else:
+                phrase = "repeat due now"
+        elif status == NO_RECORD:
+            phrase = "no record"
+        elif status == DUE_NOW:
+            phrase = "due now"
+        else:
+            phrase = "parent says given, no card"
+        groups.setdefault(phrase, []).append(item["label"])
+    line = "; ".join(f"{_join_names(names)} ({phrase})" for phrase, names in groups.items()) + "."
+    if any(item["status"] in (NO_RECORD, PARENT_REPORT) for item in attention_items):
+        line += " Ask for the vaccination card."
+    count = len(attention_items)
+    return f"{count} dose{'' if count == 1 else 's'} to follow up", line
 
 
 def _summarise(counts, applicable):
@@ -1319,12 +1451,23 @@ def parse_reported_doses(form_data, patient, visit_date=None, given_today=()):
                 else (form_data.get(IMMUNIZATION_ELSEWHERE_FIELD) or []))
     keys = parse_dose_keys(raw_keys)
     conflicting = set(given_today or ())
+    on_file = None
+    if keys and patient and patient.get("id"):
+        birth = as_date(patient["birth_date"]) if patient.get("birth_date") else None
+        on_file = (birth, dose_groups(birth, [dict(r) for r in get_immunizations_for_patient(patient["id"])]))
+    reference = as_date(visit_date) if visit_date is not None else today()
 
     entries, errors = [], {}
     for code, dose_number in keys:
         key = f"{code}:{dose_number}"
         field = reported_date_field(key)
         proof_field = reported_proof_field(key)
+
+        # Not before the child is old enough for the dose (Task 15, D1).
+        if on_file is not None and not may_record_elsewhere(
+                on_file[0], on_file[1].get((code, dose_number), _NO_RECORDS), code, dose_number, reference):
+            errors[field] = too_young_message(patient, code, dose_number, on_file[0])
+            continue
 
         if (code, dose_number) in conflicting:
             errors[field] = (
@@ -1546,6 +1689,7 @@ def record_elsewhere_dose(patient_id, code, dose_number, evidence, date_given, p
         "upgraded"       a parent's report is now a card record (the card was shown)
         "unchanged"      the same record was already on file; nothing changed
         "already-given"  the dose already counts as given (here, or a card): refused
+        "too-young"      the child is not yet old enough for this dose (Task 15, D1): refused
         "invalid"        not a dose of the schedule, bad evidence, or a card with no date
 
     A dose on file only as a record given too early takes the new record beside it: the
@@ -1558,9 +1702,12 @@ def record_elsewhere_dose(patient_id, code, dose_number, evidence, date_given, p
         return "invalid"
     place = clean_place(place)
     with db_connection() as conn:
-        group = _groups_in(conn, patient_id).get((code, dose_number), _NO_RECORDS)
+        records, birth = _records_in(conn, patient_id)
+        group = dose_groups(birth, records).get((code, dose_number), _NO_RECORDS)
         if group["counting"] is not None:
             return "already-given"
+        if not may_record_elsewhere(birth, group, code, dose_number, today()):
+            return "too-young"
         if _same_record_on_file(group, evidence, day):
             return "unchanged"
         parent = group["parent"]

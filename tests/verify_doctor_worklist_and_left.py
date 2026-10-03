@@ -1575,8 +1575,7 @@ css = re.search(r"\.immun-tag\.immun-norecord\{[^}]*\}", queue["staff"]).group(0
 check("the queue badge for 'no record' is amber (#FEF3C7 / #92400E), not red",
       "#FEF3C7" in css and "#92400E" in css and "#FEE2E2" not in css and "#B91C1C" not in css, css)
 profile = body(staff.get(f"/staff/patient_profile/17"))
-alert = profile.split("have no record here")[0].rsplit("<div style=", 1)[-1] if "have no record here" in profile \
-    else profile.split("has no record here")[0].rsplit("<div style=", 1)[-1]
+alert = profile.split("to follow up")[0].rsplit("<div style=", 1)[-1]
 check("the profile alert is amber, not red",
       "#FFFBEB" in alert and "#FEF2F2" not in alert and "#FECACA" not in alert and "#B91C1C" not in alert, alert[-250:])
 dash = body(staff.get("/staff/dashboard"))
