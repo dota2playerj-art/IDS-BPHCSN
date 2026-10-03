@@ -1212,6 +1212,10 @@ The Doctor, Health Center Staff and the Barangay Official are unchanged.
   does not count. A dose may have more than one record, so the same dose can be repeated as a new record
   (migration `migrate_immunization_repeats.py`); only one valid record per dose can exist. Corrections are
   checked for sense and judged by the same rule. See `01_PROJECT_BIBLE.md`.
+- *Task 15 (2026-10-04), dates a dose can be given, and ages in weeks.* `dose_due()` gives the Due column the
+  earliest date a dose can actually be given ("After <dose>" when a previous dose has no record);
+  `may_record_elsewhere()` opens the record-elsewhere button 4 days before the minimum age, on the profile and
+  the server; `format_age()` is the one age helper (weeks and days for a baby). See `01_PROJECT_BIBLE.md`.
 - *Task 10 (2026-10-03), open visits and plain screens.* The Patient Queue lists every open visit from an
   earlier day ("Open visits from earlier days"), whatever its status, with the actions of the one mapping.
   Screens carry no explanatory boxes: the "not tracked" and "does not do" notes, the design-reasoning

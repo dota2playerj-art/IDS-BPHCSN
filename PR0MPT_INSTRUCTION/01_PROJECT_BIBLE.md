@@ -766,6 +766,33 @@ one parent's report.
 **Existing data.** The one dose given here before its minimum age in `app.db` (id 302) is now judged by the rule:
 it reads Given too early and does not count. It was not changed.
 
+# Decision Record — Dates a Dose Can Be Given, and Ages in Weeks (2026-10-04, Task 15)
+
+**Found by the team in real use.** A 30-day-old baby had an early Pentavalent dose 1 recorded. The profile offered
+"Record dose given elsewhere" on doses the baby was far too young to have had; it showed that dose "Due Oct 15"
+though its repeat could not be given before Oct 31, and showed later doses with dates counted from birth; the age
+read only in months, so staff could not tell a 5-week-old from a 6-week-old; and the alert carried long helper text.
+
+**The Due column.** A dose's due date is the earliest date it can actually be given (`dose_due()`): the later of its
+minimum age date, the previous valid dose + the minimum interval, and for a repeat the last invalid dose + the
+series' interval. When the previous dose will be repeated, the date follows the repeat (never earlier than today).
+When a previous dose has no record, the row reads "After <that dose>" instead of a date. The recommended age column
+is unchanged. A dose is not Due Now or No record before it can be given.
+
+**The button.** "Record dose given elsewhere" appears on a dose only from 4 days before its minimum age date (the
+ACIP grace). Rows with a parent's report (to upgrade to a card) and rows that need a repeat keep it. The server
+refuses the same doses with one message ("<Name> is not old enough for <dose> yet. It can be recorded from <date>."),
+on the profile and on the consultation form's "given elsewhere" tick.
+
+**Age.** One helper, `format_age()`, used by the profile, the patient list, the check-in list, the consultation form,
+the prints and the exports, and mirrored in the registration preview: under 28 days "12 days"; to 16 weeks "4 weeks
+2 days"; to 24 months "5 months 3 days"; to 5 years "2 years 6 months"; then "7 years". Calendar months, exact
+leap-year and month-end arithmetic. Age filters and report age groups are unchanged.
+
+**Text.** The profile alert is a title ("3 doses to follow up") and one line ("Pentavalent dose 1 (repeat from Oct
+31, 2026); BCG and Hepatitis B (parent says given, no card). Ask for the vaccination card."). The "not in today's
+queue" sentence, the "next consultation" sentence and the "At next visit" notes are gone.
+
 # Sample Development Workflow
 
 Research
@@ -964,3 +991,7 @@ Vaccines Only When Due".
 
 Task 14, every dose judged, and repeats: one validity rule for every recorded dose, and a dose given too early
 can be repeated as a new record. See "Decision Record — Every Dose Judged, and Repeats".
+
+Task 15, dates a dose can be given, and ages in weeks: the Due column shows the earliest date a dose can be given,
+the record-elsewhere button waits until the child is old enough, and ages show weeks for a baby. See "Decision
+Record — Dates a Dose Can Be Given, and Ages in Weeks".

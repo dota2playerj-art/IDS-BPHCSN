@@ -936,8 +936,12 @@ dose that has no given-here or card record: a dialog asks for the proof (card se
 date (required for a card, never in the future or before birth), and the place (optional). A card shows
 "Given elsewhere" (green) with its date and place; a parent's report shows "Parent says given — no card"
 (amber). Either can be changed or removed from the same row; a parent's report is upgraded by recording the card.
-The profile alert reads: "<N> doses have no record here. Ask for the child's vaccination card. If the card shows
-the dose, record it as given elsewhere." The Administrator and the Official have no such button or route. The
+The profile alert (Task 15) is a title ("<N> doses to follow up") and one line listing the doses, for example
+"Pentavalent dose 1 (repeat from Oct 31, 2026); BCG and Hepatitis B (parent says given, no card). Ask for the
+vaccination card." The button shows only from 4 days before a dose's minimum age (and on rows with a parent's
+report or a repeat), and the server refuses the others. The Due column shows the earliest date the dose can be
+given, or "After <dose>" when the previous dose has no record. Ages read "12 days", "4 weeks 2 days", "5 months 3
+days", "2 years 6 months", "7 years" on every screen. The Administrator and the Official have no such button or route. The
 reasoning, the CDC basis and the FHIR mapping are in `01_PROJECT_BIBLE.md`.
 
 Named campaigns are declared untracked. Nothing in the schema groups doses into a campaign — there is no campaign table, no target group and no coverage goal.
