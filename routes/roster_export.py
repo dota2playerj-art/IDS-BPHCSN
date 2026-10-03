@@ -873,11 +873,9 @@ CALENDAR_COLUMNS = (
     "Date",
     "Day",
     "Visits",
-    "Never closed",
     "In the queue",
     "Waiting for the Doctor",
     "Completed",
-    "Cancelled or no-show",
 )
 
 
@@ -963,11 +961,9 @@ def _appointment_export(context, produced_by):
             display_date(cell["date"]),
             cell["date"].strftime("%A"),
             cell["total"],
-            cell["pending"],
             cell["in_queue"],
             cell["waiting_doctor"],
             cell["completed"],
-            cell["cancelled"],
         ]
         for week in calendar["weeks"]
         for cell in week
@@ -1015,8 +1011,7 @@ def _appointment_export(context, produced_by):
                  "Intake saved; the Doctor has not written the diagnosis yet"),
                 ("Completed today", queue_stats["completed"],
                  f"Finished visits, of the {queue_stats['total_today']} checked in today"),
-                (f"Visits in {calendar['label']}", calendar["month_total"],
-                 f"Of which {calendar['month_pending']} were never closed"),
+                (f"Visits in {calendar['label']}", calendar["month_total"], ""),
             ],
             note=("The queue figures are today's, at the health center; the month "
                   "figure covers the calendar month on the sheet before this one. "

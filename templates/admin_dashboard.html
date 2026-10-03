@@ -130,7 +130,6 @@
           <div class="stat-label">Today's Appointments</div>
           <div class="stat-trend" style="color:var(--text-muted);">
             {{ queue_stats.walk_ins }} walk-in{{ '' if queue_stats.walk_ins == 1 else 's' }}
-            {%- if queue_stats.not_arrived %} &middot; {{ queue_stats.not_arrived }} not yet arrived{% endif %}
           </div>
         </div>
       </div>

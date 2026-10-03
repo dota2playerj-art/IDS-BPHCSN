@@ -374,16 +374,15 @@
                   atrend | map(attribute='label') | list,
                   [{'name': 'Attended',            'values': atrend | map(attribute='attended') | list},
                    {'name': 'Waiting for the Doctor', 'values': atrend | map(attribute='awaiting') | list},
-                   {'name': 'Still expected',      'values': atrend | map(attribute='expected') | list},
-                   {'name': 'Cancelled / no-show', 'values': atrend | map(attribute='missed')   | list},
                    {'name': 'Left before being seen', 'values': atrend | map(attribute='left') | list}]) }}
           <div class="mini-legend no-print">
             <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--success);"></span>Attended ({{ appt.attended }})</div>
             <div class="mini-legend-item"><span class="mini-legend-dot" style="background:#6D28D9;"></span>Waiting for the Doctor ({{ appt.awaiting }})</div>
-            <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--info);"></span>Still expected ({{ appt.expected }})</div>
-            <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--danger);"></span>Cancelled or no-show ({{ appt.missed }})</div>
             <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--warning);"></span>Left before being seen ({{ appt.left }})</div>
           </div>
+{%- if appt.older %}
+          <div class="panel-sub" style="margin-top:8px;">Older records: {{ appt.older }}</div>
+{%- endif %}
         </div>
       </div>
 {%- endif %}
@@ -791,8 +790,6 @@
       labels: {{ appointment_report.trend | map(attribute='label') | list | tojson }},
       attended: {{ appointment_report.trend | map(attribute='attended') | list | tojson }},
       awaiting: {{ appointment_report.trend | map(attribute='awaiting') | list | tojson }},
-      expected: {{ appointment_report.trend | map(attribute='expected') | list | tojson }},
-      missed: {{ appointment_report.trend | map(attribute='missed') | list | tojson }},
       left: {{ appointment_report.trend | map(attribute='left') | list | tojson }}
     },
     consultations: {
@@ -867,8 +864,6 @@
       datasets: [
         { label:'Attended', data:reportData.appointments.attended, backgroundColor: success, borderRadius:4 },
         { label:'Waiting for the Doctor', data:reportData.appointments.awaiting, backgroundColor: purple, borderRadius:4 },
-        { label:'Still expected', data:reportData.appointments.expected, backgroundColor: info, borderRadius:4 },
-        { label:'Cancelled / no-show', data:reportData.appointments.missed, backgroundColor: danger, borderRadius:4 },
         { label:'Left before being seen', data:reportData.appointments.left, backgroundColor: warning, borderRadius:4 }
       ]
     },

@@ -677,11 +677,7 @@ def _appointments(context):
         _trend_block(
             "Appointment outcomes, by month", appointments["trend"],
             [("Attended", "attended"), ("Waiting for the Doctor", "awaiting"),
-             ("Still expected", "expected"),
-             ("Cancelled / no-show", "missed"),
              ("Left before being seen", "left")],
-            note=("The five outcomes partition every status an appointment can "
-                  "hold, so a month's row totals that month's appointments."),
         ),
         figures("Appointment outcomes in this range", [
             ("Appointments", window["total"], "Dated into the range, walk-ins included"),
@@ -689,23 +685,13 @@ def _appointments(context):
              "Completed visits, plus those in the clinic right now"),
             ("Waiting for the Doctor", window["awaiting"],
              "Intake saved; the Doctor has not written the diagnosis yet"),
-            ("Cancelled or no-show", window["missed"], ""),
             ("Left before being seen", window["left"],
              "Checked in, then went home before the Doctor saw them"),
-            ("Still expected", window["expected"],
-             "From the earlier booking system, never closed. Zero since September "
-             "2026, when booking ended"),
             ("Resolved", window["resolved"],
-             "Attended, waiting for the Doctor, cancelled/no-show and left before being seen — a visit still to happen has "
-             "neither succeeded nor failed"),
+             "Attended, waiting for the Doctor and left before being seen"),
             ("Attendance rate (%)", window["attendance_pct"],
              "Of the resolved appointments only"),
-            ("Missed rate (%)", window["missed_pct"],
-             "Of the resolved appointments only"),
-            ("Walk-ins", window["walk_ins"], ""),
-            ("From the earlier booking system", window["booked"],
-             "Visits booked ahead before September 2026"),
-        ]),
+        ] + ([("Older records", window["older"], "")] if window["older"] else [])),
     ]
 
 

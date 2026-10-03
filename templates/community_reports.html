@@ -492,13 +492,15 @@
             <span class="fig-value">{{ appt.awaiting }}</span>
           </div>
           <div class="fig-row">
-            <span class="fig-name">Cancelled or no-show</span>
-            <span class="fig-value">{{ appt.missed }}</span>
-          </div>
-          <div class="fig-row">
             <span class="fig-name">Left before being seen</span>
             <span class="fig-value">{{ appt.left }}</span>
           </div>
+{%- if appt.older %}
+          <div class="fig-row">
+            <span class="fig-name">Older records</span>
+            <span class="fig-value">{{ appt.older }}</span>
+          </div>
+{%- endif %}
           <div class="fig-row">
             <span class="fig-name">Attendance rate<span class="fig-note">Of the {{ appt.resolved }} that have resolved</span></span>
 {%- if appt.attendance_pct is not none %}

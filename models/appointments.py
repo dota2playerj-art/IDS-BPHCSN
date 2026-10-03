@@ -1344,6 +1344,10 @@ def _outcome_summary(counts, walk_ins, total, services, viewer_role):
     return {
         "total": total,
         "expected": counts[OUTCOME_EXPECTED],
+        # Records from the old booking system (Scheduled, Confirmed, Cancelled, No-show).
+        # No screen or file shows them as figures; one line says how many there are, and
+        # only when there are some (Task 11, L48).
+        "older": counts[OUTCOME_EXPECTED] + counts[OUTCOME_MISSED],
         "attended": counts[OUTCOME_ATTENDED],
         "awaiting": counts[OUTCOME_AWAITING],
         "missed": counts[OUTCOME_MISSED],
@@ -1469,6 +1473,7 @@ def get_appointment_report(months=6, on_date=None, start=None, end=None, *, view
             "month": month_start.strftime("%Y-%m"),
             "label": label,
             "expected": bucket[OUTCOME_EXPECTED],
+            "older": bucket[OUTCOME_EXPECTED] + bucket[OUTCOME_MISSED],
             "attended": bucket[OUTCOME_ATTENDED],
             "awaiting": bucket[OUTCOME_AWAITING],
             "missed": bucket[OUTCOME_MISSED],

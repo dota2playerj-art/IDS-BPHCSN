@@ -1597,6 +1597,67 @@ check("the Administrator's dashboard says 'with no record' in amber, not red",
 run_sql("UPDATE appointments SET status = 'Completed' WHERE id IN (?, ?)", (earlier_no, earlier_rec))
 
 # ---------------------------------------------------------------------------
+section("19. NO BOOKING-ERA FIGURE ANYWHERE; 'OLDER RECORDS' ONLY WHEN SUCH ROWS EXIST (Task 11, L48)")
+BOOKING_WORDS = ("Still expected", "Cancelled or no-show", "Cancelled / no-show", "not yet arrived",
+                 "Never closed", "Missed rate", "earlier booking system")
+OLD_STATUSES = ("Scheduled", "Confirmed", "Cancelled", "No-show")
+old_now = q1("SELECT COUNT(*) FROM appointments WHERE status IN ('Scheduled','Confirmed','Cancelled','No-show')")[0]
+SCREENS = [(doctor, "/staff/reports_analytics"), (admin, "/admin/reports_analytics"),
+           (official, "/official/reports_analytics"), (official, "/official/community-reports"),
+           (staff, "/staff/dashboard"), (doctor, "/staff/dashboard"), (admin, "/admin/dashboard"),
+           (official, "/official/dashboard"), (staff, "/staff/appointment_scheduling"),
+           (admin, "/admin/appointment_scheduling"), (doctor, "/staff/appointment_scheduling")]
+FILES = [(doctor, "/staff/reports_analytics/export"), (admin, "/admin/reports_analytics/export"),
+         (official, "/official/reports_analytics/export"), (official, "/official/community-reports/export"),
+         (staff, "/staff/appointment_scheduling/export"), (admin, "/admin/appointment_scheduling/export")]
+
+
+def booking_words_found():
+    found = []
+    for client, url in SCREENS:
+        text = body(client.get(url))
+        found += [(url, w) for w in BOOKING_WORDS if w in text]
+    for client, stem in FILES:
+        for ext, convert in ((".xlsx", lambda d: "\n".join(
+                str(c.value) for sh in load_workbook(io.BytesIO(d)) for row in sh.iter_rows() for c in row
+                if c.value is not None)), (".pdf", pdf_text)):
+            text = convert(client.get(stem + ext).get_data())
+            found += [(stem + ext, w) for w in BOOKING_WORDS if w in text]
+    return found
+
+
+def older_everywhere():
+    """Whether 'Older records' shows on the reports, the community report and the files."""
+    return {
+        "reports": "Older records: " in body(doctor.get("/staff/reports_analytics")),
+        "community": "Older records" in body(official.get("/official/community-reports")),
+        "excel": "Older records" in "\n".join(
+            str(c.value) for sh in load_workbook(io.BytesIO(official.get("/official/community-reports/export.xlsx").get_data()))
+            for row in sh.iter_rows() for c in row if c.value is not None),
+    }
+
+
+found = booking_words_found()
+check(f"none of the booking-era figures is on any of {len(SCREENS)} screens or in any of {len(FILES) * 2} Excel and "
+      "PDF files (Still expected, Cancelled / no-show, not yet arrived, Never closed, Missed rate, booking system)",
+      not found, found[:5])
+check("with no old record in the database, 'Older records' is not shown anywhere",
+      old_now == 0 and not any(older_everywhere().values()), (old_now, older_everywhere()))
+for i, status in enumerate(("No-show", "Cancelled", "Scheduled")):
+    run_sql("INSERT INTO appointments (patient_id, scheduled_by, appointment_type, appointment_date, status, is_walkin) "
+            "VALUES (?, ?, 'Consultation', ?, ?, 0)",
+            (1 + i, STAFF_ID, (today - timedelta(days=20)).isoformat(), status))
+shown = older_everywhere()
+check("with old records in the window, 'Older records: N' shows on the reports, the community report and the files",
+      all(shown.values()), shown)
+check("... as one line, with the count of those rows (3)",
+      "Older records: 3" in body(doctor.get("/staff/reports_analytics")))
+found = booking_words_found()
+check("... and the booking-era figures are still not shown", not found, found[:5])
+run_sql("DELETE FROM appointments WHERE status IN ('No-show', 'Cancelled', 'Scheduled', 'Confirmed')")
+check("once they are gone the line is gone", not any(older_everywhere().values()))
+
+# ---------------------------------------------------------------------------
 passed = sum(1 for _, ok in results if ok)
 print("\n" + "=" * 78)
 print(f"RESULT: {passed}/{len(results)} checks passed")

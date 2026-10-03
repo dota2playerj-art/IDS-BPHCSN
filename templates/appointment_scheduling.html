@@ -452,15 +452,13 @@
           <!-- The whole waiting room above; below, how many of them can actually
                go in, which under one-at-a-time is never more than one.
 
-               The middle branch is what this pass added. While the room is held
-               the first branch is correctly false, and falling straight to "N
-               not yet arrived" left the card saying nothing about the person
-               standing at the desk. Naming who is next and why they are still
-               sitting down is the answer the card is being asked for. -->
+               While the room is held the first branch is false. Naming who is next
+               and why they are still sitting down is the answer the card is
+               being asked for. -->
           <div class="stat-trend" style="color:var(--text-muted);">
             {%- if queue_stats.ready %}{{ queue_stats.next_up_name }} can be seen now
             {%- elif queue_stats.next_up_name %}{{ queue_stats.next_up_name }} is next, once {{ queue_stats.active_name }} is finished
-            {%- else %}{{ queue_stats.not_arrived }} not yet arrived{% endif -%}
+            {%- endif -%}
           </div>
         </div>
       </div>
