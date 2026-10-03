@@ -690,36 +690,86 @@ check("once the room is free the same undo works", status_of(k) == "In Consultat
 run_sql("UPDATE appointments SET status = 'Completed' WHERE id = ?", (k,))
 
 # ---------------------------------------------------------------------------
-section("8. THE QUEUE SCREEN: EARLIER DAYS (D7), THE DIALOGS, READ-ONLY FOR THE ADMINISTRATOR")
+section("8. THE QUEUE SCREEN: OPEN VISITS FROM EARLIER DAYS, THE DIALOGS, READ-ONLY FOR THE ADMINISTRATOR (Task 10)")
 run_sql("UPDATE appointments SET status = 'Waiting', status_before_left = NULL, left_by = NULL, "
         "left_at = NULL WHERE id = ?", (ids["B"],))
+OPEN_TITLE = "Open visits from earlier days"
 
 
 def section_of(page):
-    if "Still waiting from earlier days" not in page:
+    """The earlier-days section: from its title to the end of its table."""
+    if OPEN_TITLE not in page:
         return ""
-    return page.split("Still waiting from earlier days")[1].split("One thing this screen")[0]
+    return page.split(OPEN_TITLE)[1].split("</table>")[0]
+
+
+def row_in(section_html, marker):
+    for chunk in section_html.split("<tr")[1:]:
+        r_ = chunk.split("</tr>")[0]
+        if marker in r_:
+            return r_
+    return ""
 
 
 page = body(staff.get("/staff/appointment_scheduling"))
 section_text = section_of(page)
-check("Staff see 'Still waiting from earlier days' with the right visit, its ID and how long",
+check("Staff see 'Open visits from earlier days' with a waiting visit, its ID and how long",
       NAMES["B"] in section_text and f"APT-{ids['B']:05d}" in section_text and "day" in section_text)
-check("the section is for status Waiting only: visits waiting for the Doctor, finished ones and "
-      "today's are not in it",
-      not any(NAMES[t] in section_text for t in ("D", "S", "L", "E", "X", "M")))
-check("each row has a Left before being seen button that opens the dialog",
-      'data-bs-target="#leftModal"' in section_text)
+check("it lists every open earlier visit, whatever its status: Waiting, and Waiting for the Doctor",
+      all(NAMES[t] in section_text for t in ("D", "S")) and "Waiting for the Doctor" in section_text,
+      [t for t in ("D", "S") if NAMES[t] not in section_text])
+check("it does not list finished visits, left visits, or today's visits",
+      not any(NAMES[t] in section_text for t in ("E", "F", "H", "J", "P", "K", "M", "A")))
+check("the old title 'Still waiting from earlier days' is gone", "Still waiting from earlier days" not in page)
+d_row = row_in(section_text, f"APT-{ids['D']:05d}")
+check("Staff can mark a visit waiting for the Doctor as left before being seen from there, and have no "
+      "'See patient'", 'data-bs-target="#leftModal"' in d_row and "See patient" not in d_row, d_row[-300:])
+doctor_section = section_of(body(doctor.get("/staff/appointment_scheduling")))
+d_row_doctor = row_in(doctor_section, f"APT-{ids['D']:05d}")
+check("the Doctor sees 'See patient' on it, as well as Left before being seen",
+      f"see-patient/{ids['D']}" in d_row_doctor and "See patient" in d_row_doctor
+      and 'data-bs-target="#leftModal"' in d_row_doctor, d_row_doctor[-300:])
+check("each earlier row has a Status column", "<th>Status</th>" in section_text
+      and "badge-waiting-doctor" in d_row)
 check("the dialog asks first, in plain words, and posts to mark-left",
       "Mark this patient as left before being seen?" in page and MARK in page)
-check("a Doctor sees the section too", "Still waiting from earlier days" in
-      body(doctor.get("/staff/appointment_scheduling")))
 admin_queue = body(admin.get("/admin/appointment_scheduling"))
-check("the Administrator's queue is read-only: no earlier-days section, no dialog, no button",
-      "Still waiting from earlier days" not in admin_queue and "leftModal" not in admin_queue
-      and "mark-left" not in admin_queue and "undoLeftForm" not in admin_queue)
+admin_section = section_of(admin_queue)
+check("the Administrator sees the section read-only: the visits, no Left button, no See patient, no Start, "
+      "no dialog",
+      NAMES["D"] in admin_section and "leftModal" not in admin_queue and "mark-left" not in admin_queue
+      and "undoLeftForm" not in admin_queue and "See patient" not in admin_queue
+      and "Start Consultation" not in admin_section and "sendToDoctorForm" not in admin_queue)
 check("the Administrator's queue shows no service for any visit (it names a clinical fact)",
       not any(s in admin_queue for s in ("Prenatal Check-up", "Immunization", "Dental", HTN, FOLLOW)))
+# The counts: the dashboard, the Staff card and the queue (today plus earlier days) agree.
+with app.app_context():
+    from models.doctor_worklist import count_waiting_for_doctor as _count_wfd
+    dashboard_count = _count_wfd()
+today_wfd_rows = q1("SELECT COUNT(*) FROM appointments WHERE status = ? AND date(appointment_date) = ?",
+                    (WFD, today.isoformat()))[0]
+earlier_wfd_rows = q1("SELECT COUNT(*) FROM appointments WHERE status = ? AND date(appointment_date) < ?",
+                      (WFD, today.isoformat()))[0]
+queue_page = body(doctor.get("/staff/appointment_scheduling"))
+today_summary = flat(queue_page.split('id="queueSummary"')[1].split("</div>")[0])
+earlier_summary = flat(queue_page.split('id="earlierSummary"')[1].split("</div>")[0])
+queue_today = int(re.search(r"Waiting for the Doctor (\d+)", today_summary).group(1))
+queue_earlier = int(re.search(r"Waiting for the Doctor (\d+)", earlier_summary).group(1))
+dash_text = flat(body(doctor.get("/staff/dashboard")))
+check("the dashboard count equals the queue's open visits waiting for the Doctor, today plus earlier days",
+      dashboard_count == queue_today + queue_earlier == today_wfd_rows + earlier_wfd_rows
+      and earlier_wfd_rows > 0, (dashboard_count, queue_today, queue_earlier))
+check("the Staff and Administrator dashboards show the same count",
+      f"Waiting for the Doctor: {dashboard_count}" in flat(body(staff.get("/staff/dashboard")))
+      and f"Waiting for the Doctor: {dashboard_count}" in flat(body(admin.get("/admin/dashboard"))))
+check("the summary under Today's Queue starts with 'Today:' and the earlier-days line has its own counts",
+      today_summary.lstrip("> ").startswith("Today: Waiting") and earlier_summary.lstrip("> ").startswith("Earlier days: Waiting")
+      and "In Consultation" in earlier_summary)
+open_now = {st: q1("SELECT COUNT(*) FROM appointments WHERE status = ? AND date(appointment_date) < ?",
+                   (st, today.isoformat()))[0] for st in ("Waiting", "In Consultation", WFD)}
+check("the earlier-days counts are the real counts by status",
+      all(int(re.search(rf"{st} (\d+)", earlier_summary).group(1)) == n for st, n in open_now.items()),
+      (earlier_summary, open_now))
 today_wfd = add_visit(23, "W", 0, WFD, consultation=True, time="16:30")[0]
 page = body(staff.get("/staff/appointment_scheduling"))
 check("today's queue shows the new status as its own badge and counts it in its own footer figure",
@@ -1349,7 +1399,7 @@ for role, page in queue_pages.items():
           "legend or the summary line",
           not any(word.lower() in text.lower() for word in
                   ("Scheduled", "not yet arrived", "Cancelled or missed", "Arrived /", "ready to consult")), text)
-    pairs = re.findall(r"([A-Z][A-Za-z ]+): (\d+)", summary_text(page))
+    pairs = re.findall(r"(Waiting for the Doctor|Left before being seen|In Consultation|Completed|Waiting) (\d+)", summary_text(page))
     counts_now = {st: q1("SELECT COUNT(*) FROM appointments WHERE date(appointment_date) = "
                          "date('now', 'localtime') AND status = ?", (st,))[0] for st in STATUS_NAMES}
     check(f"{role}: the summary line uses the five status names, in the legend's order, with today's counts",

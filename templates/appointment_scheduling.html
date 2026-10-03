@@ -283,6 +283,116 @@
     </div>{% endblock %}
 
 {% block content %}
+{#- The buttons of one queue row, for today's table and for the open visits from earlier days. One
+    macro, so both draw exactly the actions models/queue_actions.py allows for the role. #}
+{%- macro row_actions(entry) %}
+{%- set patient_name = entry.first_name ~ ' ' ~ entry.last_name %}
+                <div class="d-flex justify-content-end gap-1 align-items-center">
+{%- if care_team_view %}
+{#- Every button below is drawn from entry.shown: the one status x role mapping in
+    models/queue_actions.py (Task 6d), less what makes no sense for this visit now. #}
+{%- if 'start' in entry.shown and entry.can_start %}
+                  <!-- This moves the patient into the room, and is offered only
+                       while the room is empty. Recording what happened in the
+                       consultation is a later pass. The one who arrived first
+                       gets the filled button; anyone taken out of turn gets the
+                       outline one, so the queue still says who is due. -->
+                  <button type="submit" form="startConsultationForm" name="appointment_id" value="{{ entry.id }}"
+                          class="{% if entry.is_ready %}btn-primary-teal{% else %}btn-outline-teal{% endif %}" style="padding:6px 12px; font-size:12.5px;"
+                          title="{% if entry.is_ready %}Start consultation for {{ patient_name }} — first in line{% else %}Start consultation for {{ patient_name }} out of turn{% endif %}">
+                    <span class="material-symbols-outlined" style="font-size:16px;">play_arrow</span>Start Consultation
+                  </button>
+{%- elif 'start' in entry.shown %}
+                  <!-- Someone else is with the clinician. Shown disabled rather
+                       than hidden so the row explains why it cannot start. The
+                       server refuses this too -- see start_consultation(). -->
+                  <button type="button" class="btn-start-blocked" disabled
+                          title="{{ queue_stats.active_name }} is in consultation. Only one patient is seen at a time — complete that consultation first.">
+                    <span class="material-symbols-outlined" style="font-size:16px;">lock_clock</span>Start Consultation
+                  </button>
+{%- elif 'open_intake' in entry.shown %}
+                  <!-- Writing up the visit is the action that belongs here: it
+                       records what happened and completes the queue entry in one
+                       save. Mark Completed stays beside it, de-emphasised, for
+                       the case where the patient left before anything could be
+                       recorded -- closing a visit with nothing written is a real
+                       situation, just not the normal one. -->
+                  <a href="{{ url_for(record_consultation_endpoint, appointment_id=entry.id) }}"
+                     class="btn-primary-teal" style="padding:6px 12px; font-size:12.5px; text-decoration:none;"
+                     title="Write up {{ patient_name }}'s consultation and complete the visit">
+                    <span class="material-symbols-outlined" style="font-size:16px;">edit_note</span>Record Consultation
+                  </a>
+{%- if 'send_to_doctor' in entry.shown %}
+                  <button type="submit" form="sendToDoctorForm" name="appointment_id" value="{{ entry.id }}"
+                          class="btn-outline-teal" style="padding:6px 12px; font-size:12.5px;"
+                          title="Send {{ patient_name }}'s visit to the Doctor without recording a consultation{% if queue_stats.next_up_name %} — {{ queue_stats.next_up_name }} is next{% endif %}">
+                    <span class="material-symbols-outlined" style="font-size:16px;">send</span>Send to the Doctor
+                  </button>
+{%- elif 'mark_completed' in entry.shown %}
+                  <button type="submit" form="completeConsultationForm" name="appointment_id" value="{{ entry.id }}"
+                          class="btn-outline-teal" style="padding:6px 12px; font-size:12.5px;"
+                          title="Close {{ patient_name }}'s visit without recording a consultation{% if queue_stats.next_up_name %} — {{ queue_stats.next_up_name }} is next{% endif %}">
+                    <span class="material-symbols-outlined" style="font-size:16px;">check_circle</span>Mark Completed
+                  </button>
+{%- endif %}
+{%- endif %}
+{#- The Doctor sees a visit that is Waiting for the Doctor, whether or not Staff did the
+    intake (Task 6d). One link: it opens the saved record, or a new consultation. #}
+{%- if 'see_patient' in entry.shown %}
+                  <a href="{{ url_for(see_patient_endpoint, appointment_id=entry.id) }}"
+                     class="btn-primary-teal" style="padding:6px 12px; font-size:12.5px; text-decoration:none;"
+                     title="See {{ patient_name }}: open the consultation and write the diagnosis and treatment plan">
+                    <span class="material-symbols-outlined" style="font-size:16px;">stethoscope</span>See patient
+                  </a>
+{%- endif %}
+{#- Left before being seen (Task 6). Offered where mark_left() would accept it, and
+    the server decides again. A dialog asks first. #}
+{%- if 'mark_left' in entry.shown %}
+                  <button type="button" class="btn-outline-teal" style="padding:6px 12px; font-size:12.5px;"
+                          data-bs-toggle="modal" data-bs-target="#leftModal"
+                          data-appointment="{{ entry.id }}" data-name="{{ patient_name }}"
+                          title="{{ patient_name }} went home before being seen">
+                    <span class="material-symbols-outlined" style="font-size:16px;">directions_walk</span>Left before being seen
+                  </button>
+{%- endif %}
+{%- if 'undo_left' in entry.shown %}
+                  <button type="submit" form="undoLeftForm" name="appointment_id" value="{{ entry.id }}"
+                          class="btn-outline-teal" style="padding:6px 12px; font-size:12.5px;"
+                          title="Put {{ patient_name }} back to {{ entry.status_before_left }}. Today only.">
+                    <span class="material-symbols-outlined" style="font-size:16px;">undo</span>Undo
+                  </button>
+{%- endif %}
+{%- if 'change_service' in entry.shown %}
+                  <button type="button" class="btn-outline-teal" style="padding:6px 12px; font-size:12.5px;"
+                          data-bs-toggle="modal" data-bs-target="#serviceModal"
+                          data-appointment="{{ entry.id }}" data-name="{{ patient_name }}"
+                          data-service="{{ entry.appointment_type or '' }}"
+                          title="Correct the service of {{ patient_name }}'s visit">
+                    <span class="material-symbols-outlined" style="font-size:16px;">edit</span>Change service
+                  </button>
+{%- endif %}
+{%- endif %}
+                  <a href="{{ url_for(patient_profile_endpoint, patient_id=entry.patient_id) }}" class="action-icon" title="Open {{ patient_name }}'s profile"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></a>
+                  {#- Printing from a booking means printing the patient's record,
+                      exactly as it does on a Patient Records row. The row itself is
+                      a line in a working queue -- a name, a time and a status -- and
+                      a printed copy of it is not a document anybody keeps; what a
+                      clinician wants on paper before seeing this patient is the
+                      patient's record, and that record is their profile. So this
+                      links to the profile with ?print=1, which goes straight to the
+                      print dialog there.
+
+                      This is the same leap the View action beside it already makes:
+                      View on this screen does not open the appointment, it opens the
+                      patient. Print follows View rather than inventing a second
+                      answer to "what does this row stand for". Nothing new is
+                      rendered for the printer -- patient_profile.html already
+                      includes _print.html and already has its letterhead. #}
+                  <a href="{{ url_for(patient_profile_endpoint, patient_id=entry.patient_id, print=1) }}"
+                     class="action-icon" title="Print {{ patient_name }}'s full record"><span class="material-symbols-outlined" style="font-size:18px;">print</span></a>
+                </div>
+{%- endmacro %}
+
     <div class="eyebrow">{{ health_center.name }}</div>
     <div class="page-title">Patient Queue</div>
     <div class="page-desc">Check patients in as they arrive, work today's queue in order, and see what each day of the month held.</div>
@@ -701,110 +811,7 @@
               <td>{{ entry.arrival_time or '—' }}</td>
               <td><span class="badge-status {{ entry.display_badge_class }}">{{ entry.display_status }}</span></td>
               <td>
-                <div class="d-flex justify-content-end gap-1 align-items-center">
-{%- if care_team_view %}
-{#- Every button below is drawn from entry.shown: the one status x role mapping in
-    models/queue_actions.py (Task 6d), less what makes no sense for this visit now. #}
-{%- if 'start' in entry.shown and entry.can_start %}
-                  <!-- This moves the patient into the room, and is offered only
-                       while the room is empty. Recording what happened in the
-                       consultation is a later pass. The one who arrived first
-                       gets the filled button; anyone taken out of turn gets the
-                       outline one, so the queue still says who is due. -->
-                  <button type="submit" form="startConsultationForm" name="appointment_id" value="{{ entry.id }}"
-                          class="{% if entry.is_ready %}btn-primary-teal{% else %}btn-outline-teal{% endif %}" style="padding:6px 12px; font-size:12.5px;"
-                          title="{% if entry.is_ready %}Start consultation for {{ patient_name }} — first in line{% else %}Start consultation for {{ patient_name }} out of turn{% endif %}">
-                    <span class="material-symbols-outlined" style="font-size:16px;">play_arrow</span>Start Consultation
-                  </button>
-{%- elif 'start' in entry.shown %}
-                  <!-- Someone else is with the clinician. Shown disabled rather
-                       than hidden so the row explains why it cannot start. The
-                       server refuses this too -- see start_consultation(). -->
-                  <button type="button" class="btn-start-blocked" disabled
-                          title="{{ queue_stats.active_name }} is in consultation. Only one patient is seen at a time — complete that consultation first.">
-                    <span class="material-symbols-outlined" style="font-size:16px;">lock_clock</span>Start Consultation
-                  </button>
-{%- elif 'open_intake' in entry.shown %}
-                  <!-- Writing up the visit is the action that belongs here: it
-                       records what happened and completes the queue entry in one
-                       save. Mark Completed stays beside it, de-emphasised, for
-                       the case where the patient left before anything could be
-                       recorded -- closing a visit with nothing written is a real
-                       situation, just not the normal one. -->
-                  <a href="{{ url_for(record_consultation_endpoint, appointment_id=entry.id) }}"
-                     class="btn-primary-teal" style="padding:6px 12px; font-size:12.5px; text-decoration:none;"
-                     title="Write up {{ patient_name }}'s consultation and complete the visit">
-                    <span class="material-symbols-outlined" style="font-size:16px;">edit_note</span>Record Consultation
-                  </a>
-{%- if 'send_to_doctor' in entry.shown %}
-                  <button type="submit" form="sendToDoctorForm" name="appointment_id" value="{{ entry.id }}"
-                          class="btn-outline-teal" style="padding:6px 12px; font-size:12.5px;"
-                          title="Send {{ patient_name }}'s visit to the Doctor without recording a consultation{% if queue_stats.next_up_name %} — {{ queue_stats.next_up_name }} is next{% endif %}">
-                    <span class="material-symbols-outlined" style="font-size:16px;">send</span>Send to the Doctor
-                  </button>
-{%- elif 'mark_completed' in entry.shown %}
-                  <button type="submit" form="completeConsultationForm" name="appointment_id" value="{{ entry.id }}"
-                          class="btn-outline-teal" style="padding:6px 12px; font-size:12.5px;"
-                          title="Close {{ patient_name }}'s visit without recording a consultation{% if queue_stats.next_up_name %} — {{ queue_stats.next_up_name }} is next{% endif %}">
-                    <span class="material-symbols-outlined" style="font-size:16px;">check_circle</span>Mark Completed
-                  </button>
-{%- endif %}
-{%- endif %}
-{#- The Doctor sees a visit that is Waiting for the Doctor, whether or not Staff did the
-    intake (Task 6d). One link: it opens the saved record, or a new consultation. #}
-{%- if 'see_patient' in entry.shown %}
-                  <a href="{{ url_for(see_patient_endpoint, appointment_id=entry.id) }}"
-                     class="btn-primary-teal" style="padding:6px 12px; font-size:12.5px; text-decoration:none;"
-                     title="See {{ patient_name }}: open the consultation and write the diagnosis and treatment plan">
-                    <span class="material-symbols-outlined" style="font-size:16px;">stethoscope</span>See patient
-                  </a>
-{%- endif %}
-{#- Left before being seen (Task 6). Offered where mark_left() would accept it, and
-    the server decides again. A dialog asks first. #}
-{%- if 'mark_left' in entry.shown %}
-                  <button type="button" class="btn-outline-teal" style="padding:6px 12px; font-size:12.5px;"
-                          data-bs-toggle="modal" data-bs-target="#leftModal"
-                          data-appointment="{{ entry.id }}" data-name="{{ patient_name }}"
-                          title="{{ patient_name }} went home before being seen">
-                    <span class="material-symbols-outlined" style="font-size:16px;">directions_walk</span>Left before being seen
-                  </button>
-{%- endif %}
-{%- if 'undo_left' in entry.shown %}
-                  <button type="submit" form="undoLeftForm" name="appointment_id" value="{{ entry.id }}"
-                          class="btn-outline-teal" style="padding:6px 12px; font-size:12.5px;"
-                          title="Put {{ patient_name }} back to {{ entry.status_before_left }}. Today only.">
-                    <span class="material-symbols-outlined" style="font-size:16px;">undo</span>Undo
-                  </button>
-{%- endif %}
-{%- if 'change_service' in entry.shown %}
-                  <button type="button" class="btn-outline-teal" style="padding:6px 12px; font-size:12.5px;"
-                          data-bs-toggle="modal" data-bs-target="#serviceModal"
-                          data-appointment="{{ entry.id }}" data-name="{{ patient_name }}"
-                          data-service="{{ entry.appointment_type or '' }}"
-                          title="Correct the service of {{ patient_name }}'s visit">
-                    <span class="material-symbols-outlined" style="font-size:16px;">edit</span>Change service
-                  </button>
-{%- endif %}
-{%- endif %}
-                  <a href="{{ url_for(patient_profile_endpoint, patient_id=entry.patient_id) }}" class="action-icon" title="Open {{ patient_name }}'s profile"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></a>
-                  {#- Printing from a booking means printing the patient's record,
-                      exactly as it does on a Patient Records row. The row itself is
-                      a line in a working queue -- a name, a time and a status -- and
-                      a printed copy of it is not a document anybody keeps; what a
-                      clinician wants on paper before seeing this patient is the
-                      patient's record, and that record is their profile. So this
-                      links to the profile with ?print=1, which goes straight to the
-                      print dialog there.
-
-                      This is the same leap the View action beside it already makes:
-                      View on this screen does not open the appointment, it opens the
-                      patient. Print follows View rather than inventing a second
-                      answer to "what does this row stand for". Nothing new is
-                      rendered for the printer -- patient_profile.html already
-                      includes _print.html and already has its letterhead. #}
-                  <a href="{{ url_for(patient_profile_endpoint, patient_id=entry.patient_id, print=1) }}"
-                     class="action-icon" title="Print {{ patient_name }}'s full record"><span class="material-symbols-outlined" style="font-size:18px;">print</span></a>
-                </div>
+{{ row_actions(entry) }}
               </td>
             </tr>
 {%- endfor %}
@@ -847,27 +854,30 @@
 
 {%- if queue %}
       <div class="table-footer" id="tableFooter">
-        <!-- The summary uses the same five status names as the legend above. Each
-             visit is counted once, under the status it holds. -->
         <div class="pg-info" id="queueSummary">
-          <span id="queueShown">{{ queue|length }}</span> of {{ queue|length }} patient{{ '' if queue|length == 1 else 's' }} for today
-          &middot; Waiting: {{ queue_stats.waiting }}
-          &middot; In Consultation: {{ queue_stats.in_consultation_today }}
-          &middot; Waiting for the Doctor: {{ queue_stats.waiting_doctor }}
-          &middot; Completed: {{ queue_stats.completed }}
-          &middot; Left before being seen: {{ queue_stats.left }}
+          Today: Waiting {{ queue_stats.waiting }}
+          &middot; In Consultation {{ queue_stats.in_consultation_today }}
+          &middot; Waiting for the Doctor {{ queue_stats.waiting_doctor }}
+          &middot; Completed {{ queue_stats.completed }}
+          &middot; Left before being seen {{ queue_stats.left }}
         </div>
       </div>
 
 {%- endif %}
 
-{#- STILL WAITING FROM EARLIER DAYS (Task 6, D5). A visit still Waiting from a day that
-    has gone is not in today's table. Listed here so Staff can close it. Nothing closes
-    it automatically. Staff and the Doctor only. #}
-{%- if care_team_view and earlier_waiting %}
-      <div class="mt-4" id="earlierWaiting">
-        <h2 style="font-size:16px; font-weight:600; color:var(--text-dark); margin-bottom:2px;">Still waiting from earlier days</h2>
-        <div class="panel-sub" style="margin-bottom:10px;">These patients checked in on an earlier day and are still marked Waiting. If they went home, close the visit.</div>
+{#- OPEN VISITS FROM EARLIER DAYS (Task 10, D1). Today's table shows only today. A visit from a
+    day that has gone and is still Waiting, In Consultation or Waiting for the Doctor is listed
+    here, oldest first, with the actions its status allows. Nothing closes a visit automatically. #}
+{%- if earlier_open %}
+      <div class="mt-4" id="earlierOpen">
+        <h2 style="font-size:16px; font-weight:600; color:var(--text-dark); margin-bottom:2px;">Open visits from earlier days</h2>
+        <div class="table-footer" style="margin:6px 0 10px; padding:0;">
+          <div class="pg-info" id="earlierSummary">
+            Earlier days: Waiting {{ earlier_counts['Waiting'] }}
+            &middot; In Consultation {{ earlier_counts['In Consultation'] }}
+            &middot; Waiting for the Doctor {{ earlier_counts['Waiting for the Doctor'] }}
+          </div>
+        </div>
         <div style="overflow-x:auto;">
           <table class="appt-table">
             <thead>
@@ -876,29 +886,26 @@
                 <th>Patient Name</th>
                 <th>Checked in</th>
                 <th>Waiting</th>
+{%- if care_team_view %}
                 <th>Service</th>
+{%- endif %}
+                <th>Status</th>
                 <th style="text-align:right;">Actions</th>
               </tr>
             </thead>
             <tbody>
-{%- for entry in earlier_waiting %}
-{%- set patient_name = entry.first_name ~ ' ' ~ entry.last_name %}
+{%- for entry in earlier_open %}
               <tr>
                 <td class="appt-id">{{ entry.reference }}</td>
-                <td><div class="pat-name"><a href="{{ url_for(patient_profile_endpoint, patient_id=entry.patient_id) }}">{{ patient_name }}</a></div><div class="po-meta">{{ entry.patient_reference }}</div></td>
+                <td><div class="pat-name"><a href="{{ url_for(patient_profile_endpoint, patient_id=entry.patient_id) }}">{{ entry.first_name }} {{ entry.last_name }}</a></div><div class="po-meta">{{ entry.patient_reference }}</div></td>
                 <td>{{ entry.checked_in_date | display_date }}{% if entry.arrival_time %} &middot; {{ entry.arrival_time }}{% endif %}</td>
                 <td>{{ entry.waiting_text }}</td>
+{%- if care_team_view %}
                 <td>{{ entry.appointment_type or 'Consultation' }}</td>
-                <td>
-                  <div class="d-flex justify-content-end">
-{%- if entry.can_leave %}
-                    <button type="button" class="btn-outline-teal" style="padding:6px 12px; font-size:12.5px;"
-                            data-bs-toggle="modal" data-bs-target="#leftModal"
-                            data-appointment="{{ entry.id }}" data-name="{{ patient_name }}">
-                      <span class="material-symbols-outlined" style="font-size:16px;">directions_walk</span>Left before being seen
-                    </button>
 {%- endif %}
-                  </div>
+                <td><span class="badge-status {{ entry.display_badge_class }}">{{ entry.display_status }}</span></td>
+                <td>
+{{ row_actions(entry) }}
                 </td>
               </tr>
 {%- endfor %}

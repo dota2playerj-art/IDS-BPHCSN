@@ -1201,19 +1201,30 @@ def attach_actions(entries, role):
     return entries
 
 
-def get_earlier_waiting():
-    """Visits still Waiting from an earlier day, oldest first (Task 6, D5).
+# The statuses of a visit that is still open: nobody has finished it. A visit from an
+# earlier day in one of these is listed on the Patient Queue (Task 10), whatever its status.
+OPEN_STATUSES = (WAITING, IN_CONSULTATION, WAITING_DOCTOR)
 
-    Shown to Staff and the Doctor under "Still waiting from earlier days" so they can
-    close them. Nothing closes them automatically.
+
+def get_open_earlier_visits(active=None):
+    """Every visit from an earlier day that is still open, oldest first (Task 10, D1).
+
+    Waiting, In Consultation or Waiting for the Doctor. Today's table shows only today, so
+    these used to be invisible on the queue. Nothing closes them automatically. The queue
+    lists them for Staff, the Doctor and (read-only) the Administrator, with the same
+    actions as a row of today's table, drawn from models/queue_actions.py. `active` is the
+    visit holding the room, which decides whether Start can be offered.
     """
+    marks = ", ".join("?" for _ in OPEN_STATUSES)
     with db_connection() as conn:
         rows = conn.execute(
             _QUEUE_SELECT
-            + " WHERE a.status = ? AND date(a.appointment_date) < ? "
+            + f" WHERE a.status IN ({marks}) AND date(a.appointment_date) < ? "
               "ORDER BY a.appointment_date, a.checked_in_at, a.id",
-            (WAITING, today().isoformat()),
+            (*OPEN_STATUSES, today().isoformat()),
         ).fetchall()
+    if active is None:
+        active = get_active_consultation()
     moment = now().replace(tzinfo=None)
     entries = []
     for row in rows:
@@ -1224,8 +1235,19 @@ def get_earlier_waiting():
             since = None
         entry["waiting_text"] = waiting_text(since, moment)
         entry["checked_in_date"] = _as_date(entry["appointment_date"])
+        # Start is offered on the same fact the server tests: nobody holds the room.
+        entry["can_start"] = entry["is_waiting"] and active is None
+        entry["is_ready"] = False
+        entry["display_status"] = entry["status"]
+        entry["display_badge_class"] = entry["status_badge_class"]
         entries.append(entry)
-    return attach_leave_flags(entries)
+    return entries
+
+
+def count_open_by_status(entries):
+    """{status: how many} for the three open statuses, in the legend's order."""
+    return {status: sum(1 for entry in entries if entry["status"] == status)
+            for status in OPEN_STATUSES}
 
 
 def get_appointment_day_summary(start_date, end_date):

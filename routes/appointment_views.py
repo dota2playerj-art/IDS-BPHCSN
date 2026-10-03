@@ -17,7 +17,8 @@ from models.appointments import (
     get_active_consultation,
     get_appointment_by_id,
     get_calendar_month,
-    get_earlier_waiting,
+    count_open_by_status,
+    get_open_earlier_visits,
     get_queue_entry,
     get_queue_stats,
     STATUS_DOT_CLASS,
@@ -91,8 +92,15 @@ def appointment_scheduling_context(month=None):
     # The buttons for Left before being seen, and the visits still Waiting from earlier
     # days (Task 6). Only the care team gets either: the Administrator's queue is
     # read-only and the server refuses his POST anyway.
+    # Visits from earlier days that are still open (Task 10, D1). The Administrator sees
+    # them too, read-only: no actions.
+    earlier = get_open_earlier_visits(active=active)
     if care_team:
         entries = attach_actions(attach_leave_flags(entries), role)
+        earlier = attach_actions(attach_leave_flags(earlier), role)
+    else:
+        for entry in earlier:
+            entry["shown"] = ()
     immunization_alert = (get_immunization_alert() if care_team
                           else {"children": [], "child_count": 0,
                                 "no_record_child_count": 0})
@@ -134,7 +142,8 @@ def appointment_scheduling_context(month=None):
 
     return {
         "queue": entries,
-        "earlier_waiting": get_earlier_waiting() if care_team else [],
+        "earlier_open": earlier,
+        "earlier_counts": count_open_by_status(earlier),
         # False for the Administrator: the screen and the exports leave the reason
         # column out altogether.
         "show_visit_reason": is_care_team(role),
