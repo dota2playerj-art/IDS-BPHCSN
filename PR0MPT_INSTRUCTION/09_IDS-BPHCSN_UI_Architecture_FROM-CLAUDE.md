@@ -1202,6 +1202,11 @@ The Doctor, Health Center Staff and the Barangay Official are unchanged.
   word: recorded, not counted). A dose with nothing on file reads **No record**, never Overdue. Staff and the
   Doctor record a dose given elsewhere from the Immunization Record tab, outside a consultation. Basis: CDC
   General Best Practices; FHIR `primarySource` and `reportOrigin`. See `01_PROJECT_BIBLE.md`.
+- *Task 13 (2026-10-03), vaccines only when due.* One rule (`dose_eligibility()`) decides whether a
+  scheduled dose may be given today: minimum age, previous dose of the series on file and valid, minimum
+  interval. The consultation form greys out a dose that is not eligible, with its earliest date or reason; the
+  server refuses it too. A card dose given too early is amber and does not count. Basis: WHO routine
+  immunization tables and ACIP's 4-day grace. No override in this version. See `01_PROJECT_BIBLE.md`.
 - *Task 10 (2026-10-03), open visits and plain screens.* The Patient Queue lists every open visit from an
   earlier day ("Open visits from earlier days"), whatever its status, with the actions of the one mapping.
   Screens carry no explanatory boxes: the "not tracked" and "does not do" notes, the design-reasoning

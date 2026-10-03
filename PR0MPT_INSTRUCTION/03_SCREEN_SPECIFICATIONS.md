@@ -444,7 +444,8 @@ patient's badge reads **Next in line** (a display label; the stored status is Wa
 (existing patient, new patient), with no default: Consultation, Follow-up Consultation, Hypertension /
 Diabetes Monitoring, Prenatal Check-up, Immunization, Dental. A row has a **Change service** button, with a
 dialog, while the visit is Waiting, In Consultation or Waiting for the Doctor. Health Center Staff and the
-Doctor only. The Administrator's queue shows no service column, filter or button.
+Doctor only. The Administrator's queue shows no service column, filter or button. An earlier day's Waiting
+visit offers only Left before being seen: no Start and no Change service (Task 13).
 
 **Left before being seen (Task 6, 2026-10-02).** A new status for a patient who checked in and went home.
 Health Center Staff and the Doctor have a button on the row. It opens a dialog: "Mark this patient as left
@@ -1068,6 +1069,15 @@ Shown for patients under 5 only.
 Every scheduled dose is offered, not only the outstanding ones, so a health worker catching a child up can see the whole schedule.
 
 A dose already on file renders as a locked fact with the date it was given, not as a checkbox.
+
+**Only eligible doses can be ticked (Task 13).** A dose is eligible today only if the child has reached its
+minimum age, the previous dose of the same series is on file (given here or a card) and valid, and the minimum
+interval has passed. A dose that is not eligible is greyed out, with the earliest date ("From Nov 14, 2026")
+or the reason ("Needs Pentavalent dose 1 first"). The server refuses any non-eligible dose with one message
+("This dose is not due yet. Earliest date: Nov 14, 2026."). Several eligible doses at one visit are allowed.
+A card dose given too early reads "Given too early — ask the Doctor about a repeat" (amber) and does not count.
+The table of minimum ages and intervals, the WHO and ACIP basis, and the note that there is no override
+(outbreak campaigns that use other ages are outside this version) are in `01_PROJECT_BIBLE.md`.
 
 The form is add-only for immunisations. A previously recorded dose cannot be removed here. See `09_IDS-BPHCSN_UI_Architecture_FROM-CLAUDE.md` §10 for the reasoning.
 

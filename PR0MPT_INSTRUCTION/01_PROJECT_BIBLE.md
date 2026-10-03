@@ -681,6 +681,59 @@ Edit details. It backs up first, is safe to run twice and writes one audit entry
 
 ---
 
+# Decision Record — Vaccines Only When Due (2026-10-03, Task 13)
+
+**The concern (found with the capstone adviser).** A 1-month-old had a dose recorded. At a second
+consultation the form still allowed ticking a vaccine meant for older babies. The system let staff record
+a dose before the child was old enough, before the previous dose of the series, or too soon after it. A dose
+given too early does not count and must be repeated, so the child gets an extra injection.
+
+**The basis.** WHO routine immunization tables: Pentavalent, OPV and PCV primary doses start at a minimum
+age of 6 weeks, with at least 4 weeks between doses; the first measles-containing dose is at 9 months, with
+at least 4 weeks between the first and the second. A dose given before the minimum age or interval is
+invalid and is repeated after at least the minimum interval. ACIP: when checking records of doses given
+elsewhere, a 4-day grace period applies.
+
+**The rule.** One function, `dose_eligibility()` in `models/immunizations.py`, used by the consultation form,
+the server and every screen. A scheduled dose is eligible today only if (a) the child has reached its minimum
+age, (b) the previous dose of the same series is on file as given here or on a card, and is valid, and (c)
+at least the minimum interval has passed since that dose. A dose already validly recorded is never eligible
+again. A parent's report does not count as a previous dose. The values are named fields in `DOSE_RULES`, one
+row per scheduled dose, next to the schedule. The recommended ages shown to users are unchanged.
+
+| Dose | Minimum age | Minimum interval | Previous dose required |
+|---|---|---|---|
+| BCG | birth | none | none |
+| Hepatitis B | birth | none | none |
+| Pentavalent 1, OPV 1, PCV 1 | 6 weeks | none | none |
+| Pentavalent 2, OPV 2, PCV 2 | 6 weeks | 4 weeks | dose 1 of the same vaccine |
+| Pentavalent 3, OPV 3, PCV 3 | 6 weeks | 4 weeks | dose 2 of the same vaccine |
+| IPV | 14 weeks (as scheduled) | none | none |
+| MR | 9 months | none | none |
+| MMR | 12 months | 4 weeks | MR |
+
+**On the consultation form.** Only eligible doses have a tick box. A dose that is not eligible is greyed out
+with the earliest date ("From Nov 14, 2026") or the reason ("Needs Pentavalent dose 1 first"). The server
+refuses any non-eligible dose with one plain message, for example "This dose is not due yet. Earliest date:
+Nov 14, 2026.", whatever the form showed. Several eligible doses at one visit are allowed (co-administration
+is normal); doses ticked at the same visit do not count as the "previous dose" of each other. A card dose
+reported at the same visit, with its date, does.
+
+**Doses given elsewhere (a card).** They are history, recorded with their real date. A card dose dated more
+than 4 days before the minimum age, or more than 4 days before the minimum interval after the previous dose
+on file, reads **Given too early — ask the Doctor about a repeat** (amber). It stays on file but does not
+count for completion, coverage or the next dose's eligibility, and the child stays on the follow-up list.
+Within the 4-day grace it counts. A dose given here gets no grace, because the form does not offer it before
+its date. Staff and the Doctor can change or remove such a card record from its row; the Doctor decides about
+a repeat.
+
+**What this version does not do (D5).** There is no override. The system follows the routine DOH schedule;
+outbreak campaigns that use other ages are outside its scope.
+
+**Queue (D6).** An earlier day's Waiting visit no longer offers Change service; only Left before being seen.
+
+**Existing data.** A record that breaks the rule is not changed. The counts found are in the tracker.
+
 # Sample Development Workflow
 
 Research
@@ -870,3 +923,9 @@ Version 3.3 (2026-10-03)
 Task 12, stock in batches and medicines named by generic name (RA 6675). Each delivery is a batch with its
 own lot, expiry, source and brand; dispensing is FEFO; a batch past its expiry date is never used or
 counted. See "Decision Record — Stock in Batches, Named by Generic Name".
+
+Version 3.4 (2026-10-03)
+
+Task 13, vaccines only when due: a dose needs the minimum age, the previous dose of its series and the
+minimum interval (WHO routine immunization tables; ACIP 4-day grace for cards). See "Decision Record —
+Vaccines Only When Due".
