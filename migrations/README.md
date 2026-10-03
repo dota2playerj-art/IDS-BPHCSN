@@ -44,5 +44,6 @@ Run a migration only on a database that was built before the change it describes
 | 2026-10-02 | `migrate_visit_service_and_doctor_status.py` | the queue status "Waiting for the Doctor" (Task 6b, M33 and L31). |
 | 2026-10-02 | `migrate_remove_service_names_from_audit.py` | take visit service names out of earlier audit entries (Task 6c, L32). |
 | 2026-10-03 | `migrate_immunization_evidence.py` | a dose says what its record rests on: given here, a card, or a parent's report (Task 9). |
+| 2026-10-03 | `migrate_inventory_batches.py` | stock is kept in batches with their own expiry dates, and medicines are named by generic name, strength and form (Task 12). |
 
 Repair scripts that only served the old, archived demo data were deleted in Task 7.

@@ -133,17 +133,24 @@ CREATE TABLE consultations (
     FOREIGN KEY (appointment_id) REFERENCES appointments(id) ON DELETE SET NULL
 );
 
+-- An inventory item is a kind of thing the health center stocks. It holds no quantity
+-- and no expiry date: those belong to the batches below (Task 12).
+--
+-- A medicine is defined by generic name, strength and dosage form (RA 6675, the Generics
+-- Act, asks government health agencies to use generic names). name is the display name
+-- built from them, for example "Paracetamol 500 mg tablet", and is kept in step by the
+-- code. A supply or equipment item has a simple item name and a size or specification
+-- instead: its item name is kept in generic_name and its size in dosage_strength.
+--
 -- Two different classifications live here, and they are not interchangeable:
 --
 --   category    the item type, constrained to Medicine / Supply / Equipment.
 --   drug_class  the therapeutic classification (Antibiotic, Antihypertensive,
---               ...) that Screen 06's table shows as a pill and Screen 07's
---               "Category" dropdown offers. Free text, because the vocabulary
---               is a presentation list that will grow.
+--               ...). Free text, because the vocabulary is a presentation list.
 --
--- stock_quantity is compared against this row's own low_stock_threshold rather
--- than a single system-wide number: a barangay health center reorders gauze and
--- amoxicillin at very different levels.
+-- low_stock_threshold is compared with the item's usable stock (the sum of its batches
+-- that are not expired) rather than a single system-wide number: a barangay health
+-- center reorders gauze and amoxicillin at very different levels.
 --
 -- status is a soft lifecycle flag, as on patients: inventory rows are not
 -- hard-deleted.
@@ -152,17 +159,12 @@ CREATE TABLE inventory_items (
     item_code TEXT NOT NULL UNIQUE,
     name TEXT NOT NULL,
     generic_name TEXT,
-    brand_name TEXT,
     category TEXT NOT NULL CHECK (category IN ('Medicine', 'Supply', 'Equipment')),
     drug_class TEXT,
     dosage_strength TEXT,
     dosage_form TEXT,
     unit TEXT,
-    stock_quantity INTEGER NOT NULL DEFAULT 0,
     low_stock_threshold INTEGER NOT NULL DEFAULT 0,
-    expiry_date TEXT,
-    date_received TEXT,
-    batch_number TEXT,
     manufacturer TEXT,
     supplier TEXT,
     unit_cost REAL,
@@ -171,6 +173,45 @@ CREATE TABLE inventory_items (
     status TEXT NOT NULL DEFAULT 'Active' CHECK (status IN ('Active', 'Inactive')),
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- One delivery of one item (Task 12). Stock is the sum of quantity_remaining over the
+-- batches that are not expired, and "which boxes expire when" is a row each. The brand
+-- belongs here because deliveries of the same generic can come from different makers.
+-- expiry_date is required for a medicine and optional for a supply, which the code checks.
+-- lot_number holds the printed lot, or "No lot number" when the delivery had none.
+-- quantity_remaining goes down when stock is dispensed or removed, and never below 0.
+CREATE TABLE inventory_batches (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    inventory_item_id INTEGER NOT NULL,
+    lot_number TEXT NOT NULL,
+    expiry_date TEXT,
+    quantity_received INTEGER NOT NULL CHECK (quantity_received >= 0),
+    quantity_remaining INTEGER NOT NULL CHECK (quantity_remaining >= 0),
+    date_received TEXT NOT NULL,
+    source TEXT NOT NULL CHECK (source IN ('DOH', 'Municipal Health Office / RHU',
+                                           'Barangay purchase', 'Donation', 'Other')),
+    brand_name TEXT,
+    received_by INTEGER,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (inventory_item_id) REFERENCES inventory_items(id) ON DELETE RESTRICT,
+    FOREIGN KEY (received_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- An amount taken out of one batch without a patient: expired, damaged, lost, returned
+-- or a count correction. The note is optional. The audit entry names the reason, not the
+-- note.
+CREATE TABLE inventory_removals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    batch_id INTEGER NOT NULL,
+    quantity INTEGER NOT NULL CHECK (quantity > 0),
+    reason TEXT NOT NULL CHECK (reason IN ('Expired', 'Damaged', 'Lost', 'Returned',
+                                           'Count correction')),
+    note TEXT,
+    removed_by INTEGER,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (batch_id) REFERENCES inventory_batches(id) ON DELETE RESTRICT,
+    FOREIGN KEY (removed_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
 -- schedule_logs used to be defined here. It was meant to hold both appointments
@@ -340,12 +381,10 @@ CREATE TABLE general_vaccinations (
 
 -- Medicine actually handed to a patient, taken off the shelf.
 --
--- The other half of Objective 2's "real-time monitoring". inventory_items holds
--- one number per item, and every other writer moves it up or corrects it
--- wholesale; this is the only thing in the system that takes units off a shelf,
--- and models/dispensing.py decrements inventory_items.stock_quantity in the same
--- transaction that inserts the row here, so the record and the shelf can never
--- disagree about what left.
+-- The other half of Objective 2's "real-time monitoring". This is the only thing in the
+-- system that takes units off a shelf for a patient, and models/dispensing.py decrements
+-- the batches (medicine_dispensing_batches) in the same transaction that inserts the row
+-- here, so the record and the shelf can never disagree about what left.
 --
 -- One row is HL7 FHIR's MedicationDispense in its ward-stock sense -- issuing a
 -- dose from stock to a patient for consumption -- and, like FHIR's, it is tied to
@@ -354,8 +393,8 @@ CREATE TABLE general_vaccinations (
 -- barangay-level facility requires: medicine given out here is traceable to the
 -- medical supervision that authorised it.
 --
--- inventory_item_id is the traceability link back to the batch, the expiry date
--- and the supplier the units came from. medicine_name and unit are a snapshot of
+-- inventory_item_id is the traceability link back to the item; the batches the units
+-- came from are in medicine_dispensing_batches. medicine_name and unit are a snapshot of
 -- what was actually handed over: the Add / Edit Medicine form can rewrite an
 -- inventory row's name in place, and a history rendered purely by joining would
 -- silently re-label a dose given months ago. Same pair, same reason, as
@@ -383,6 +422,19 @@ CREATE TABLE medicine_dispensing (
     FOREIGN KEY (consultation_id) REFERENCES consultations(id) ON DELETE SET NULL,
     FOREIGN KEY (inventory_item_id) REFERENCES inventory_items(id) ON DELETE RESTRICT,
     FOREIGN KEY (dispensed_by) REFERENCES users(id) ON DELETE RESTRICT
+);
+
+-- Which batch or batches a dispensing came out of (Task 12). Dispensing takes from the
+-- usable batch with the earliest expiry first (FEFO), and splits across batches when one
+-- runs out, so one dispensing can have several rows here. The quantities add up to
+-- quantity_dispensed.
+CREATE TABLE medicine_dispensing_batches (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    dispensing_id INTEGER NOT NULL,
+    batch_id INTEGER NOT NULL,
+    quantity INTEGER NOT NULL CHECK (quantity > 0),
+    FOREIGN KEY (dispensing_id) REFERENCES medicine_dispensing(id) ON DELETE CASCADE,
+    FOREIGN KEY (batch_id) REFERENCES inventory_batches(id) ON DELETE RESTRICT
 );
 
 CREATE TABLE audit_logs (
@@ -565,7 +617,11 @@ CREATE INDEX idx_consultations_patient_date ON consultations(patient_id, consult
 -- Answers "has this queue entry already been written up?" before a second
 -- consultation can be recorded against the same visit.
 CREATE INDEX idx_consultations_appointment ON consultations(appointment_id);
-CREATE INDEX idx_inventory_low_stock ON inventory_items(stock_quantity, low_stock_threshold);
+-- The inventory list reads every batch of every item; FEFO reads one item's batches.
+CREATE INDEX idx_inventory_batches_item ON inventory_batches(inventory_item_id, expiry_date);
+CREATE INDEX idx_inventory_removals_batch ON inventory_removals(batch_id);
+CREATE INDEX idx_dispensing_batches_dispensing ON medicine_dispensing_batches(dispensing_id);
+CREATE INDEX idx_dispensing_batches_batch ON medicine_dispensing_batches(batch_id);
 CREATE INDEX idx_appointments_date ON appointments(appointment_date, status);
 -- The consultation queue reads one day's rows and orders them by arrival.
 CREATE INDEX idx_appointments_queue ON appointments(appointment_date, status, checked_in_at);

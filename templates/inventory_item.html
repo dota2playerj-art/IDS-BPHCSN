@@ -1,0 +1,346 @@
+{% extends "base.html" %}
+{% set active_nav = "medicine_inventory" %}
+{% block title %}{{ system_short_name }} | {{ item.name }}{% endblock %}
+
+{% block styles %}
+  .page-desc{font-size:14px; color:var(--text-muted); margin-top:4px; max-width:680px;}
+  .title-row{display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap;}
+  a.btn-primary-teal, a.btn-outline-teal{text-decoration:none;}
+
+  .stat-card{background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:20px 22px; height:100%;}
+  .stat-value{font-size:24px; font-weight:700; color:var(--text-dark);}
+  .stat-label{font-size:13px; color:var(--text-muted); margin-top:2px;}
+  .stat-trend{font-size:12px; font-weight:600; margin-top:6px;}
+
+  .panel-card{background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:24px; margin-bottom:24px;}
+  .section-title{font-size:18px; font-weight:600; color:var(--text-dark); margin-bottom:14px;}
+
+  .info-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:20px 28px;}
+  .info-item .info-label{font-size:12px; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:0.03em;}
+  .info-item .info-value{font-size:14.5px; color:var(--text-dark); margin-top:3px;}
+  .info-item .info-value.info-prose{white-space:pre-wrap;}
+
+  table.inv-table{width:100%; border-collapse:separate; border-spacing:0; font-size:13.5px;}
+  table.inv-table thead th{
+    text-align:left; color:var(--text-muted); font-weight:600; font-size:11.5px; letter-spacing:0.03em;
+    text-transform:uppercase; padding:12px 14px; border-bottom:1px solid var(--border-color); white-space:nowrap;
+  }
+  table.inv-table tbody td{padding:14px; border-bottom:1px solid var(--border-color); color:var(--text-dark); vertical-align:middle;}
+  table.inv-table tbody tr:last-child td{border-bottom:none;}
+  tr.batch-expired td{background:#FAFAFA;}
+
+  .badge-status{
+    display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600;
+    padding:4px 11px; border-radius:999px; white-space:nowrap;
+  }
+  .badge-instock{background:#DCFCE7; color:#15803D;}
+  .badge-lowstock{background:#FEF3C7; color:#B45309;}
+  .badge-critical{background:#FEE2E2; color:#B91C1C;}
+  .badge-nearexpiry{background:#FFEDD5; color:#C2410C;}
+  .badge-expired{background:#F3F4F6; color:#4B5563;}
+  .badge-retired{background:#F3F4F6; color:#4B5563;}
+
+  .notice{border-radius:12px; border:1px solid; padding:14px 16px; font-size:13.5px; display:flex; gap:12px; align-items:flex-start; margin-bottom:20px;}
+  .notice .material-symbols-outlined{font-size:20px; margin-top:1px;}
+  .notice-warn{background:#FFFBEB; border-color:#FDE68A; color:#92400E;}
+  .notice-danger{background:#FEF2F2; border-color:#FECACA; color:#B91C1C;}
+
+  label.field-label{font-size:13px; font-weight:600; color:var(--text-dark); margin-bottom:6px; display:inline-block;}
+  label.field-label .req{color:var(--danger); margin-left:2px;}
+  .form-control, .form-select{height:48px; border-radius:12px; border:1px solid var(--border-color); font-size:14px; color:var(--text-dark);}
+  .form-control:focus, .form-select:focus{border-color:var(--teal); box-shadow:0 0 0 3px rgba(22,155,146,0.12);}
+  .form-control.is-invalid, .form-select.is-invalid{border-color:var(--danger);}
+  .invalid-feedback{font-size:12.5px;}
+  .form-text-hint{font-size:12px; color:var(--text-muted); margin-top:4px;}
+  .btn-small{
+    background:transparent; border:1px solid var(--border-color); color:var(--text-dark); border-radius:8px;
+    padding:6px 12px; font-size:13px; font-weight:500; white-space:nowrap;
+  }
+  .btn-small:hover{border-color:var(--teal); color:var(--teal-dark);}
+  .btn-small.urgent{border-color:#C2410C; color:#C2410C;}
+{% endblock %}
+
+{% block breadcrumb %}
+
+    <div class="breadcrumb-nav">
+      <a href="{{ url_for(dashboard_endpoint) }}">Dashboard</a>
+      <span class="sep material-symbols-outlined">chevron_right</span>
+      <a href="{{ url_for(medicine_inventory_endpoint) }}">Medicine Inventory</a>
+      <span class="sep material-symbols-outlined">chevron_right</span>
+      <span class="current">{{ item.name }}</span>
+    </div>{% endblock %}
+
+{% block content %}
+{%- set unit_word = (item.unit or 'units')|lower %}
+    <div class="title-row">
+      <div>
+        <div class="eyebrow">{{ health_center.name }} &middot; {{ item.item_code }}</div>
+        <div class="page-title">{{ item.name }}</div>
+        <div class="page-desc"><span class="badge-status {{ item.status_badge_class }}">{{ item.display_status }}</span></div>
+      </div>
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <a href="{{ url_for(add_edit_medicine_endpoint, medicine_id=item.id) }}" class="btn-outline-teal"><span class="material-symbols-outlined" style="font-size:18px;">edit</span>Edit details</a>
+        <a href="#receiveStock" class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">add</span>Receive stock</a>
+      </div>
+    </div>
+
+    <div style="height:20px;"></div>
+
+{%- if item.needs_details %}
+    <div class="notice notice-warn">
+      <span class="material-symbols-outlined">info</span>
+      <div>This medicine has no generic name, strength or dosage form on file. Use Edit details to add them.</div>
+    </div>
+{%- endif %}
+{%- if item.expired_batches %}
+    <div class="notice notice-danger">
+      <span class="material-symbols-outlined">block</span>
+      <div>{{ item.expired_batches }} expired batch{{ "es" if item.expired_batches != 1 }} still hold{{ "s" if item.expired_batches == 1 }} {{ "{:,}".format(item.expired_quantity) }} {{ unit_word }}. Expired stock is not counted and is never dispensed. Use Remove from stock on each one.</div>
+    </div>
+{%- endif %}
+
+    <div class="row g-3 mb-4">
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-value">{{ "{:,}".format(item.stock_quantity) }}</div>
+          <div class="stat-label">Usable stock ({{ unit_word }})</div>
+          <div class="stat-trend" style="color:var(--text-muted);">Reorder level {{ "{:,}".format(item.low_stock_threshold) }}</div>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-value" style="font-size:20px;">{{ item.nearest_expiry | display_date('No expiry') }}</div>
+          <div class="stat-label">Nearest expiry</div>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-value">{{ item.expiring_soon_batches }}</div>
+          <div class="stat-label">Expiring soon ({{ expiring_soon_days }} days)</div>
+        </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+          <div class="stat-value">{{ item.expired_batches }}</div>
+          <div class="stat-label">Expired batches</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-card">
+      <div class="section-title">Batches</div>
+{%- if item.batches %}
+      <div style="overflow-x:auto;">
+        <table class="inv-table" id="batchTable">
+          <thead>
+            <tr>
+              <th>Lot</th>
+              <th>Brand</th>
+              <th>Source</th>
+              <th>Received</th>
+              <th>Expiry</th>
+              <th>Received qty</th>
+              <th>Left</th>
+              <th>Status</th>
+              <th style="text-align:right;">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+{%- for batch in item.batches %}
+            <tr class="batch-row{% if batch.is_expired %} batch-expired{% endif %}" data-status="{{ batch.status }}">
+              <td>{{ batch.lot_number }}</td>
+              <td>{{ batch.brand_name or '—' }}</td>
+              <td>{{ batch.source }}</td>
+              <td>{{ batch.date_received | display_date }}</td>
+              <td>{{ batch.expiry_date | display_date('No expiry') }}</td>
+              <td>{{ "{:,}".format(batch.quantity_received) }}</td>
+              <td><strong>{{ "{:,}".format(batch.quantity_remaining) }}</strong></td>
+              <td><span class="badge-status {{ batch.badge_class }}">{{ batch.status }}</span></td>
+              <td style="text-align:right;">
+{%- if batch.quantity_remaining > 0 %}
+                <button type="button" class="btn-small{% if batch.is_expired %} urgent{% endif %}" data-bs-toggle="modal" data-bs-target="#removeStockModal"
+                        data-batch-id="{{ batch.id }}" data-lot="{{ batch.lot_number }}" data-left="{{ batch.quantity_remaining }}"
+                        data-expired="{{ '1' if batch.is_expired else '' }}">Remove from stock</button>
+{%- endif %}
+              </td>
+            </tr>
+{%- endfor %}
+          </tbody>
+        </table>
+      </div>
+{%- else %}
+      <div class="page-desc">No stock has been received for this item yet.</div>
+{%- endif %}
+    </div>
+
+    <div class="panel-card" id="receiveStock">
+      <div class="section-title">Receive stock</div>
+      <div class="page-desc" style="margin-bottom:16px;">Each delivery is its own batch, with its own expiry date.</div>
+{%- if receive_errors %}
+      <div class="notice notice-danger">
+        <span class="material-symbols-outlined">error</span>
+        <div>Please correct the {{ receive_errors|length }} highlighted field{{ "s" if receive_errors|length != 1 }} below.</div>
+      </div>
+{%- endif %}
+      <form method="post" action="{{ url_for(receive_stock_endpoint, item_id=item.id) }}" novalidate>
+        {{ csrf_field() }}
+        <div class="row g-3 mb-3">
+          <div class="col-md-4">
+            <label class="field-label" for="rLot">Lot number<span class="req">*</span></label>
+            <input type="text" class="form-control{% if receive_errors.lot_number %} is-invalid{% endif %}" name="lot_number" id="rLot" value="{{ receive_form.lot_number or '' }}">
+            {%- if receive_errors.lot_number %}<div class="invalid-feedback d-block">{{ receive_errors.lot_number }}</div>{% endif %}
+            <div class="form-check mt-2">
+              <input class="form-check-input" type="checkbox" name="no_lot" id="rNoLot" value="1"{% if receive_form.no_lot %} checked{% endif %}>
+              <label class="form-check-label" for="rNoLot" style="font-size:13px;">{{ options.no_lot_number }}</label>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <label class="field-label" for="rExpiry">Expiry date{% if item.is_medicine %}<span class="req">*</span>{% endif %}</label>
+            <input type="date" class="form-control{% if receive_errors.expiry_date %} is-invalid{% endif %}" name="expiry_date" id="rExpiry" value="{{ receive_form.expiry_date or '' }}">
+            {%- if receive_errors.expiry_date %}<div class="invalid-feedback d-block">{{ receive_errors.expiry_date }}</div>{% endif %}
+          </div>
+          <div class="col-md-4">
+            <label class="field-label" for="rQuantity">Quantity received<span class="req">*</span></label>
+            <input type="number" min="1" step="1" class="form-control{% if receive_errors.quantity %} is-invalid{% endif %}" name="quantity" id="rQuantity" value="{{ receive_form.quantity or '' }}">
+            {%- if receive_errors.quantity %}<div class="invalid-feedback d-block">{{ receive_errors.quantity }}</div>{% endif %}
+          </div>
+        </div>
+        <div class="row g-3 mb-3">
+          <div class="col-md-4">
+            <label class="field-label" for="rDate">Date received</label>
+            <input type="date" class="form-control{% if receive_errors.date_received %} is-invalid{% endif %}" name="date_received" id="rDate" value="{{ receive_form.date_received or '' }}">
+            {%- if receive_errors.date_received %}<div class="invalid-feedback d-block">{{ receive_errors.date_received }}</div>{% endif %}
+          </div>
+          <div class="col-md-4">
+            <label class="field-label" for="rSource">Source<span class="req">*</span></label>
+            <select class="form-select{% if receive_errors.source %} is-invalid{% endif %}" name="source" id="rSource">
+              <option value="">Select source</option>
+{%- for option in options.sources %}
+              <option value="{{ option }}"{% if receive_form.source == option %} selected{% endif %}>{{ option }}</option>
+{%- endfor %}
+            </select>
+            {%- if receive_errors.source %}<div class="invalid-feedback d-block">{{ receive_errors.source }}</div>{% endif %}
+          </div>
+          <div class="col-md-4">
+            <label class="field-label" for="rBrand">Brand name</label>
+            <input type="text" class="form-control" name="brand_name" id="rBrand" value="{{ receive_form.brand_name or '' }}" placeholder="Optional">
+          </div>
+        </div>
+        <div class="d-flex justify-content-end">
+          <button type="submit" class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">save</span>Receive stock</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="panel-card">
+      <div class="section-title">Details</div>
+      <div class="info-grid" style="margin-bottom:16px;">
+        <div class="info-item"><div class="info-label">Item code</div><div class="info-value">{{ item.item_code }}</div></div>
+        <div class="info-item"><div class="info-label">{{ 'Generic name' if item.is_medicine else 'Item name' }}</div><div class="info-value">{{ item.generic_name or 'Not recorded' }}</div></div>
+        <div class="info-item"><div class="info-label">{{ 'Strength' if item.is_medicine else 'Size' }}</div><div class="info-value">{{ item.dosage_strength or 'Not recorded' }}</div></div>
+        {%- if item.is_medicine %}
+        <div class="info-item"><div class="info-label">Dosage form</div><div class="info-value">{{ item.dosage_form or 'Not recorded' }}</div></div>
+        <div class="info-item"><div class="info-label">Category</div><div class="info-value">{{ item.drug_class or 'Not recorded' }}</div></div>
+        {%- endif %}
+        <div class="info-item"><div class="info-label">Item type</div><div class="info-value">{{ item.category }}</div></div>
+        <div class="info-item"><div class="info-label">Unit of measure</div><div class="info-value">{{ item.unit or 'Not recorded' }}</div></div>
+        <div class="info-item"><div class="info-label">Reorder level</div><div class="info-value">{{ "{:,}".format(item.low_stock_threshold) }}</div></div>
+        <div class="info-item"><div class="info-label">Unit cost</div><div class="info-value">{% if item.unit_cost is not none %}&#8369;{{ "{:,.2f}".format(item.unit_cost) }}{% else %}Not recorded{% endif %}</div></div>
+        <div class="info-item"><div class="info-label">Manufacturer</div><div class="info-value">{{ item.manufacturer or 'Not recorded' }}</div></div>
+        <div class="info-item"><div class="info-label">Supplier</div><div class="info-value">{{ item.supplier or 'Not recorded' }}</div></div>
+        <div class="info-item"><div class="info-label">Storage location</div><div class="info-value">{{ item.storage_location or 'Not recorded' }}</div></div>
+      </div>
+      <div class="info-grid">
+        <div class="info-item" style="grid-column:1/-1;"><div class="info-label">Notes</div><div class="info-value info-prose">{{ item.notes or 'Not recorded' }}</div></div>
+      </div>
+    </div>
+
+{%- if removals %}
+    <div class="panel-card">
+      <div class="section-title">Recent removals</div>
+      <div style="overflow-x:auto;">
+        <table class="inv-table">
+          <thead><tr><th>Date</th><th>Lot</th><th>Amount</th><th>Reason</th><th>Note</th><th>By</th></tr></thead>
+          <tbody>
+{%- for removal in removals %}
+            <tr>
+              <td>{{ removal.created_at | display_date }}</td>
+              <td>{{ removal.lot_number }}</td>
+              <td>{{ "{:,}".format(removal.quantity) }}</td>
+              <td>{{ removal.reason }}</td>
+              <td>{{ removal.note or '—' }}</td>
+              <td>{{ removal.removed_by_name or '—' }}</td>
+            </tr>
+{%- endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+{%- endif %}
+
+    <div class="modal fade" id="removeStockModal" tabindex="-1" aria-labelledby="removeStockModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <form class="modal-content" method="post" action="{{ url_for(remove_stock_endpoint, item_id=item.id) }}" style="border-radius:16px;">
+          {{ csrf_field() }}
+          <input type="hidden" name="batch_id" id="removeBatchId" value="">
+          <div class="modal-header">
+            <h5 class="modal-title" id="removeStockModalLabel">Remove from stock</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p style="margin-bottom:14px;">Lot <strong id="removeLot"></strong> holds <strong id="removeLeft"></strong>. This takes stock out of this one batch.</p>
+            <div class="mb-3">
+              <label class="field-label" for="removeQuantity">Amount to remove<span class="req">*</span></label>
+              <input type="number" min="1" step="1" class="form-control" name="quantity" id="removeQuantity" required>
+            </div>
+            <div class="mb-3">
+              <label class="field-label" for="removeReason">Reason<span class="req">*</span></label>
+              <select class="form-select" name="reason" id="removeReason" required>
+                <option value="">Select reason</option>
+{%- for option in options.reasons %}
+                <option value="{{ option }}">{{ option }}</option>
+{%- endfor %}
+              </select>
+            </div>
+            <div>
+              <label class="field-label" for="removeNote">Note</label>
+              <input type="text" class="form-control" name="note" id="removeNote" maxlength="200" placeholder="Optional. Do not write a patient name.">
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">block</span>Remove from stock</button>
+          </div>
+        </form>
+      </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  var removeModal = document.getElementById('removeStockModal');
+  if(removeModal){
+    removeModal.addEventListener('show.bs.modal', function(event){
+      var trigger = event.relatedTarget;
+      if(!trigger){ return; }
+      var left = trigger.dataset.left || '';
+      document.getElementById('removeBatchId').value = trigger.dataset.batchId || '';
+      document.getElementById('removeLot').textContent = trigger.dataset.lot || '';
+      document.getElementById('removeLeft').textContent = left;
+      var quantity = document.getElementById('removeQuantity');
+      quantity.max = left;
+      quantity.value = left;
+      document.getElementById('removeReason').value = trigger.dataset.expired ? 'Expired' : '';
+      document.getElementById('removeNote').value = '';
+    });
+  }
+  // A ticked "No lot number" replaces the lot box.
+  (function(){
+    var box = document.getElementById('rNoLot');
+    var lot = document.getElementById('rLot');
+    if(!box || !lot){ return; }
+    function sync(){ lot.disabled = box.checked; }
+    box.addEventListener('change', sync);
+    sync();
+  })();
+</script>{% endblock %}

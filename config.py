@@ -58,6 +58,10 @@ SCHEMA = os.path.join(BASE_DIR, "schema.sql")
 # short date range can point at one person. See utils/small_counts.py.
 SMALL_COUNT_THRESHOLD = 5
 
+# A batch of stock that expires within this many days is "Expiring soon" (Task 12). One
+# number for the inventory list, the item page, the dashboards and the reports.
+EXPIRING_SOON_DAYS = 90
+
 # Signed out after this long with no activity.
 IDLE_TIMEOUT = timedelta(minutes=30)
 # Signed out this long after signing in, whatever happens.

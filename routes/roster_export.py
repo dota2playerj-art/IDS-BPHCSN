@@ -6,6 +6,7 @@ Export button quoting one shared reason. This module is what all four press now.
 """
 import config
 from models.consultations import RESTRICTED_PLACEHOLDER
+from models.inventory import get_expiry_batches
 from models.settings import health_center_name
 from routes.report_export import _download  # noqa: F401  (re-exported below)
 from utils.dates import display_date, display_timestamp, long_date, now, today
@@ -71,12 +72,6 @@ INVENTORY_UNTRACKED = (
         "Stock movement, in this file",
         "Dispensing is recorded; see Items Dispensed on Reports & Analytics. This file shows the "
         "shelf as it is today, with no movement column.",
-    ),
-    (
-        "Batch history",
-        "A row holds one batch number and one expiry date. There is no table of "
-        "earlier batches, so an item that has been restocked shows only its "
-        "current one.",
     ),
     (
         "That this export happened",
@@ -717,18 +712,22 @@ def _patient_selection_export(context, produced_by):
 # has no second line, so they become columns. Nothing is added that the screen
 # does not show, and nothing it shows is dropped.
 INVENTORY_COLUMNS = (
-    "Medicine Name",
+    "Item",
     "Generic Name",
     "Category",
-    "Dosage / Form",
-    "Current Stock",
+    "Strength / Form",
+    "Usable Stock",
     "Unit",
     "Reorder Level",
-    "Expiration Date",
+    "Nearest Expiry",
+    "Batches Expiring Soon",
+    "Expired Batches",
     "Supplier",
     "Status",
     "Stock condition",
 )
+
+BATCH_COLUMNS = ("Item", "Lot", "Expiry", "Amount", "Unit", "Status")
 
 
 def _inventory_export(context, produced_by):
@@ -747,7 +746,9 @@ def _inventory_export(context, produced_by):
             _value(item.get("stock_quantity")),
             _value(item.get("unit")),
             _value(item.get("low_stock_threshold")),
-            display_date(item.get("expiry_date"), "No expiry"),
+            display_date(item.get("nearest_expiry"), "No expiry"),
+            _value(item.get("expiring_soon_batches")),
+            _value(item.get("expired_batches")),
             _value(item.get("supplier")),
             # What the screen's Status cell prints: "Retired" for an item taken out
             # of service, and the stock condition otherwise. The lifecycle status
@@ -766,8 +767,8 @@ def _inventory_export(context, produced_by):
             f"Every item on the shelf — {_count_label(total, 'item')}",
             INVENTORY_COLUMNS,
             rows,
-            note=("Sorted by medicine name, A to Z. Status shows a retired item's status, or its "
-                  "stock condition."),
+            note=("Sorted by item name, A to Z. Usable stock counts batches that are not "
+                  "expired. Status shows a retired item's status, or its stock condition."),
             empty="The inventory holds nothing.",
         )],
         heading="Medicine Inventory",
@@ -795,18 +796,31 @@ def _inventory_export(context, produced_by):
                  "figures"),
                 ("Items below reorder level", stats["low_stock_count"],
                  f"Of which {stats['out_of_stock_count']} at zero stock"),
-                (f"Near expiry (within {stats['near_expiry_days']} days)",
-                 stats["near_expiry_count"],
-                 f"Of which {stats['expires_today_count']} "
-                 f"{'expires' if stats['expires_today_count'] == 1 else 'expire'} "
-                 "today"),
-                ("Already expired", stats["expired_count"],
-                 f"On the shelf and past their expiry date on "
-                 f"{display_date(today())}"),
+                (f"Batches expiring soon (within {stats['expiring_soon_days']} days)",
+                 stats["expiring_soon_count"],
+                 "Batches that still hold stock"),
+                ("Expired batches", stats["expired_count"],
+                 f"Still holding stock and past their expiry date on "
+                 f"{display_date(today())}. Not counted as stock"),
             ],
             note=("The position today, over the whole shelf, not over any filter on the screen."),
         )],
         heading="Stock Summary",
+    )
+
+    batches = sheet(
+        "Batches",
+        [table(
+            "Batches expiring soon and expired",
+            BATCH_COLUMNS,
+            [[row["item_name"], row["lot_number"],
+              display_date(row["expiry_date"], "No expiry"), row["quantity_remaining"],
+              _value(row.get("unit")), row["status"]]
+             for row in get_expiry_batches(items)],
+            note="Soonest expiry first. Items in service only.",
+            empty="No batch is expiring soon or expired.",
+        )],
+        heading="Batches Expiring Soon and Expired",
     )
 
     cover = _cover_sheet(
@@ -826,6 +840,7 @@ def _inventory_export(context, produced_by):
         index=[
             ["Inventory", "Every stock item, name order, retired items included."],
             ["Stock Summary", "The figures the screen's stat cards show."],
+            ["Batches", "The batches expiring soon and the expired ones that hold stock."],
         ],
         intro=(
             "The complete inventory list, taken off the system on "
@@ -837,7 +852,7 @@ def _inventory_export(context, produced_by):
     notes = _untracked_sheet(
         INVENTORY_UNTRACKED,
         "This list holds the columns the screen shows. The other stored fields appear only on the"
-        " Add / Edit Medicine form. The items below are not stored.",
+        " Edit details form. The items below are not stored.",
     )
 
     return _assemble(
@@ -845,7 +860,7 @@ def _inventory_export(context, produced_by):
         f"Complete shelf · {_count_label(total, 'item')}",
         _stem("Medicine Inventory", "Full item list"),
         cover,
-        [listing, summary],
+        [listing, summary, batches],
         notes,
     )
 

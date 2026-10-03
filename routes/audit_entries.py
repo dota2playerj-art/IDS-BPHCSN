@@ -41,7 +41,8 @@ from models.audit import (
     ACTION_ELSEWHERE_DOSE_REMOVED,
     ACTION_PARENT_REPORT_RECORDED,
     ACTION_PARENT_REPORT_UPGRADED,
-    ACTION_STOCK_ADJUSTED,
+    ACTION_STOCK_RECEIVED,
+    ACTION_STOCK_REMOVED,
     MODULE_APPOINTMENTS,
     MODULE_CONSULTATIONS,
     MODULE_IMMUNIZATIONS,
@@ -249,33 +250,56 @@ def medicine_dispensed(patient_id, consultation_id, user_id, ip_address=None):
 
 
 def inventory_added(user_id, ip_address=None):
+    """A new item. It holds no stock yet: stock arrives as a batch (Receive stock)."""
     write = _entry(user_id, ip_address, ACTION_INVENTORY_ADDED, MODULE_INVENTORY)
 
     def audit(conn, item_id):
-        stock = conn.execute(
-            "SELECT stock_quantity FROM inventory_items WHERE id = ?", (item_id,)
-        ).fetchone()["stock_quantity"]
-        write(conn, f"{_item(conn, item_id)}, stock {stock}.")
+        write(conn, f"{_item(conn, item_id)}.")
     return audit
 
 
 def inventory_edited(item_id, user_id, ip_address=None):
-    """Stock and status are shown before and after. Other fields by name."""
+    """Edit details changes the item's fields, never a quantity. Fields are named, not quoted."""
     def audit(conn, changes):
-        stock = next((c for c in changes if c["field"] == "stock_quantity"), None)
         status = next((c for c in changes if c["field"] == "status"), None)
-        others = [c["label"] for c in changes if c not in (stock, status)]
+        others = [c["label"] for c in changes if c is not status]
         parts = []
-        if stock:
-            parts.append(f"Stock: {stock['old']} → {stock['new']}")
         if status:
             parts.append(f"Status: {status['old']} → {status['new']}")
         if others:
             parts.append(("Also changed: " if parts else "Changed: ") + ", ".join(others))
-        action = ACTION_STOCK_ADJUSTED if stock else ACTION_INVENTORY_EDITED
-        log_action(user_id, action, MODULE_INVENTORY,
-                   f"{_item(conn, item_id)} — " + "; ".join(parts), ip_address,
-                   conn=conn)
+        log_action(user_id, ACTION_INVENTORY_EDITED, MODULE_INVENTORY,
+                   f"{_item(conn, item_id)} — " + "; ".join(parts), ip_address, conn=conn)
+    return audit
+
+
+def _batch_label(conn, batch_id):
+    """'Paracetamol 500 mg tablet (MED-0001), lot L-123' for a batch."""
+    row = conn.execute(
+        "SELECT inventory_item_id, lot_number FROM inventory_batches WHERE id = ?", (batch_id,)
+    ).fetchone()
+    return f"{_item(conn, row['inventory_item_id'])}, lot {row['lot_number']}"
+
+
+def stock_received(user_id, ip_address=None):
+    """Who, the item, the lot and the amount received."""
+    write = _entry(user_id, ip_address, ACTION_STOCK_RECEIVED, MODULE_INVENTORY)
+
+    def audit(conn, batch_id):
+        quantity = conn.execute(
+            "SELECT quantity_received FROM inventory_batches WHERE id = ?", (batch_id,)
+        ).fetchone()["quantity_received"]
+        write(conn, f"{_batch_label(conn, batch_id)}: received {quantity:,}.")
+    return audit
+
+
+def stock_removed(user_id, ip_address=None):
+    """Who, the item, the lot, the amount and the reason. The note is not copied here."""
+    write = _entry(user_id, ip_address, ACTION_STOCK_REMOVED, MODULE_INVENTORY)
+
+    def audit(conn, removal):
+        write(conn, f"{_batch_label(conn, removal['batch_id'])}: removed "
+                    f"{removal['quantity']:,} ({removal['reason']}).")
     return audit
 
 

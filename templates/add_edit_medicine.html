@@ -1,15 +1,10 @@
 {% extends "base.html" %}
 {% set active_nav = "medicine_inventory" %}
-{% block title %}{{ system_short_name }} | Add/Edit Medicine{% endblock %}
+{% block title %}{{ system_short_name }} | Item details{% endblock %}
 
 {% block styles %}
   .title-row{display:flex; align-items:center; gap:12px; flex-wrap:wrap;}
   .page-desc{font-size:14px; color:var(--text-muted); margin-top:4px; max-width:640px;}
-
-  .mode-badge{
-    display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600;
-    padding:4px 12px; border-radius:999px; background:var(--teal-light); color:var(--teal-dark);
-  }
 
   .panel-card{
     background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:24px; margin-bottom:24px;
@@ -18,7 +13,6 @@
   .section-icon{width:40px;height:40px;border-radius:10px; background:var(--teal-light); display:flex; align-items:center; justify-content:center;}
   .section-icon .material-symbols-outlined{color:var(--teal-dark); font-size:20px;}
   .section-title{font-size:18px; font-weight:600; color:var(--text-dark);}
-  .section-sub{font-size:13px; color:var(--text-muted);}
 
   label.field-label{font-size:13px; font-weight:600; color:var(--text-dark); margin-bottom:6px; display:inline-block;}
   label.field-label .req{color:var(--danger); margin-left:2px;}
@@ -31,9 +25,7 @@
     border-color:var(--teal); box-shadow:0 0 0 3px rgba(22,155,146,0.12);
   }
   .form-control.is-invalid, .form-select.is-invalid{border-color:var(--danger);}
-  .form-control.is-valid, .form-select.is-valid{border-color:var(--success);}
   .invalid-feedback{font-size:12.5px;}
-  .valid-feedback{font-size:12.5px;}
   .form-text-hint{font-size:12px; color:var(--text-muted); margin-top:4px;}
   .input-prefix-group{position:relative;}
   .input-prefix-group .prefix{
@@ -55,27 +47,17 @@
   }
   .id-preview strong{color:var(--teal-dark); font-weight:700;}
 
-  /* ALERTS */
   .alert-ids{border-radius:12px; border:1px solid; padding:14px 16px; font-size:13.5px; display:flex; gap:12px; align-items:flex-start; margin-bottom:20px;}
-  .alert-warning-ids{background:#FFFBEB; border-color:#FDE68A; color:#92400E;}
-  .alert-success-ids{background:#F0FDF4; border-color:#BBF7D0; color:#166534;}
   .alert-danger-ids{background:#FEF2F2; border-color:#FECACA; color:#B91C1C;}
   .alert-ids .material-symbols-outlined{font-size:20px; margin-top:1px;}
   .alert-ids strong{display:block; font-size:13.5px; margin-bottom:2px;}
-  .alert-ids .alert-close{margin-left:auto; cursor:pointer; opacity:0.6;}
 
-  /* FOOTER ACTION BAR */
   .form-actions{
     background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:18px 24px;
     display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;
   }
   .req-legend{font-size:12.5px; color:var(--text-muted);}
   .req-legend .req{color:var(--danger);}
-  .btn-ghost-ids{
-    background:transparent; border:1px solid var(--border-color); color:var(--text-dark); border-radius:10px; padding:11px 18px;
-    font-size:14px; font-weight:500; display:flex; align-items:center; gap:6px;
-  }
-  .btn-ghost-ids:hover{border-color:#C7CBD1; background:var(--bg);}
   .btn-danger-text{background:transparent; border:none; color:var(--text-muted); font-size:14px; font-weight:500; padding:11px 14px;}
   .btn-danger-text:hover{color:var(--danger);}
 {% endblock %}
@@ -87,26 +69,18 @@
       <span class="sep material-symbols-outlined">chevron_right</span>
       <a href="{{ url_for(medicine_inventory_endpoint) }}">Medicine Inventory</a>
       <span class="sep material-symbols-outlined">chevron_right</span>
-      <span class="current">{% if item %}Edit Medicine{% else %}Add Medicine{% endif %}</span>
+      <span class="current">{% if item %}Edit details{% else %}Add medicine{% endif %}</span>
     </div>{% endblock %}
 
 {% block content %}
+{%- set form_type = form.category or 'Medicine' %}
     <div class="title-row">
       <div>
         <div class="eyebrow">{{ health_center.name }}</div>
-        <div class="page-title">{% if item %}Edit Medicine{% else %}Add Medicine{% endif %}</div>
+        <div class="page-title">{% if item %}Edit details{% else %}Add medicine{% endif %}</div>
       </div>
-      {% if item %}
-      <span class="mode-badge"><span class="material-symbols-outlined" style="font-size:16px;">edit</span>Edit Mode</span>
-      {% else %}
-      <span class="mode-badge"><span class="material-symbols-outlined" style="font-size:16px;">add</span>Add Mode</span>
-      {% endif %}
     </div>
-    {%- if item %}
-    <div class="page-desc">Fields marked with <span style="color:var(--danger);">*</span> are required.</div>
-    {%- else %}
-    <div class="page-desc">Fields marked with <span style="color:var(--danger);">*</span> are required.</div>
-    {%- endif %}
+    <div class="page-desc">{% if item %}This changes the item's details only. Add or remove stock on its page.{% else %}Add the item first. Then receive its stock.{% endif %} Fields marked with <span style="color:var(--danger);">*</span> are required.</div>
 
     <div style="height:20px;"></div>
 
@@ -115,7 +89,7 @@
       <span class="material-symbols-outlined">error</span>
       <div>
         <strong>{% if item %}Your changes were not saved{% else %}This item was not saved{% endif %}</strong>
-        Please correct the {{ errors|length }} highlighted field{{ "s" if errors|length != 1 else "" }} below. Everything you already entered has been kept.
+        Please correct the {{ errors|length }} highlighted field{{ "s" if errors|length != 1 else "" }} below.
       </div>
     </div>
 {%- endif %}
@@ -123,90 +97,95 @@
     <form method="post" novalidate>
       {{ csrf_field() }}
 
-      <!-- MEDICINE INFORMATION -->
       <div class="panel-card">
         <div class="section-head">
           <div class="section-icon"><span class="material-symbols-outlined">inventory_2</span></div>
           <div>
-            <div class="section-title">Medicine Information</div>
-            
+            <div class="section-title">Item</div>
           </div>
         </div>
 
         <div class="row g-3 mb-3">
           <div class="col-md-4">
-            <label class="field-label">Medicine ID</label>
-            <!-- Never editable: auto-assigned on save, then permanent. -->
+            <label class="field-label">Item ID</label>
             <div class="id-preview">
               <span class="material-symbols-outlined" style="font-size:16px;">tag</span>
               {% if item %}Reference: <strong>{{ item.item_code }}</strong>{% else %}Auto-generated: <strong>{{ next_item_code }}</strong>{% endif %}
+            </div>
+          </div>
+          <div class="col-md-4">
+            <label class="field-label" for="fCategoryType">Item type<span class="req">*</span></label>
+            <select class="form-select{% if errors.category %} is-invalid{% endif %}" name="category" id="fCategoryType">
+{%- for option in options.item_categories %}
+              <option value="{{ option }}"{% if form_type == option %} selected{% endif %}>{{ option }}</option>
+{%- endfor %}
+            </select>
+            {%- if errors.category %}<div class="invalid-feedback d-block">{{ errors.category }}</div>{% endif %}
+          </div>
+          <div class="col-md-4">
+            <label class="field-label">Name shown</label>
+            <div class="id-preview"><strong id="namePreview">—</strong></div>
+          </div>
+        </div>
+
+        <div id="medicineFields">
+          <div class="row g-3 mb-3">
+            <div class="col-md-4">
+              <label class="field-label" for="fGeneric">Generic name<span class="req">*</span></label>
+              <input type="text" class="form-control{% if errors.generic_name %} is-invalid{% endif %}" name="generic_name" id="fGeneric" value="{{ form.generic_name or '' }}" placeholder="e.g., Paracetamol">
+              {%- if errors.generic_name %}<div class="invalid-feedback d-block">{{ errors.generic_name }}</div>{% endif %}
+            </div>
+            <div class="col-md-4">
+              <label class="field-label" for="fStrength">Strength<span class="req">*</span></label>
+              <input type="text" class="form-control{% if errors.dosage_strength %} is-invalid{% endif %}" name="dosage_strength" id="fStrength" value="{{ form.dosage_strength or '' }}" placeholder="e.g., 500 mg or 250 mg/5 mL">
+              {%- if errors.dosage_strength %}<div class="invalid-feedback d-block">{{ errors.dosage_strength }}</div>{% endif %}
+            </div>
+            <div class="col-md-4">
+              <label class="field-label" for="fForm">Dosage form<span class="req">*</span></label>
+              <select class="form-select{% if errors.dosage_form %} is-invalid{% endif %}" name="dosage_form" id="fForm">
+                <option value="">Select dosage form</option>
+{%- for option in options.dosage_forms %}
+                <option value="{{ option }}"{% if (form.dosage_form or '')|lower == option %} selected{% endif %}>{{ option }}</option>
+{%- endfor %}
+              </select>
+              {%- if errors.dosage_form %}<div class="invalid-feedback d-block">{{ errors.dosage_form }}</div>{% endif %}
+            </div>
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-md-4">
+              <label class="field-label" for="fDrugClass">Category<span class="req">*</span></label>
+              <select class="form-select{% if errors.drug_class %} is-invalid{% endif %}" name="drug_class" id="fDrugClass">
+                <option value="">Select category</option>
+{%- for option in options.drug_classes %}
+                <option value="{{ option }}"{% if form.drug_class == option %} selected{% endif %}>{{ option }}</option>
+{%- endfor %}
+              </select>
+              {%- if errors.drug_class %}<div class="invalid-feedback d-block">{{ errors.drug_class }}</div>{% endif %}
+            </div>
+            <div class="col-md-8">
+              <div class="form-text-hint" style="margin-top:34px;">The brand name is entered when stock is received. Each delivery can have a different brand.</div>
+            </div>
+          </div>
+        </div>
+
+        <div id="supplyFields">
+          <div class="row g-3 mb-3">
+            <div class="col-md-4">
+              <label class="field-label" for="fItemName">Item name<span class="req">*</span></label>
+              <input type="text" class="form-control{% if errors.item_name %} is-invalid{% endif %}" name="item_name" id="fItemName" value="{{ form.item_name or '' }}" placeholder="e.g., Gauze pad">
+              {%- if errors.item_name %}<div class="invalid-feedback d-block">{{ errors.item_name }}</div>{% endif %}
+            </div>
+            <div class="col-md-4">
+              <label class="field-label" for="fSize">Size or specification</label>
+              <input type="text" class="form-control" name="size" id="fSize" value="{{ form.size or '' }}" placeholder="e.g., 4 x 4 in">
             </div>
           </div>
         </div>
 
         <div class="row g-3 mb-3">
           <div class="col-md-4">
-            <label class="field-label">Medicine Name<span class="req">*</span></label>
-            <input type="text" class="form-control{% if errors.name %} is-invalid{% endif %}" name="name" value="{{ form.name or '' }}" placeholder="e.g., Amoxicillin">
-            {%- if errors.name %}<div class="invalid-feedback d-block">{{ errors.name }}</div>{% endif %}
-          </div>
-          <div class="col-md-4">
-            <label class="field-label">Generic Name<span class="req">*</span></label>
-            <input type="text" class="form-control{% if errors.generic_name %} is-invalid{% endif %}" name="generic_name" value="{{ form.generic_name or '' }}" placeholder="e.g., Amoxicillin Trihydrate">
-            {%- if errors.generic_name %}<div class="invalid-feedback d-block">{{ errors.generic_name }}</div>{% endif %}
-          </div>
-          <div class="col-md-4">
-            <label class="field-label">Brand Name</label>
-            <input type="text" class="form-control" name="brand_name" value="{{ form.brand_name or '' }}" placeholder="e.g., Amoxil">
-          </div>
-        </div>
-
-        <div class="row g-3 mb-3">
-          <div class="col-md-4">
-            <!-- Item Type drives the rest of the form: the medicine-only fields
-                 above and below are required only when this is "Medicine", so a
-                 box of gauze can be stocked without a dosage or a generic name. -->
-            <label class="field-label">Item Type<span class="req">*</span></label>
-            <select class="form-select{% if errors.category %} is-invalid{% endif %}" name="category">
-              <option value="">Select item type</option>
-{%- for option in options.item_categories %}
-              <option value="{{ option }}"{% if form.category == option %} selected{% endif %}>{{ option }}</option>
-{%- endfor %}
-            </select>
-            {%- if errors.category %}<div class="invalid-feedback d-block">{{ errors.category }}</div>{% endif %}
-            <div class="form-text-hint">Medicines require dosage and batch details</div>
-          </div>
-          <div class="col-md-4">
-            <label class="field-label">Category<span class="req">*</span></label>
-            <select class="form-select{% if errors.drug_class %} is-invalid{% endif %}" name="drug_class">
-              <option value="">Select category</option>
-{%- for option in options.drug_classes %}
-              <option value="{{ option }}"{% if form.drug_class == option %} selected{% endif %}>{{ option }}</option>
-{%- endfor %}
-            </select>
-            {%- if errors.drug_class %}<div class="invalid-feedback d-block">{{ errors.drug_class }}</div>{% endif %}
-          </div>
-          <div class="col-md-4">
-            <label class="field-label">Dosage Strength<span class="req">*</span></label>
-            <input type="text" class="form-control{% if errors.dosage_strength %} is-invalid{% endif %}" name="dosage_strength" value="{{ form.dosage_strength or '' }}" placeholder="e.g., 500mg">
-            {%- if errors.dosage_strength %}<div class="invalid-feedback d-block">{{ errors.dosage_strength }}</div>{% endif %}
-          </div>
-        </div>
-
-        <div class="row g-3 mb-3">
-          <div class="col-md-4">
-            <label class="field-label">Dosage Form<span class="req">*</span></label>
-            <select class="form-select{% if errors.dosage_form %} is-invalid{% endif %}" name="dosage_form">
-              <option value="">Select dosage form</option>
-{%- for option in options.dosage_forms %}
-              <option value="{{ option }}"{% if form.dosage_form == option %} selected{% endif %}>{{ option }}</option>
-{%- endfor %}
-            </select>
-            {%- if errors.dosage_form %}<div class="invalid-feedback d-block">{{ errors.dosage_form }}</div>{% endif %}
-          </div>
-          <div class="col-md-4">
-            <label class="field-label">Unit of Measure<span class="req">*</span></label>
-            <select class="form-select{% if errors.unit %} is-invalid{% endif %}" name="unit">
+            <label class="field-label" for="fUnit">Unit of measure<span class="req">*</span></label>
+            <select class="form-select{% if errors.unit %} is-invalid{% endif %}" name="unit" id="fUnit">
               <option value="">Select unit</option>
 {%- for option in options.units %}
               <option value="{{ option }}"{% if form.unit == option %} selected{% endif %}>{{ option }}</option>
@@ -215,55 +194,13 @@
             {%- if errors.unit %}<div class="invalid-feedback d-block">{{ errors.unit }}</div>{% endif %}
           </div>
           <div class="col-md-4">
-            <label class="field-label">Manufacturer</label>
-            <input type="text" class="form-control" name="manufacturer" value="{{ form.manufacturer or '' }}" placeholder="Enter manufacturer">
-          </div>
-        </div>
-
-        <div class="row g-3 mb-3">
-          <div class="col-md-4">
-            <label class="field-label">Supplier</label>
-            <input type="text" class="form-control" name="supplier" value="{{ form.supplier or '' }}" placeholder="Enter supplier">
-          </div>
-          <div class="col-md-4">
-            <label class="field-label">Batch Number<span class="req">*</span></label>
-            <input type="text" class="form-control{% if errors.batch_number %} is-invalid{% endif %}" name="batch_number" value="{{ form.batch_number or '' }}" placeholder="e.g., AMX-2026-0317">
-            {%- if errors.batch_number %}<div class="invalid-feedback d-block">{{ errors.batch_number }}</div>{% endif %}
-          </div>
-          <div class="col-md-4">
-            <label class="field-label">Storage Location</label>
-            <input type="text" class="form-control" name="storage_location" value="{{ form.storage_location or '' }}" placeholder="e.g., Cabinet A, Shelf 1">
-          </div>
-        </div>
-
-        <div class="row g-3 mb-3">
-          <div class="col-md-4">
-            <label class="field-label">Expiration Date<span class="req">*</span></label>
-            <input type="date" class="form-control{% if errors.expiry_date %} is-invalid{% endif %}" name="expiry_date" value="{{ form.expiry_date or '' }}">
-            {%- if errors.expiry_date %}<div class="invalid-feedback d-block">{{ errors.expiry_date }}</div>{% endif %}
-            <div class="form-text-hint">A date already past is allowed — it flags the batch as expired</div>
-          </div>
-          <div class="col-md-4">
-            <label class="field-label">Date Received<span class="req">*</span></label>
-            <input type="date" class="form-control{% if errors.date_received %} is-invalid{% endif %}" name="date_received" value="{{ form.date_received or '' }}">
-            {%- if errors.date_received %}<div class="invalid-feedback d-block">{{ errors.date_received }}</div>{% endif %}
-          </div>
-        </div>
-
-        <div class="row g-3 mb-3">
-          <div class="col-md-3">
-            <label class="field-label">Current Stock<span class="req">*</span></label>
-            <input type="number" min="0" step="1" class="form-control{% if errors.stock_quantity %} is-invalid{% endif %}" name="stock_quantity" value="{{ form.stock_quantity or '' }}">
-            {%- if errors.stock_quantity %}<div class="invalid-feedback d-block">{{ errors.stock_quantity }}</div>{% endif %}
-          </div>
-          <div class="col-md-3">
-            <label class="field-label">Reorder Level<span class="req">*</span></label>
-            <input type="number" min="0" step="1" class="form-control{% if errors.low_stock_threshold %} is-invalid{% endif %}" name="low_stock_threshold" value="{{ form.low_stock_threshold or '' }}">
+            <label class="field-label" for="fReorder">Reorder level<span class="req">*</span></label>
+            <input type="number" min="0" step="1" class="form-control{% if errors.low_stock_threshold %} is-invalid{% endif %}" name="low_stock_threshold" id="fReorder" value="{{ form.low_stock_threshold or '' }}">
             {%- if errors.low_stock_threshold %}<div class="invalid-feedback d-block">{{ errors.low_stock_threshold }}</div>{% endif %}
-            <div class="form-text-hint">Triggers low-stock alert</div>
+            <div class="form-text-hint">Usable stock at or below this raises a low-stock alert</div>
           </div>
-          <div class="col-md-3">
-            <label class="field-label">Unit Cost</label>
+          <div class="col-md-4">
+            <label class="field-label">Unit cost</label>
             <div class="input-prefix-group">
               <span class="prefix">&#8369;</span>
               <input type="number" min="0" step="0.01" class="form-control{% if errors.unit_cost %} is-invalid{% endif %}" name="unit_cost" value="{{ form.unit_cost or '' }}">
@@ -273,9 +210,24 @@
         </div>
 
         <div class="row g-3 mb-3">
+          <div class="col-md-4">
+            <label class="field-label">Manufacturer</label>
+            <input type="text" class="form-control" name="manufacturer" value="{{ form.manufacturer or '' }}">
+          </div>
+          <div class="col-md-4">
+            <label class="field-label">Supplier</label>
+            <input type="text" class="form-control" name="supplier" value="{{ form.supplier or '' }}">
+          </div>
+          <div class="col-md-4">
+            <label class="field-label">Storage location</label>
+            <input type="text" class="form-control" name="storage_location" value="{{ form.storage_location or '' }}" placeholder="e.g., Cabinet A, Shelf 1">
+          </div>
+        </div>
+
+        <div class="row g-3 mb-3">
           <div class="col-12">
-            <label class="field-label">Medicine Description / Notes</label>
-            <textarea class="form-control" name="notes" placeholder="Add notes on usage, storage requirements, or handling instructions">{{ form.notes or '' }}</textarea>
+            <label class="field-label">Notes</label>
+            <textarea class="form-control" name="notes">{{ form.notes or '' }}</textarea>
           </div>
         </div>
 
@@ -293,20 +245,11 @@
         </div>
       </div>
 
-      <!-- FORM ACTIONS -->
       <div class="form-actions">
-        <div class="req-legend"><span class="req">*</span> Indicates a required field</div>
+        <div class="req-legend"><span class="req">*</span> Required</div>
         <div class="d-flex align-items-center gap-2 flex-wrap">
-          <a href="{{ url_for(medicine_inventory_endpoint) }}" class="btn-danger-text" style="text-decoration:none;">Cancel</a>
-          {%- if not item %}
-          <!-- Add mode only. In edit mode a type="reset" sitting beside Save silently
-               reverts every field to the values the record loaded with, so a stray
-               click followed by Save writes the old values straight back -- which
-               looks exactly like the save being dropped. Clearing a blank new-item
-               form is harmless; reverting an in-progress edit is not. -->
-          <button type="reset" class="btn-ghost-ids"><span class="material-symbols-outlined" style="font-size:18px;">restart_alt</span>Reset</button>
-          {%- endif %}
-          <button type="submit" class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">save</span>{% if item %}Save Changes{% else %}Save Medicine{% endif %}</button>
+          <a href="{% if item %}{{ url_for(medicine_item_endpoint, item_id=item.id) }}{% else %}{{ url_for(medicine_inventory_endpoint) }}{% endif %}" class="btn-danger-text" style="text-decoration:none;">Cancel</a>
+          <button type="submit" class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">save</span>{% if item %}Save details{% else %}Save item{% endif %}</button>
         </div>
       </div>
 
@@ -315,9 +258,7 @@
 
 {% block scripts %}
 <script>
-  // Keeps the .checked styling on the Status pills in step with the real input
-  // state. The server renders the initial state; this only maintains it as the
-  // user clicks. Same helper as register_patient.html.
+  // Keeps the .checked styling on the Status pills in step with the real input state.
   document.querySelectorAll('.radio-pill input').forEach(function(input){
     input.addEventListener('change', function(){
       document.querySelectorAll('input[name="' + input.name + '"]').forEach(function(other){
@@ -326,4 +267,31 @@
       });
     });
   });
+
+  // A medicine is named by generic name, strength and form; a supply by item name and size.
+  // The server builds the stored name; this only previews it.
+  (function(){
+    var type = document.getElementById('fCategoryType');
+    var medicine = document.getElementById('medicineFields');
+    var supply = document.getElementById('supplyFields');
+    var preview = document.getElementById('namePreview');
+    function value(id){ return (document.getElementById(id).value || '').replace(/\s+/g, ' ').trim(); }
+    function strength(text){ return text.replace(/(\d)\s*(mg|mcg|ug|g|kg|ml|l|iu|units?|meq|mmol|%)(?![A-Za-z])/gi, '$1 $2'); }
+    function update(){
+      var isMedicine = type.value === 'Medicine';
+      medicine.style.display = isMedicine ? '' : 'none';
+      supply.style.display = isMedicine ? 'none' : '';
+      var parts = isMedicine
+        ? [value('fGeneric'), strength(value('fStrength')), value('fForm')]
+        : [value('fItemName'), value('fSize')];
+      if(parts[0]){ parts[0] = parts[0].charAt(0).toUpperCase() + parts[0].slice(1); }
+      preview.textContent = parts.filter(Boolean).join(' ') || '—';
+    }
+    ['fCategoryType', 'fGeneric', 'fStrength', 'fForm', 'fItemName', 'fSize'].forEach(function(id){
+      var el = document.getElementById(id);
+      el.addEventListener('input', update);
+      el.addEventListener('change', update);
+    });
+    update();
+  })();
 </script>{% endblock %}

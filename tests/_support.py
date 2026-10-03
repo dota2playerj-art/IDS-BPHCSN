@@ -137,20 +137,21 @@ PATIENTS = [
 # The medicines on the shelf. Ten with plenty of stock, one supply, one that is
 # low on stock, and one that has expired (the dispensing suite needs both).
 INVENTORY = [
-    # code, name, category, unit, stock, low threshold, expiry
-    ("MED-001", "Paracetamol 500mg", "Medicine", "tablet", 900, 100, "2028-06-30"),
-    ("MED-002", "Amoxicillin 500mg", "Medicine", "capsule", 850, 100, "2028-03-31"),
-    ("MED-003", "Cetirizine 10mg", "Medicine", "tablet", 800, 50, "2028-01-31"),
-    ("MED-004", "Losartan 50mg", "Medicine", "tablet", 750, 50, "2027-12-31"),
-    ("MED-005", "Metformin 500mg", "Medicine", "tablet", 700, 50, "2027-11-30"),
-    ("MED-006", "Amlodipine 5mg", "Medicine", "tablet", 650, 50, "2027-10-31"),
-    ("MED-007", "Ascorbic Acid 500mg", "Medicine", "tablet", 600, 50, "2027-09-30"),
-    ("MED-008", "Oral Rehydration Salts", "Medicine", "sachet", 550, 50, "2027-08-31"),
-    ("MED-009", "Mefenamic Acid 500mg", "Medicine", "capsule", 500, 50, "2027-07-31"),
-    ("MED-010", "Salbutamol 2mg", "Medicine", "tablet", 450, 50, "2027-06-30"),
-    ("SUP-001", "Cotton Balls", "Supply", "pack", 300, 20, None),
-    ("MED-011", "Ferrous Sulfate 325mg", "Medicine", "tablet", 4, 30, "2027-05-31"),
-    ("MED-012", "Lagundi Syrup 60ml", "Medicine", "bottle", 40, 10, "2024-12-31"),
+    # code, generic name (item name for a supply), strength (size), form, category, unit,
+    # stock, low threshold, expiry. Each item has one batch, lot "B-<code>".
+    ("MED-001", "Paracetamol", "500 mg", "tablet", "Medicine", "tablet", 900, 100, "2028-06-30"),
+    ("MED-002", "Amoxicillin", "500 mg", "capsule", "Medicine", "capsule", 850, 100, "2028-03-31"),
+    ("MED-003", "Cetirizine", "10 mg", "tablet", "Medicine", "tablet", 800, 50, "2028-01-31"),
+    ("MED-004", "Losartan", "50 mg", "tablet", "Medicine", "tablet", 750, 50, "2027-12-31"),
+    ("MED-005", "Metformin", "500 mg", "tablet", "Medicine", "tablet", 700, 50, "2027-11-30"),
+    ("MED-006", "Amlodipine", "5 mg", "tablet", "Medicine", "tablet", 650, 50, "2027-10-31"),
+    ("MED-007", "Ascorbic acid", "500 mg", "tablet", "Medicine", "tablet", 600, 50, "2027-09-30"),
+    ("MED-008", "Oral rehydration salts", "20.5 g", "sachet", "Medicine", "sachet", 550, 50, "2027-08-31"),
+    ("MED-009", "Mefenamic acid", "500 mg", "capsule", "Medicine", "capsule", 500, 50, "2027-07-31"),
+    ("MED-010", "Salbutamol", "2 mg", "tablet", "Medicine", "tablet", 450, 50, "2027-06-30"),
+    ("SUP-001", "Cotton balls", "", None, "Supply", "pack", 300, 20, None),
+    ("MED-011", "Ferrous sulfate", "325 mg", "tablet", "Medicine", "tablet", 4, 30, "2027-05-31"),
+    ("MED-012", "Lagundi", "60 mL", "syrup", "Medicine", "bottle", 40, 10, "2024-12-31"),
 ]
 
 DIAGNOSES = [
@@ -217,13 +218,19 @@ def build_fixture_database(path):
              "Surigao del Norte", f"0900000{patient_id:04d}", status),
         )
 
-    for code, name, category, unit, stock, threshold, expiry in INVENTORY:
+    for code, generic, strength, form, category, unit, stock, threshold, expiry in INVENTORY:
+        name = " ".join(part for part in (generic, strength, form) if part)
+        cursor = conn.execute(
+            "INSERT INTO inventory_items (item_code, name, generic_name, category, "
+            "dosage_strength, dosage_form, unit, low_stock_threshold, status) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Active')",
+            (code, name, generic, category, strength or None, form, unit, threshold),
+        )
         conn.execute(
-            "INSERT INTO inventory_items (item_code, name, generic_name, category, unit, "
-            "stock_quantity, low_stock_threshold, expiry_date, date_received, "
-            "batch_number, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Active')",
-            (code, name, name.split()[0], category, unit, stock, threshold, expiry,
-             "2026-05-15", f"B-{code}"),
+            "INSERT INTO inventory_batches (inventory_item_id, lot_number, expiry_date, "
+            "quantity_received, quantity_remaining, date_received, source) "
+            "VALUES (?, ?, ?, ?, ?, '2026-05-15', 'DOH')",
+            (cursor.lastrowid, f"B-{code}", expiry, stock, stock),
         )
 
     for cid in range(1, CONSULTATION_COUNT + 1):
@@ -250,11 +257,16 @@ def build_fixture_database(path):
     conn.execute(
         "INSERT INTO medicine_dispensing (patient_id, consultation_id, inventory_item_id, "
         "medicine_name, unit, quantity_dispensed, date_dispensed, dispensed_by) "
-        "VALUES (?, 36, 1, 'Paracetamol 500mg', 'tablet', 10, ?, 2)",
+        "VALUES (?, 36, 1, 'Paracetamol 500 mg tablet', 'tablet', 10, ?, 2)",
         (_consultation_patient(36), _consultation_date(36)),
     )
     conn.execute(
-        "UPDATE inventory_items SET stock_quantity = stock_quantity - 10 WHERE id = 1"
+        "INSERT INTO medicine_dispensing_batches (dispensing_id, batch_id, quantity) "
+        "VALUES (last_insert_rowid(), 1, 10)"
+    )
+    conn.execute(
+        "UPDATE inventory_batches SET quantity_remaining = quantity_remaining - 10 "
+        "WHERE inventory_item_id = 1"
     )
 
     # The infant's birth doses, given here.

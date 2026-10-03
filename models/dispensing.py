@@ -10,7 +10,7 @@ from models.inventory import (
     ITEM_CATEGORIES,
     RETIRED_STATUS,
     get_all_inventory_items,
-    stock_status,
+    usable_batches,
 )
 from utils.dates import display_date, resolve_range, today
 from utils.roles import is_care_team
@@ -133,44 +133,28 @@ def can_see_sealed_medicines(role):
 
 
 def _describe(item):
-    """'Paracetamol 500mg Tablet' for an option label, from an enriched item."""
-    dosage = (item.get("display_dosage") or "").strip()
-    return "{} {}".format(item["name"], dosage).strip()
+    """'Paracetamol 500 mg tablet' for an option label: the item's display name, which is
+    already built from its generic name, strength and form."""
+    return item["name"]
 
 
 def dispensable_items(items=None):
     """The items the form may offer, in the order it lists them.
 
-    Four conditions, and each is one this project already decides somewhere else
-    rather than a new judgement made here:
+    Three conditions, and each is one this project already decides somewhere else:
 
-        a category the inventory   see the module header. Medicine, Supply and
-        records                    Equipment all qualify; the test is kept as a
-                                   guard rather than as a narrowing.
-        not retired                models.inventory.RETIRED_STATUS -- the same
-                                   flag in_service() excludes from every
-                                   operating figure. An item the centre has
-                                   stopped stocking is not one to hand out.
-        not expired                stock_status() via is_expired -- the same call
-                                   behind the badge on Screen 06. An item with no
-                                   expiry date is not expired and never becomes
-                                   so, which is how a thermometer passes this
-                                   without a rule of its own.
-        stock above zero           there is nothing to give
+        a category the inventory   Medicine, Supply and Equipment all qualify; the test is
+        records                    kept as a guard rather than as a narrowing.
+        not retired                the same flag in_service() excludes from every figure.
+        usable stock above zero    stock_quantity on an enriched item is the sum of its
+                                   usable batches, so an item whose only stock is expired
+                                   is not offered.
 
-    The last two are the two hard blocks, applied here as well so the form does
-    not offer a choice it is about to refuse. That is not a substitute for the
-    refusal -- an option list is a suggestion and a POST need not have come from
-    one -- but a dropdown listing an expired item and then rejecting it is a
-    worse screen than one that never offered it.
+    An option list is a suggestion and a POST need not have come from one, so the same rules
+    are enforced again by _refusal(). Sorted by label, so the three categories interleave
+    alphabetically.
 
-    Sorted by label, so the three categories interleave alphabetically rather than
-    grouping. The operator is looking for one named thing and knows its name; the
-    alternative -- medicines, then supplies, then equipment -- would make them
-    know which drawer the system files it under before they can find it.
-
-    `items` lets a caller that has already loaded the inventory pass it in rather
-    than querying twice.
+    `items` lets a caller that has already loaded the inventory pass it in.
     """
     if items is None:
         items = get_all_inventory_items()
@@ -179,7 +163,6 @@ def dispensable_items(items=None):
     for item in items:
         if (item.get("category") not in DISPENSABLE_CATEGORIES
                 or item.get("is_retired")
-                or item.get("is_expired")
                 or (item.get("stock_quantity") or 0) <= 0):
             continue
         offered.append({
@@ -189,42 +172,27 @@ def dispensable_items(items=None):
             "unit": item.get("unit"),
             "stock_quantity": item.get("stock_quantity") or 0,
             "stock_status": item.get("stock_status"),
-            # Carried so the dropdown can mark a supply or a piece of equipment
-            # as such. The list mixes three kinds of thing now, and on a clinical
-            # form the difference between a drug and a consumable is worth
-            # stating at the moment somebody picks one.
             "category": item.get("category"),
-            # So the option can say "820 tablets in stock" and the operator sees
-            # the limit before they hit it rather than after.
+            # So the option can say "820 tablets available" and the operator sees the limit
+            # before they hit it rather than after.
             "stock_text": _plural(item.get("stock_quantity") or 0, item.get("unit")),
         })
     offered.sort(key=lambda entry: entry["label"].lower())
     return offered
 
 
-def _refusal(row, quantity):
+def _refusal(row, usable_total, quantity):
     """Why this item cannot be dispensed in this amount, or None if it can.
 
-    THE SINGLE DEFINITION OF BOTH HARD BLOCKS. Called by check_dispensing()
-    before anything is written and again by record_dispensing() inside the write
-    transaction, on the row it is about to decrement. Two callers, one rule, so
-    the check the operator was shown and the check that actually governs the
-    write cannot come apart.
+    THE SINGLE DEFINITION OF THE HARD BLOCKS. Called by check_dispensing() before anything
+    is written and again by record_dispensing() inside the write transaction, so the check
+    the operator was shown and the check that governs the write cannot come apart.
 
-    Category-blind, and always was: nothing below asks what kind of thing it is
-    looking at. An item with no expiry date -- ordinary for equipment -- is not
-    expired, because stock_status() only calls something expired when it has a
-    date that has passed. Every other test still applies to it in full.
-
-    `row` is anything with the inventory columns on it: an enriched dict from
-    get_inventory_item_by_id(), or a bare sqlite3.Row read inside a transaction.
-    It deliberately takes the raw columns and calls stock_status() itself rather
-    than reading a derived flag, because the derived flags are only present on
-    the enriched dicts -- and it is the in-transaction call, on a raw row, that
-    is the one that has to be right.
+    `usable_total` is the amount in the item's usable batches: not expired, not empty. An
+    expired batch is never used, so it is not in it. When the amount is short the message
+    says how much is available.
     """
     name = row["name"]
-    stock = row["stock_quantity"] or 0
     unit = row["unit"]
 
     if row["status"] == RETIRED_STATUS:
@@ -234,51 +202,36 @@ def _refusal(row, quantity):
             .format(name)
         )
 
-    # The same call behind the badge on Screen 06. Expired stock is physically on
-    # the shelf, which is exactly why stock alone cannot be the test -- and why
-    # this is a refusal rather than a warning. Returns a non-Expired status for an
-    # item carrying no expiry date, which is how equipment passes here.
-    status = stock_status(stock, row["low_stock_threshold"], row["expiry_date"])
-    if status == "Expired":
+    if usable_total <= 0:
         return (
-            "{} expired on {} and cannot be dispensed. Remove it from the shelf "
-            "and dispense from an unexpired batch."
-            .format(name, display_date(row["expiry_date"]))
+            "{} has no usable stock, so none can be dispensed. Expired stock is "
+            "not used.".format(name)
         )
 
-    if stock <= 0:
+    if quantity > usable_total:
         return (
-            "{} is out of stock, so none can be dispensed. Restock it on "
-            "Medicine Inventory first.".format(name)
-        )
-
-    if quantity > stock:
-        return (
-            "Only {} of {} remain in stock, so {} cannot be dispensed. Restock "
-            "before dispensing more than what is on the shelf."
-            .format(_plural(stock, unit), name, _plural(quantity, unit))
+            "Only {} of {} available, so {} cannot be dispensed."
+            .format(_plural(usable_total, unit), name, _plural(quantity, unit))
         )
 
     return None
 
 
-def _blamed_field(index, row, quantity):
+def _blamed_field(index, usable_total, quantity):
     """Which of a line's two boxes a refusal should be reported against.
 
-    The quantity box when the amount is the thing that has to change -- there is
-    stock, just not that much of it -- and the item box for everything else,
-    because an expired, retired or empty item cannot be fixed by typing a smaller
-    number.
-
-    Shared by check_dispensing() and record_dispensing() rather than written
-    twice, for the reason _refusal() itself is shared: the two run the same rule
-    at different moments, and a refusal that highlighted a different box before
-    and after the save would be the same rule disagreeing with itself.
+    The quantity box when the amount is the thing that has to change -- there is usable
+    stock, just not that much of it -- and the item box for everything else, because a
+    retired or empty item cannot be fixed by typing a smaller number.
     """
-    stock = row["stock_quantity"] or 0
-    if stock > 0 and quantity > stock:
+    if usable_total > 0 and quantity > usable_total:
         return quantity_field(index)
     return item_field(index)
+
+
+def _usable_total(conn, item_id):
+    """The amount an item can be dispensed from right now: its usable batches, FEFO order."""
+    return sum(batch["quantity_remaining"] for batch in usable_batches(conn, item_id))
 
 
 def parse_dispensing(form_data):
@@ -409,9 +362,7 @@ def check_dispensing(entries, consultation_id=None):
                 continue
 
             row = conn.execute(
-                "SELECT id, name, unit, category, status, stock_quantity, "
-            "       low_stock_threshold, expiry_date "
-            "FROM inventory_items WHERE id = ?",
+                "SELECT id, name, unit, category, status FROM inventory_items WHERE id = ?",
                 (entry["item_id"],),
             ).fetchone()
 
@@ -434,9 +385,10 @@ def check_dispensing(entries, consultation_id=None):
                 )
                 continue
 
-            refusal = _refusal(row, entry["quantity"])
+            usable_total = _usable_total(conn, row["id"])
+            refusal = _refusal(row, usable_total, entry["quantity"])
             if refusal:
-                errors[_blamed_field(entry["index"], row, entry["quantity"])] = refusal
+                errors[_blamed_field(entry["index"], usable_total, entry["quantity"])] = refusal
 
     return errors
 
@@ -475,12 +427,14 @@ def record_dispensing(patient_id, entries, dispensed_by, date_dispensed,
     commit its own dispensing of the same medicine. IMMEDIATE takes the write
     lock up front, so the stock this function reads is the stock it decrements.
 
-    The decrement is itself guarded -- `AND stock_quantity >= ?` -- and its
-    rowcount is checked. That is the third and last refusal of the insufficient
-    stock block, after the form's and _refusal()'s, and it is the one that holds
-    with no Python involved at all. If it ever fires, something upstream is
-    wrong; it rolls back rather than writing a record whose stock movement did
-    not happen.
+    FEFO (First Expiry, First Out): the amount comes from the usable batch with the
+    earliest expiry, then the next, until it is covered. Which batches were used is
+    recorded for each dispensing (medicine_dispensing_batches). Staff do not pick batches.
+
+    Each batch decrement is itself guarded -- `AND quantity_remaining >= ?` -- and its
+    rowcount is checked. That is the last refusal, after the form's and _refusal()'s, and
+    it holds with no Python involved at all. If it ever fires, something upstream is
+    wrong; it rolls back rather than writing a record whose stock movement did not happen.
 
     `audit(conn, stored)` is called inside that transaction, before the commit,
     so a refused or failed submission leaves no audit entry either.
@@ -503,9 +457,8 @@ def record_dispensing(patient_id, entries, dispensed_by, date_dispensed,
 
             for entry in entries:
                 row = conn.execute(
-                    "SELECT id, name, unit, category, status, stock_quantity, "
-                "       low_stock_threshold, expiry_date "
-                "FROM inventory_items WHERE id = ?",
+                    "SELECT id, name, unit, category, status, low_stock_threshold "
+                    "FROM inventory_items WHERE id = ?",
                     (entry["item_id"],),
                 ).fetchone()
 
@@ -516,23 +469,20 @@ def record_dispensing(patient_id, entries, dispensed_by, date_dispensed,
                     )
                     raise _Refused
 
-                refusal = _refusal(row, entry["quantity"])
+                # FEFO: the usable batches, earliest expiry first. Expired and empty
+                # batches are not in the list, so they are never used.
+                batches = usable_batches(conn, row["id"])
+                usable_total = sum(batch["quantity_remaining"] for batch in batches)
+                refusal = _refusal(row, usable_total, entry["quantity"])
                 if refusal:
-                    errors[_blamed_field(entry["index"], row, entry["quantity"])] = refusal
+                    errors[_blamed_field(entry["index"], usable_total, entry["quantity"])] = refusal
                     raise _Refused
 
                 # The same item, at the same visit, already on file. The table's
                 # UNIQUE (consultation_id, inventory_item_id) would refuse the insert
-                # below anyway -- that is the guarantee, and it is why the constraint
-                # exists -- but it would refuse it by raising, which reaches the
-                # operator as a failed request rather than as a sentence telling them
-                # what is already recorded. So the constraint is asked *first*, in the
-                # same transaction and under the same lock, and the refusal is worded.
-                #
-                # This is the check that makes a double-submitted form safe. The
-                # second POST finds the first one's row, refuses the whole
-                # submission, and rolls back -- so nothing is dispensed twice and no
-                # stock moves twice.
+                # below anyway, but by raising; asking first, in the same transaction
+                # and under the same lock, lets the refusal be worded. This is the check
+                # that makes a double-submitted form safe.
                 if consultation_id:
                     already = conn.execute(
                         "SELECT medicine_name, unit, quantity_dispensed "
@@ -552,26 +502,6 @@ def record_dispensing(patient_id, entries, dispensed_by, date_dispensed,
 
                 cursor = conn.execute(
                     """
-                UPDATE inventory_items
-                   SET stock_quantity = stock_quantity - ?,
-                       updated_at = CURRENT_TIMESTAMP
-                 WHERE id = ? AND stock_quantity >= ?
-                """,
-                    (entry["quantity"], entry["item_id"], entry["quantity"]),
-                )
-                if cursor.rowcount != 1:
-                    # Unreachable through the form -- _refusal() above has already
-                    # compared the same two numbers on the same row inside the same
-                    # lock. Kept because it is the refusal that does not depend on
-                    # any of that being true.
-                    errors[quantity_field(entry["index"])] = (
-                        "{}'s stock changed while this was being saved, so nothing "
-                    "was dispensed. Reload and try again.".format(row["name"])
-                    )
-                    raise _Refused
-
-                conn.execute(
-                    """
                 INSERT INTO medicine_dispensing
                     (patient_id, consultation_id, inventory_item_id,
                      medicine_name, unit, quantity_dispensed, date_dispensed,
@@ -581,6 +511,47 @@ def record_dispensing(patient_id, entries, dispensed_by, date_dispensed,
                     (patient_id, consultation_id, entry["item_id"], row["name"],
                      row["unit"], entry["quantity"], day, dispensed_by),
                 )
+                dispensing_id = cursor.lastrowid
+
+                # Take it batch by batch, earliest expiry first, splitting across batches
+                # when one runs out. Each decrement is guarded in SQL, so a batch can
+                # never go below zero; if one ever fails, the whole submission rolls back.
+                needed, taken = entry["quantity"], []
+                for batch in batches:
+                    if needed <= 0:
+                        break
+                    amount = min(needed, batch["quantity_remaining"])
+                    moved = conn.execute(
+                        "UPDATE inventory_batches "
+                        "SET quantity_remaining = quantity_remaining - ? "
+                        "WHERE id = ? AND quantity_remaining >= ?",
+                        (amount, batch["id"], amount),
+                    )
+                    if moved.rowcount != 1:
+                        errors[quantity_field(entry["index"])] = (
+                            "{}'s stock changed while this was being saved, so nothing "
+                        "was dispensed. Reload and try again.".format(row["name"])
+                        )
+                        raise _Refused
+                    conn.execute(
+                        "INSERT INTO medicine_dispensing_batches "
+                        "(dispensing_id, batch_id, quantity) VALUES (?, ?, ?)",
+                        (dispensing_id, batch["id"], amount),
+                    )
+                    taken.append((batch["lot_number"], amount))
+                    needed -= amount
+                if needed > 0:
+                    # Unreachable: usable_total was checked against the same batches under
+                    # the same lock. Kept so a record never exists without its stock move.
+                    errors[quantity_field(entry["index"])] = (
+                        "{}'s stock changed while this was being saved, so nothing "
+                    "was dispensed. Reload and try again.".format(row["name"])
+                    )
+                    raise _Refused
+                conn.execute(
+                    "UPDATE inventory_items SET updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (entry["item_id"],),
+                )
 
                 stored.append({
                     "index": entry["index"],
@@ -588,11 +559,10 @@ def record_dispensing(patient_id, entries, dispensed_by, date_dispensed,
                     "medicine_name": row["name"],
                     "unit": row["unit"],
                     "quantity_dispensed": entry["quantity"],
-                    # What the shelf holds now, read off the figure this statement
-                    # just wrote rather than recomputed. The flash message says it
-                    # back to the operator, which is the moment a stock level is
-                    # worth anything.
-                    "stock_after": (row["stock_quantity"] or 0) - entry["quantity"],
+                    # The batches used, as (lot number, amount), earliest expiry first.
+                    "batches": taken,
+                    # What the item holds in usable stock now, for the flash message.
+                    "stock_after": usable_total - entry["quantity"],
                     "low_stock_threshold": row["low_stock_threshold"] or 0,
                 })
 

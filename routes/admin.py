@@ -17,7 +17,10 @@ from routes.inventory_views import (
     add_edit_medicine_context,
     medicine_inventory_context,
     process_add_edit_medicine,
+    item_page_context,
     process_archive_medicine,
+    process_receive_stock,
+    process_remove_stock,
 )
 from routes.patient_views import (
     patient_demographics_context,
@@ -240,14 +243,8 @@ def archive_medicine():
     return redirect(url_for("admin.medicine_inventory"))
 
 
-# Add mode carries no id; edit mode carries the medicine's id. Same shape as
-# the Register Patient screen -- one view, one template, distinguished by the path.
-#
-# There is no per-item detail screen for inventory the way patient_profile is one
-# for a patient, so a successful save redirects back to the list rather than to a
-# record of its own. Reading a stock item in full does not need one: the View
-# icon on a Medicine Inventory row expands a read-only panel in place, which is
-# why that button is no longer disabled and why no route was added for it.
+# No id in the URL means add mode; an id means Edit details for that item. Edit details never
+# changes a quantity. A new item has no stock: its page is where stock is received.
 @admin_bp.route('/add_edit_medicine', methods=["GET", "POST"])
 @admin_bp.route('/add_edit_medicine/<int:medicine_id>', methods=["GET", "POST"])
 @login_required
@@ -266,15 +263,48 @@ def add_edit_medicine(medicine_id=None):
             ip_address=request.remote_addr,
         )
         if saved_id:
-            # The message names the fields that actually changed, so a save that
-            # wrote back the stored values says so instead of claiming success.
             flash(message)
-            return redirect(url_for("admin.medicine_inventory"))
+            return redirect(url_for("admin.medicine_item", item_id=saved_id))
         return render_template('add_edit_medicine.html', **context)
 
     return render_template(
         'add_edit_medicine.html', **add_edit_medicine_context(item=item)
     )
+
+
+# The item page: its details, its batches, Receive stock and Remove from stock.
+@admin_bp.route('/medicine_inventory/<int:item_id>')
+@login_required
+@role_required("Admin")
+def medicine_item(item_id):
+    context = item_page_context(item_id)
+    if context is None:
+        flash("That inventory item could not be found.")
+        return redirect(url_for("admin.medicine_inventory"))
+    return render_template('inventory_item.html', **context)
+
+
+@admin_bp.route('/medicine_inventory/<int:item_id>/receive', methods=["POST"])
+@login_required
+@role_required("Admin")
+def receive_stock(item_id):
+    batch_id, context, message = process_receive_stock(
+        item_id, request.form, session.get("user_id"), request.remote_addr)
+    if context is not None:
+        return render_template('inventory_item.html', **context)
+    flash(message)
+    if batch_id is None:
+        return redirect(url_for("admin.medicine_inventory"))
+    return redirect(url_for("admin.medicine_item", item_id=item_id))
+
+
+@admin_bp.route('/medicine_inventory/<int:item_id>/remove', methods=["POST"])
+@login_required
+@role_required("Admin")
+def remove_stock(item_id):
+    flash(process_remove_stock(
+        item_id, request.form, session.get("user_id"), request.remote_addr))
+    return redirect(url_for("admin.medicine_item", item_id=item_id))
 
 
 # ?month=YYYY-MM moves the calendar panel; anything unusable falls back to the

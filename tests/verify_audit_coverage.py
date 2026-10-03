@@ -18,7 +18,7 @@ import _support  # noqa: E402  (first: builds the test database, points the app 
 
 from app import create_app  # noqa: E402
 from models import audit as A  # noqa: E402
-from models.inventory import DOSAGE_FORMS, DRUG_CLASSES, INVENTORY_FIELDS, UNITS  # noqa: E402
+from models.inventory import DOSAGE_FORMS, DRUG_CLASSES, UNITS  # noqa: E402
 from models.patients import get_patient_by_id  # noqa: E402
 from openpyxl import load_workbook  # noqa: E402
 from routes.patient_views import patient_to_form  # noqa: E402
@@ -92,6 +92,15 @@ def none_written(name, start):
 def patient_ref(pid):
     p = get_patient_by_id(pid)
     return f"{p['full_name']} ({p['patient_id']})"
+
+
+USABLE_SUM = ("(SELECT COALESCE(SUM(b.quantity_remaining), 0) FROM inventory_batches b "
+              "WHERE b.inventory_item_id = i.id AND (b.expiry_date IS NULL "
+              "OR b.expiry_date > date('now')))")
+
+
+def usable_stock(item_id):
+    return q(f"SELECT {USABLE_SUM} FROM inventory_items i WHERE i.id = ?", (item_id,))[0][0]
 
 
 def item_ref(item_id):
@@ -222,10 +231,9 @@ consult = {
     "temperature": "38.4", "blood_pressure": "110/70", "pulse_rate": "90",
     "respiratory_rate": "18", "weight": "58", "remarks": REMARKS,
 }
-medicine = q("""SELECT id, name, unit FROM inventory_items WHERE status = 'Active'
-                AND category = 'Medicine' AND stock_quantity > 20
-                AND (expiry_date IS NULL OR expiry_date > date('now')) ORDER BY id LIMIT 1""")[0]
-stock_before = q("SELECT stock_quantity FROM inventory_items WHERE id = ?", (medicine["id"],))[0][0]
+medicine = q(f"""SELECT i.id, i.name, i.unit FROM inventory_items i WHERE i.status = 'Active'
+                AND i.category = 'Medicine' AND {USABLE_SUM} > 20 ORDER BY i.id LIMIT 1""")[0]
+stock_before = usable_stock(medicine["id"])
 
 staff.post("/staff/appointment_scheduling/start-consultation", data={"appointment_id": str(other)})
 start = mark()
@@ -236,8 +244,7 @@ start = mark()
 r = doctor.post(f"/staff/consultation/record/{other}", data=dict(
     consult, dispense_item_0=str(medicine["id"]), dispense_qty_0=str(stock_before + 50)))
 none_written("a consultation refused for too little stock writes nothing", start)
-check("and no stock moved", q("SELECT stock_quantity FROM inventory_items WHERE id = ?",
-                              (medicine["id"],))[0][0] == stock_before)
+check("and no stock moved", usable_stock(medicine["id"]) == stock_before)
 
 start = mark()
 r = doctor.post(f"/staff/consultation/record/{other}", data=dict(
@@ -317,9 +324,9 @@ check("neither names the vaccine",
 # ===========================================================================
 section("5. EDITING A CONSULTATION: DISPENSING STILL WRITES ITS OWN ENTRY")
 # A second medicine: the same one again on this visit is refused by design.
-second = q("""SELECT id, name, unit FROM inventory_items WHERE status = 'Active'
-              AND category = 'Medicine' AND stock_quantity > 20 AND id != ?
-              AND (expiry_date IS NULL OR expiry_date > date('now')) ORDER BY id LIMIT 1""",
+second = q(f"""SELECT i.id, i.name, i.unit FROM inventory_items i WHERE i.status = 'Active'
+              AND i.category = 'Medicine' AND {USABLE_SUM} > 20 AND i.id != ?
+              ORDER BY i.id LIMIT 1""",
            (medicine["id"],))[0]
 start = mark()
 edit = dict(consult, dispense_item_0=str(second["id"]), dispense_qty_0="1")
@@ -332,39 +339,52 @@ check("an edit that dispenses writes one dispensing entry",
       [g["details"] for g in since(start)])
 
 # ===========================================================================
-section("6. MEDICINE INVENTORY: ADD, EDIT, STOCK, ARCHIVE")
+section("6. MEDICINE INVENTORY: ADD, EDIT DETAILS, RECEIVE, REMOVE, ARCHIVE")
 item_form = {
-    "name": "Cetirizine 10 mg tablet", "generic_name": "Cetirizine", "brand_name": "",
-    "category": "Medicine", "drug_class": DRUG_CLASSES[0], "dosage_strength": "10 mg",
-    "dosage_form": DOSAGE_FORMS[0], "unit": UNITS[0], "stock_quantity": "100",
-    "low_stock_threshold": "20", "expiry_date": "2029-12-31", "date_received": "2026-09-01",
-    "batch_number": "AUD-001", "manufacturer": "", "supplier": "", "unit_cost": "",
-    "storage_location": "", "notes": "", "status": "Active",
+    "category": "Medicine", "generic_name": "Loratadine", "dosage_strength": "10 mg",
+    "dosage_form": DOSAGE_FORMS[0], "item_name": "", "size": "",
+    "drug_class": DRUG_CLASSES[0], "unit": UNITS[0], "low_stock_threshold": "20",
+    "manufacturer": "", "supplier": "", "unit_cost": "", "storage_location": "", "notes": "",
+    "status": "Active",
 }
 start = mark()
-staff.post("/staff/add_edit_medicine", data=dict(item_form, name=""))
+staff.post("/staff/add_edit_medicine", data=dict(item_form, generic_name=""))
 none_written("an item refused by validation writes nothing", start)
 start = mark()
 staff.post("/staff/add_edit_medicine", data=item_form)
-iid = q("SELECT id FROM inventory_items WHERE batch_number = 'AUD-001'")[0][0]
+iid = q("SELECT id FROM inventory_items WHERE name = 'Loratadine 10 mg tablet'")[0][0]
 one_entry("adding an item writes one entry", start, A.ACTION_INVENTORY_ADDED,
-          A.MODULE_INVENTORY, STAFF_ID, f"{item_ref(iid)}, stock 100.")
+          A.MODULE_INVENTORY, STAFF_ID, f"{item_ref(iid)}.")
+receive_form = {"lot_number": "AUD-001", "expiry_date": "2029-12-31", "quantity": "100",
+                "date_received": "2026-09-01", "source": "DOH", "brand_name": ""}
 start = mark()
-staff.post(f"/staff/add_edit_medicine/{iid}", data=dict(item_form, stock_quantity="90",
-                                                      batch_number="AUD-002"))
-one_entry("a stock change writes 'Adjusted stock quantity' with before and after", start,
-          A.ACTION_STOCK_ADJUSTED, A.MODULE_INVENTORY, STAFF_ID,
-          f"{item_ref(iid)} — Stock: 100 → 90; Also changed: Batch number")
+staff.post(f"/staff/medicine_inventory/{iid}/receive", data=dict(receive_form, expiry_date=""))
+none_written("stock refused by validation writes nothing", start)
 start = mark()
-staff.post(f"/staff/add_edit_medicine/{iid}", data=dict(item_form, stock_quantity="90",
-                                                      batch_number="AUD-003"))
-one_entry("any other edit writes 'Edited inventory item' with the field names", start,
+staff.post(f"/staff/medicine_inventory/{iid}/receive", data=receive_form)
+batch_id = q("SELECT id FROM inventory_batches WHERE inventory_item_id = ?", (iid,))[0][0]
+one_entry("receiving stock writes one entry naming the item, the lot and the amount", start,
+          A.ACTION_STOCK_RECEIVED, A.MODULE_INVENTORY, STAFF_ID,
+          f"{item_ref(iid)}, lot AUD-001: received 100.")
+start = mark()
+staff.post(f"/staff/medicine_inventory/{iid}/remove",
+           data={"batch_id": str(batch_id), "quantity": "10", "reason": ""})
+none_written("removing stock with no reason writes nothing", start)
+start = mark()
+staff.post(f"/staff/medicine_inventory/{iid}/remove",
+           data={"batch_id": str(batch_id), "quantity": "10", "reason": "Damaged",
+                 "note": "Zznote dropped on the floor"})
+one_entry("removing stock writes one entry naming the item, the lot, the amount and the reason",
+          start, A.ACTION_STOCK_REMOVED, A.MODULE_INVENTORY, STAFF_ID,
+          f"{item_ref(iid)}, lot AUD-001: removed 10 (Damaged).")
+start = mark()
+staff.post(f"/staff/add_edit_medicine/{iid}", data=dict(item_form, manufacturer="Demo Pharma"))
+one_entry("Edit details writes 'Edited inventory item' with the field names", start,
           A.ACTION_INVENTORY_EDITED, A.MODULE_INVENTORY, STAFF_ID,
-          f"{item_ref(iid)} — Changed: Batch number")
+          f"{item_ref(iid)} — Changed: Manufacturer")
 start = mark()
-staff.post(f"/staff/add_edit_medicine/{iid}", data=dict(item_form, stock_quantity="90",
-                                                      batch_number="AUD-003"))
-none_written("saving an item with nothing changed writes nothing", start)
+staff.post(f"/staff/add_edit_medicine/{iid}", data=dict(item_form, manufacturer="Demo Pharma"))
+none_written("saving details with nothing changed writes nothing", start)
 start = mark()
 staff.post("/staff/medicine_inventory/archive", data={"item_id": str(iid), "status": "Inactive"})
 one_entry("archiving writes one entry", start, A.ACTION_INVENTORY_ARCHIVED, A.MODULE_INVENTORY,
@@ -385,8 +405,8 @@ NEW_ACTIONS = {v for k, v in vars(A).items() if k.startswith("ACTION_") and v in
     A.ACTION_CONSULTATION_RECORDED, A.ACTION_EPI_DOSES_RECORDED,
     A.ACTION_REPORTED_DOSES_RECORDED, A.ACTION_OTHER_VACCINATIONS_RECORDED,
     A.ACTION_MEDICINE_DISPENSED, A.ACTION_INVENTORY_ADDED, A.ACTION_INVENTORY_EDITED,
-    A.ACTION_STOCK_ADJUSTED, A.ACTION_INVENTORY_ARCHIVED, A.ACTION_INVENTORY_RESTORED,
-    A.ACTION_PATIENT_CHECKED_IN, A.ACTION_CONSULTATION_STARTED,
+    A.ACTION_STOCK_RECEIVED, A.ACTION_STOCK_REMOVED, A.ACTION_INVENTORY_ARCHIVED,
+    A.ACTION_INVENTORY_RESTORED, A.ACTION_PATIENT_CHECKED_IN, A.ACTION_CONSULTATION_STARTED,
     A.ACTION_CONSULTATION_COMPLETED}}
 written = [r for r in since(SUITE_START) if r["action"] in NEW_ACTIONS]
 check(f"every new kind of entry was exercised ({len(NEW_ACTIONS)} kinds)",
@@ -427,7 +447,7 @@ cells = " ".join(str(v) for ws in load_workbook(io.BytesIO(r.data)).worksheets
                  for row in ws.iter_rows(values_only=True) for v in row if v is not None)
 check("the Excel export carries the new entries",
       r.status_code == 200 and all(a in cells for a in (
-          A.ACTION_PATIENT_DECLARED_DECEASED, A.ACTION_STOCK_ADJUSTED,
+          A.ACTION_PATIENT_DECLARED_DECEASED, A.ACTION_STOCK_RECEIVED,
           A.ACTION_PATIENT_CHECKED_IN)))
 r = admin.get("/admin/audit_logs/export.pdf")
 check("the PDF export still works", r.status_code == 200 and r.data[:4] == b"%PDF")
@@ -530,7 +550,8 @@ check("the check sees the paths this task added",
 
 # ===========================================================================
 section("10. THE ENTRY AND THE CHANGE COMMIT TOGETHER")
-from models.inventory import create_inventory_item, set_item_status  # noqa: E402
+from models.inventory import (  # noqa: E402
+    create_inventory_item, receive_stock, remove_from_batch, set_item_status)
 from models.patients import set_patient_status  # noqa: E402
 
 
@@ -551,10 +572,19 @@ def raises(call):
 
 
 start = mark()
-failed = raises(lambda: create_inventory_item(dict(item_form, batch_number="AUD-ROLLBACK"),
+failed = raises(lambda: create_inventory_item(dict(item_form, generic_name="Zzrollback"),
                                               audit=failing_audit))
 check("if the entry cannot be written, the new item is not saved either",
-      failed and not q("SELECT 1 FROM inventory_items WHERE batch_number = 'AUD-ROLLBACK'"))
+      failed and not q("SELECT 1 FROM inventory_items WHERE generic_name = 'Zzrollback'"))
+failed = raises(lambda: receive_stock(iid, receive_form, audit=failing_audit))
+check("nor is received stock",
+      failed and q("SELECT COUNT(*) FROM inventory_batches WHERE inventory_item_id = ?",
+                   (iid,))[0][0] == 1)
+failed = raises(lambda: remove_from_batch(
+    iid, batch_id, {"quantity": "5", "reason": "Lost"}, audit=failing_audit))
+check("nor is stock removed from a batch",
+      failed and q("SELECT quantity_remaining FROM inventory_batches WHERE id = ?",
+                   (batch_id,))[0][0] == 90)
 failed = raises(lambda: set_item_status(iid, "Inactive", audit=failing_audit))
 failed_patient = raises(lambda: set_patient_status([14], "Inactive", audit=failing_audit))
 check("the same holds for a status change, on items and on patients",

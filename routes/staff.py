@@ -34,7 +34,10 @@ from routes.inventory_views import (
     add_edit_medicine_context,
     medicine_inventory_context,
     process_add_edit_medicine,
+    item_page_context,
     process_archive_medicine,
+    process_receive_stock,
+    process_remove_stock,
 )
 from routes.roster_export import (
     appointment_document,
@@ -368,10 +371,8 @@ def staff_archive_medicine():
     return redirect(url_for("staff.staff_medicine_inventory"))
 
 
-# No id in the URL means add mode; an id means edit that item. A successful save
-# redirects to the list -- inventory has no per-item detail screen the way a
-# patient has patient_profile. It does not need one to be read: the View icon on
-# a Medicine Inventory row expands a read-only panel in place, route-free.
+# No id in the URL means add mode; an id means Edit details for that item. Edit details never
+# changes a quantity. A new item has no stock: its page is where stock is received.
 @staff_bp.route('/add_edit_medicine', methods=["GET", "POST"])
 @staff_bp.route('/add_edit_medicine/<int:medicine_id>', methods=["GET", "POST"])
 @login_required
@@ -390,15 +391,48 @@ def staff_add_edit_medicine(medicine_id=None):
             ip_address=request.remote_addr,
         )
         if saved_id:
-            # The message names the fields that actually changed, so a save that
-            # wrote back the stored values says so instead of claiming success.
             flash(message)
-            return redirect(url_for("staff.staff_medicine_inventory"))
+            return redirect(url_for("staff.staff_medicine_item", item_id=saved_id))
         return render_template('add_edit_medicine.html', **context)
 
     return render_template(
         'add_edit_medicine.html', **add_edit_medicine_context(item=item)
     )
+
+
+# The item page: its details, its batches, Receive stock and Remove from stock.
+@staff_bp.route('/medicine_inventory/<int:item_id>')
+@login_required
+@role_required(*CLINICAL_FLOOR_ROLES)
+def staff_medicine_item(item_id):
+    context = item_page_context(item_id)
+    if context is None:
+        flash("That inventory item could not be found.")
+        return redirect(url_for("staff.staff_medicine_inventory"))
+    return render_template('inventory_item.html', **context)
+
+
+@staff_bp.route('/medicine_inventory/<int:item_id>/receive', methods=["POST"])
+@login_required
+@role_required(*CLINICAL_FLOOR_ROLES)
+def staff_receive_stock(item_id):
+    batch_id, context, message = process_receive_stock(
+        item_id, request.form, session.get("user_id"), request.remote_addr)
+    if context is not None:
+        return render_template('inventory_item.html', **context)
+    flash(message)
+    if batch_id is None:
+        return redirect(url_for("staff.staff_medicine_inventory"))
+    return redirect(url_for("staff.staff_medicine_item", item_id=item_id))
+
+
+@staff_bp.route('/medicine_inventory/<int:item_id>/remove', methods=["POST"])
+@login_required
+@role_required(*CLINICAL_FLOOR_ROLES)
+def staff_remove_stock(item_id):
+    flash(process_remove_stock(
+        item_id, request.form, session.get("user_id"), request.remote_addr))
+    return redirect(url_for("staff.staff_medicine_item", item_id=item_id))
 
 
 # ?month=YYYY-MM moves the calendar panel; anything unusable falls back to the

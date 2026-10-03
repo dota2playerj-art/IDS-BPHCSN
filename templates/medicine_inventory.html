@@ -102,15 +102,8 @@
   .badge-lowstock{background:#FEF3C7; color:#B45309;}
   .badge-critical{background:#FEE2E2; color:#B91C1C;}
   .badge-nearexpiry{background:#FFEDD5; color:#C2410C;}
-  /* Expires Today is the only filled badge on the screen. Every other state is a
-     pale tint, so a solid fill reads as more urgent than Near Expiry's orange
-     without borrowing Critical's red tint or Expired's grey — and it uses
-     var(--danger) rather than a new colour. */
-  .badge-expirestoday{background:var(--danger); color:#fff;}
   .badge-expired{background:#F3F4F6; color:#4B5563;}
-  /* Retired borrows Expired's grey deliberately: both mean "not part of what is
-     dispensable today", and giving retirement a colour of its own would imply a
-     condition to act on when the whole point is that there is none. */
+  /* Retired borrows Expired's grey: both mean "not part of what is dispensable". */
   .badge-retired{background:#F3F4F6; color:#4B5563;}
 
   /* A retired row stays in the table -- it is still a record, and taking it out
@@ -126,23 +119,6 @@
   }
   .action-icon:hover{background:var(--bg); color:var(--teal-dark);}
   a.action-icon, a.btn-primary-teal{text-decoration:none;}
-
-  /* READ-ONLY DETAIL PANEL
-     ----------------------
-     The same three classes Consultation History's panel is built from
-     (patient_profile.html), with the same values, so the two read-only panels in
-     this project look like one thing rather than two. Divs, not inputs: there is
-     no form element anywhere inside the panel and no endpoint it could post to,
-     so the record cannot be altered from it by any means. */
-  .info-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:20px 28px;}
-  .info-item .info-label{font-size:12px; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:0.03em;}
-  .info-item .info-value{font-size:14.5px; color:var(--text-dark); margin-top:3px;}
-  /* Notes are typed prose and can arrive with line breaks; the rest of the grid
-     is single values, so this is scoped to the cells that ask for it. */
-  .info-item .info-value.info-prose{white-space:pre-wrap;}
-  /* A detail row is structural: it must never take the item rows' hover tint,
-     and it carries no bottom border of its own while collapsed. */
-  table.inv-table tbody tr.detail-row:hover{background:transparent;}
 
   .table-footer{display:flex; align-items:center; justify-content:space-between; padding-top:18px; margin-top:6px; border-top:1px solid var(--border-color); flex-wrap:wrap; gap:12px;}
   .pg-info{font-size:13px; color:var(--text-muted);}
@@ -183,19 +159,13 @@
     <div class="page-title">Medicine Inventory</div>
     <div class="page-desc">Stock levels and expiry dates.</div>
 
-    <!-- STAT CARDS — every figure is counted from the rows below, not stored, so a
-         stock edit that crosses a reorder level moves these on the next render. -->
+    <!-- STAT CARDS: every figure is counted from the rows below, not stored. -->
     <div class="row g-3 mt-1 mb-4">
       <div class="col-md-3 col-sm-6">
         <div class="stat-card">
           <div class="stat-icon" style="background:var(--teal-light);"><span class="material-symbols-outlined" style="color:var(--teal-dark);">inventory_2</span></div>
           <div class="stat-value">{{ "{:,}".format(stats.total_items) }}</div>
           <div class="stat-label">Items In Service</div>
-          {#- All four cards count the working inventory, so a retired item is in
-              none of them. The table below lists every row including retired
-              ones, so the cards and the row count differ whenever anything is
-              retired -- this line says so outright rather than leaving a reader
-              to notice the gap and distrust both numbers. #}
           <div class="stat-trend" style="color:var(--text-muted);">{{ stats.medicine_count }} medicine{{ "s" if stats.medicine_count != 1 }}, {{ stats.total_items - stats.medicine_count }} supply &amp; equipment{% if stats.retired_count %} &middot; {{ stats.retired_count }} retired, not counted{% endif %}</div>
         </div>
       </div>
@@ -216,26 +186,23 @@
       <div class="col-md-3 col-sm-6">
         <div class="stat-card">
           <div class="stat-icon" style="background:#FFEDD5;"><span class="material-symbols-outlined" style="color:#C2410C;">schedule</span></div>
-          <div class="stat-value">{{ stats.near_expiry_count }}</div>
-          <div class="stat-label">Near Expiry ({{ stats.near_expiry_days }} days)</div>
-          {#- Items expiring today are inside the window, so they are part of the
-              count above; the sub-count names them because they are the urgent ones. #}
-          {%- if stats.expires_today_count %}
-          <div class="stat-trend" style="color:var(--danger);">{{ stats.expires_today_count }} expire{{ "s" if stats.expires_today_count == 1 }} today</div>
-          {%- else %}
-          <div class="stat-trend" style="color:var(--text-muted);">{{ "Review before use" if stats.near_expiry_count else "Nothing lapsing soon" }}</div>
-          {%- endif %}
+          <div class="stat-value" id="statExpiringSoon">{{ stats.expiring_soon_count }}</div>
+          <div class="stat-label">Expiring Soon ({{ stats.expiring_soon_days }} days)</div>
+          <div class="stat-trend" style="color:var(--text-muted);">{{ "Batches to use first" if stats.expiring_soon_count else "No batch expiring soon" }}</div>
         </div>
       </div>
       <div class="col-md-3 col-sm-6">
         <div class="stat-card">
           <div class="stat-icon" style="background:#F3F4F6;"><span class="material-symbols-outlined" style="color:#4B5563;">block</span></div>
-          <div class="stat-value">{{ stats.expired_count }}</div>
-          <div class="stat-label">Expired Items</div>
-          <div class="stat-trend" style="color:var(--text-muted);">{{ "Pending disposal" if stats.expired_count else "None on the shelf" }}</div>
+          <div class="stat-value" id="statExpired">{{ stats.expired_count }}</div>
+          <div class="stat-label">Expired Batches</div>
+          <div class="stat-trend" style="color:var(--text-muted);">{{ "Remove from stock" if stats.expired_count else "None on the shelf" }}</div>
         </div>
       </div>
     </div>
+{%- if stats.needs_details_count %}
+    <div class="page-desc" style="margin:-8px 0 16px; color:#92400E;">{{ stats.needs_details_count }} medicine{{ "s have" if stats.needs_details_count != 1 else " has" }} no generic name, strength or dosage form. Open it and use Edit details.</div>
+{%- endif %}
 
     <!-- TABLE PANEL -->
     <div class="panel-card">
@@ -244,22 +211,12 @@
         <div class="d-flex align-items-center gap-2 flex-wrap">
           <div class="toolbar-search">
             <span class="material-symbols-outlined" style="font-size:18px;">search</span>
-            <input type="text" id="itemSearch" placeholder="Search by medicine name, generic name, or category" autocomplete="off">
+            <input type="text" id="itemSearch" placeholder="Search by name or category" autocomplete="off">
           </div>
           <button class="filter-btn" id="filterToggleBtn" onclick="toggleFilterPanel()">
             <span class="material-symbols-outlined" style="font-size:18px;">filter_list</span>Advanced Filter
           </button>
-{#- SORT. Built, for the same four-column reason Patient Records' is: every
-    column offered is one this table already shows and the row already carries a
-    comparable key for.
-
-    Category, Dosage / Form and Supplier are not offered -- Category and Supplier
-    are what the Advanced Filter narrows by, and an order over them is a grouping
-    nobody reads a shelf in. Reorder Level is not offered either: on its own it
-    sorts by how big each item's threshold happens to be, which says nothing about
-    the shelf; the question behind it is "what is running out", and Status answers
-    that properly because stock_status() has already weighed each item's stock
-    against its own reorder level. #}
+{#- SORT: the four columns the table has a comparable key for. #}
           <div class="sort-wrap">
             <button class="filter-btn" type="button" id="sortToggleBtn" onclick="toggleSortMenu()"
                     aria-haspopup="true" aria-expanded="false" aria-controls="sortMenu">
@@ -267,9 +224,9 @@
             </button>
             <div class="sort-menu" id="sortMenu" role="menu" aria-labelledby="sortToggleBtn">
               <div class="sort-menu-label">Sort inventory by</div>
-              <button type="button" class="sort-option" role="menuitem" data-sort-key="name">Medicine Name<span class="dir"></span></button>
-              <button type="button" class="sort-option" role="menuitem" data-sort-key="stock">Current Stock<span class="dir"></span></button>
-              <button type="button" class="sort-option" role="menuitem" data-sort-key="expiry">Expiration Date<span class="dir"></span></button>
+              <button type="button" class="sort-option" role="menuitem" data-sort-key="name">Item name<span class="dir"></span></button>
+              <button type="button" class="sort-option" role="menuitem" data-sort-key="stock">Usable stock<span class="dir"></span></button>
+              <button type="button" class="sort-option" role="menuitem" data-sort-key="expiry">Nearest expiry<span class="dir"></span></button>
               <button type="button" class="sort-option" role="menuitem" data-sort-key="status">Status<span class="dir"></span></button>
             </div>
           </div>
@@ -287,7 +244,7 @@
              title="Download as Excel"><span class="material-symbols-outlined" style="font-size:18px;">description</span>Export Excel</a>
           <a class="btn-outline-teal" href="{{ url_for(medicine_inventory_pdf_endpoint) }}" download
              title="Download as PDF"><span class="material-symbols-outlined" style="font-size:18px;">picture_as_pdf</span>Export PDF</a>
-          <a href="{{ url_for(add_edit_medicine_endpoint) }}" class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">add</span>Add Medicine</a>
+          <a href="{{ url_for(add_edit_medicine_endpoint) }}" class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">add</span>Add medicine</a>
         </div>
       </div>
 
@@ -326,7 +283,7 @@
             </select>
           </div>
           <div class="col-md-4 col-sm-6">
-            <label for="fExpiry">Expiring on or before</label>
+            <label for="fExpiry">Nearest expiry on or before</label>
             <input type="date" class="form-control" id="fExpiry">
           </div>
           <div class="col-12">
@@ -351,162 +308,47 @@
         <table class="inv-table" id="invTable">
           <thead>
             <tr>
-              <th>Medicine Name</th>
+              <th>Item</th>
               <th>Category</th>
-              <th>Dosage / Form</th>
-              <th>Current Stock</th>
+              <th>Usable Stock</th>
               <th>Reorder Level</th>
-              <th>Expiration Date</th>
-              <th>Supplier</th>
+              <th>Nearest Expiry</th>
+              <th>Expiring Soon</th>
+              <th>Expired</th>
               <th>Status</th>
               <th style="text-align:right;">Actions</th>
             </tr>
           </thead>
           <tbody id="invTableBody">
 {%- for item in items %}
-            {#- What the toolbar matches on, written by the server in the item's
-                stored form. data-category mirrors the expression the Category
-                cell below prints, so a filter value always matches the cell
-                beside it. Same shape as Screens 03, 09 and 12. #}
             <tr class="item-row{% if item.is_retired %} retired{% endif %}"
-                data-search="{{ (item.name ~ ' ' ~ (item.generic_name or '') ~ ' ' ~ (item.drug_class or '') ~ ' ' ~ (item.category or '') ~ ' ' ~ (item.supplier or '')) | lower }}"
+                data-search="{{ (item.name ~ ' ' ~ (item.generic_name or '') ~ ' ' ~ (item.drug_class or '') ~ ' ' ~ (item.category or '')) | lower }}"
                 data-category="{{ (item.drug_class or item.category or '') | lower }}"
-                {#- The Status filter matches on what the Status cell prints, so a
-                    retired item is reachable through "Retired" in that same
-                    dropdown. Patient Records filters its Inactive and Deceased
-                    records through its one Status control in exactly this way. #}
                 data-status="{{ (item.display_status or '') | lower }}"
-                data-expiry="{{ item.expiry_date or '' }}"
-                {#- SORT KEYS, written by the server in comparable form exactly as
-                    the filter keys above are.
-
-                    data-sort-name is the name get_all_inventory_items() already
-                    orders by (ORDER BY name COLLATE NOCASE), so "Medicine name,
-                    A-Z" is the order the page arrives in.
-
-                    data-stock is the raw quantity, not the "1,234 tablet" the
-                    cell prints -- a thousands separator would sort 1,000 below
-                    200 as text, and the unit is not a number at all.
-
-                    data-status-rank is STATUS_SORT_ORDER, which is stock_status()'s
-                    own urgency ladder; see models/inventory.py.
-
-                    data-expiry above already holds the ISO date and is reused
-                    rather than duplicated: the expiry filter and the expiry sort
-                    are asking about the same field, so they read the same one. #}
+                data-expiry="{{ item.nearest_expiry or '' }}"
                 data-sort-name="{{ (item.name or '') | lower }}"
-                data-stock="{{ item.stock_quantity if item.stock_quantity is not none else '' }}"
+                data-stock="{{ item.stock_quantity }}"
                 data-status-rank="{{ item.status_rank if item.status_rank is not none else '' }}">
-              <td><div class="med-name">{{ item.name }}</div><div class="med-generic">{{ item.generic_name or item.category }}</div></td>
+              <td><a href="{{ url_for(medicine_item_endpoint, item_id=item.id) }}" class="med-name" style="text-decoration:none; color:var(--text-dark);">{{ item.name }}</a>{% if item.needs_details %}<div class="med-generic" style="color:#92400E;">Needs details</div>{% endif %}</td>
               <td><span class="cat-pill">{{ item.drug_class or item.category }}</span></td>
-              <td>{{ item.display_dosage or '—' }}</td>
               <td class="stock-cell">
                 <div class="stock-num">{{ "{:,}".format(item.stock_quantity) }} <span class="stock-unit">{{ item.unit or '' }}</span></div>
-                <!-- No "full shelf" figure is stored, so the bar reads against this
-                     item's own reorder level: half full at the threshold, full at
-                     twice it. Computed in models/inventory.py. -->
                 <div class="stock-bar-track"><div class="stock-bar-fill {{ item.stock_fill_class }}" style="width:{{ item.stock_percent }}%;"></div></div>
               </td>
               <td>{{ "{:,}".format(item.low_stock_threshold) }} {{ item.unit or '' }}</td>
-              <td>{{ item.expiry_date | display_date('No expiry') }}</td>
-              <td>{{ item.supplier or '—' }}</td>
-              {#- "Retired" replaces the stock condition rather than sitting beside
-                  it. An item nobody is restocking must not be labelled "Low Stock"
-                  here while the alert, the cards and the dashboards have all
-                  stopped counting it -- the row would be contradicting them. The
-                  stock figure, reorder level and expiry date are all still in the
-                  row, so nothing about the item is hidden by this. #}
+              <td>{{ item.nearest_expiry | display_date('No expiry') }}</td>
+              <td>{% if item.expiring_soon_batches %}<span class="badge-status badge-nearexpiry">{{ item.expiring_soon_batches }}</span>{% else %}0{% endif %}</td>
+              <td>{% if item.expired_batches %}<span class="badge-status badge-expired">{{ item.expired_batches }}</span>{% else %}0{% endif %}</td>
               <td><span class="badge-status {{ item.status_badge_class }}">{{ item.display_status }}</span>{% if item.is_retired %}<div class="med-generic">{{ item.stock_status }} when retired</div>{% endif %}</td>
               <td>
                 <div class="d-flex justify-content-end gap-1">
-{#- VIEW. The read-only panel below, opened in place -- the treatment
-    Consultation History uses, and for the same complaint: eight stored fields
-    were readable only by opening the form that can also change them. No new
-    route, no new template, and nothing inside the panel that can write. #}
-                  <button type="button" class="action-icon" data-bs-toggle="collapse"
-                          data-bs-target="#itemDetail{{ item.id }}"
-                          aria-expanded="false" aria-controls="itemDetail{{ item.id }}"
-                          title="View {{ item.name }} — read only, nothing here can change the record"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button>
-                  <a href="{{ url_for(add_edit_medicine_endpoint, medicine_id=item.id) }}" class="action-icon" title="Edit {{ item.name }}"><span class="material-symbols-outlined" style="font-size:18px;">edit</span></a>
-{#- ARCHIVE. The same status action Patient Records' row icon offers, on the
-    same flag the Add / Edit Medicine form already writes: it opens a
-    confirmation dialog listing only the statuses this item may legally move to,
-    and the server re-derives that list from the stored row before writing.
-    Both directions, so retiring the wrong item is a correctable mis-click
-    rather than a trip through the edit form.
-
-    There is no Print icon beside it any more. A printed copy of one stock item
-    was never a document anybody keeps -- unlike a patient's record, which is a
-    page in its own right -- and Export Excel / Export PDF in the toolbar above
-    already produce the inventory document that is actually wanted.
-
-    The glyph is `archive` whichever direction the row can go, which is what
-    Patient Records' equivalent icon does for all three of its statuses: the icon
-    names the dialog, and the dialog names the move. Swapping in `unarchive` for a
-    retired row was tried and reverted -- the icon font here is self-hosted
-    (static/fonts/material-symbols-outlined.woff2, a fixed subset rather than
-    Google's live endpoint), and a ligature that subset does not carry renders as
-    the literal word. Every glyph used below is one this project already ships.
-    The title says which way this particular row will move. #}
+                  <a href="{{ url_for(medicine_item_endpoint, item_id=item.id) }}" class="action-icon" title="Open {{ item.name }}: batches, receive stock, remove from stock"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></a>
+                  <a href="{{ url_for(add_edit_medicine_endpoint, medicine_id=item.id) }}" class="action-icon" title="Edit details of {{ item.name }}"><span class="material-symbols-outlined" style="font-size:18px;">edit</span></a>
                   <button type="button" class="action-icon"
                           data-bs-toggle="modal" data-bs-target="#archiveMedicineModal"
                           data-item-id="{{ item.id }}" data-item-name="{{ item.name }}"
                           data-item-status="{{ item.status }}"
                           title="{{ 'Return ' ~ item.name ~ ' to service' if item.is_retired else 'Retire ' ~ item.name }} (currently {{ item.status }})"><span class="material-symbols-outlined" style="font-size:18px;">archive</span></button>
-                </div>
-              </td>
-            </tr>
-{#- The detail row. Collapsed by default so the table still reads as a shelf at a
-    glance. It holds every column of the inventory_items row: the eight fields
-    that had no reader outside the Add / Edit form -- item code, brand name, date
-    received, batch number, manufacturer, unit cost, storage location and notes --
-    beside the ones the summary row above already shows, so the panel is the whole
-    record rather than a second partial view of it.
-
-    "Not recorded" rather than a blank wherever a nullable field is empty, the way
-    the consultation panel prints it: an empty cell is something a reader can
-    mistake for a zero or for a rendering fault.
-
-    Status is split in two here, which the one-line summary cell above cannot do.
-    Item Status is the lifecycle flag stored on the row; Stock Condition is what
-    the shelf figures work out to. They are the same thing for an active item and
-    they are not for a retired one, and this is the screen with room to say so. #}
-            <tr class="detail-row">
-              <td colspan="9" style="padding:0; border-bottom:1px solid var(--border-color);">
-                <div class="collapse" id="itemDetail{{ item.id }}">
-                  <div style="padding:16px 14px 20px; background:#FAFBFC;">
-                    <div class="info-grid" style="margin-bottom:16px;">
-                      <div class="info-item"><div class="info-label">Item Code</div><div class="info-value">{{ item.item_code or 'Not recorded' }}</div></div>
-                      <div class="info-item"><div class="info-label">Medicine Name</div><div class="info-value">{{ item.name }}</div></div>
-                      <div class="info-item"><div class="info-label">Generic Name</div><div class="info-value">{{ item.generic_name or 'Not recorded' }}</div></div>
-                      <div class="info-item"><div class="info-label">Brand Name</div><div class="info-value">{{ item.brand_name or 'Not recorded' }}</div></div>
-                      <div class="info-item"><div class="info-label">Item Type</div><div class="info-value">{{ item.category or 'Not recorded' }}</div></div>
-                      <div class="info-item"><div class="info-label">Category</div><div class="info-value">{{ item.drug_class or 'Not recorded' }}</div></div>
-                      <div class="info-item"><div class="info-label">Dosage / Form</div><div class="info-value">{{ item.display_dosage or 'Not recorded' }}</div></div>
-                      <div class="info-item"><div class="info-label">Unit of Measure</div><div class="info-value">{{ item.unit or 'Not recorded' }}</div></div>
-                      <div class="info-item"><div class="info-label">Manufacturer</div><div class="info-value">{{ item.manufacturer or 'Not recorded' }}</div></div>
-                      <div class="info-item"><div class="info-label">Supplier</div><div class="info-value">{{ item.supplier or 'Not recorded' }}</div></div>
-                      <div class="info-item"><div class="info-label">Batch Number</div><div class="info-value">{{ item.batch_number or 'Not recorded' }}</div></div>
-                      <div class="info-item"><div class="info-label">Storage Location</div><div class="info-value">{{ item.storage_location or 'Not recorded' }}</div></div>
-                      <div class="info-item"><div class="info-label">Date Received</div><div class="info-value">{{ item.date_received | display_date('Not recorded') }}</div></div>
-                      <div class="info-item"><div class="info-label">Expiration Date</div><div class="info-value">{{ item.expiry_date | display_date('No expiry on file') }}</div></div>
-{#- The stock figures repeated from the row, so the panel can be read on its own
-    without scrolling back up to the cells it was opened from. #}
-                      <div class="info-item"><div class="info-label">Current Stock</div><div class="info-value">{{ "{:,}".format(item.stock_quantity) }} {{ item.unit or '' }}</div></div>
-                      <div class="info-item"><div class="info-label">Reorder Level</div><div class="info-value">{{ "{:,}".format(item.low_stock_threshold) }} {{ item.unit or '' }}</div></div>
-{#- 0 is a real unit cost and None is not, so this tests for None rather than
-    falsiness -- `or` here would print "Not recorded" over a genuine zero. #}
-                      <div class="info-item"><div class="info-label">Unit Cost</div><div class="info-value">{% if item.unit_cost is not none %}&#8369;{{ "{:,.2f}".format(item.unit_cost) }}{% else %}Not recorded{% endif %}</div></div>
-                      <div class="info-item"><div class="info-label">Item Status</div><div class="info-value">{{ item.status or 'Not recorded' }}</div></div>
-                      <div class="info-item"><div class="info-label">Stock Condition</div><div class="info-value">{{ item.stock_status }}</div></div>
-                    </div>
-                    <div class="info-grid">
-                      <div class="info-item" style="grid-column:1/-1;"><div class="info-label">Medicine Description / Notes</div><div class="info-value info-prose">{{ item.notes or 'Not recorded' }}</div></div>
-                    </div>
-                    <div style="font-size:12px; color:var(--text-muted); margin-top:14px; padding-top:12px; border-top:1px dashed var(--border-color);">
-                      Added to inventory {{ item.created_at | display_date }}{% if item.updated_at and item.updated_at != item.created_at %} &middot; last edited {{ item.updated_at | display_date }}{% endif %}.
-                    </div>
-                  </div>
                 </div>
               </td>
             </tr>
@@ -521,10 +363,10 @@
         <div class="icon-circle">
           <span class="material-symbols-outlined" style="font-size:34px; color:var(--teal-dark);">inventory_2</span>
         </div>
-        <h5>No medicines match.</h5>
+        <h5>No items match.</h5>
         <div class="d-flex gap-2">
           <button class="btn-outline-teal" type="button" onclick="clearFilters()"><span class="material-symbols-outlined" style="font-size:18px;">restart_alt</span>Clear Filters</button>
-          <a href="{{ url_for(add_edit_medicine_endpoint) }}" class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">add</span>Add Medicine</a>
+          <a href="{{ url_for(add_edit_medicine_endpoint) }}" class="btn-primary-teal"><span class="material-symbols-outlined" style="font-size:18px;">add</span>Add medicine</a>
         </div>
       </div>
 
@@ -539,7 +381,7 @@
             fixed words "Sorted by medicine name, A-Z", which stayed true only
             while nothing could change the order; now that Sort works it is
             written from the same state the button and the menu read. #}
-        <div class="pg-info" id="sortSummary">Sorted by medicine name, A&ndash;Z</div>
+        <div class="pg-info" id="sortSummary">Sorted by item name, A&ndash;Z</div>
         <div class="pg-info">Single page</div>
       </div>
 {%- endif %}
@@ -699,21 +541,6 @@
       rows.forEach(function(row){
         var hit = matches(row);
         row.hidden = !hit;
-        // Each item row is followed by its own read-only detail row, which is
-        // part of the same record and has to leave with it -- otherwise a
-        // filtered-out medicine leaves an open panel behind, attached to a row
-        // that is no longer on screen.
-        //
-        // Hiding is all this does. It does not reach into the panel to close it,
-        // because Bootstrap owns the collapse's open/closed state and the
-        // button's aria-expanded with it; stripping the class here would leave
-        // the two disagreeing and the next click doing nothing. A panel the
-        // operator opened is therefore still open if a filter takes its row away
-        // and a later one brings it back, which is also what they left it as.
-        var detail = row.nextElementSibling;
-        if(detail && detail.classList.contains('detail-row')){
-          detail.hidden = !hit;
-        }
         if(hit){ shown++; }
       });
       if(counter){
@@ -753,15 +580,6 @@
   // The comparator is static/js/table-sort.js, shared with Patient Records; this
   // is this screen's column list and its menu wiring.
   //
-  // THE ONE THING THIS TABLE NEEDS THAT PATIENT RECORDS DOES NOT
-  // ------------------------------------------------------------
-  // A record here is two rows, not one: every item row is followed by its own
-  // read-only detail row, which applyFilters() above already hides and shows in
-  // step with its parent. Reordering the item rows alone would leave every panel
-  // attached to whichever medicine happened to land above it -- so the companion
-  // below hands each item row's detail row to the sorter, which moves the pair
-  // together. Because the elements are moved rather than rebuilt, a panel the
-  // operator had open is still open, and still on the same medicine, afterwards.
   var toggleSortMenu;
   (function(){
     var button  = document.getElementById('sortToggleBtn');
@@ -776,21 +594,17 @@
     var sorter = IDSTableSort.create({
       tbody: tbody,
       rowSelector: 'tr.item-row',
-      companion: function(row){
-        var detail = row.nextElementSibling;
-        return (detail && detail.classList.contains('detail-row')) ? detail : null;
-      },
       columns: [
-        { key: 'name',   label: 'medicine name',   attr: 'data-sort-name',   type: 'text',
+        { key: 'name',   label: 'item name',   attr: 'data-sort-name',   type: 'text',
           asc: 'A–Z',       desc: 'Z–A' },
         // Opens lowest-first: a stock sort is asked "what is nearly gone", not
         // "what is there most of".
-        { key: 'stock',  label: 'current stock',   attr: 'data-stock',       type: 'number',
+        { key: 'stock',  label: 'usable stock',   attr: 'data-stock',       type: 'number',
           asc: 'lowest first',   desc: 'highest first' },
         // Soonest-first for the same reason, and the reason blanks sort last is
         // this exact column: "what do I use up next" must not open on a page of
         // items with no expiry date on file. See static/js/table-sort.js.
-        { key: 'expiry', label: 'expiration date', attr: 'data-expiry',      type: 'date',
+        { key: 'expiry', label: 'nearest expiry', attr: 'data-expiry',      type: 'date',
           asc: 'soonest first',  desc: 'latest first' },
         { key: 'status', label: 'status',          attr: 'data-status-rank', type: 'number',
           asc: 'most urgent first', desc: 'least urgent first' }

@@ -769,7 +769,7 @@
             <div class="section-title">Items Dispensed</div>
           </div>
         </div>
-        <div class="cohort-note" style="margin:0 0 12px; padding:0; border:0;">Each line comes off Medicine Inventory at once. It is refused if the shelf holds less or the item has expired.</div>
+        <div class="cohort-note" style="margin:0 0 12px; padding:0; border:0;">Each line comes off Medicine Inventory at once, from the batch that expires first. It is refused if usable stock is less. Expired stock is never used.</div>
 
 {%- if dispensing.recorded %}
         <!-- Already dispensed at this visit. Shown as fact rather than as
@@ -843,7 +843,7 @@
     shelf. Every condition is named, because "nothing can be dispensed" with a
     stocked store behind it reads as the feature being broken. #}
         <div class="dispense-empty">
-          Nothing can be dispensed at this visit: no item is active, unexpired and in stock. Restock or correct an expiry date on Medicine Inventory.
+          Nothing can be dispensed at this visit: no active item has usable stock. Receive stock on Medicine Inventory.
         </div>
 {%- endif %}
 

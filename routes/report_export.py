@@ -366,6 +366,9 @@ def _summary_sheet(context, sections):
         inventory = context["inventory_report"]
         rows.append(("Inventory items in service", inventory["total_items"], standing))
         rows.append(("Items below reorder level", inventory["low_stock_count"], standing))
+        rows.append(("Batches expiring soon", inventory["expiring_soon_count"],
+                     f"{standing}. Within {inventory['expiring_soon_days']} days"))
+        rows.append(("Expired batches holding stock", inventory["expired_count"], standing))
     if "dispensing" in sections:
         dispensed = context["dispensing_stats"]["window"]
         rows.append(("Medicine units dispensed", dispensed["units"], ranged))
@@ -828,7 +831,7 @@ def _inventory(context):
               ("Condition", "Items"),
               [["In Stock", distribution["in_stock"]],
                ["Low Stock", distribution["low_stock"]],
-               ["Near Expiry", distribution["near_expiry"]],
+               ["Expiring Soon", distribution["expiring_soon"]],
                ["Expired", distribution["expired"]]],
               note=(context["snapshot_note"] + " Each item is counted once, under the "
                     "most urgent condition that applies to it, so these sum to the "
@@ -839,17 +842,31 @@ def _inventory(context):
              "from the reorder figure below"),
             ("Items below reorder level", inventory["low_stock_count"], "Today"),
             ("Items out of stock", inventory["out_of_stock_count"], "Today"),
+            ("Batches expiring soon", inventory["expiring_soon_count"],
+             f"Within {inventory['expiring_soon_days']} days, still holding stock"),
+            ("Expired batches holding stock", inventory["expired_count"],
+             "Not counted as stock and never dispensed"),
         ]),
+        table("Batches expiring soon and expired, today",
+              ("Item", "Lot", "Expiry", "Amount", "Unit", "Status"),
+              [[row["item_name"], row["lot_number"],
+                display_date(row["expiry_date"], "No expiry"), row["quantity_remaining"],
+                row.get("unit") or "", row["status"]]
+               for row in inventory["expiry_batches"]],
+              note=("Soonest expiry first. These are stock facts with no patient link, so the "
+                    "small-count rule does not apply."),
+              empty="No batch is expiring soon or expired."),
         table("Items below their reorder level, today",
-              ("Item", "Dosage", "Stock", "Reorder level", "Unit",
+              ("Item", "Usable stock", "Reorder level", "Unit",
                "% of reorder level", "Status"),
-              [[item["name"], item.get("display_dosage") or "",
+              [[item["name"],
                 item.get("stock_quantity") or 0,
                 item.get("low_stock_threshold") or 0,
                 item.get("unit") or "", item.get("threshold_pct"),
                 item.get("stock_status") or ""]
                for item in inventory["low_stock_items"]],
-              note="Most urgent first: stock as a fraction of the item's own reorder level.",
+              note=("Most urgent first: usable stock as a fraction of the item's own "
+                    "reorder level. Expired stock is not counted."),
               empty="Every item is above its reorder level."),
     ]
 

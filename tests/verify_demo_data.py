@@ -33,6 +33,7 @@ def section(title):
 
 
 import seed_demo_data as seed  # noqa: E402
+from models.inventory import DOSAGE_FORMS, STOCK_SOURCES  # noqa: E402
 import archive_plain_databases as archive  # noqa: E402
 from utils import sealed_crypto  # noqa: E402
 
@@ -99,7 +100,8 @@ check("about 150 patients and about 400 visits, a handful of sealed visits, ten 
       and 3 <= counts["sealed visits"] <= 5 and counts["broadcasts"] == 10, counts)
 check("immunizations, dispensing, inventory and audit entries are all filled",
       counts["immunizations"] > 100 and counts["dispensing issues"] > 100
-      and counts["inventory items"] == 15 and counts["audit entries"] > 1000, counts)
+      and counts["inventory items"] == 15 and counts["inventory batches"] > 15
+      and counts["audit entries"] > 1000, counts)
 
 
 section("2. IT IS DETERMINISTIC")
@@ -192,7 +194,8 @@ check("no diagnosis was refused: nobody outside the Doctor tried to write one",
 admin_actions = {r[0] for r in db.execute(
     "SELECT DISTINCT action FROM audit_logs WHERE user_id = ?", (users["admin"]["id"],))}
 check("the Administrator made no clinical write: only an inventory item and SMS broadcasts",
-      admin_actions <= {"Added inventory item", "Sent community SMS broadcast"}, admin_actions)
+      admin_actions <= {"Added inventory item", "Received stock", "Sent community SMS broadcast"},
+      admin_actions)
 official_actions = {r[0] for r in db.execute(
     "SELECT DISTINCT action FROM audit_logs WHERE user_id = ?", (users["official"]["id"],))}
 check("the Barangay Official only sent SMS broadcasts",
@@ -218,7 +221,8 @@ wanted = {"Marked as left before being seen", "Registered patient", "Checked pat
           "Dispensed medicine", "Recorded EPI immunisation doses",
           "Recorded doses given elsewhere", "Marked consultation restricted",
           "Changed patient status", "Declared patient deceased", "Added inventory item",
-          "Sent community SMS broadcast", "Intake saved, waiting for the Doctor"}
+          "Sent community SMS broadcast", "Intake saved, waiting for the Doctor",
+          "Received stock"}
 check("the audit trail holds an entry for every workflow action", wanted <= actions,
       sorted(wanted - actions))
 def audit_count(action):
@@ -339,16 +343,89 @@ _c.close()
 check("the Service Schedule is empty: it holds the real service days, not invented ones",
       db.execute("SELECT COUNT(*) FROM service_schedule").fetchone()[0] == 0)
 items = db.execute("SELECT * FROM inventory_items").fetchall()
-check("no item has negative stock, and at least two are at or below their reorder level",
-      all(i["stock_quantity"] >= 0 for i in items)
-      and sum(1 for i in items if i["stock_quantity"] <= i["low_stock_threshold"]
+batches = db.execute("SELECT * FROM inventory_batches").fetchall()
+usable = {i["id"]: sum(b["quantity_remaining"] for b in batches
+                       if b["inventory_item_id"] == i["id"]
+                       and (b["expiry_date"] is None or b["expiry_date"] >= today.isoformat()))
+          for i in items}
+check("no batch has negative stock, and at least two medicines are at or below their reorder level",
+      all(b["quantity_remaining"] >= 0 for b in batches)
+      and sum(1 for i in items if usable[i["id"]] <= i["low_stock_threshold"]
               and i["category"] == "Medicine") >= 2)
-check("the common barangay medicines are on the shelf",
-      {"Paracetamol 500mg", "Amoxicillin 500mg", "Oral Rehydration Salts", "Zinc Sulfate 20mg",
-       "Cotrimoxazole 400/80mg", "Losartan 50mg", "Amlodipine 5mg", "Metformin 500mg",
-       "Ferrous Sulfate + Folic Acid"} <= {i["name"] for i in items})
-check("no medicine is expired on the day the data was built",
-      all(i["expiry_date"] is None or i["expiry_date"] > today.isoformat() for i in items))
+check("the common barangay medicines are on the shelf, named by generic name, strength and form",
+      {"Paracetamol 500 mg tablet", "Amoxicillin 500 mg capsule",
+       "Oral rehydration salts 20.5 g sachet", "Zinc sulfate 20 mg tablet",
+       "Sulfamethoxazole-trimethoprim 400/80 mg tablet", "Losartan potassium 50 mg tablet",
+       "Amlodipine besylate 5 mg tablet", "Metformin hydrochloride 500 mg tablet",
+       "Ferrous sulfate + folic acid 60 mg/400 mcg tablet"} <= {i["name"] for i in items})
+check("every medicine has a generic name, a strength and a listed dosage form; no item has a "
+      "separate brand column any more",
+      all(i["generic_name"] and i["dosage_strength"] and i["dosage_form"] in DOSAGE_FORMS
+          for i in items if i["category"] == "Medicine")
+      and "brand_name" not in items[0].keys())
+check("every medicine has two or more batches, with different expiry dates and brands",
+      all(len([b for b in batches if b["inventory_item_id"] == i["id"]]) >= 2
+          and len({b["expiry_date"] for b in batches if b["inventory_item_id"] == i["id"]}) >= 2
+          and len({b["brand_name"] for b in batches if b["inventory_item_id"] == i["id"]}) >= 2
+          for i in items if i["category"] == "Medicine"))
+check("at least one batch is expiring soon and one has expired, both still holding stock",
+      any(b["quantity_remaining"] > 0 and b["expiry_date"]
+          and today.isoformat() <= b["expiry_date"]
+          <= (today + timedelta(days=config.EXPIRING_SOON_DAYS)).isoformat() for b in batches)
+      and any(b["quantity_remaining"] > 0 and b["expiry_date"] and b["expiry_date"] < today.isoformat()
+              for b in batches))
+check("lots, sources and dates are filled; the sources come from the list",
+      all(b["lot_number"] and b["date_received"] and b["source"] in STOCK_SOURCES
+          for b in batches))
+
+
+def replay_fefo(db):
+    """Replay every dispensing in order against the batches as first received, choosing the
+    usable batch with the earliest expiry each time, and return the allocations that should
+    have been recorded: {dispensing id: [(batch id, amount), ...]}."""
+    remaining = {b["id"]: b["quantity_received"] for b in batches}
+    expected = {}
+    for row in db.execute("SELECT id, inventory_item_id, quantity_dispensed, date_dispensed "
+                          "FROM medicine_dispensing ORDER BY id"):
+        usable_now = sorted(
+            (b for b in batches if b["inventory_item_id"] == row["inventory_item_id"]
+             and remaining[b["id"]] > 0
+             and (b["expiry_date"] is None or b["expiry_date"] >= row["date_dispensed"])),
+            key=lambda b: (b["expiry_date"] is None, b["expiry_date"] or "", b["date_received"],
+                           b["id"]))
+        needed, taken = row["quantity_dispensed"], []
+        for b in usable_now:
+            amount = min(needed, remaining[b["id"]])
+            if amount:
+                taken.append((b["id"], amount))
+                remaining[b["id"]] -= amount
+                needed -= amount
+            if needed == 0:
+                break
+        expected[row["id"]] = taken if needed == 0 else None
+    return expected, remaining
+
+
+expected, left_after = replay_fefo(db)
+recorded = {}
+for link in db.execute("SELECT dispensing_id, batch_id, quantity FROM medicine_dispensing_batches "
+                       "ORDER BY id"):
+    recorded.setdefault(link["dispensing_id"], []).append((link["batch_id"], link["quantity"]))
+check("every dispensing recorded its batches, and they add up to the amount dispensed",
+      set(recorded) == {r["id"] for r in db.execute("SELECT id FROM medicine_dispensing")}
+      and all(sum(q for _, q in recorded[d["id"]]) == d["quantity_dispensed"]
+              for d in db.execute("SELECT id, quantity_dispensed FROM medicine_dispensing")))
+check("dispensing followed FEFO: replaying it batch by batch gives exactly the recorded batches",
+      all(expected[d] is not None and sorted(expected[d]) == sorted(recorded[d])
+          for d in recorded), [d for d in recorded if sorted(expected[d] or []) != sorted(recorded[d])][:5])
+check("the batches left over match the replay, so every unit is accounted for",
+      all(left_after[b["id"]] == b["quantity_remaining"] for b in batches))
+check("some dispensings were split across two batches, and none used an expired batch",
+      any(len(v) > 1 for v in recorded.values())
+      and not db.execute(
+          "SELECT 1 FROM medicine_dispensing_batches l JOIN medicine_dispensing d ON d.id = l.dispensing_id "
+          "JOIN inventory_batches b ON b.id = l.batch_id "
+          "WHERE b.expiry_date IS NOT NULL AND b.expiry_date < d.date_dispensed").fetchone())
 
 # ===========================================================================
 section("5. PEOPLE, NAMES AND PHONE NUMBERS ARE INVENTED")

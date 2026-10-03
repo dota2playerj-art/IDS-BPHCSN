@@ -139,6 +139,7 @@
           <div class="stat-value">{{ inventory_stats.total_items }}</div>
           <div class="stat-label">Active Inventory Items</div>
           <div class="stat-trend" style="color:var(--text-muted);">{{ inventory_stats.medicine_count }} medicine{{ '' if inventory_stats.medicine_count == 1 else 's' }}</div>
+          <div class="stat-trend" style="color:{{ 'var(--danger)' if inventory_stats.expired_count else 'var(--text-muted)' }};">Expiring soon: {{ inventory_stats.expiring_soon_count }} &middot; Expired: {{ inventory_stats.expired_count }}</div>
         </div>
       </div>
       <div class="col-lg-2 col-md-4 col-sm-6">
@@ -287,16 +288,17 @@
             <div class="panel-title" style="font-size:15px;">Medicine Inventory</div>
           </div>
           <div class="panel-sub mb-2">{{ low_stock.total_items }} item{{ "s" if low_stock.total_items != 1 }} &middot; {{ low_stock.low_stock_count }} low stock</div>
+          <div class="panel-sub mb-2">Expiring soon: {{ inventory_stats.expiring_soon_count }} &middot; Expired: {{ inventory_stats.expired_count }}</div>
 
 {%- for item in low_stock.low_stock_items %}
           <!-- Most critical first: stock as a fraction of this item's own reorder
                level, so 15 of 60 outranks 90 of 90. Ordered in models/inventory.py. -->
-{%- set critical = item.stock_status in ('Out of Stock', 'Critical', 'Expires Today', 'Expired') %}
+{%- set critical = item.stock_status in ('Out of Stock', 'Critical') %}
           <div class="inv-item">
-            <div class="inv-item-head"><span class="inv-name">{{ item.name }}{% if item.display_dosage %} {{ item.display_dosage }}{% endif %}</span>{% if item.threshold_pct is not none %}<span class="inv-pct" style="color:{{ 'var(--danger)' if critical else 'var(--warning)' }};">{{ item.threshold_pct }}%</span>{% endif %}</div>
+            <div class="inv-item-head"><span class="inv-name">{{ item.name }}</span>{% if item.threshold_pct is not none %}<span class="inv-pct" style="color:{{ 'var(--danger)' if critical else 'var(--warning)' }};">{{ item.threshold_pct }}%</span>{% endif %}</div>
             <div class="inv-qty">{{ item.stock_quantity }} / {{ item.low_stock_threshold }} {{ item.unit or 'units' }}</div>
             <div class="inv-bar-track"><div class="inv-bar-fill {{ item.stock_fill_class }}" style="width:{{ item.stock_percent }}%;"></div></div>
-            <div class="inv-exp">Exp: {{ item.expiry_date | display_date('No expiry') }}</div>
+            <div class="inv-exp">Exp: {{ item.nearest_expiry | display_date('No expiry') }}</div>
           </div>
 {%- endfor %}
 {%- if not low_stock.low_stock_items %}

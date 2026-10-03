@@ -62,12 +62,18 @@ def login(client, username, password):
                        follow_redirects=True)
 
 
+# Stock is the sum of an item's usable batches: not expired, not empty (Task 12).
+USABLE_STOCK_SQL = ("SELECT COALESCE(SUM(quantity_remaining), 0) FROM inventory_batches "
+                    "WHERE quantity_remaining > 0 AND (expiry_date IS NULL "
+                    "OR expiry_date >= date('now'))")
+
+
 def stock_of(item_id):
     conn = db()
-    row = conn.execute("SELECT stock_quantity FROM inventory_items WHERE id=?",
+    row = conn.execute(USABLE_STOCK_SQL + " AND inventory_item_id=?",
                        (item_id,)).fetchone()
     conn.close()
-    return row["stock_quantity"]
+    return row[0]
 
 
 def dispensing_rows(consultation_id):
@@ -139,13 +145,17 @@ with appmod.app.app_context():
 
 _conn = db()
 SHELF_STOCK = {
-    row["id"]: row["stock_quantity"]
-    for row in _conn.execute("SELECT id, stock_quantity FROM inventory_items")
+    row["id"]: row["stock"]
+    for row in _conn.execute(
+        "SELECT i.id, COALESCE(SUM(CASE WHEN b.expiry_date IS NULL OR b.expiry_date >= date('now') "
+        "THEN b.quantity_remaining END), 0) AS stock FROM inventory_items i "
+        "LEFT JOIN inventory_batches b ON b.inventory_item_id = i.id GROUP BY i.id")
 }
 _expired = _conn.execute(
-    "SELECT id, name FROM inventory_items "
-    "WHERE category = 'Medicine' AND expiry_date < date('now') "
-    "ORDER BY stock_quantity DESC LIMIT 1").fetchone()
+    "SELECT i.id, i.name FROM inventory_items i JOIN inventory_batches b "
+    "ON b.inventory_item_id = i.id WHERE i.category = 'Medicine' "
+    "AND b.expiry_date < date('now') AND b.quantity_remaining > 0 "
+    "ORDER BY b.quantity_remaining DESC LIMIT 1").fetchone()
 _conn.close()
 
 EXPIRED_ID, EXPIRED_NAME = (_expired["id"], _expired["name"]) if _expired else (None, None)
@@ -319,7 +329,8 @@ for username, password, url_pattern, role, patient in ROLES:
                                        + [(EXPIRED_ID, 5)]))
     html = resp.get_data(as_text=True)
     check("expired %s on LINE 6 is refused" % EXPIRED_NAME, "was not saved" in html)
-    check("the refusal names the expiry", "expired on" in html)
+    check("the refusal says there is no usable stock and that expired stock is not used",
+          "no usable stock" in html and "Expired stock is not used" in html)
     check("it blames the medicine, not the quantity", "Item on line 6" in html)
     check("expired stock was not touched", stock_of(EXPIRED_ID) == before_expired)
     check("no consultation was written", consultation_for(appointment) is None)
@@ -422,8 +433,8 @@ KEPT = [
     "Tick what was given today",
     "dose number only where the vaccine has one",
     "comes off Medicine Inventory at once",
-    "refused if the shelf holds less",
-    "the item has expired",
+    "refused if usable stock is less",
+    "Expired stock is never used",
 ]
 for phrase in KEPT:
     check('rule still stated: "%s"' % phrase[:44], phrase in text, "MISSING")

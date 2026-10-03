@@ -521,12 +521,14 @@ ACTION_PARENT_REPORT_RECORDED = "Recorded a parent report of a dose"
 ACTION_PARENT_REPORT_UPGRADED = "Upgraded a parent report to a card record"
 ACTION_ELSEWHERE_DOSE_CHANGED = "Changed a dose record given elsewhere"
 ACTION_ELSEWHERE_DOSE_REMOVED = "Removed a dose record given elsewhere"
-# Medicine Inventory. Dispensing moves stock, so it is filed here. An edit that
-# moved the stock figure is "Adjusted stock quantity", the more serious fact.
+# Medicine Inventory. Dispensing moves stock, so it is filed here. Stock is received as a
+# batch and removed from one batch (Task 12); Edit details never changes a quantity.
 ACTION_MEDICINE_DISPENSED = "Dispensed medicine"
 ACTION_INVENTORY_ADDED = "Added inventory item"
 ACTION_INVENTORY_EDITED = "Edited inventory item"
-ACTION_STOCK_ADJUSTED = "Adjusted stock quantity"
+ACTION_STOCK_ADJUSTED = "Adjusted stock quantity"  # old entries; stock is now received and removed by batch
+ACTION_STOCK_RECEIVED = "Received stock"
+ACTION_STOCK_REMOVED = "Removed stock from a batch"
 ACTION_INVENTORY_ARCHIVED = "Archived inventory item"
 ACTION_INVENTORY_RESTORED = "Returned inventory item to service"
 # Appointment Scheduling (the Patient Queue).

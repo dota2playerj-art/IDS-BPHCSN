@@ -385,16 +385,17 @@
         <div class="panel-card">
           <div class="panel-title" style="font-size:15px;">Medicine Stock Alerts</div>
           <div class="panel-sub mb-2">{{ low_stock.low_stock_count }} item{{ "s" if low_stock.low_stock_count != 1 }} below reorder level</div>
+          <div class="panel-sub mb-2">Expiring soon: {{ inventory_stats.expiring_soon_count }} &middot; Expired: {{ inventory_stats.expired_count }}</div>
           <div>
 {%- for item in low_stock.low_stock_items %}
             <!-- Out of stock, at half their reorder level or less, or out of time
                  carry the red treatment; the rest are amber. Same split the Medicine
                  Inventory badges use. -->
-{%- set critical = item.stock_status in ('Out of Stock', 'Critical', 'Expires Today', 'Expired') %}
+{%- set critical = item.stock_status in ('Out of Stock', 'Critical') %}
             <div class="alert-row">
               <div class="alert-icon" style="background:{{ '#FEE2E2' if critical else '#FEF3C7' }};"><span class="material-symbols-outlined" style="color:{{ 'var(--danger)' if critical else 'var(--warning)' }}; font-size:18px;">{{ 'warning' if critical else 'error' }}</span></div>
               <div>
-                <div class="alert-title">{{ item.name }}{% if item.display_dosage %} {{ item.display_dosage }}{% endif %}</div>
+                <div class="alert-title">{{ item.name }}</div>
                 <div class="alert-sub">{{ item.stock_quantity }} / {{ item.low_stock_threshold }} {{ item.unit or 'units' }}{% if item.threshold_pct is not none %} &middot; {{ item.threshold_pct }}% of reorder level{% endif %}</div>
               </div>
             </div>

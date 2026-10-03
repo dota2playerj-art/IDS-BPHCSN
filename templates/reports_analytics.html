@@ -299,6 +299,7 @@
           <div class="stat-label">Inventory Items In Service</div>
           {%- if inventory_report.low_stock_count %}
           <div class="stat-trend" style="color:var(--danger);">{{ inventory_report.low_stock_count }} low stock &middot; today</div>
+          <div class="stat-trend" style="color:var(--text-muted);">Expiring soon: {{ inventory_report.expiring_soon_count }} &middot; Expired: {{ inventory_report.expired_count }}</div>
           {%- else %}
           <div class="stat-trend" style="color:var(--success);">All above reorder level &middot; today</div>
           {%- endif %}
@@ -399,13 +400,13 @@
           <div class="panel-sub">{{ dist.total }} item{{ "s" if dist.total != 1 }} by stock condition &middot; each counted once, under its most urgent condition</div>
           <div class="chart-wrap short"><canvas id="chartInvStatus"></canvas></div>
 {{ ct.chart_table('Inventory items by stock condition, today',
-                  ['In Stock', 'Low Stock', 'Near Expiry', 'Expired'],
-                  [{'name': 'Items', 'values': [dist.in_stock, dist.low_stock, dist.near_expiry, dist.expired]}],
+                  ['In Stock', 'Low Stock', 'Expiring Soon', 'Expired'],
+                  [{'name': 'Items', 'values': [dist.in_stock, dist.low_stock, dist.expiring_soon, dist.expired]}],
                   first_head='Condition') }}
           <div class="mini-legend no-print">
             <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--success);"></span>In Stock ({{ dist.in_stock }})</div>
             <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--warning);"></span>Low Stock ({{ dist.low_stock }})</div>
-            <div class="mini-legend-item"><span class="mini-legend-dot" style="background:#FFEDD5;"></span>Near Expiry ({{ dist.near_expiry }})</div>
+            <div class="mini-legend-item"><span class="mini-legend-dot" style="background:#FFEDD5;"></span>Expiring Soon ({{ dist.expiring_soon }})</div>
             <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--danger);"></span>Expired ({{ dist.expired }})</div>
           </div>
 {#- Still a snapshot, and the reason is now narrower than it was. It used to be
@@ -425,9 +426,9 @@
 {%- for item in inventory_report.low_stock_items %}
             <!-- Most critical first, ordered by get_low_stock_alert(): stock as a
                  fraction of this item's own reorder level. -->
-{%- set critical = item.stock_status in ('Out of Stock', 'Critical', 'Expires Today', 'Expired') %}
+{%- set critical = item.stock_status in ('Out of Stock', 'Critical') %}
             <div class="low-stock-item">
-              <div><div class="ls-name">{{ item.name }}{% if item.display_dosage %} {{ item.display_dosage }}{% endif %}</div><div class="ls-meta">{{ item.stock_quantity }} / {{ item.low_stock_threshold }} {{ item.unit or 'units' }}</div></div>
+              <div><div class="ls-name">{{ item.name }}</div><div class="ls-meta">{{ item.stock_quantity }} / {{ item.low_stock_threshold }} {{ item.unit or 'units' }}</div></div>
               {%- if item.threshold_pct is not none %}
               <div class="ls-pct" style="color:{{ 'var(--danger)' if critical else 'var(--warning)' }};">{{ item.threshold_pct }}%</div>
               {%- endif %}
@@ -437,6 +438,40 @@
             <div class="panel-sub">Every item is above its reorder level.</div>
 {%- endif %}
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ROW: BATCHES EXPIRING SOON AND EXPIRED. Stock facts with no patient link, so the
+         small-count rule does not apply and every role that sees this report sees the same rows. -->
+    <div class="row g-3 mt-1">
+      <div class="col-12">
+        <div class="panel-card" id="expiryBatches">
+          <h2 class="print-only print-section-title">Batches Expiring Soon and Expired</h2>
+          <div class="panel-title no-print">Batches Expiring Soon and Expired</div>
+          <div class="panel-sub">Expiring soon: {{ inventory_report.expiring_soon_count }} (within {{ inventory_report.expiring_soon_days }} days) &middot; Expired: {{ inventory_report.expired_count }} &middot; as of {{ report_date | display_date }}</div>
+{%- if inventory_report.expiry_batches %}
+          <div style="overflow-x:auto;">
+            <table class="table" style="font-size:13.5px;">
+              <thead>
+                <tr><th scope="col">Item</th><th scope="col">Lot</th><th scope="col">Expiry</th><th scope="col" class="text-end">Amount</th><th scope="col">Status</th></tr>
+              </thead>
+              <tbody>
+{%- for row in inventory_report.expiry_batches %}
+                <tr>
+                  <td>{{ row.item_name }}</td>
+                  <td>{{ row.lot_number }}</td>
+                  <td>{{ row.expiry_date | display_date('No expiry') }}</td>
+                  <td class="text-end">{{ "{:,}".format(row.quantity_remaining) }} {{ (row.unit or 'units') | lower }}</td>
+                  <td>{{ row.status }}</td>
+                </tr>
+{%- endfor %}
+              </tbody>
+            </table>
+          </div>
+{%- else %}
+          <div class="panel-sub">No batch is expiring soon or expired.</div>
+{%- endif %}
         </div>
       </div>
     </div>
@@ -879,8 +914,8 @@
   draw('chartInvStatus', {
     type: 'doughnut',
     data: {
-      labels: ['In Stock','Low Stock','Near Expiry','Expired'],
-      datasets: [{ data:[{{ inventory_report.status_distribution.in_stock }},{{ inventory_report.status_distribution.low_stock }},{{ inventory_report.status_distribution.near_expiry }},{{ inventory_report.status_distribution.expired }}], backgroundColor:[success, warning, '#FFEDD5', danger], borderWidth:0 }]
+      labels: ['In Stock','Low Stock','Expiring Soon','Expired'],
+      datasets: [{ data:[{{ inventory_report.status_distribution.in_stock }},{{ inventory_report.status_distribution.low_stock }},{{ inventory_report.status_distribution.expiring_soon }},{{ inventory_report.status_distribution.expired }}], backgroundColor:[success, warning, '#FFEDD5', danger], borderWidth:0 }]
     },
     options: { responsive:true, maintainAspectRatio:false, cutout:'68%', plugins:{legend:{display:false}} }
   });

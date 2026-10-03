@@ -40,6 +40,9 @@ def client_as(user_id, role):
 
 def cleanup():
     conn = db()
+    for dispensing_id in created["dispensing"]:
+        conn.execute("DELETE FROM medicine_dispensing_batches WHERE dispensing_id = ?",
+                     (dispensing_id,))
     for table, key in (("medicine_dispensing", "dispensing"),
                        ("immunizations", "immunizations"),
                        ("general_vaccinations", "general"),
@@ -47,10 +50,10 @@ def cleanup():
                        ("appointments", "appointments")):
         for row_id in created[key]:
             conn.execute(f"DELETE FROM {table} WHERE id = ?", (row_id,))
-    for item_id, quantity in stock_restore:
+    for batch_id, quantity in stock_restore:
         conn.execute(
-            "UPDATE inventory_items SET stock_quantity = ? WHERE id = ?",
-            (quantity, item_id),
+            "UPDATE inventory_batches SET quantity_remaining = ? WHERE id = ?",
+            (quantity, batch_id),
         )
     conn.commit()
     conn.close()
@@ -82,9 +85,11 @@ def main():
     ).fetchone())
     item = conn.execute(
         """
-        SELECT id, name, unit, stock_quantity FROM inventory_items
-         WHERE status = 'Active' AND stock_quantity >= 5
-           AND (expiry_date IS NULL OR expiry_date >= date('now'))
+        SELECT i.id, i.name, i.unit, SUM(b.quantity_remaining) AS stock_quantity
+          FROM inventory_items i JOIN inventory_batches b ON b.inventory_item_id = i.id
+         WHERE i.status = 'Active' AND b.quantity_remaining > 0
+           AND (b.expiry_date IS NULL OR b.expiry_date >= date('now'))
+         GROUP BY i.id HAVING SUM(b.quantity_remaining) >= 5
          ORDER BY stock_quantity DESC LIMIT 1
         """
     ).fetchone()
@@ -93,7 +98,12 @@ def main():
     print(f"\nPatient {patient['patient_id']} ({patient['first_name']}), "
           f"item {item['name']} at {item['stock_quantity']}\n")
     stock_before = item["stock_quantity"]
-    stock_restore.append((item["id"], stock_before))
+    conn = db()
+    stock_restore.extend(
+        (row["id"], row["quantity_remaining"]) for row in conn.execute(
+            "SELECT id, quantity_remaining FROM inventory_batches WHERE inventory_item_id = ?",
+            (item["id"],)))
+    conn.close()
 
     appt = make_queue_entry(patient["id"])
 
@@ -155,7 +165,8 @@ def main():
         "SELECT * FROM medicine_dispensing WHERE consultation_id = ?", (cid,)
     ).fetchall()
     after_stock = conn.execute(
-        "SELECT stock_quantity FROM inventory_items WHERE id = ?", (item["id"],)
+        "SELECT SUM(quantity_remaining) FROM inventory_batches WHERE inventory_item_id = ? "
+        "AND (expiry_date IS NULL OR expiry_date >= date('now'))", (item["id"],)
     ).fetchone()[0]
     queue_status = conn.execute(
         "SELECT status FROM appointments WHERE id = ?", (appt,)

@@ -62,26 +62,82 @@ ACCOUNT_NAMES = tuple(name for _, name, _ in ACCOUNTS)
 PHONE_PATTERN = r"^0900000\d{4}$"
 
 # ---------------------------------------------------------------------------
-# The shelf. key -> (name, generic, category, drug class, strength, form, unit,
-# reorder level, stock left at the end, days to expiry, unit cost)
+# The shelf. key -> (generic name, strength, dosage form, category, drug class, unit,
+# reorder level, usable stock left at the end, days to expiry, unit cost). The item's
+# display name is built from the first three ("Paracetamol 500 mg tablet"). A supply has
+# an item name and a size instead.
 # ---------------------------------------------------------------------------
 ITEMS = (
-    ("paracetamol", "Paracetamol 500mg", "Paracetamol", "Medicine", "Analgesic / Antipyretic", "500mg", "Tablet", "Tablet", 200, (300, 500), 420, 1.5),
-    ("amoxicillin", "Amoxicillin 500mg", "Amoxicillin", "Medicine", "Antibiotic", "500mg", "Capsule", "Capsule", 150, (200, 400), 380, 3.0),
-    ("ors", "Oral Rehydration Salts", "Oral rehydration salts", "Medicine", "Oral Rehydration", "20.5g", "Sachet", "Sachet", 60, (80, 160), 500, 6.0),
-    ("zinc", "Zinc Sulfate 20mg", "Zinc sulfate", "Medicine", "Vitamins & Supplements", "20mg", "Tablet", "Tablet", 100, (150, 250), 45, 2.0),
-    ("cotrimoxazole", "Cotrimoxazole 400/80mg", "Sulfamethoxazole-trimethoprim", "Medicine", "Antibiotic", "400/80mg", "Tablet", "Tablet", 120, (30, 70), 300, 2.5),
-    ("losartan", "Losartan 50mg", "Losartan potassium", "Medicine", "Antihypertensive", "50mg", "Tablet", "Tablet", 300, (400, 700), 450, 4.0),
-    ("amlodipine", "Amlodipine 5mg", "Amlodipine besylate", "Medicine", "Antihypertensive", "5mg", "Tablet", "Tablet", 300, (350, 600), 440, 3.5),
-    ("metformin", "Metformin 500mg", "Metformin hydrochloride", "Medicine", "Antidiabetic", "500mg", "Tablet", "Tablet", 300, (60, 200), 400, 2.0),
-    ("ferrous", "Ferrous Sulfate + Folic Acid", "Ferrous sulfate, folic acid", "Medicine", "Vitamins & Supplements", "60mg/400mcg", "Tablet", "Tablet", 200, (250, 450), 480, 1.8),
-    ("cetirizine", "Cetirizine 10mg", "Cetirizine hydrochloride", "Medicine", "Antihistamine", "10mg", "Tablet", "Tablet", 100, (120, 220), 410, 2.2),
-    ("salbutamol", "Salbutamol Nebule 2.5mg", "Salbutamol sulfate", "Medicine", "Bronchodilator", "2.5mg/2.5mL", "Nebule", "Piece", 40, (60, 120), 350, 12.0),
-    ("vitamin_a", "Vitamin A 200,000 IU", "Retinol", "Medicine", "Vitamins & Supplements", "200,000 IU", "Capsule", "Capsule", 40, (60, 120), 460, 5.0),
-    ("condoms", "Condoms", None, "Supply", None, None, None, "Pack", 40, (80, 160), None, 25.0),
-    ("pregtest", "Pregnancy Test Kit", None, "Supply", None, None, None, "Piece", 20, (30, 60), None, 30.0),
-    ("thermometer", "Digital Thermometer", None, "Equipment", None, None, None, "Piece", 2, (4, 4), None, 250.0),
+    ("paracetamol", "Paracetamol", "500 mg", "tablet", "Medicine", "Analgesic / Antipyretic", "Tablet", 200, (300, 500), 420, 1.5),
+    ("amoxicillin", "Amoxicillin", "500 mg", "capsule", "Medicine", "Antibiotic", "Capsule", 150, (200, 400), 380, 3.0),
+    ("ors", "Oral rehydration salts", "20.5 g", "sachet", "Medicine", "Oral Rehydration", "Sachet", 60, (80, 160), 500, 6.0),
+    ("zinc", "Zinc sulfate", "20 mg", "tablet", "Medicine", "Vitamins & Supplements", "Tablet", 100, (150, 250), 45, 2.0),
+    ("cotrimoxazole", "Sulfamethoxazole-trimethoprim", "400/80 mg", "tablet", "Medicine", "Antibiotic", "Tablet", 120, (30, 70), 300, 2.5),
+    ("losartan", "Losartan potassium", "50 mg", "tablet", "Medicine", "Antihypertensive", "Tablet", 300, (400, 700), 450, 4.0),
+    ("amlodipine", "Amlodipine besylate", "5 mg", "tablet", "Medicine", "Antihypertensive", "Tablet", 300, (350, 600), 440, 3.5),
+    ("metformin", "Metformin hydrochloride", "500 mg", "tablet", "Medicine", "Antidiabetic", "Tablet", 300, (60, 200), 400, 2.0),
+    ("ferrous", "Ferrous sulfate + folic acid", "60 mg/400 mcg", "tablet", "Medicine", "Vitamins & Supplements", "Tablet", 200, (250, 450), 480, 1.8),
+    ("cetirizine", "Cetirizine hydrochloride", "10 mg", "tablet", "Medicine", "Antihistamine", "Tablet", 100, (120, 220), 410, 2.2),
+    ("salbutamol", "Salbutamol sulfate", "2.5 mg/2.5 mL", "other", "Medicine", "Bronchodilator", "Piece", 40, (60, 120), 350, 12.0),
+    ("vitamin_a", "Retinol (vitamin A)", "200,000 IU", "capsule", "Medicine", "Vitamins & Supplements", "Capsule", 40, (60, 120), 460, 5.0),
+    ("condoms", "Condoms", "", None, "Supply", None, "Pack", 40, (80, 160), None, 25.0),
+    ("pregtest", "Pregnancy test kit", "", None, "Supply", None, "Piece", 20, (30, 60), None, 30.0),
+    ("thermometer", "Digital thermometer", "", None, "Equipment", None, "Piece", 2, (4, 4), None, 250.0),
 )
+
+# Invented brand names, two per medicine: each delivery of the same generic comes from a
+# different maker, so the brand belongs to the batch.
+BRANDS = {
+    "paracetamol": ("Febrex", "Paracare"), "amoxicillin": ("Amoxiclear", "Bactonil"),
+    "ors": ("Hydrasalt", "Rehydra"), "zinc": ("Zincovit-D", "Zinfort"),
+    "cotrimoxazole": ("Cotrimex", "Septrol"), "losartan": ("Losarex", "Tensolar"),
+    "amlodipine": ("Amlocor", "Norvexa"), "metformin": ("Glucomet", "Diabeform"),
+    "ferrous": ("Ferrofol", "Hemacare"), "cetirizine": ("Allerzine", "Cetrilux"),
+    "salbutamol": ("Ventolair", "Brethex"), "vitamin_a": ("Retinova", "Vitalia"),
+}
+SOURCES = ("DOH", "Municipal Health Office / RHU", "Barangay purchase", "Donation")
+
+
+def batch_plan(key, number, medicine, needed, left, expiry_days, today):
+    """The deliveries of one item, as dicts for the Receive stock form.
+
+    Several batches per medicine, with different expiry dates, brands and sources, so FEFO has
+    something to choose between. Three items are shaped on purpose: zinc keeps a batch that is
+    expiring soon, amoxicillin keeps an old batch that has expired (with stock left in it), and
+    the others split their stock between an earlier and a later expiry. `needed` is what the
+    visits take over the whole year and `left` is what should be usable at the end, so a
+    batch's size is chosen to leave something in it whichever batches FEFO empties first.
+    """
+    total = needed + left
+    lot = f"LOT-{number + 1:03d}"
+    if not medicine:
+        return [{"lot": f"{lot}-A" if expiry_days else "No lot number", "expiry": None, "qty": total,
+                 "brand": "", "source": SOURCES[number % len(SOURCES)], "ago": 0}]
+    brand_a, brand_b = BRANDS[key]
+    if key == "zinc":
+        soon = needed + left // 2
+        return [
+            {"lot": f"{lot}-A", "expiry": today + timedelta(days=expiry_days), "qty": soon,
+             "brand": brand_a, "source": "DOH", "ago": 60},
+            {"lot": f"{lot}-B", "expiry": today + timedelta(days=400), "qty": total - soon,
+             "brand": brand_b, "source": "Donation", "ago": 0},
+        ]
+    if key == "amoxicillin":
+        return [
+            {"lot": f"{lot}-X", "expiry": today - timedelta(days=12), "qty": needed + 30,
+             "brand": brand_a, "source": "DOH", "ago": 120},
+            {"lot": f"{lot}-B", "expiry": today + timedelta(days=expiry_days), "qty": total,
+             "brand": brand_b, "source": "Municipal Health Office / RHU", "ago": 0},
+        ]
+    earlier = max(1, total // 3)
+    return [
+        {"lot": f"{lot}-A", "expiry": today + timedelta(days=expiry_days - 120), "qty": earlier,
+         "brand": brand_a, "source": "DOH", "ago": 60},
+        {"lot": f"{lot}-B", "expiry": today + timedelta(days=expiry_days), "qty": total - earlier,
+         "brand": brand_b, "source": "Municipal Health Office / RHU" if number % 2 else "Barangay purchase",
+         "ago": 0},
+    ]
+
 
 # ---------------------------------------------------------------------------
 # The case mix. key -> label, main complaint, other complaints, diagnosis,
@@ -734,7 +790,7 @@ def run_sql(path, sql, args=()):
         conn.close()
 
 
-STAMP_TABLES = ("users", "patients", "consultations", "inventory_items", "appointments",
+STAMP_TABLES = ("users", "patients", "consultations", "inventory_items", "inventory_batches", "appointments",
                 "immunizations", "general_vaccinations", "medicine_dispensing", "audit_logs",
                 "sms_broadcasts", "sms_broadcast_recipients", "appointment_sms_messages",
                 "settings")
@@ -899,9 +955,12 @@ def build(path, say=print, show_passwords=True, today_override=None):
                   for name in ("admin", "doctor", "staff1", "staff2", "official")}
         staff_cycle = ("staff1", "staff2")
 
-        # ---- inventory, added by Health Center Staff (the Administrator adds one)
+        # ---- inventory: Health Center Staff add each item, then receive its batches (the
+        # Administrator adds and stocks one)
+        from models.inventory import build_display_name
         item_ids = {}
-        for number, (key, name, generic, category, drug_class, strength, form_, unit, reorder,
+        batch_count = 0
+        for number, (key, generic, strength, form_, category, drug_class, unit, reorder,
                      (low_left, high_left), expiry_days, cost) in enumerate(ITEMS):
             if key in ("metformin", "cotrimoxazole"):
                 left = rng.randint(2, max(3, reorder // 4))          # below the reorder level
@@ -909,24 +968,37 @@ def build(path, say=print, show_passwords=True, today_override=None):
                 left = reorder + 2                                     # just above it
             else:
                 left = rng.randint(low_left, high_left)
-            stock = needed.get(key, 0) + left
+            medicine = category == "Medicine"
             values = {
-                "name": name, "generic_name": generic or "", "category": category,
-                "drug_class": drug_class or "", "dosage_strength": strength or "",
-                "dosage_form": form_ or "", "unit": unit, "stock_quantity": str(stock),
+                "category": category,
+                "generic_name": generic if medicine else "", "dosage_strength": strength if medicine else "",
+                "dosage_form": form_ or "",
+                "item_name": "" if medicine else generic, "size": "" if medicine else strength,
+                "drug_class": drug_class or "", "unit": unit,
                 "low_stock_threshold": str(reorder),
-                "expiry_date": (today + timedelta(days=expiry_days)).isoformat() if expiry_days else "",
-                "date_received": setup_day.isoformat(),
-                "batch_number": f"DEMO-{number + 1:04d}" if category == "Medicine" else "",
-                "manufacturer": "Demo Pharma Corp." if category == "Medicine" else "",
+                "manufacturer": "Demo Pharma Corp." if medicine else "",
                 "supplier": "Demo Supplier Inc.", "unit_cost": f"{cost:.2f}",
                 "storage_location": "Health center cabinet", "notes": "", "status": "Active",
             }
-            actor = actors["admin"] if key == "thermometer" else actors["staff1"]
-            url = "/admin/add_edit_medicine" if key == "thermometer" else "/staff/add_edit_medicine"
-            actor.post(url, values)
+            admin_adds = key == "thermometer"
+            actor = actors["admin"] if admin_adds else actors["staff1"]
+            area = "/admin" if admin_adds else "/staff"
+            actor.post(f"{area}/add_edit_medicine", values)
             stamper.stamp(_clock["now"])
+            name = build_display_name(category, generic, strength, form_ or "")
             item_ids[key] = rows(path, "SELECT id FROM inventory_items WHERE name = ?", (name,))[0][0]
+            for batch in batch_plan(key, number, medicine, needed.get(key, 0), left,
+                                    expiry_days, today):
+                actor.post(f"{area}/medicine_inventory/{item_ids[key]}/receive", {
+                    "lot_number": "" if batch["lot"] == "No lot number" else batch["lot"],
+                    "no_lot": "1" if batch["lot"] == "No lot number" else "",
+                    "expiry_date": batch["expiry"].isoformat() if batch["expiry"] else "",
+                    "quantity": str(batch["qty"]),
+                    "date_received": (setup_day - timedelta(days=batch["ago"])).isoformat(),
+                    "source": batch["source"], "brand_name": batch["brand"]})
+                stamper.stamp(_clock["now"])
+                batch_count += 1
+        assert rows(path, "SELECT COUNT(*) FROM inventory_batches")[0][0] == batch_count
 
         # ---- the timeline
         events = []
@@ -1096,6 +1168,17 @@ def build(path, say=print, show_passwords=True, today_override=None):
         "doses the parent says were given, no card": rows(path, "SELECT COUNT(*) FROM immunizations WHERE evidence = 'parent_report'")[0][0],
         "dispensing issues": rows(path, "SELECT COUNT(*) FROM medicine_dispensing")[0][0],
         "inventory items": rows(path, "SELECT COUNT(*) FROM inventory_items")[0][0],
+        "inventory batches": rows(path, "SELECT COUNT(*) FROM inventory_batches")[0][0],
+        "batches expiring soon": rows(
+            path, "SELECT COUNT(*) FROM inventory_batches WHERE quantity_remaining > 0 "
+                  "AND expiry_date >= ? AND expiry_date <= ?",
+            (today.isoformat(), (today + timedelta(days=config.EXPIRING_SOON_DAYS)).isoformat()))[0][0],
+        "expired batches holding stock": rows(
+            path, "SELECT COUNT(*) FROM inventory_batches WHERE quantity_remaining > 0 "
+                  "AND expiry_date < ?", (today.isoformat(),))[0][0],
+        "dispensing rows split across batches": rows(
+            path, "SELECT COUNT(*) FROM (SELECT dispensing_id FROM medicine_dispensing_batches "
+                  "GROUP BY dispensing_id HAVING COUNT(*) > 1)")[0][0],
         "broadcasts": rows(path, "SELECT COUNT(*) FROM sms_broadcasts")[0][0],
         "audit entries": rows(path, "SELECT COUNT(*) FROM audit_logs")[0][0],
     }

@@ -1,28 +1,31 @@
-"""Medicine and supply inventory queries.
+"""Medicine and supply inventory: items, and the batches their stock is kept in.
 
-Like models/patients.py, the read functions return plain dicts rather than
-sqlite3.Row objects: Screen 06 renders a stock status, a badge class and a
-progress bar that are all derived from stock_quantity, low_stock_threshold and
-expiry_date rather than stored. sqlite3.Row is read-only, so each row is copied
-into a dict and the derived keys are added alongside.
+An item is a kind of thing the health center stocks. A medicine is defined by its generic
+name, strength and dosage form (RA 6675, the Generics Act, asks government health agencies
+to use generic names); its display name is built from them. The stock of an item is the
+sum of its usable batches: each delivery is a batch with its own lot, expiry date, source
+and brand. A batch past its expiry date is Expired and is never counted or dispensed.
+
+The read functions return plain dicts rather than sqlite3.Row objects: the screens render
+a stock status, a badge class and a progress bar that are derived, not stored.
 """
+import re
 from datetime import datetime
 
+from config import EXPIRING_SOON_DAYS
 from database.connection import db_connection
 from utils.dates import today
 
-# The vocabularies the Add/Edit Medicine form offers. The template renders its
-# <select> options from these same tuples, so a constrained field cannot accept a
-# value the form never offered, and the two cannot drift apart.
+# The vocabularies the forms offer. The templates render their <select> options from these
+# same tuples, so a constrained field cannot accept a value the form never offered.
 #
-# ITEM_CATEGORIES is the item *type* and matches the inventory_items.category
-# CHECK exactly -- a value outside it would be rejected by the database.
+# ITEM_CATEGORIES is the item *type* and matches the inventory_items.category CHECK. A
+# Medicine is named by generic name, strength and form; a Supply or Equipment item has a
+# simple item name and a size.
 ITEM_CATEGORIES = ("Medicine", "Supply", "Equipment")
+MEDICINE_CATEGORY = "Medicine"
 
-# The therapeutic classification, stored in drug_class. The first six are the
-# options Screen 06's filter panel and Screen 07's "Category" dropdown already
-# listed; the last two were added so the seeded Cetirizine and Salbutamol have an
-# honest class instead of being filed under a heading that does not describe them.
+# The therapeutic classification, stored in drug_class.
 DRUG_CLASSES = (
     "Antihypertensive",
     "Analgesic / Antipyretic",
@@ -34,29 +37,31 @@ DRUG_CLASSES = (
     "Bronchodilator",
 )
 
-# Screen 07 listed six dosage forms and six units; "Nebule", "Piece" and "Pack"
-# are added because the inventory also holds nebules and non-dosed supplies.
-DOSAGE_FORMS = ("Tablet", "Capsule", "Syrup", "Sachet", "Injection", "Ointment", "Nebule")
+# The one list of dosage forms.
+DOSAGE_FORMS = ("tablet", "capsule", "syrup", "suspension", "drops", "sachet",
+                "injection", "cream", "ointment", "inhaler", "other")
 UNITS = ("Tablet", "Capsule", "Bottle", "Sachet", "Vial", "Box", "Piece", "Pack")
 
 ITEM_STATUSES = ("Active", "Inactive")
 
-# Human wording for the "what changed" line flashed after a save. Keyed by column
-# so the message names the field the operator sees on the form, not the column.
+# Where a delivery came from, and why stock is taken out of a batch.
+STOCK_SOURCES = ("DOH", "Municipal Health Office / RHU", "Barangay purchase", "Donation",
+                 "Other")
+REMOVAL_REASONS = ("Expired", "Damaged", "Lost", "Returned", "Count correction")
+# What the lot number says when a delivery had none. Allowed only with the tick box.
+NO_LOT_NUMBER = "No lot number"
+# The cap on one delivery or one removal. A typo guard, not a storage limit.
+MAX_QUANTITY = 100000
+
+# Human wording for the "what changed" line flashed after Edit details.
 FIELD_LABELS = {
-    "name": "Medicine name",
     "generic_name": "Generic name",
-    "brand_name": "Brand name",
     "category": "Item type",
     "drug_class": "Category",
-    "dosage_strength": "Dosage strength",
+    "dosage_strength": "Strength",
     "dosage_form": "Dosage form",
     "unit": "Unit of measure",
-    "stock_quantity": "Current stock",
     "low_stock_threshold": "Reorder level",
-    "expiry_date": "Expiration date",
-    "date_received": "Date received",
-    "batch_number": "Batch number",
     "manufacturer": "Manufacturer",
     "supplier": "Supplier",
     "unit_cost": "Unit cost",
@@ -64,118 +69,57 @@ FIELD_LABELS = {
     "notes": "Notes",
     "status": "Status",
 }
+SUPPLY_FIELD_LABELS = {"generic_name": "Item name", "dosage_strength": "Size"}
 
-# Fields marked with * on the form and required for every item regardless of type.
-REQUIRED_FIELDS = {
-    "name": "Medicine name is required.",
-    "category": "Item type is required.",
-    "unit": "Unit of measure is required.",
-    "date_received": "Date received is required.",
-    "stock_quantity": "Current stock is required.",
-    "low_stock_threshold": "Reorder level is required.",
-    "status": "Status is required.",
-}
-
-# Also marked with * on the form, but only meaningful for an actual medicine: a
-# box of gauze has no generic name, dosage strength or expiry batch. Requiring
-# these of every row would make Supply and Equipment items unaddable and their
-# stock uneditable, so they are enforced only when category == 'Medicine'.
-MEDICINE_ONLY_REQUIRED_FIELDS = {
-    "generic_name": "Generic name is required for a medicine.",
-    "drug_class": "Category is required for a medicine.",
-    "dosage_strength": "Dosage strength is required for a medicine.",
-    "dosage_form": "Dosage form is required for a medicine.",
-    "batch_number": "Batch number is required for a medicine.",
-    "expiry_date": "Expiration date is required for a medicine.",
-}
-
-# Every column the form writes, in one place so the INSERT, the UPDATE and the
-# redisplay cannot fall out of step. item_code, created_at and updated_at are
-# absent on purpose: the first is auto-assigned, the other two are timestamps.
-INVENTORY_FIELDS = (
-    "name", "generic_name", "brand_name", "category", "drug_class",
-    "dosage_strength", "dosage_form", "unit", "stock_quantity",
-    "low_stock_threshold", "expiry_date", "date_received", "batch_number",
-    "manufacturer", "supplier", "unit_cost", "storage_location", "notes",
-    "status",
+# The columns Edit details writes, apart from the display name. item_code, created_at and
+# updated_at are absent on purpose: the first is auto-assigned, the other two are timestamps.
+ITEM_FIELDS = (
+    "generic_name", "category", "drug_class", "dosage_strength", "dosage_form", "unit",
+    "low_stock_threshold", "manufacturer", "supplier", "unit_cost", "storage_location",
+    "notes", "status",
+)
+# The form fields. A medicine posts generic_name, dosage_strength and dosage_form; a supply
+# posts item_name and size instead. Both sets are carried so a redisplay keeps what was typed.
+FORM_FIELDS = (
+    "category", "generic_name", "dosage_strength", "dosage_form", "item_name", "size",
+    "drug_class", "unit", "low_stock_threshold", "manufacturer", "supplier", "unit_cost",
+    "storage_location", "notes", "status",
 )
 
-# Stored as numbers rather than text, so they are normalised apart from the rest.
-INTEGER_FIELDS = ("stock_quantity", "low_stock_threshold")
-DECIMAL_FIELDS = ("unit_cost",)
-TEXT_FIELDS = tuple(
-    field for field in INVENTORY_FIELDS
-    if field not in INTEGER_FIELDS + DECIMAL_FIELDS
-)
-
-# An item expiring within this many days is flagged for review before use. Screen
-# 06's third stat card names the window explicitly ("Near Expiry (90 days)"), and
-# get_status_distribution() and the dashboards all read this same constant, so the
-# window is stated once for the whole project.
-NEAR_EXPIRY_DAYS = 90
-
-# The stored lifecycle status that takes an item out of service. It is one of
-# ITEM_STATUSES above, set on the Add / Edit Medicine form, and until now it was
-# written by that form and read by nothing at all: an Inactive item still sat in
-# the list looking stocked, still counted in all four stat cards, and could still
-# raise a low-stock alert on both dashboards, the sidebar badge and Reports &
-# Analytics. Naming it here is what lets every operating figure below agree on
-# which rows are in service.
-#
-# It is deliberately the same soft flag patients have -- schema.sql calls it "a
-# soft lifecycle flag, as on patients" -- and it retires a row rather than
-# removing one. Nothing is deleted and no history is lost; the row keeps its
-# batch number, its expiry date and its stock figure, and going back to Active
-# restores it everywhere.
-RETIRED_STATUS = "Inactive"
-
-# stock status -> the badge class Screen 06's stylesheet defines.
+# stock status -> the badge class the inventory screen's stylesheet defines.
 STATUS_BADGE_CLASS = {
-    # Retired is not a stock condition and is not returned by stock_status(). It
-    # is what Screen 06 shows *instead* of one for an item out of service, since
-    # "Low Stock" on something nobody is restocking is exactly the sentence this
-    # badge should never say.
     "Retired": "badge-retired",
     "In Stock": "badge-instock",
     "Low Stock": "badge-lowstock",
     "Critical": "badge-critical",
     "Out of Stock": "badge-critical",
-    "Near Expiry": "badge-nearexpiry",
-    "Expires Today": "badge-expirestoday",
+    "Expiring Soon": "badge-nearexpiry",
+}
+BATCH_BADGE_CLASS = {
+    "Usable": "badge-instock",
+    "Expiring soon": "badge-nearexpiry",
     "Expired": "badge-expired",
+    "Empty": "badge-retired",
 }
 
+# The order "sort by status" uses: most urgent first. Retired is not a stock condition and
+# goes last.
+STATUS_SORT_ORDER = ("Out of Stock", "Critical", "Low Stock", "Expiring Soon", "In Stock",
+                     "Retired")
 
-# Screen 06's Sort control, Status column. The order is stock_status()'s own
-# resolution order -- the sequence its docstring lays out and its `if` ladder
-# walks, most urgent first -- so "sort by status" groups the shelf the same way
-# the badge already decides what to call each item. Sorting these alphabetically
-# would open on Critical and bury Out of Stock between Near Expiry and In Stock,
-# which is the opposite of what a pharmacist opens this screen to find.
-#
-# "Retired" is not a stock condition and stock_status() never returns it, so it
-# is not in that ladder; it goes last here because an item nobody is restocking
-# is the least urgent thing on the shelf, which is the same judgement in_service()
-# already makes when it keeps retired items out of the low-stock alert.
-STATUS_SORT_ORDER = (
-    "Out of Stock",
-    "Expired",
-    "Expires Today",
-    "Critical",
-    "Low Stock",
-    "Near Expiry",
-    "In Stock",
-    "Retired",
-)
+# The stored lifecycle status that takes an item out of service. An Inactive item is left
+# out of every operating figure (the stat cards, the low-stock alert, the dashboards and the
+# reports) but keeps its batches, and going back to Active restores it everywhere.
+RETIRED_STATUS = "Inactive"
+
+# FEFO: the usable batch with the earliest expiry first. A batch with no expiry date is last.
+# Ties go to the older delivery, then the lower id, so the order never wobbles.
+FEFO_ORDER = ("CASE WHEN expiry_date IS NULL THEN 1 ELSE 0 END, expiry_date, "
+              "date_received, id")
 
 
 def status_rank(display_status):
-    """Where a status sits in STATUS_SORT_ORDER, or None if it is not one.
-
-    None rather than a large number on purpose: the sort holds unknown values at
-    the bottom in both directions, and a status this module does not recognise is
-    exactly that -- an absence of a known rank, not a very unurgent item.
-    """
+    """Where a status sits in STATUS_SORT_ORDER, or None if it is not one."""
     return (
         STATUS_SORT_ORDER.index(display_status)
         if display_status in STATUS_SORT_ORDER else None
@@ -185,30 +129,82 @@ def status_rank(display_status):
 def allowed_item_status_transitions(current_status):
     """The statuses an item currently in current_status may be moved to.
 
-    Every status except the one it already holds, in ITEM_STATUSES order, which
-    on a two-value lifecycle yields exactly the two cases the Archive dialog
-    offers:
-
-        Active   -> Inactive   (retire it)
-        Inactive -> Active     (put it back in service)
-
-    The second direction is deliberate, and it is the one
-    models/patients.py allowed_status_transitions() argues for at length:
-    retiring the wrong row is a mis-click, and a one-way door turns a clerical
-    slip into something only an edit form can undo.
-
-    An unrecognised status (a hand-edited row) yields both, so the dialog still
-    offers a way out rather than presenting no options at all.
-
-    The caller passes the status it read back out of the database, never the one
-    the page posted: the dialog decides what to offer from a page that can be
-    stale, and a POST can be made without loading that page at all. That is the
-    same reason get_patient_statuses() exists on the patient side; here the
-    fresh read is get_inventory_item_by_id(), which the caller already needs for
-    the item's name, so there is no second query for the same row.
+    Every status except the one it already holds. The caller passes the status it read back
+    out of the database, never the one the page posted: a POST can be made without loading
+    the page at all. An unrecognised status yields both, so the dialog still offers a way out.
     """
     return tuple(status for status in ITEM_STATUSES if status != current_status)
 
+
+def is_medicine(category):
+    return category == MEDICINE_CATEGORY
+
+
+# --- names ----------------------------------------------------------------------------
+
+def _clean(text):
+    return re.sub(r"\s+", " ", str(text or "")).strip()
+
+
+# A number followed by one of these units gets one space between them: "500mg" -> "500 mg".
+# Only units are spaced, so "4x4 in" on a supply is left as typed.
+_STRENGTH_UNIT = re.compile(r"(\d)\s*(mg|mcg|ug|g|kg|ml|l|iu|units?|meq|mmol|%)(?![A-Za-z])",
+                            re.IGNORECASE)
+
+
+def normalize_strength(text):
+    """'500mg' -> '500 mg', '250 mg/5mL' -> '250 mg/5 mL'. One space between a number and its unit."""
+    return _STRENGTH_UNIT.sub(r"\1 \2", _clean(text))
+
+
+def _capitalize(text):
+    text = _clean(text)
+    return text[:1].upper() + text[1:]
+
+
+def build_display_name(category, generic_name, strength, form):
+    """'Paracetamol 500 mg tablet' for a medicine; 'Gauze pad 4 x 4 in' for a supply."""
+    if is_medicine(category):
+        parts = [_capitalize(generic_name), normalize_strength(strength), _clean(form).lower()]
+    else:
+        parts = [_capitalize(generic_name), _clean(strength)]
+    return " ".join(part for part in parts if part)
+
+
+def _identity_key(category, generic_name, strength, form):
+    """What makes two items the same item: generic name, strength and form, ignoring case
+    and spaces. A supply is told apart by its item name and size."""
+    def squash(text):
+        return re.sub(r"\s+", "", str(text or "")).lower()
+    return (is_medicine(category), squash(generic_name), squash(strength),
+            squash(form) if is_medicine(category) else "")
+
+
+def find_duplicate(conn, category, generic_name, strength, form, exclude_id=None):
+    """The display name of an existing item with the same identity, or None."""
+    wanted = _identity_key(category, generic_name, strength, form)
+    for row in conn.execute(
+        "SELECT id, name, category, generic_name, dosage_strength, dosage_form "
+        "FROM inventory_items"
+    ).fetchall():
+        if exclude_id is not None and row["id"] == exclude_id:
+            continue
+        if _identity_key(row["category"], row["generic_name"], row["dosage_strength"],
+                         row["dosage_form"]) == wanted:
+            return row["name"]
+    return None
+
+
+def needs_details(item):
+    """A medicine that is missing its generic name, strength or a listed dosage form
+    (the migration could not split its old name). Staff fix it with Edit details."""
+    if not is_medicine(item.get("category")):
+        return False
+    return not (_clean(item.get("generic_name")) and _clean(item.get("dosage_strength"))
+                and item.get("dosage_form") in DOSAGE_FORMS)
+
+
+# --- dates and statuses -----------------------------------------------------------------
 
 def _parse_date(value):
     """Read a stored ISO date into a date, or None if it is absent/malformed."""
@@ -223,8 +219,8 @@ def _parse_date(value):
 def days_until_expiry(expiry_date, on_date=None):
     """Whole days from on_date (default today) until expiry_date, or None.
 
-    Negative once the date has passed, which is what makes the expired check a
-    plain comparison against zero.
+    Negative once the date has passed. The printed date is a "use by", so a batch is usable
+    through the whole of its expiry date and is Expired from the day after.
     """
     parsed = _parse_date(expiry_date)
     if parsed is None:
@@ -232,67 +228,44 @@ def days_until_expiry(expiry_date, on_date=None):
     return (parsed - (on_date or today())).days
 
 
-def stock_status(stock_quantity, low_stock_threshold, expiry_date, on_date=None):
-    """The single status badge Screen 06 shows for one item.
+def batch_status(expiry_date, quantity_remaining, on_date=None):
+    """Empty, Expired, Expiring soon or Usable: the one status of a batch."""
+    if (quantity_remaining or 0) <= 0:
+        return "Empty"
+    days = days_until_expiry(expiry_date, on_date)
+    if days is not None and days < 0:
+        return "Expired"
+    if days is not None and days <= EXPIRING_SOON_DAYS:
+        return "Expiring soon"
+    return "Usable"
 
-    An item can be several of these at once -- low on stock *and* near expiry --
-    but the table has one badge, so they are resolved in order of how urgently
-    each demands action:
 
-      Out of Stock   nothing on the shelf; whether it also expired is moot
-      Expired        physically present but must not be dispensed
-      Expires Today  still dispensable today, unusable tomorrow
-      Critical       at or below half the reorder level
-      Low Stock      at or below the reorder level
-      Near Expiry    usable for a while yet, review before it lapses
-      In Stock       nothing to flag
+def stock_status(usable_stock, low_stock_threshold, expiring_soon_batches=0):
+    """The single status badge the inventory list shows for one item.
 
-    The expiry tiers follow standard pharmacy practice: the printed date is a
-    "use by", not a "discard before", so an item is usable *through* the whole of
-    its expiry date and only becomes Expired the day after. That is why the
-    Expired test is `remaining < 0` rather than `<= 0`, and why day zero has its
-    own tier instead of sharing one with something ninety days out.
-
-    "Expires Today" sits directly below Expired and above the stock tiers for the
-    same reason Expired does: a deadline that lands today outranks a restocking
-    level, because no amount of restocking makes today's stock last past midnight.
-
-    The stat cards deliberately do *not* use this: they count each condition
-    independently, so an item that is both low and near expiry is counted in both
-    totals rather than being claimed by whichever won here.
+    An item can be several of these at once, but the table has one badge, so they are
+    resolved in order of how urgently each demands action: Out of Stock, Critical (at or
+    below half the reorder level), Low Stock, Expiring Soon, In Stock. `usable_stock`
+    counts usable batches only, so expired stock never makes an item look stocked.
     """
-    stock = stock_quantity or 0
+    stock = usable_stock or 0
     threshold = low_stock_threshold or 0
-    remaining = days_until_expiry(expiry_date, on_date)
-
     if stock == 0:
         return "Out of Stock"
-    if remaining is not None and remaining < 0:
-        return "Expired"
-    if remaining == 0:
-        return "Expires Today"
     if stock <= threshold:
-        # Half the reorder level or less is the point at which a restock stops
-        # being routine, matching the mockup's separate "Critical" badge.
         return "Critical" if stock * 2 <= threshold else "Low Stock"
-    if remaining is not None and remaining <= NEAR_EXPIRY_DAYS:
-        return "Near Expiry"
+    if expiring_soon_batches:
+        return "Expiring Soon"
     return "In Stock"
 
 
 def _stock_bar(stock_quantity, low_stock_threshold):
-    """Percentage fill and colour class for the stock bar on Screen 06.
-
-    There is no "full shelf" column to measure against, so the reorder level is
-    the reference point: the bar reads half full exactly at the threshold and
-    full at twice it. That keeps the bar honest about the only capacity figure
-    the record actually carries, instead of inventing a maximum.
-    """
+    """Percentage fill and colour class for the stock bar: half full at the reorder level,
+    full at twice it."""
     stock = stock_quantity or 0
     threshold = low_stock_threshold or 0
 
     if threshold <= 0:
-        # No reorder level set, so there is nothing to be low against.
         return (100 if stock > 0 else 0), "fill-good"
 
     percent = min(100, round(stock / (threshold * 2) * 100))
@@ -305,145 +278,130 @@ def _stock_bar(stock_quantity, low_stock_threshold):
     return percent, fill
 
 
-def _display_dosage(row):
-    """'500mg' + 'Capsule' -> '500mg Capsule'. Screen 06's Dosage / Form column."""
-    parts = [row["dosage_strength"], row["dosage_form"]]
-    return " ".join(str(part).strip() for part in parts if part)
-
-
-def _to_item(row, on_date=None):
-    """Copy an inventory_items row into a dict and add the derived display fields."""
-    item = dict(row)
-    status = stock_status(
-        item.get("stock_quantity"),
-        item.get("low_stock_threshold"),
-        item.get("expiry_date"),
-        on_date,
-    )
-    percent, fill_class = _stock_bar(
-        item.get("stock_quantity"), item.get("low_stock_threshold")
-    )
-
-    # stock_status stays the pure stock condition whatever the item's lifecycle
-    # status is -- it is a fact about the shelf, and a retired item can still be
-    # short or expired. What changes for a retired item is not the fact but who
-    # is in scope for it, and that is decided once, in in_service() below, rather
-    # than by quietly rewriting the fact here.
-    item["stock_status"] = status
-    item["is_retired"] = item.get("status") == RETIRED_STATUS
-
-    # What Screen 06 puts in its Status column. A retired row shows "Retired"
-    # rather than a stock condition it is not being judged on, which also puts
-    # the value into that screen's existing Status filter -- so retired items are
-    # reachable through the one control that already filters by status, exactly
-    # as Inactive and Deceased patients are on Patient Records, instead of
-    # needing a "show retired" toggle this project has nowhere else.
-    item["display_status"] = "Retired" if item["is_retired"] else status
-    item["status_badge_class"] = STATUS_BADGE_CLASS.get(
-        item["display_status"], "badge-instock"
-    )
-    # For Screen 06's Sort control; see STATUS_SORT_ORDER above. Ranked on
-    # display_status rather than stock_status so the sort groups by what the
-    # Status column actually shows -- a retired item sorts as Retired, which is
-    # what its badge says and what the Status filter beside it matches on.
-    item["status_rank"] = status_rank(item["display_status"])
-    item["stock_percent"] = percent
-    item["stock_fill_class"] = fill_class
-    item["days_until_expiry"] = days_until_expiry(item.get("expiry_date"), on_date)
-    item["display_dosage"] = _display_dosage(row)
-    item["is_low_stock"] = (item.get("stock_quantity") or 0) <= (
-        item.get("low_stock_threshold") or 0
-    )
-    item["is_out_of_stock"] = (item.get("stock_quantity") or 0) == 0
-    # Expiry facts, exposed as flags so no template has to re-derive them from the
-    # day count and reach a different answer about where the boundaries fall.
-    item["expires_today"] = item["days_until_expiry"] == 0
-    item["is_expired"] = (
-        item["days_until_expiry"] is not None and item["days_until_expiry"] < 0
-    )
-    item["threshold_pct"] = _threshold_pct(
-        item.get("stock_quantity"), item.get("low_stock_threshold")
-    )
-    return item
-
-
 def _threshold_pct(stock_quantity, low_stock_threshold):
-    """Stock as a percentage of this item's own reorder level, or None.
-
-    This is what the dashboard alert panels read as "% of reorder level": 100%
-    means the stock has just landed on the reorder point, and anything under it
-    is short by that proportion. Distinct from _stock_bar()'s percentage, which
-    measures a bar against a comfortably-stocked shelf rather than the threshold.
-
-    None when no reorder level is set, because there is then nothing to be a
-    percentage of.
-    """
+    """Stock as a percentage of this item's own reorder level, or None."""
     threshold = low_stock_threshold or 0
     if threshold <= 0:
         return None
     return round((stock_quantity or 0) / threshold * 100)
 
 
-def get_all_inventory_items():
-    """Every inventory item, ordered by name."""
+def _display_dosage(row):
+    """'500 mg tablet' (strength and form), the Strength / Form column."""
+    parts = [row["dosage_strength"], row["dosage_form"]]
+    return " ".join(str(part).strip() for part in parts if part)
+
+
+def _to_batch(row, on_date=None):
+    batch = dict(row)
+    status = batch_status(batch["expiry_date"], batch["quantity_remaining"], on_date)
+    batch["status"] = status
+    batch["badge_class"] = BATCH_BADGE_CLASS[status]
+    batch["days_until_expiry"] = days_until_expiry(batch["expiry_date"], on_date)
+    batch["is_usable"] = status in ("Usable", "Expiring soon")
+    batch["is_expired"] = status == "Expired"
+    batch["is_expiring_soon"] = status == "Expiring soon"
+    batch["is_empty"] = status == "Empty"
+    return batch
+
+
+def _to_item(row, batches, on_date=None):
+    """Copy an inventory_items row into a dict and add the figures derived from its batches."""
+    item = dict(row)
+    batches = [_to_batch(batch, on_date) for batch in batches]
+    usable = [batch for batch in batches if batch["is_usable"]]
+    expiring = [batch for batch in batches if batch["is_expiring_soon"]]
+    expired = [batch for batch in batches if batch["is_expired"]]
+
+    item["batches"] = batches
+    item["stock_quantity"] = sum(batch["quantity_remaining"] for batch in usable)
+    item["expired_quantity"] = sum(batch["quantity_remaining"] for batch in expired)
+    # The nearest expiry among the batches that can still be used.
+    dated = sorted(batch["expiry_date"] for batch in usable if batch["expiry_date"])
+    item["nearest_expiry"] = dated[0] if dated else None
+    item["expiring_soon_batches"] = len(expiring)
+    item["expired_batches"] = len(expired)
+
+    status = stock_status(item["stock_quantity"], item.get("low_stock_threshold"),
+                          len(expiring))
+    percent, fill_class = _stock_bar(item["stock_quantity"], item.get("low_stock_threshold"))
+
+    # stock_status stays the pure stock condition whatever the item's lifecycle status is;
+    # what changes for a retired item is who is in scope for it, decided in in_service().
+    item["stock_status"] = status
+    item["is_retired"] = item.get("status") == RETIRED_STATUS
+    item["display_status"] = "Retired" if item["is_retired"] else status
+    item["status_badge_class"] = STATUS_BADGE_CLASS.get(item["display_status"], "badge-instock")
+    item["status_rank"] = status_rank(item["display_status"])
+    item["stock_percent"] = percent
+    item["stock_fill_class"] = fill_class
+    item["display_dosage"] = _display_dosage(row)
+    item["is_medicine"] = is_medicine(item.get("category"))
+    item["needs_details"] = needs_details(item)
+    item["is_low_stock"] = item["stock_quantity"] <= (item.get("low_stock_threshold") or 0)
+    item["is_out_of_stock"] = item["stock_quantity"] == 0
+    item["threshold_pct"] = _threshold_pct(item["stock_quantity"], item.get("low_stock_threshold"))
+    return item
+
+
+def _load_items(conn, where="", parameters=(), on_date=None):
+    rows = conn.execute(
+        f"SELECT * FROM inventory_items {where} ORDER BY name COLLATE NOCASE, id", parameters
+    ).fetchall()
+    by_item = {}
+    for batch in conn.execute(
+        "SELECT * FROM inventory_batches ORDER BY " + FEFO_ORDER
+    ).fetchall():
+        by_item.setdefault(batch["inventory_item_id"], []).append(batch)
+    return [_to_item(row, by_item.get(row["id"], []), on_date) for row in rows]
+
+
+def get_all_inventory_items(on_date=None):
+    """Every inventory item, ordered by name, each with its batches."""
     with db_connection() as conn:
-        rows = conn.execute(
-            "SELECT * FROM inventory_items ORDER BY name COLLATE NOCASE"
-        ).fetchall()
-    return [_to_item(row) for row in rows]
+        return _load_items(conn, on_date=on_date)
 
 
-def get_inventory_item_by_id(item_id):
+def get_inventory_item_by_id(item_id, on_date=None):
     """One inventory item by primary key, or None if no such row exists."""
     with db_connection() as conn:
-        row = conn.execute(
-            "SELECT * FROM inventory_items WHERE id = ?", (item_id,)
-        ).fetchone()
-    return _to_item(row) if row else None
+        found = _load_items(conn, "WHERE id = ?", (item_id,), on_date)
+    return found[0] if found else None
+
+
+def get_removals_for_item(item_id, limit=10):
+    """The latest amounts taken out of this item's batches, newest first."""
+    with db_connection() as conn:
+        rows = conn.execute(
+            "SELECT r.quantity, r.reason, r.note, r.created_at, b.lot_number, "
+            "       u.full_name AS removed_by_name "
+            "FROM inventory_removals r "
+            "JOIN inventory_batches b ON b.id = r.batch_id "
+            "LEFT JOIN users u ON u.id = r.removed_by "
+            "WHERE b.inventory_item_id = ? ORDER BY r.id DESC LIMIT ?",
+            (item_id, limit),
+        ).fetchall()
+    return [dict(row) for row in rows]
 
 
 def in_service(items):
-    """The items every operating figure in this module is computed over.
+    """The items every operating figure in this module is computed over: not retired.
 
-    One definition of "in scope", read by the stat cards, the status doughnut and
-    the low-stock alert, so those three cannot come to disagree about whether a
-    retired item counts. An item the health centre has stopped stocking is not
-    short of stock in any sense that asks somebody to reorder it, is not awaiting
-    disposal off a shelf it is no longer on, and is not part of how the working
-    inventory divides up.
-
-    This is the pattern the project already uses for patients, not a new one. The
-    roster on Patient Records lists every patient whatever their status, and the
-    exclusion of the non-Active ones happens further out, in the derived lists
-    where being non-Active changes what should be done: the SMS audience excludes
-    them in its SQL (models/broadcasts.py) and the immunisation follow-up list and
-    coverage denominator exclude them in Python (models/immunizations.py), each
-    for a reason particular to what that list is for. This is the inventory's
-    version of the same step.
-
-    Deliberately NOT applied in get_all_inventory_items(). Hiding retired rows
-    from Screen 06 would contradict the promise the equivalent patient dialog
-    makes -- "the patient stays listed here under the new status" -- and would
-    leave an operator no way to see, or undo, a retirement. They stay listed,
-    badged "Retired", and filterable by that value; they simply stop being
-    counted.
+    One definition of "in scope", read by the stat cards, the status doughnut, the low-stock
+    alert and the expiry report, so they cannot disagree about whether a retired item counts.
+    Retired items stay listed on the inventory screen, badged "Retired", so a retirement can
+    be seen and undone.
     """
     return [item for item in items if not item["is_retired"]]
 
 
 def get_inventory_stats(items=None):
-    """Counts behind the four stat cards on Screen 06.
+    """Counts behind the stat cards on the inventory screen and the dashboards.
 
-    Every figure is computed from the rows themselves rather than stored, so a
-    stock edit that crosses a threshold moves the cards on the next render with
-    nothing else to keep in step. `items` may be passed in to avoid a second
-    query when the caller has already loaded the list.
-
-    Retired items are excluded from all four cards by in_service(). The cards
-    report the working inventory, while the table below them lists every row, so
-    the two would appear to disagree whenever anything is retired -- and rather
-    than let a reader guess, retired_count is returned alongside so Screen 06 can
-    name the difference in words instead of leaving it to be discovered.
+    Every figure is computed from the rows themselves rather than stored. Retired items are
+    excluded; retired_count is returned alongside so the screen can say so. The expiring-soon
+    and expired figures count batches that still hold stock, and the expired ones are not part
+    of any item's stock.
     """
     if items is None:
         items = get_all_inventory_items()
@@ -451,140 +409,114 @@ def get_inventory_stats(items=None):
     retired_count = sum(1 for item in items if item["is_retired"])
     items = in_service(items)
 
-    low_stock = [item for item in items if item["is_low_stock"]]
-    out_of_stock = [item for item in items if item["is_out_of_stock"]]
-    # "Expires Today" is a badge tier, not a separate counting bucket: day zero is
-    # inside the near-expiry window, so it stays counted here. Splitting it out
-    # would silently drop the Near Expiry card by one on the very day an item
-    # becomes most urgent, which is the opposite of what that card is for. The
-    # separate expires_today_count below is a subset of this figure, not a rival.
-    near_expiry = [
-        item
-        for item in items
-        if item["days_until_expiry"] is not None
-        and 0 <= item["days_until_expiry"] <= NEAR_EXPIRY_DAYS
-    ]
-    expires_today = [item for item in items if item["expires_today"]]
-    expired = [item for item in items if item["is_expired"]]
-
     return {
         "total_items": len(items),
-        "medicine_count": sum(1 for item in items if item["category"] == "Medicine"),
+        "medicine_count": sum(1 for item in items if item["category"] == MEDICINE_CATEGORY),
         "retired_count": retired_count,
-        "low_stock_count": len(low_stock),
-        "out_of_stock_count": len(out_of_stock),
-        "near_expiry_count": len(near_expiry),
-        "expires_today_count": len(expires_today),
-        "expired_count": len(expired),
-        "near_expiry_days": NEAR_EXPIRY_DAYS,
+        "low_stock_count": sum(1 for item in items if item["is_low_stock"]),
+        "out_of_stock_count": sum(1 for item in items if item["is_out_of_stock"]),
+        "expiring_soon_count": sum(item["expiring_soon_batches"] for item in items),
+        "expired_count": sum(item["expired_batches"] for item in items),
+        "needs_details_count": sum(1 for item in items if item["needs_details"]),
+        "expiring_soon_days": EXPIRING_SOON_DAYS,
     }
 
 
 def get_status_distribution(items=None):
-    """The four segments of Screen 10's Medicine Inventory Status doughnut.
+    """The four segments of the Medicine Inventory Status doughnut.
 
-    A doughnut has to partition its total, so each item is counted exactly once,
-    under the most urgent condition that applies to it:
+    A doughnut has to partition its total, so each item is counted once, under the most
+    urgent condition that applies to it:
 
-      Low Stock    at or below its own reorder level (out-of-stock included)
-      Expired      not short, but past its expiry date
-      Near Expiry  not short and not expired, but lapsing within the window
-      In Stock     nothing to flag
+      Low Stock      at or below its own reorder level (out-of-stock included)
+      Expired        not short, but holding an expired batch
+      Expiring Soon  not short and not expired, but holding a batch that expires soon
+      In Stock       nothing to flag
 
-    Low Stock is resolved *first* specifically so this segment always equals the
-    low_stock_count reported by the dashboards, the sidebar badge and Medicine
-    Inventory. An item that is both short and expired lands in Low Stock here,
-    where the badge on Screen 06 would call it Expired -- the two answer different
-    questions (what is the one thing to say about this row, versus how does the
-    whole inventory divide up for restocking), and only this one has to add up.
-
-    The counts therefore sum to total_items, which the legend and the panel
-    subtitle both rely on.
-
-    An item expiring *today* is counted under Near Expiry, not Expired: it is
-    still dispensable for the rest of the day, and the Expired segment is what a
-    reader will treat as "must be pulled from the shelf". It keeps its own
-    "Expires Today" badge on Screen 06 -- the badge answers what to do about one
-    row, this chart answers how the shelf divides up, and those differ.
-
-    Retired items are excluded by in_service(), which the Low Stock invariant
-    above actually requires: that segment is promised to equal the low_stock_count
-    the dashboards and the sidebar badge report, and those now exclude retired
-    items, so counting them here would break the one thing this function is
-    documented to guarantee. `total` is therefore the working inventory too, which
-    is what the legend and the panel subtitle are describing.
+    Low Stock is resolved first so this segment always equals the low_stock_count the
+    dashboards and the sidebar badge report. The counts sum to total.
     """
     if items is None:
         items = get_all_inventory_items()
 
     items = in_service(items)
-    low_stock = expired = near_expiry = in_stock = 0
+    low_stock = expired = expiring_soon = in_stock = 0
     for item in items:
-        remaining = item["days_until_expiry"]
         if item["is_low_stock"]:
             low_stock += 1
-        elif item["is_expired"]:
+        elif item["expired_batches"]:
             expired += 1
-        elif remaining is not None and remaining <= NEAR_EXPIRY_DAYS:
-            near_expiry += 1
+        elif item["expiring_soon_batches"]:
+            expiring_soon += 1
         else:
             in_stock += 1
 
     return {
         "in_stock": in_stock,
         "low_stock": low_stock,
-        "near_expiry": near_expiry,
+        "expiring_soon": expiring_soon,
         "expired": expired,
         "total": len(items),
     }
 
 
+def get_expiry_batches(items=None):
+    """The batches that need attention, soonest expiry first: those expiring soon and those
+    expired, that still hold stock, on items in service. Stock facts with no patient link."""
+    if items is None:
+        items = get_all_inventory_items()
+    rows = []
+    for item in in_service(items):
+        for batch in item["batches"]:
+            if batch["is_expired"] or batch["is_expiring_soon"]:
+                rows.append({
+                    "item_id": item["id"],
+                    "item_name": item["name"],
+                    "unit": item.get("unit"),
+                    "batch_id": batch["id"],
+                    "lot_number": batch["lot_number"],
+                    "expiry_date": batch["expiry_date"],
+                    "quantity_remaining": batch["quantity_remaining"],
+                    "status": batch["status"],
+                    "days_until_expiry": batch["days_until_expiry"],
+                })
+    rows.sort(key=lambda row: (row["expiry_date"] or "", row["item_name"].lower(),
+                               row["lot_number"], row["batch_id"]))
+    return rows
+
+
 def get_inventory_report():
-    """Stock-level summary for Screen 10.
+    """Stock-level summary for Reports & Analytics.
 
-    Predates the rest of this module and keeps its original keys, since Reports &
-    Analytics is rendered from them for both roles that reach it. The items are
-    the same enriched dicts the inventory screen uses, so a report can show the
-    stock status without recomputing it.
-
-    The counts and the ordered low-stock list come from get_low_stock_alert() --
-    the same call behind the two dashboards and the sidebar badge -- so Screen 10
-    cannot report a different low-stock figure from the rest of the project.
-
-    Every figure here is over the working inventory: `items` is narrowed by
-    in_service() before anything is counted from it, so the totals, the
-    out-of-stock list and the doughnut all describe the same set of rows that the
-    low-stock list does. A report that counted retired items in its total while
-    the alert beside it did not would be the same disagreement this function was
-    written to prevent, one level up.
+    The counts and the ordered low-stock list come from get_low_stock_alert(), the same call
+    behind the dashboards and the sidebar badge, so the report cannot show a different
+    low-stock figure. Every figure is over the working inventory (retired items left out).
     """
     items = in_service(get_all_inventory_items())
     alert = get_low_stock_alert()
+    batches = get_expiry_batches(items)
 
     return {
         "items": items,
         "total_items": len(items),
-        # Ordered most-critical-first by get_low_stock_alert(), which is the order
-        # Screen 10's Low Stock Items list wants to read them in.
+        # Most critical first, as get_low_stock_alert() orders them.
         "low_stock_items": alert["low_stock_items"],
         "out_of_stock_items": [item for item in items if item["is_out_of_stock"]],
         "low_stock_count": alert["low_stock_count"],
         "out_of_stock_count": alert["out_of_stock_count"],
         "status_distribution": get_status_distribution(items),
+        "expiry_batches": batches,
+        "expiring_soon_count": sum(1 for row in batches if row["status"] == "Expiring soon"),
+        "expired_count": sum(1 for row in batches if row["status"] == "Expired"),
+        "expiring_soon_days": EXPIRING_SOON_DAYS,
     }
 
 
 def _criticality(item):
     """Sort key putting the item in most urgent need of restocking first.
 
-    Stock as a fraction of its own reorder level, so a per-item comparison rather
-    than a raw quantity: 15 of a 60 reorder level outranks 90 of a 90 one, even
-    though 90 is the larger number.
-
-    Ties are broken by how many units short the item is, largest first. Without
-    that, every out-of-stock item scores 0.0 and their order falls out of however
-    the rows arrived -- so an item needing 40 units could be listed below one
-    needing 1. Items with no reorder level sort last; they cannot be judged short.
+    Usable stock as a fraction of its own reorder level; ties go to the larger shortfall.
+    Items with no reorder level sort last; they cannot be judged short.
     """
     threshold = item.get("low_stock_threshold") or 0
     stock = item.get("stock_quantity") or 0
@@ -596,27 +528,10 @@ def _criticality(item):
 def get_low_stock_alert(limit=None):
     """The in-system low-stock alert behind the dashboards and the sidebar badge.
 
-    Proposal Objective 2 asks for staff to be alerted when stock falls below the
-    defined threshold. This is that alert: every screen that reports a low-stock
-    figure reads it from here, so the dashboard stat card, the sidebar badge and
-    the detail panel cannot disagree with each other or with Medicine Inventory.
-    All of them ultimately derive from the same per-item is_low_stock flag set in
-    _to_item().
-
-    `limit` caps only the returned item list, never the counts -- a panel with
-    room for five rows still reports the true total above them.
-
-    The list is keyed "low_stock_items" rather than the more obvious "items"
-    because this dict is handed to Jinja, where `low_stock.items` would resolve
-    to dict.items -- the built-in method -- and silently iterate nothing.
-
-    Retired items are excluded by in_service(), and this is the exclusion that
-    matters most: an item the centre has stopped stocking cannot be "below its
-    reorder level" in any sense that asks somebody to go and reorder it. Because
-    every low-stock figure in the project reads this one function, that exclusion
-    reaches the sidebar badge, both dashboards and Reports & Analytics without any
-    of them being touched -- which is the whole reason the figure was centralised
-    here.
+    Every screen that reports a low-stock figure reads it from here. It counts usable stock
+    only: an expired batch never keeps an item off the list. `limit` caps only the returned
+    item list, never the counts. The list is keyed "low_stock_items" rather than "items"
+    because Jinja would resolve `low_stock.items` to dict.items.
     """
     items = in_service(get_all_inventory_items())
     low_stock = sorted(
@@ -631,8 +546,10 @@ def get_low_stock_alert(limit=None):
     }
 
 
+# --- validation ---------------------------------------------------------------------------
+
 def _parse_int(raw):
-    """('12', True) for a valid non-negative integer, (None, False) otherwise."""
+    """(12, True) for a valid non-negative integer, (None, False) otherwise."""
     text = str(raw or "").strip()
     if not text:
         return None, False
@@ -644,7 +561,7 @@ def _parse_int(raw):
 
 
 def _parse_decimal(raw):
-    """('8.5', True) for a valid non-negative number, (None, False) otherwise."""
+    """(8.5, True) for a valid non-negative number, (None, False) otherwise."""
     text = str(raw or "").strip()
     if not text:
         return None, False
@@ -655,108 +572,136 @@ def _parse_decimal(raw):
     return value, value >= 0
 
 
-def validate_inventory_form(values):
-    """Server-side validation. Returns {field: message}; empty means valid.
+def _get(values, field):
+    return (values.get(field) or "").strip()
 
-    Runs independently of the browser -- the form carries `novalidate`, and a
-    POST can arrive without ever touching the page.
+
+def _item_identity(values):
+    """(generic_name, strength, form) as the form posted them, by item type."""
+    if is_medicine(_get(values, "category")):
+        return (_clean(_get(values, "generic_name")), normalize_strength(_get(values, "dosage_strength")),
+                _get(values, "dosage_form").lower())
+    return _clean(_get(values, "item_name")), _clean(_get(values, "size")), ""
+
+
+def validate_inventory_form(values, item_id=None):
+    """Server-side validation of Edit details and Add medicine. Returns {field: message}.
+
+    Runs independently of the browser: the form carries `novalidate`, and a POST can arrive
+    without ever touching the page. There is no quantity or expiry here: those belong to
+    batches (Receive stock).
     """
     errors = {}
-
-    for field, message in REQUIRED_FIELDS.items():
-        if not (values.get(field) or "").strip():
-            errors[field] = message
-
-    category = (values.get("category") or "").strip()
-    if category and category not in ITEM_CATEGORIES:
+    category = _get(values, "category")
+    if not category:
+        errors["category"] = "Item type is required."
+    elif category not in ITEM_CATEGORIES:
         errors["category"] = "Choose an item type from the list."
 
-    # The medicine-only fields; see MEDICINE_ONLY_REQUIRED_FIELDS.
-    if category == "Medicine":
-        for field, message in MEDICINE_ONLY_REQUIRED_FIELDS.items():
-            if not (values.get(field) or "").strip():
-                errors[field] = message
+    medicine = is_medicine(category)
+    if medicine:
+        if not _get(values, "generic_name"):
+            errors["generic_name"] = "Generic name is required."
+        if not _get(values, "dosage_strength"):
+            errors["dosage_strength"] = "Strength is required, for example 500 mg."
+        form = _get(values, "dosage_form").lower()
+        if not form:
+            errors["dosage_form"] = "Dosage form is required."
+        elif form not in DOSAGE_FORMS:
+            errors["dosage_form"] = "Choose a dosage form from the list."
+        if not _get(values, "drug_class"):
+            errors["drug_class"] = "Category is required for a medicine."
+    elif category in ITEM_CATEGORIES and not _get(values, "item_name"):
+        errors["item_name"] = "Item name is required."
 
     # Constrained fields: reject anything the form does not itself offer.
-    for field, allowed, label in (
-        ("drug_class", DRUG_CLASSES, "category"),
-        ("dosage_form", DOSAGE_FORMS, "dosage form"),
-        ("unit", UNITS, "unit of measure"),
-        ("status", ITEM_STATUSES, "status"),
-    ):
-        value = (values.get(field) or "").strip()
-        if value and field not in errors and value not in allowed:
+    checks = [("unit", UNITS, "unit of measure"), ("status", ITEM_STATUSES, "status")]
+    if medicine:
+        checks.append(("drug_class", DRUG_CLASSES, "category"))
+    for field, allowed, label in checks:
+        value = _get(values, field)
+        if not value:
+            if field in ("unit", "status"):
+                errors[field] = f"{label.capitalize()} is required."
+        elif field not in errors and value not in allowed:
             errors[field] = f"Choose a {label} from the list."
 
-    for field, label in (
-        ("stock_quantity", "Current stock"),
-        ("low_stock_threshold", "Reorder level"),
-    ):
-        raw = (values.get(field) or "").strip()
-        if raw and field not in errors:
-            _, ok = _parse_int(raw)
-            if not ok:
-                errors[field] = f"{label} must be a whole number of 0 or more."
+    raw = _get(values, "low_stock_threshold")
+    if not raw:
+        errors["low_stock_threshold"] = "Reorder level is required."
+    else:
+        _, ok = _parse_int(raw)
+        if not ok:
+            errors["low_stock_threshold"] = "Reorder level must be a whole number of 0 or more."
 
-    unit_cost = (values.get("unit_cost") or "").strip()
+    unit_cost = _get(values, "unit_cost")
     if unit_cost:
         _, ok = _parse_decimal(unit_cost)
         if not ok:
             errors["unit_cost"] = "Unit cost must be a number of 0 or more."
 
-    # Expiry may legitimately be in the past -- an expired batch still sits on the
-    # shelf awaiting disposal, and Screen 06 has a badge for exactly that -- so
-    # only the format is checked here.
-    expiry_date = (values.get("expiry_date") or "").strip()
-    if expiry_date and "expiry_date" not in errors:
-        if _parse_date(expiry_date) is None:
-            errors["expiry_date"] = "Enter a valid date in YYYY-MM-DD format."
-
-    date_received = (values.get("date_received") or "").strip()
-    if date_received and "date_received" not in errors:
-        parsed = _parse_date(date_received)
-        if parsed is None:
-            errors["date_received"] = "Enter a valid date in YYYY-MM-DD format."
-        elif parsed > today():
-            errors["date_received"] = "Date received cannot be in the future."
+    if not errors:
+        generic, strength, form = _item_identity(values)
+        with db_connection() as conn:
+            duplicate = find_duplicate(conn, category, generic, strength, form, item_id)
+        if duplicate:
+            field = "generic_name" if medicine else "item_name"
+            errors[field] = f"{duplicate} is already in the inventory."
 
     return errors
 
 
 def _build_record(values):
-    """Normalise submitted form values into the column values to store.
+    """Normalise submitted form values into the column values to store, display name included.
 
-    Shared by create_inventory_item() and update_inventory_item() so an insert
-    and an edit can never normalise the same field differently.
+    Shared by create_inventory_item() and update_inventory_item() so an insert and an edit
+    can never normalise the same field differently.
     """
-    record = {field: (values.get(field) or "").strip() or None for field in TEXT_FIELDS}
+    category = _get(values, "category")
+    generic, strength, form = _item_identity(values)
+    medicine = is_medicine(category)
+    count, ok = _parse_int(values.get("low_stock_threshold"))
+    cost, cost_ok = _parse_decimal(values.get("unit_cost"))
 
-    for field in INTEGER_FIELDS:
-        value, ok = _parse_int(values.get(field))
-        # Validation has already rejected a malformed figure; a blank one on a
-        # field that is not required stores as 0, matching the column default.
-        record[field] = value if ok else 0
+    def text(field):
+        return _get(values, field) or None
 
-    for field in DECIMAL_FIELDS:
-        value, ok = _parse_decimal(values.get(field))
-        record[field] = value if ok else None
-
-    return record
+    return {
+        "name": build_display_name(category, generic, strength, form),
+        "generic_name": _capitalize(generic),
+        "category": category,
+        "drug_class": text("drug_class") if medicine else None,
+        "dosage_strength": strength or None,
+        "dosage_form": form if medicine else None,
+        "unit": text("unit"),
+        "low_stock_threshold": count if ok else 0,
+        "manufacturer": text("manufacturer"),
+        "supplier": text("supplier"),
+        "unit_cost": cost if cost_ok else None,
+        "storage_location": text("storage_location"),
+        "notes": text("notes"),
+        "status": text("status") or "Active",
+    }
 
 
 def create_inventory_item(values, audit=None):
-    """Insert an inventory item and return its new primary key.
+    """Insert an inventory item (details only, no stock) and return its new primary key.
 
-    created_at and updated_at are left to their DEFAULT CURRENT_TIMESTAMP.
-    `audit(conn, new_id)` is called before the commit.
+    A duplicate of an existing item raises ValueError; the form's validation has already
+    checked, and this checks again inside the write. `audit(conn, new_id)` is called before
+    the commit.
     """
     record = _build_record(values)
-
-    columns = ["item_code"] + list(INVENTORY_FIELDS)
+    columns = ["item_code", "name"] + list(ITEM_FIELDS)
     placeholders = ", ".join("?" for _ in columns)
-    parameters = [generate_next_item_code()] + [record[f] for f in INVENTORY_FIELDS]
 
     with db_connection() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        if find_duplicate(conn, record["category"], record["generic_name"],
+                          record["dosage_strength"], record["dosage_form"]):
+            raise ValueError("That item is already in the inventory.")
+        parameters = ([_next_item_code(conn), record["name"]]
+                      + [record[field] for field in ITEM_FIELDS])
         cursor = conn.execute(
             f"INSERT INTO inventory_items ({', '.join(columns)}) VALUES ({placeholders})",
             parameters,
@@ -769,47 +714,47 @@ def create_inventory_item(values, audit=None):
 
 
 def update_inventory_item(item_id, values, audit=None):
-    """Overwrite one item's form-collected fields.
+    """Overwrite one item's details. Never touches stock: there is no quantity here.
 
-    Deliberately leaves item_code and created_at alone -- the identifier and the
-    date the item entered the system are historical fact -- and refreshes
-    updated_at, which is what makes "last updated" on a stock edit meaningful.
-
-    Returns the list of fields that actually changed, as
-    [{"field", "label", "old", "new"}, ...]. An empty list means the submitted
-    form carried exactly the stored values, which is a real and confusing outcome
-    for an operator -- the row's updated_at moves but nothing they can see
-    differs, so it looks indistinguishable from a save that was silently dropped.
-    The caller uses this to say which is which instead of flashing an
-    unconditional "updated".
-
-    `audit(conn, changes)` is called before the commit when something changed.
+    Leaves item_code and created_at alone and refreshes updated_at. Returns the list of
+    changes, [{"field", "label", "old", "new"}, ...]; an empty list means the submitted form
+    carried exactly the stored values, so the caller can say that instead of "updated".
+    A change of the generic name, strength or form that would duplicate another item raises
+    ValueError. `audit(conn, changes)` is called before the commit when something changed.
     """
     record = _build_record(values)
 
     with db_connection() as conn:
+        conn.execute("BEGIN IMMEDIATE")
         before = conn.execute(
             "SELECT * FROM inventory_items WHERE id = ?", (item_id,)
         ).fetchone()
         if before is None:
             return []
+        if find_duplicate(conn, record["category"], record["generic_name"],
+                          record["dosage_strength"], record["dosage_form"], item_id):
+            raise ValueError("That item is already in the inventory.")
 
+        labels = dict(FIELD_LABELS)
+        if not is_medicine(record["category"]):
+            labels.update(SUPPLY_FIELD_LABELS)
         changes = [
             {
                 "field": field,
-                "label": FIELD_LABELS.get(field, field),
+                "label": labels.get(field, field),
                 "old": before[field],
                 "new": record[field],
             }
-            for field in INVENTORY_FIELDS
+            for field in ITEM_FIELDS
             if before[field] != record[field]
         ]
 
-        assignments = ", ".join(f"{field} = ?" for field in INVENTORY_FIELDS)
-        parameters = [record[field] for field in INVENTORY_FIELDS] + [item_id]
+        fields = ("name",) + ITEM_FIELDS
+        assignments = ", ".join(f"{field} = ?" for field in fields)
+        parameters = [record[field] for field in fields] + [item_id]
         conn.execute(
             f"UPDATE inventory_items SET {assignments}, updated_at = CURRENT_TIMESTAMP "
-        "WHERE id = ?",
+            "WHERE id = ?",
             parameters,
         )
         if audit and changes:
@@ -821,24 +766,10 @@ def update_inventory_item(item_id, values, audit=None):
 def set_item_status(item_id, status, audit=None):
     """Move one item between Active and Inactive. Returns rows changed.
 
-    This is the whole of the Archive action on Screen 06, and it is deliberately
-    the same shape as set_patient_status(): retiring is an UPDATE of one already
-    existing flag and nothing else. No row is removed, item_code, created_at, the
-    batch number, the expiry date and the stock figure are all untouched, and
-    only updated_at moves alongside the status -- which is why going back to
-    Active restores the item everywhere it was counted before.
-
-    It writes the same column the Add / Edit Medicine form writes, so there is
-    one definition of retired in the system and every figure that already
-    respects RETIRED_STATUS respects this the moment it commits. Nothing here
-    re-implements that logic.
-
-    `AND status != ?` makes the count honest, exactly as it does on patients:
-    SQLite's rowcount reports rows matched, not rows changed, so without it
-    re-retiring an already-Inactive item would claim an update that did not
-    happen and would bump updated_at for a write that changed nothing.
-
-    `audit(conn)` is called before the commit when the status actually changed.
+    Retiring is an UPDATE of one flag and nothing else: no row is removed, and the batches
+    are untouched. `AND status != ?` makes the count honest, since SQLite's rowcount reports
+    rows matched, not rows changed. `audit(conn)` is called before the commit when the
+    status actually changed.
     """
     if status not in ITEM_STATUSES:
         raise ValueError(
@@ -861,27 +792,153 @@ def set_item_status(item_id, status, audit=None):
     return affected
 
 
-def generate_next_item_code():
-    """Next free identifier in the existing MED-#### series.
+def _next_item_code(conn):
+    """Next free identifier in the MED-#### series, one series for every item type.
 
-    Reads the highest number currently in use rather than counting rows, so a gap
-    left by an earlier record cannot cause a UNIQUE collision. Four digits to
-    match the reference Screen 07 displays ("MED-0037"); a series past MED-9999
-    simply grows wider.
-
-    One series covers medicines, supplies and equipment alike, because item_code
-    is UNIQUE across the whole table and the screen these codes appear on is
-    Medicine Inventory.
+    Reads the highest number in use rather than counting rows, so a gap cannot cause a
+    UNIQUE collision.
     """
-    with db_connection() as conn:
-        rows = conn.execute(
-            "SELECT item_code FROM inventory_items WHERE item_code LIKE 'MED-%'"
-        ).fetchall()
-
+    rows = conn.execute(
+        "SELECT item_code FROM inventory_items WHERE item_code LIKE 'MED-%'"
+    ).fetchall()
     highest = 0
     for row in rows:
         suffix = str(row["item_code"]).split("-", 1)[1]
         if suffix.isdigit():
             highest = max(highest, int(suffix))
-
     return f"MED-{highest + 1:04d}"
+
+
+def generate_next_item_code():
+    with db_connection() as conn:
+        return _next_item_code(conn)
+
+
+# --- batches: Receive stock, Remove from stock ----------------------------------------------
+
+def validate_receive_form(values, item):
+    """Server-side validation of Receive stock. Returns {field: message}."""
+    errors = {}
+    no_lot = bool(_get(values, "no_lot"))
+    if not no_lot and not _get(values, "lot_number"):
+        errors["lot_number"] = "Enter the lot number, or tick No lot number."
+
+    expiry = _get(values, "expiry_date")
+    if not expiry:
+        if is_medicine(item["category"]):
+            errors["expiry_date"] = "Expiry date is required for a medicine."
+    else:
+        parsed = _parse_date(expiry)
+        if parsed is None:
+            errors["expiry_date"] = "Enter a valid date in YYYY-MM-DD format."
+        elif parsed < today():
+            errors["expiry_date"] = "That expiry date has already passed."
+
+    quantity, ok = _parse_int(values.get("quantity"))
+    if not ok or quantity < 1:
+        errors["quantity"] = "Enter the quantity received as a whole number of 1 or more."
+    elif quantity > MAX_QUANTITY:
+        errors["quantity"] = f"Enter a quantity of {MAX_QUANTITY:,} or less."
+
+    received = _get(values, "date_received")
+    if received:
+        parsed = _parse_date(received)
+        if parsed is None:
+            errors["date_received"] = "Enter a valid date in YYYY-MM-DD format."
+        elif parsed > today():
+            errors["date_received"] = "Date received cannot be in the future."
+
+    source = _get(values, "source")
+    if not source:
+        errors["source"] = "Source is required."
+    elif source not in STOCK_SOURCES:
+        errors["source"] = "Choose a source from the list."
+    return errors
+
+
+def receive_stock(item_id, values, received_by=None, audit=None):
+    """Add one batch to an item. Returns the new batch id, or None if there is no such item.
+
+    The caller has validated `values`. A blank date received is today. `audit(conn, batch_id)`
+    is called before the commit.
+    """
+    lot = NO_LOT_NUMBER if _get(values, "no_lot") else _clean(_get(values, "lot_number"))
+    quantity, _ = _parse_int(values.get("quantity"))
+    with db_connection() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        if conn.execute("SELECT 1 FROM inventory_items WHERE id = ?", (item_id,)).fetchone() is None:
+            return None
+        cursor = conn.execute(
+            "INSERT INTO inventory_batches (inventory_item_id, lot_number, expiry_date, "
+            "quantity_received, quantity_remaining, date_received, source, brand_name, "
+            "received_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (item_id, lot, _get(values, "expiry_date") or None, quantity, quantity,
+             _get(values, "date_received") or today().isoformat(), _get(values, "source"),
+             _clean(_get(values, "brand_name")) or None, received_by),
+        )
+        batch_id = cursor.lastrowid
+        conn.execute("UPDATE inventory_items SET updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                     (item_id,))
+        if audit:
+            audit(conn, batch_id)
+        conn.commit()
+    return batch_id
+
+
+def remove_from_batch(item_id, batch_id, values, removed_by=None, audit=None):
+    """Take an amount out of ONE batch, with a reason. Returns (removed, errors).
+
+    `errors` is {field: message}; `removed` is the amount taken out, or None when refused.
+    The reason is required and must be one of REMOVAL_REASONS; the amount must be a whole
+    number from 1 up to what the batch holds. The decrement is guarded in SQL, so the batch
+    cannot go below zero even if two requests race. `audit(conn, details)` is called before
+    the commit, with the batch id, the amount and the reason.
+    """
+    errors = {}
+    reason = _get(values, "reason")
+    if not reason:
+        errors["reason"] = "Choose a reason."
+    elif reason not in REMOVAL_REASONS:
+        errors["reason"] = "Choose a reason from the list."
+    quantity, ok = _parse_int(values.get("quantity"))
+    if not ok or quantity < 1:
+        errors["quantity"] = "Enter the amount as a whole number of 1 or more."
+    if errors:
+        return None, errors
+
+    note = _clean(_get(values, "note")) or None
+    with db_connection() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        batch = conn.execute(
+            "SELECT id, quantity_remaining FROM inventory_batches "
+            "WHERE id = ? AND inventory_item_id = ?", (batch_id, item_id)
+        ).fetchone()
+        if batch is None:
+            return None, {"batch": "That batch could not be found."}
+        if quantity > batch["quantity_remaining"]:
+            return None, {"quantity": f"This batch holds only {batch['quantity_remaining']:,}."}
+        cursor = conn.execute(
+            "UPDATE inventory_batches SET quantity_remaining = quantity_remaining - ? "
+            "WHERE id = ? AND quantity_remaining >= ?", (quantity, batch_id, quantity))
+        if cursor.rowcount != 1:
+            return None, {"quantity": "The batch changed while this was being saved. Try again."}
+        conn.execute(
+            "INSERT INTO inventory_removals (batch_id, quantity, reason, note, removed_by) "
+            "VALUES (?, ?, ?, ?, ?)", (batch_id, quantity, reason, note, removed_by))
+        conn.execute("UPDATE inventory_items SET updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                     (item_id,))
+        if audit:
+            audit(conn, {"batch_id": batch_id, "quantity": quantity, "reason": reason})
+        conn.commit()
+    return quantity, {}
+
+
+def usable_batches(conn, item_id, on_date=None):
+    """The batches an item can be dispensed from, in FEFO order (earliest expiry first), on
+    the connection's own transaction. Expired and empty batches are never in this list."""
+    return conn.execute(
+        "SELECT id, lot_number, expiry_date, quantity_remaining FROM inventory_batches "
+        "WHERE inventory_item_id = ? AND quantity_remaining > 0 "
+        "AND (expiry_date IS NULL OR expiry_date >= ?) ORDER BY " + FEFO_ORDER,
+        (item_id, (on_date or today()).isoformat()),
+    ).fetchall()
