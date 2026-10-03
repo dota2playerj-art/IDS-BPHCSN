@@ -168,7 +168,7 @@
     number: some of these doses were given at another hospital and the card was
     seen here. The total counts doses with written evidence (given here, or a card
     seen); a parent's word alone is not counted, and is named underneath. #}
-          <div class="stat-trend" style="color:var(--text-muted);" title="{{ untracked.campaigns }}">
+          <div class="stat-trend" style="color:var(--text-muted);">
             {{ immunization_coverage.enrolled }} patient{{ '' if immunization_coverage.enrolled == 1 else 's' }} with a dose &middot; campaigns not tracked
 {%- if immunization_coverage.doses_elsewhere %}
             <span style="display:block;">{{ immunization_coverage.doses_administered }} given here &middot; {{ immunization_coverage.doses_elsewhere }} given elsewhere (card seen)</span>

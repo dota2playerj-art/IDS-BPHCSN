@@ -342,7 +342,7 @@
                   {#- email and phone are real columns, but nothing writes them. #}
                   <td>
                     {%- if user.contact %}{{ user.contact }}
-                    {%- else %}<span class="muted-cell" title="{{ untracked.contact }}">Not recorded</span>{% endif %}
+                    {%- else %}<span class="muted-cell">Not recorded</span>{% endif %}
                   </td>
                   <td>
                     {%- if user.is_active %}<span class="badge-status badge-active">Active</span>
@@ -365,9 +365,6 @@
           <div class="table-footer">
             <div class="pg-info">
               Showing all {{ total_users }} account{{ '' if total_users == 1 else 's' }}
-            </div>
-            <div class="pg-info" title="{{ untracked.invitations }}">
-              No account is pending activation or locked out
             </div>
           </div>
 
@@ -403,22 +400,6 @@
                 <div class="detail-label">Username</div>
                 <div class="detail-value">{{ user.username }}</div>
               </div>
-              <div class="detail-row">
-                <div class="detail-label">Email</div>
-                {%- if user.email %}
-                <div class="detail-value">{{ user.email }}</div>
-                {%- else %}
-                <div class="detail-value muted" title="{{ untracked.contact }}">Not recorded</div>
-                {%- endif %}
-              </div>
-              <div class="detail-row">
-                <div class="detail-label">Contact Number</div>
-                {%- if user.phone %}
-                <div class="detail-value">{{ user.phone }}</div>
-                {%- else %}
-                <div class="detail-value muted" title="{{ untracked.contact }}">Not recorded</div>
-                {%- endif %}
-              </div>
               {#- created_at is a UTC CURRENT_TIMESTAMP, so it goes through the
                   same converter every other stored timestamp on the system
                   uses rather than being printed as written. The mockup froze
@@ -426,10 +407,6 @@
               <div class="detail-row">
                 <div class="detail-label">Account Created</div>
                 <div class="detail-value">{{ user.created_at | display_timestamp }}</div>
-              </div>
-              <div class="detail-row">
-                <div class="detail-label">Assignment</div>
-                <div class="detail-value muted" title="{{ untracked.assignment }}">Not tracked</div>
               </div>
               <div class="detail-row">
                 <div class="detail-label">Last Login</div>
