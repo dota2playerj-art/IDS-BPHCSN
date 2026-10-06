@@ -75,7 +75,7 @@ Tracker note: the count line in §5 says "7 High, 46 Medium, 54 Low". The table 
 | B27 | … patient consultation summaries. | True | `get_consultation_report()` `models/consultations.py:504`. |
 | B28 | … appointment records. | Partly true | The report covers walk-in visits by status and service (`get_appointment_report()` `models/appointments.py:1384`). There are no booked appointments. |
 | B29 | Accessible via standard web browsers on **desktop** devices. | Partly true | True on the computer that runs the server. As installed, the server listens on that computer only: `app.run(host="127.0.0.1", port=5001)` (`app.py:94`). Other desktops cannot connect without a change to this setting. |
-| B30 | Accessible via standard web browsers on **mobile** devices. | Not true | The screens do not work at phone width (see B.8). Phones also cannot connect while the server listens on 127.0.0.1 (B29). |
+| B30 | Accessible via standard web browsers on **mobile** devices. | True (since Task 16 and 17) | Phones can connect in network mode (B29) and every screen is usable at 360 px and up (B.8, update after Task 17). Checked in Chromium emulating a phone, not yet on a real phone (L62, L64). |
 | B31 | Developed using Python, Flask, SQLite, Bootstrap 5, HTML, CSS, JavaScript and the Semaphore API. | True | `requirements.txt:1` (Flask 3.1.3); `static/css/bootstrap.min.css` (Bootstrap v5.3.3); `utils/sms.py:31` (Semaphore). The system also uses Chart.js 4.4.4, openpyxl, fpdf2, Flask-WTF, cryptography and python-dotenv (`requirements.txt`). |
 
 ### B.4 Limitation (page 7)
@@ -144,6 +144,8 @@ Tracker note: the count line in §5 says "7 High, 46 Medium, 54 Low". The table 
 - Doc 09 §6 already states the design rule: "desktop-first (min width 1366px … ). Mobile is a secondary, graceful-degradation target only." The roadmap lists responsive testing as not done (`08_PROJECT_ROADMAP.md:259-260`).
 
 **Verdict:** the screens work at desktop and laptop widths. They do not work on a phone-width browser.
+
+**Update after Task 17 (M51).** Below 992 px the sidebar is a slide-in menu (`static/css/responsive.css`), the header stays one line, every table scrolls inside its own `.table-responsive` box, fields are one column, dialogs are full screen below 576 px, and every button, link and checkbox is at least 44 by 44 px. `tests/verify_mobile_layout.py` opens every screen and dialog in a real browser at 360, 390 and 1366 px as each of the four roles and checks all of this. The Proposal's statement about mobile devices (B30, B53) is now true as written, with the real-phone caveat in L64.
 
 ### B.9 Summary of Not true findings
 

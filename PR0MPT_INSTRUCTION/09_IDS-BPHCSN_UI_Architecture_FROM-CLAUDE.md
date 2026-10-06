@@ -323,7 +323,7 @@ Staff's in every row below.
 | **Button Style** | Primary = filled teal/white text; Secondary = white/teal border; Danger = red; Success = green. All rounded 12px, Bootstrap-based. |
 | **Border Radius** | Cards 16px · Buttons 12px · Inputs 12px · Badges 999px · Tables 16px. No exceptions. |
 | **Shadows** | Subtle/soft only — never dramatic or heavy drop shadows. |
-| **Bootstrap Grid** | 12-column grid, Bootstrap 5, desktop-first (min width 1366px, target resolution 1920×1080). Mobile is a secondary, graceful-degradation target only. |
+| **Bootstrap Grid** | 12-column grid, Bootstrap 5, desktop-first (min width 1366px, target resolution 1920×1080). Phones are supported since Task 17 (360px and up): below 992px the sidebar is a slide-in menu and every table scrolls inside its own box; the rules are in 02 (Responsive Behavior). |
 
 ---
 

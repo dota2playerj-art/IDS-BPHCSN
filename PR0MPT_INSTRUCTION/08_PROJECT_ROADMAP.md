@@ -256,8 +256,8 @@ Tasks
 
 ☑ Build Tables — patient, inventory, appointment, consultation, broadcast and immunization tables
 
-☐ Responsive Testing — not yet performed on real devices; layouts use Bootstrap's grid but this
-  has not been verified against the tablet and phone widths the barangay staff would use
+☑ Responsive Testing — done in a real browser emulating a phone, at 360, 390 and 1366px, on every
+  screen and dialog (Task 17, tests/verify_mobile_layout.py). Not yet tried on a real phone (L64)
 
 Deliverable
 
