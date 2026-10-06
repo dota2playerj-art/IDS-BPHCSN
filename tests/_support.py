@@ -305,6 +305,10 @@ build_fixture_database(DB_PATH)
 # The error log goes in the temporary folder too, not in the project (Task 10, D8).
 os.environ["IDS_LOG_DIR"] = os.path.join(TEST_DIR, "logs")
 
+# The suites run in local mode, whatever .env says (Task 16). A suite that tests network
+# mode sets IDS_TEST_NETWORK=1 before importing this file. A value set here wins over .env.
+os.environ["IDS_NETWORK"] = "1" if os.environ.get("IDS_TEST_NETWORK") == "1" else "0"
+
 # Point the app at the test database BEFORE any app module is imported.
 import config  # noqa: E402
 

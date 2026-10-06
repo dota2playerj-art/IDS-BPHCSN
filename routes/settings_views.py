@@ -2,6 +2,8 @@
 import config
 import sqlite3
 
+from utils.network import network_mode_line
+from utils.server import listen_port
 from utils.sms import sms_mode
 from models.appointments import get_active_consultation
 from models.audit import (
@@ -227,6 +229,8 @@ def settings_context(general_form=None, general_errors=None, active_tab=None):
         # is always the id of a pane that exists.
         "active_pane": SETTINGS_TABS[resolve_tab(active_tab)],
         "sms_mode": sms_mode(),
+        # Read-only: local mode, or network mode and the address to open (utils/server.py).
+        "network_mode": network_mode_line(listen_port() or config.DEFAULT_PORT),
         "general": {
             # What the form draws. Typed values on a refused submit, stored
             # values otherwise -- so nothing an administrator wrote is thrown

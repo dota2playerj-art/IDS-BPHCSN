@@ -267,7 +267,7 @@
     </div>
 
     <div class="brand-headline">Empowering Community Healthcare Through Digital Innovation</div>
-    <div class="brand-desc">Securely manage patient records, medicine inventory, appointments, community announcements, SMS notifications, and reports through one integrated platform.</div>
+    <div class="brand-desc">Patient records, consultations, immunization, the patient queue, medicine inventory, SMS notifications and reports in one system.</div>
 
     <div class="brand-illustration">
       <svg width="360" height="260" viewBox="0 0 360 260" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -399,11 +399,11 @@
     (key), "Secure Auth" (shield) and "Trusted Gov System" (seal). Three are
     gone, for three different reasons.
 
-    "Encrypted Connection" was false. This application is served by app.run()
-    over plain HTTP at 127.0.0.1:5001 -- no ssl_context in app.py, no TLS
-    setting in config.py -- so the password typed into the field directly above
-    this panel travels in cleartext. It stated the opposite of what happens, on
-    the screen where the claim matters most.
+    "Encrypted Connection" was false when it was written: the app was served over
+    plain HTTP only, so the password typed above travelled in cleartext. Since
+    Task 16, local mode is still plain HTTP (on this computer only) and network
+    mode is HTTPS only (utils/server.py), so a fixed claim would be true in one
+    mode and false in the other. It is not brought back.
 
     "Secure Auth" named no mechanism, so there was nothing a reader could go and
     check. What is real here is narrower than the label: passwords are stored as

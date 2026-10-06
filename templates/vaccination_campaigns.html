@@ -85,9 +85,9 @@
     {#- WAS "All Systems Operational" (green dot) and "Secure Connection" (wifi
         icon) here. Both were fixed text, on this screen and six others. Nothing in
         this system checks its own health -- there is no probe, no status endpoint,
-        nothing that could fail and change what the pill said -- and nothing here is
-        served over TLS: app.run() puts this application on plain HTTP at
-        127.0.0.1:5001, with no ssl_context anywhere in its configuration. So one
+        nothing that could fail and change what the pill said -- and at the time
+        nothing here was served over TLS. (Since Task 16, network mode serves HTTPS
+        and local mode stays plain HTTP on 127.0.0.1; see utils/server.py.) So one
         pill reported a check that never ran, and the other stated the opposite of
         the truth.
 

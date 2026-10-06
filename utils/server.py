@@ -40,6 +40,13 @@ def start_problem():
     return None
 
 
+def listen_settings():
+    """(host, certificate, key) for the mode .env sets. Local mode has no certificate."""
+    if config.NETWORK_MODE:
+        return NETWORK_HOST, config.CERT_FILE, config.KEY_FILE
+    return LOCAL_HOST, None, None
+
+
 def build_server(app, host, port, cert_file=None, key_file=None):
     """A cheroot server for the app. With a certificate and key it speaks HTTPS only."""
     from cheroot import wsgi
@@ -65,14 +72,14 @@ def run(app):
         app.run(host=LOCAL_HOST, port=port, debug=True)
         return
 
+    host, cert_file, key_file = listen_settings()
+    server = build_server(app, host, port, cert_file, key_file)
     if config.NETWORK_MODE:
-        server = build_server(app, NETWORK_HOST, port, config.CERT_FILE, config.KEY_FILE)
         addresses = https_urls(port) or [f"https://localhost:{port}"]
         lines = ["Network mode: HTTPS only. Open one of these on devices on the same Wi-Fi:"]
         lines += [f"  {url}" for url in addresses]
         lines.append(f"  On this computer: https://localhost:{port}")
     else:
-        server = build_server(app, LOCAL_HOST, port)
         lines = [f"Local mode: this computer only. Open http://{LOCAL_HOST}:{port}"]
 
     try:
