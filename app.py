@@ -88,7 +88,12 @@ def create_app():
 app = create_app()
 
 
+def main():
+    """Serve the app. Local mode, or network mode (HTTPS) when IDS_NETWORK=1: utils/server.py."""
+    from utils.server import run
+
+    run(app)
+
+
 if __name__ == "__main__":
-    # Debug is off unless IDS_DEBUG=1 (see config.py). The app listens on this
-    # computer only.
-    app.run(host="127.0.0.1", port=5001, debug=config.DEBUG)
+    main()

@@ -38,9 +38,27 @@ _OLD_FALLBACK_KEY = "ids-bphcsn-dev-secret"
 # happens. It is on only when IDS_DEBUG is exactly 1. Anything else is off.
 DEBUG = os.environ.get("IDS_DEBUG", "").strip() == "1"
 
+# Two modes (utils/server.py). Local mode, the default, listens on this computer only
+# (127.0.0.1) over plain HTTP. Network mode (IDS_NETWORK=1) listens on the local network
+# and serves HTTPS only; it refuses to start without a certificate (setup_https.py).
+NETWORK_MODE = os.environ.get("IDS_NETWORK", "").strip() == "1"
+DEFAULT_PORT = 5001
+# The raw value; utils/server.py checks it when the app starts.
+PORT_SETTING = os.environ.get("IDS_PORT", "").strip()
+# Where setup_https.py writes the certificate and key. Ignored by git. IDS_CERT_DIR is
+# for the tests; leave it unset.
+CERT_DIR = Path(os.environ.get("IDS_CERT_DIR") or BASE_DIR / "instance" / "certs")
+CERT_FILE = CERT_DIR / "ids-bphcsn-cert.pem"
+KEY_FILE = CERT_DIR / "ids-bphcsn-key.pem"
+# The same certificate, without the key, to install on phones and other computers.
+DEVICE_CERT_FILE = CERT_DIR / "ids-bphcsn.crt"
+
 # The session cookie is not sent with a request that another site starts.
 SESSION_COOKIE_SAMESITE = "Lax"
 SESSION_COOKIE_HTTPONLY = True
+# In network mode the cookie is sent over HTTPS only. Local mode is plain HTTP on this
+# computer, so there the cookie cannot be marked Secure.
+SESSION_COOKIE_SECURE = NETWORK_MODE
 
 DATABASE = os.path.join(BASE_DIR, "app.db")
 
