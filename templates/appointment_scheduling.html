@@ -745,7 +745,7 @@
             <tr>
               <th style="width:44px;">#</th>
               <th>Appointment ID</th>
-              <th>Patient Name</th>
+              <th class="pin-name">Patient Name</th>
               <th>Service / Reason</th>
               <th>Arrived</th>
               <th>Status</th>
@@ -775,7 +775,7 @@
 {%- endif %}
               </td>
               <td class="appt-id">{{ entry.reference }}</td>
-              <td>
+              <td class="pin-name">
                 <div class="pat-name"><a href="{{ url_for(patient_profile_endpoint, patient_id=entry.patient_id) }}">{{ entry.first_name }}{% if entry.middle_name %} {{ entry.middle_name }}{% endif %} {{ entry.last_name }}</a>{% if entry.is_next_up and not entry.is_ready %}<span class="next-tag">Next</span>{% endif %}
 {#- A child in the building who has a dose due, with no record, or with only a parent's word. Put on the row
     rather than left to the profile because this is the moment it can be acted

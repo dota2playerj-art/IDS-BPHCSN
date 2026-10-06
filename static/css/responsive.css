@@ -166,12 +166,9 @@
   .panel-card { padding: 16px; }
 }
 @media (max-width: 767.98px) {
-  /* While a wide table scrolls sideways the patient's name stays in view: the third column of
-     Patient Records (after the tick box and the ID) and of the Patient Queue (after the number
-     and the appointment ID). The cell needs its own background or the cells passing under it
+  /* While a wide table scrolls sideways the patient's name stays in view: the column marked .pin-name (Patient Records and the Patient Queue). The cell needs its own background or the cells passing under it
      show through. */
-  table.patient-table th:nth-child(3), table.patient-table td:nth-child(3),
-  table#apptTable th:nth-child(3), table#apptTable td:nth-child(3) {
+  th.pin-name, td.pin-name {
     position: sticky; left: 0; z-index: 2; background: #fff;
     box-shadow: 1px 0 0 var(--border-color);
   }

@@ -51,13 +51,6 @@ PHONE_MAX = 576          # Bootstrap's sm breakpoint: below it, dialogs are full
 LG = 992                 # below this the sidebar is a menu
 MIN_TARGET = 44          # WCAG 2.5.5, in CSS pixels
 
-# A script error that was on the page before the phone layout, and is not a layout problem.
-# Each is in the tracker; it is counted and listed at the end of the run, never hidden.
-KNOWN_SCRIPT_ERRORS = [
-    ("admin", "/patient_records", "reading 'addEventListener'",
-     "L63: the Administrator's Patient Records script stops at a filter that role does not have"),
-]
-
 results = []
 exceptions = {}          # reason -> count, for the report at the end
 problems_by_check = {}
@@ -183,6 +176,10 @@ PROBE = r"""
   }
   out.cutOff = Array.from(new Set(out.cutOff)).slice(0, 8);
 
+  out.pinned = Array.from(scope.querySelectorAll('th.pin-name, td.pin-name')).filter(show)
+    .filter(c => getComputedStyle(c).position !== 'sticky').length;
+  out.hasPin = scope.querySelectorAll('th.pin-name').length > 0;
+
   // Tables: each one scrolls sideways inside its own .table-responsive box.
   out.tablesLoose = Array.from(scope.querySelectorAll('table')).filter(show)
     .filter(t => !t.closest('.table-responsive')).map(describe).slice(0, 6);
@@ -219,6 +216,15 @@ PROBE = r"""
 
 # Text in the "Loaded 20:41" pill changes every minute; nothing else on a page is time-based.
 MASK_CLOCK = "document.querySelectorAll('.sync-pill').forEach(e => e.style.visibility = 'hidden')"
+
+
+def watch_errors(page):
+    """Collect every script error and every console error the page logs (L63)."""
+    holder = {"errors": []}
+    page.on("pageerror", lambda e: holder["errors"].append("script: " + str(e)[:140]))
+    page.on("console", lambda m: holder["errors"].append("console: " + m.text[:140])
+            if m.type == "error" else None)
+    return holder
 
 
 def slug(text):
@@ -273,6 +279,8 @@ def view_checks(page, width, label, root=None, role=""):
     if phone:
         check(f"{where}: every table scrolls inside its own box",
               not facts["tablesLoose"], "\n".join(facts["tablesLoose"]))
+        check(f"{where}: the patient name column stays pinned while the table scrolls",
+              facts["pinned"] == 0, f"{facts['pinned']} cells of the .pin-name column are not sticky")
         check(f"{where}: fields stack in one column",
               not facts["sideBySide"] or width >= 768, "\n".join(facts["sideBySide"]))
         check(f"{where}: charts stay inside their box",
@@ -381,15 +389,7 @@ def visit(browser_ctx, page, role, path, label, width, tabs=False, dialogs=True)
             shot(page, role, name, width)
             if dialogs:
                 open_dialogs(page, role, name, width)
-    new = []
-    for error in errors:
-        known = next((why for role_, page_, text, why in KNOWN_SCRIPT_ERRORS
-                      if role_ == role and page_ in path and text in error), None)
-        if known:
-            exceptions[known] = exceptions.get(known, 0) + 1
-        else:
-            new.append(error)
-    check(f"{role} {label} @{width}: no script errors", not new, "\n".join(new[:3]))
+    check(f"{role} {label} @{width}: no script errors", not errors, "\n".join(errors[:3]))
     return True
 
 
@@ -541,8 +541,7 @@ def run_checks(browser, passwords, picks):
     for width in WIDTHS:
         context = browser.context(width)
         page = context.new_page()
-        holder = {"errors": []}
-        page.on("pageerror", lambda e, h=holder: h["errors"].append(str(e)[:120]))
+        holder = watch_errors(page)
         visit(holder, page, "signed-out", "/login", "sign in", width, dialogs=False)
         context.close()
 
@@ -568,8 +567,7 @@ def run_checks(browser, passwords, picks):
         for width in WIDTHS:
             context = browser.context(width, states[role])
             page = context.new_page()
-            holder = {"errors": []}
-            page.on("pageerror", lambda e, h=holder: h["errors"].append(str(e)[:120]))
+            holder = watch_errors(page)
             for path, name, tabs in pages:
                 try:
                     visit(holder, page, role, path, name, width, tabs=tabs)
@@ -661,6 +659,21 @@ def broken_layout_checks(browser, state, base_path):
           bool(after["tablesLoose"]))
     check("break-it: with .table-responsive removed, the page scrolls sideways and the check fails",
           after["scrollW"] > width)
+    page.goto(base_path["table"])
+    page.wait_for_load_state("networkidle")
+    pinned = page.evaluate(PROBE, {"root": None, "width": width})
+    check("break-it: the pinned name column is found and sticky before it is broken",
+          pinned["hasPin"] and pinned["pinned"] == 0, pinned["pinned"])
+    page.evaluate("document.querySelectorAll('.pin-name').forEach(e => e.style.position = 'static')")
+    check("break-it: with the pinning rule broken, the pin check fails",
+          page.evaluate(PROBE, {"root": None, "width": width})["pinned"] > 0)
+    page.goto(base_path["table"])
+    page.wait_for_load_state("networkidle")
+    holder = watch_errors(page)
+    page.evaluate("console.error('probe'); setTimeout(() => { throw new Error('probe') }, 0)")
+    page.wait_for_timeout(300)
+    check("break-it: a console error and a script error are both collected",
+          len(holder["errors"]) == 2, holder["errors"])
     page.goto(base_path["table"])
     page.wait_for_load_state("networkidle")
     page.evaluate("document.querySelectorAll('.offcanvas-lg, .offcanvas').forEach(e => "

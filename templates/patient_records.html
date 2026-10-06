@@ -436,7 +436,7 @@
             <tr>
               <th style="width:36px;"><input type="checkbox" class="form-check-input" id="selectAll" onclick="toggleAll(this)"></th>
               <th>Patient ID</th>
-              <th>Full Name</th>
+              <th class="pin-name">Full Name</th>
               <th>Age</th>
               <th>Gender</th>
               <th>Address</th>
@@ -492,7 +492,7 @@
                 data-visited="{{ 'visited' if patient.last_visit else 'never' }}">
               <td><input type="checkbox" class="form-check-input row-check" name="patient_ids" value="{{ patient.id }}" data-status="{{ patient.status }}" onclick="updateSelection()" aria-label="Select {{ patient.full_name }}"></td>
               <td class="pat-id">{{ patient.patient_id }}</td>
-              <td class="pat-name"><a href="{{ url_for(patient_profile_endpoint, patient_id=patient.id) }}">{{ patient.full_name }}</a></td>
+              <td class="pat-name pin-name"><a href="{{ url_for(patient_profile_endpoint, patient_id=patient.id) }}">{{ patient.full_name }}</a></td>
               <td>{{ patient.age if patient.age is not none else '—' }}</td>
               <td>{{ patient.sex or '—' }}</td>
               <td>{{ patient.display_address or '—' }}</td>
