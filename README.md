@@ -67,6 +67,20 @@ If port 5001 is already in use, another copy of the app is running. Close it fir
 
 After 5 wrong passwords in a row for one username, sign-in is closed to that username for 5 minutes.
 
+## Using the system from other devices
+
+By default the system works on this computer only. To use it from other computers and phones on
+the same Wi-Fi (always over HTTPS):
+
+1. Run `python setup_https.py` once. It makes the certificate and prints the addresses to open.
+2. In `.env`, set `IDS_NETWORK=1` (keep `IDS_DEBUG=0`), then start the app with `python app.py`.
+3. When Windows Firewall asks, allow Python on **Private networks only**. Never allow Public networks.
+4. Install `instance/certs/ids-bphcsn.crt` on each device (the script prints the steps). Never copy the key file.
+5. On each device, open the printed address, for example `https://192.168.1.10:5001`.
+
+If this computer's address changes, run `python setup_https.py --replace` and install the new `.crt` again.
+Settings shows which mode is on.
+
 The app runs entirely offline: Bootstrap, Chart.js and the Inter/Material fonts are vendored
 under `static/`, so no CDN is reached at any point. There is no jQuery; the scripts are plain
 JavaScript.
@@ -194,6 +208,7 @@ migrations/             idempotent schema migrations, each self-verifying (see i
 seed_demo_data.py       builds the fictional demo database
 archive_plain_databases.py   encrypts old plain databases, verifies, removes
 setup_env.py            creates .env with the secret keys
+setup_https.py          creates the HTTPS certificate for network mode
 restore_backup.py       opens an encrypted .idsbackup file
 export_sealed_key.py    prints the sealed-records key for the Doctor's envelope
 tests/                  the test suites; run python tests/run_all.py
