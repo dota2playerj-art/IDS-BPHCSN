@@ -1228,3 +1228,43 @@ The Doctor, Health Center Staff and the Barangay Official are unchanged.
 - *Stock accountability.* Dispensing writes no stock entry. Accountability comes from the stock
   levels and the dispensed totals in Reports. The Doctor and Health Center Staff hold the full
   dispensing records.
+
+---
+
+## 21. Design Decision — Local Mode, Network Mode and HTTPS (Task 16, 2026-10-06)
+
+**Why.** The approved Proposal describes a client-server system on the health center's Wi-Fi (a star
+topology), with each role on its own computer or phone. The server listened on 127.0.0.1 only, so only
+the server computer could use it (`docs/proposal-revisions.md`, B56 and B58). Opening it as it was would
+have sent passwords and health records over the Wi-Fi in plain text. RA 10173 asks for appropriate
+security measures for sensitive personal information.
+
+**Two modes, set in `.env`** (`utils/server.py`):
+
+| | Local mode (default) | Network mode (`IDS_NETWORK=1`) |
+|---|---|---|
+| Listens on | 127.0.0.1 only | every network address of the server computer |
+| Protocol | plain HTTP | HTTPS only (TLS 1.2 or newer); plain HTTP gets no page |
+| Starts without a certificate | yes | no: one plain message, "Run: python setup_https.py" |
+| Session cookie | HttpOnly, SameSite=Lax | also Secure |
+| Debug mode | allowed (Flask's development server) | refused |
+
+`IDS_PORT` sets the port (default 5001). The server is cheroot whenever debug is off, in both modes; it
+serves TLS by itself, so no proxy is needed. `python app.py` stays the one command.
+
+**The certificate.** `setup_https.py` makes a self-signed certificate for the computer's name, `localhost`,
+127.0.0.1 and every network address it has, valid 2 years, RSA 3072. It writes to `instance/certs/` (ignored
+by git, as are `*.pem`, `*.key` and `*.crt` anywhere), never prints the key, refuses to overwrite without
+`--replace`, prints the addresses to open, and gives short steps to trust `ids-bphcsn.crt` on Windows,
+Android and iPhone. The certificate is its own authority (basic constraints CA, path length 0) and is
+marked for server authentication, so devices that install it trust the address.
+
+**On screen.** Settings, Security pane, first row: "Network mode: Off (this computer only)" or "Network
+mode: On — open https://<address>:<port> on other devices on the same Wi-Fi". The sign-in page's description
+no longer names appointments or announcements.
+
+**Limits.** The certificate names the addresses the computer had when it was made; when the address
+changes (DHCP), run `setup_https.py --replace` and install the new `.crt` again (a fixed address for the
+server in the router avoids this). Each device must install the `.crt` once. The screens are still designed
+for desktop and laptop widths (`docs/proposal-revisions.md` B.8). Allow Python through Windows Firewall on
+Private networks only. Tests: `tests/verify_network_mode.py`.

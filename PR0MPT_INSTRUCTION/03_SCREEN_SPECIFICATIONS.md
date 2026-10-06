@@ -80,6 +80,10 @@ Session limits (added 2026-09-29): a person is signed out after 30 minutes witho
 
 Form tokens (added 2026-09-29): the login form, like every form, carries a hidden token from the page. A form sent without a valid token (for example, an old page after signing out in another tab) is not acted on. The person sees a plain page, "Your session expired. Please sign in again and repeat what you were doing.", with a Sign in button.
 
+Description line (Task 16): the brand panel says "Patient records, consultations, immunization, the patient queue, medicine inventory, SMS notifications and reports in one system." It no longer names appointments or announcements, which the system does not have.
+
+Network mode (Task 16): when the server runs in network mode, this page and every other page are served over HTTPS only, and the session cookie is marked Secure. In local mode (the default) the page is served over plain HTTP on the server computer only.
+
 Messages
 
 The login form shows only known messages: invalid credentials, maintenance mode, signed out after 30 minutes without activity, and signed out after 12 hours. The link carries a short key, never the sentence. An unknown key shows nothing.
@@ -715,7 +719,7 @@ General Settings (the health center's name and address, and its opening and clos
 
 SMS (one line: "SMS mode: Live" or "SMS mode: Simulated")
 
-Security Settings (read-only: what is enforced and what is recorded)
+Security Settings (read-only: the network mode, what is enforced and what is recorded)
 
 Password Policy (read-only)
 
@@ -737,6 +741,8 @@ There is no Restore button, no Reset, and no SMS gateway form. Restoring replace
 done on the health-center PC with `restore_backup.py`, which checks the file first.
 
 Security pane (updated 2026-09-29)
+
+Its first row (Task 16) is one read-only line about the server: "Network mode: Off (this computer only)", or "Network mode: On — open https://<address>:<port> on other devices on the same Wi-Fi". The mode is set in `.env` (IDS_NETWORK), not on this screen.
 
 It holds no controls. It states the rule in one read-only line: "Users are signed out after 30 minutes without activity, and 12 hours after they sign in." It also lists what is enforced and the sign-in counts. The old disabled controls (session timeout box, login attempt limit, two-factor switch, auto logout switch) were removed. Two-factor sign-in and lockout are not part of this system.
 

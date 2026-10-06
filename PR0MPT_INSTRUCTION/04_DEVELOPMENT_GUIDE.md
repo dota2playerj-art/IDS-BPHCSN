@@ -62,13 +62,38 @@ individually to that central server, typically over a local Wi-Fi router.
 This is not a distributed or multi-server design. All backend/deployment planning should assume
 one Flask process and one SQLite database file as the single source of truth.
 
+## Two modes, and the server (Task 16)
+
+`python app.py` is the one command to start. `utils/server.py` decides how it serves, from `.env`:
+
+- **Local mode** (the default, `IDS_NETWORK=0`): listens on 127.0.0.1 only, plain HTTP, so only the
+  server computer can use the system. `http://127.0.0.1:5001`.
+- **Network mode** (`IDS_NETWORK=1`): listens on every network address of the server computer and
+  serves **HTTPS only**. It refuses to start without a valid certificate and key, with one plain
+  message naming `python setup_https.py`. Plain HTTP is never served to the network. The session cookie
+  is marked Secure (and stays HttpOnly and SameSite=Lax). Flask-WTF's strict Referer check applies to
+  every POST over HTTPS. Debug mode is refused in network mode.
+- `IDS_PORT` sets the port (default 5001; 1024 to 65535).
+
+**The server.** With debug off, both modes are served by **cheroot** (the CherryPy web server): pure
+Python, works on Windows, installs with pip, and serves TLS by itself with Python's `ssl` module
+(TLS 1.2 or newer). Waitress was not chosen because it has no TLS; gunicorn does not run on Windows.
+With `IDS_DEBUG=1`, local mode uses Flask's development server, as before.
+
+**The certificate.** `python setup_https.py` makes a self-signed certificate (RSA 3072, SHA-256, valid
+2 years) for the computer's name, `localhost`, 127.0.0.1 and every network address it has. The files
+are in `instance/certs/`, which git ignores; the key is never printed. `ids-bphcsn.crt` is the
+certificate alone, to install on each device. When the computer's address changes, run it again with
+`--replace` and install the new `.crt`. Windows Firewall: allow Python on Private networks only.
+
 ---
 
 # Exact System Requirements (per approved Capstone Proposal)
 
 ## Admin-side Software
 - Windows 10/11
-- Python 3.11 or newer with Flask 3.1
+- Python 3.11 or newer with Flask 3.1 (the team's environment runs Python 3.14)
+- cheroot 11 as the web server; HTTPS in network mode (see "Two modes, and the server")
 - SQLite (built-in)
 - Visual Studio Code 1.88+
 - Git/GitHub (latest)
@@ -94,7 +119,8 @@ one Flask process and one SQLite database file as the single source of truth.
 - 4–8GB RAM
 - 128–256GB SSD
 - Minimum 10 Mbps connection, optional mobile hotspot backup
-- Connects to the central Flask server via Wi-Fi router
+- Connects to the central Flask server via Wi-Fi router, over HTTPS, when the server runs in network
+  mode; the device must have `ids-bphcsn.crt` installed. In local mode only the server computer is a client.
 
 ---
 
