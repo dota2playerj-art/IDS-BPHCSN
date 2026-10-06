@@ -227,6 +227,11 @@
     padding:8px 10px 4px; margin-top:4px; border-top:1px solid var(--border-color);
   }
 {% block styles %}{% endblock %}</style>
+{#- The phone layout. Every rule in it sits inside a max-width media query, so the desktop
+    layout above is untouched (the one exception is hiding the new buttons, which only exist
+    for phones). It comes after the inline styles on purpose: a page's own
+    rules are in the block above, and on a phone these must win over them. #}
+<link href="{{ url_for('static', filename='css/responsive.css') }}" rel="stylesheet">
 </head>
 {#- The session timings for static/js/session.js, from config.py. Only on a
     signed-in page: the script does nothing without them. #}
@@ -240,7 +245,12 @@
 <body>
 {%- endif %}
 
-<!-- SIDEBAR -->
+<!-- SIDEBAR
+     Below the lg breakpoint (992px) this shell is Bootstrap's responsive offcanvas: a menu
+     that slides in over the page, opened by the button in the header. From lg up Bootstrap
+     leaves the shell as an empty box in the page and the sidebar inside it is the same fixed
+     280px column as before. -->
+<div class="sidebar-shell offcanvas-lg offcanvas-start" id="sidebarMenu" tabindex="-1" aria-label="Main menu">
 <aside class="sidebar">
   <div class="sidebar-brand">
     <div class="logo-circle"><span class="material-symbols-outlined">health_metrics</span></div>
@@ -248,6 +258,9 @@
       <div class="name">{{ system_short_name }}</div>
       <div class="sub">Brgy. Poblacion HC</div>
     </div>
+    <button type="button" class="menu-close" data-bs-dismiss="offcanvas" data-bs-target="#sidebarMenu" aria-label="Close menu">
+      <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 4l12 12M16 4L4 16" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+    </button>
   </div>
 
   <div class="sidebar-user">
@@ -333,12 +346,16 @@
     <div>&copy; 2026 Brgy. Poblacion HC</div>
   </div>
 </aside>
+</div>
 
 <!-- MAIN -->
 <div class="main-wrap">
 
   <!-- HEADER -->
   <div class="topheader">
+    <button type="button" class="menu-toggle" data-bs-toggle="offcanvas" data-bs-target="#sidebarMenu" aria-controls="sidebarMenu" aria-label="Open menu">
+      <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><path d="M3 6h16M3 11h16M3 16h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+    </button>
 {#- GLOBAL PATIENT SEARCH. It was a <div> holding the words "Search patient name
     or ID..." -- not an input, inside no form, wired to nothing -- on all 21
     screens. It is a form now, and it deliberately introduces no matching rule of
@@ -354,13 +371,17 @@
     URL would still reach, it is a control that has no destination to be given.
     The empty div keeps the header's two ends where they are. #}
 {%- if patient_records_endpoint is defined %}
-    <form class="search-box" method="get" action="{{ url_for(patient_records_endpoint) }}" role="search">
+    <form class="search-box" id="headerSearch" method="get" action="{{ url_for(patient_records_endpoint) }}" role="search">
       <button type="submit" aria-label="Search the patient register" title="Search the patient register by name, patient ID, contact number or address">
         <span class="material-symbols-outlined" style="font-size:18px;">search</span>
       </button>
       <input type="text" name="search" maxlength="{{ header_search_max }}"
              placeholder="Search patient name, ID or contact..." aria-label="Search patient name, ID or contact">
     </form>
+{#- On a phone the box above is hidden, and this button opens it under the header. #}
+    <button type="button" class="search-toggle" aria-controls="headerSearch" aria-expanded="false" aria-label="Search patients">
+      <span class="material-symbols-outlined">search</span>
+    </button>
 {%- else %}
     <div></div>
 {%- endif %}
@@ -380,7 +401,7 @@
         <span class="material-symbols-outlined" style="font-size:16px;">schedule</span>Loaded {{ rendered_at | clock_time }}
       </div>
       <div class="dropdown">
-      <div class="profile-chip" role="button" id="profileDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+      <div class="profile-chip" role="button" id="profileDropdown" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Account menu">
 
         <div class="avatar">{{ sidebar_user_initials }}</div>
         <div>
@@ -469,8 +490,9 @@
 
   <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
   <script src="{{ url_for('static', filename='js/csrf.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/mobile-header.js') }}"></script>
   <div class="modal fade" id="logoutConfirmModal" tabindex="-1" aria-labelledby="logoutConfirmModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-fullscreen-sm-down modal-dialog-centered">
       <div class="modal-content" style="border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.12);">
         <div class="modal-header">
           <h5 class="modal-title" id="logoutConfirmModalLabel">Confirm Logout</h5>
@@ -493,7 +515,7 @@
 {%- if current_role %}
   {#- Shown by static/js/session.js shortly before the idle limit. #}
   <div class="modal fade" id="sessionIdleModal" tabindex="-1" aria-labelledby="sessionIdleModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-fullscreen-sm-down modal-dialog-centered">
       <div class="modal-content" style="border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.12);">
         <div class="modal-header">
           <h5 class="modal-title" id="sessionIdleModalLabel">Are you still there?</h5>

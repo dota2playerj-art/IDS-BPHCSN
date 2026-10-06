@@ -1,0 +1,71 @@
+/* THE PHONE LAYOUT (M51).
+
+   The system is used on phones, so below Bootstrap's lg breakpoint (992px) the sidebar is a
+   menu that slides in, and below md (768px) and sm (576px) the content is made to fit.
+
+   Every layout rule here sits inside a max-width media query, so 992px and wider is the layout
+   the screens were approved with. The only rules outside a query hide the three buttons that
+   exist for phones. Print is untouched too: it has its own rules in each page.
+
+   It is loaded after the inline styles in base.html and in each page, because on a phone
+   these have to win over a page's own width and padding. Rules are shared classes wherever
+   the same thing is wrong on more than one page.
+
+   The numbers: 44px is the smallest tappable size (WCAG 2.5.5). */
+
+/* The buttons that only exist on phones. */
+.menu-toggle, .search-toggle, .menu-close { display: none; }
+
+/* ======================= below lg (992px): the menu and the header ======================= */
+@media (max-width: 991.98px) {
+  /* The sidebar becomes the body of Bootstrap's responsive offcanvas (.sidebar-shell). */
+  .sidebar-shell {
+    --bs-offcanvas-bg: var(--teal);
+    --bs-offcanvas-color: #fff;
+    --bs-offcanvas-width: min(300px, 86vw);
+    --bs-offcanvas-border-width: 0;
+  }
+  .sidebar {
+    position: static; width: 100%; height: 100%; overflow-y: auto; z-index: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .sidebar-brand .menu-close {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 44px; height: 44px; margin-left: auto; flex: none; padding: 0;
+    background: rgba(255, 255, 255, 0.12); border: 0; border-radius: 12px; color: #fff;
+  }
+  .sidebar-nav a { min-height: 44px; }
+
+  .main-wrap { margin-left: 0; }
+
+  /* One line: menu button, search button, then the time and the account on the right. */
+  .topheader {
+    height: 64px; padding: 0 16px; gap: 8px; justify-content: flex-start;
+  }
+  .topheader > div:empty { display: none; }
+  .menu-toggle, .search-toggle {
+    display: inline-flex; align-items: center; justify-content: center; flex: none;
+    width: 44px; height: 44px; padding: 0; border: 0; border-radius: 12px;
+    background: transparent; color: var(--text-dark);
+  }
+  .menu-toggle:hover, .search-toggle:hover { background: var(--bg); }
+  .search-toggle .material-symbols-outlined { font-size: 24px; }
+
+  /* The search box opens under the header, over the page, until it is used or dismissed. */
+  .search-box { display: none; }
+  .topheader.search-open .search-box {
+    display: flex; position: absolute; top: 100%; left: 0; right: 0; width: auto; margin: 0;
+    background: #fff; border-width: 0 0 1px; border-radius: 0 0 12px 12px; padding: 4px 8px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.10);
+  }
+  .search-box input { min-height: 44px; font-size: 16px; }
+  .search-box button { min-width: 44px; min-height: 44px; justify-content: center; }
+
+  .header-right { margin-left: auto; gap: 8px; min-width: 0; }
+  .sync-pill { padding: 6px 10px; font-size: 12px; white-space: nowrap; }
+  /* The chip is the avatar alone; the name and role are in the menu. */
+  .profile-chip { min-width: 44px; min-height: 44px; justify-content: center; gap: 0; }
+  .profile-chip > div:not(.avatar), .profile-chip > .material-symbols-outlined { display: none; }
+
+  .content { padding: 20px 16px 40px; }
+}
