@@ -981,7 +981,7 @@
       search.value = '';
       fSex.value = '';
       fStatus.value = '';
-      fVisit.value = '';
+      if(fVisit){ fVisit.value = ''; }
       fAgeMin.value = '';
       fAgeMax.value = '';
       applyFilters();
@@ -992,6 +992,7 @@
     // change too so the button is a confirmation rather than the only way.
     search.addEventListener('input', applyFilters);
     [fSex, fStatus, fVisit, fAgeMin, fAgeMax].forEach(function(control){
+      if(!control){ return; }  // the Administrator's roster has no Last Visit filter
       control.addEventListener('change', applyFilters);
     });
 
