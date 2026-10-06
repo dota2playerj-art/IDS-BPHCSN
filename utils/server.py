@@ -9,7 +9,9 @@ With debug off, both modes use cheroot, a production web server that serves HTTP
 itself. With IDS_DEBUG=1, local mode uses Flask's own development server, as before;
 network mode refuses debug, because the debugger runs code typed into a browser.
 """
+import re
 import ssl
+from contextlib import suppress
 
 import config
 from utils.network import certificate_problem, https_urls
@@ -47,15 +49,61 @@ def listen_settings():
     return LOCAL_HOST, None, None
 
 
-def build_server(app, host, port, cert_file=None, key_file=None):
-    """A cheroot server for the app. With a certificate and key it speaks HTTPS only."""
-    from cheroot import wsgi
+PLAIN_HTTP_MARKER = "plain HTTP sent to the HTTPS port"
+
+
+def log_plain_http(message):
+    """One short line in logs/errors.log for a device that sent plain HTTP to the HTTPS port."""
+    found = re.search(r"Client \('([^']+)'", str(message))
+    who = found.group(1) if found else "a device"
+    try:
+        from utils.errors import error_logger
+
+        error_logger().error("Plain HTTP request to the HTTPS port refused, from %s. "
+                             "The address to use starts with https://", who)
+    except Exception:
+        pass  # a log that cannot be written must never turn one problem into two
+
+
+def _cheroot_classes():
+    """cheroot's server and TLS adapter, changed in one way: a plain HTTP request to the HTTPS
+    port is refused quietly (L60).
+
+    cheroot answers it by writing an error page onto a socket the failed TLS handshake has
+    already closed. On Windows that raised WinError 10038 from clean-up code, which Python
+    printed to the console as a traceback. The request was refused all the same; only the
+    noise was wrong. Here the socket is closed at once, nothing is written to it, and the
+    server's own message becomes one line in logs/errors.log instead of console text.
+    """
+    from cheroot import errors, wsgi
     from cheroot.ssl.builtin import BuiltinSSLAdapter
 
-    server = wsgi.Server((host, port), app, numthreads=THREADS,
-                         server_name=config.SYSTEM_SHORT_NAME)
+    class Adapter(BuiltinSSLAdapter):
+        def wrap(self, sock):
+            try:
+                return super().wrap(sock)
+            except errors.NoSSLError:
+                with suppress(OSError):
+                    sock.close()
+                raise errors.FatalSSLAlert(PLAIN_HTTP_MARKER) from None
+
+    class Server(wsgi.Server):
+        def error_log(self, msg="", level=20, traceback=False):
+            if PLAIN_HTTP_MARKER in str(msg):
+                log_plain_http(msg)
+                return
+            super().error_log(msg, level, traceback)
+
+    return Server, Adapter
+
+
+def build_server(app, host, port, cert_file=None, key_file=None):
+    """A cheroot server for the app. With a certificate and key it speaks HTTPS only."""
+    Server, Adapter = _cheroot_classes()
+
+    server = Server((host, port), app, numthreads=THREADS, server_name=config.SYSTEM_SHORT_NAME)
     if cert_file:
-        adapter = BuiltinSSLAdapter(str(cert_file), str(key_file))
+        adapter = Adapter(str(cert_file), str(key_file))
         adapter.context.minimum_version = ssl.TLSVersion.TLSv1_2
         server.ssl_adapter = adapter
     return server

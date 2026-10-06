@@ -5,8 +5,11 @@ a temporary folder. The server under test listens on 127.0.0.1, never on the who
 so no firewall prompt appears. Child processes use their own test database.
 """
 import atexit
+import contextlib
+import gc
 import hashlib
 import http.client
+import io
 import os
 import re
 import shutil
@@ -346,15 +349,31 @@ try:
     check("over HTTPS, a POST whose Referer is another site is refused", status == 400, status)
 
     plain = {}
-    try:
-        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
-        conn.request("GET", "/login")
-        response = conn.getresponse()
-        plain = {"status": response.status, "page": response.read().decode("utf-8", "replace")}
-    except OSError as error:
-        plain = {"error": type(error).__name__}
+    # L60: the refusal must not print a traceback on the console; it is one line in errors.log.
+    console = io.StringIO()
+    error_log = Path(config.LOG_DIR) / "errors.log"
+    lines_before = error_log.read_text(encoding="utf-8").splitlines() if error_log.exists() else []
+    with contextlib.redirect_stderr(console):
+        try:
+            conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+            conn.request("GET", "/login")
+            response = conn.getresponse()
+            plain = {"status": response.status, "page": response.read().decode("utf-8", "replace")}
+        except OSError as error:
+            plain = {"error": type(error).__name__}
+        time.sleep(0.5)
+        gc.collect()  # the old noise came from clean-up code that runs when objects are collected
     check("a plain HTTP request to the HTTPS port gets no page",
           plain.get("status") != 200 and "Sign In" not in plain.get("page", ""), plain)
+    check("L60: that refusal prints nothing to the console, no traceback",
+          console.getvalue() == "", console.getvalue()[:300])
+    lines_after = error_log.read_text(encoding="utf-8").splitlines() if error_log.exists() else []
+    added = lines_after[len(lines_before):]
+    check("L60: it writes exactly one short line to logs/errors.log, and no traceback",
+          len(added) == 1 and "Plain HTTP request to the HTTPS port refused" in added[0]
+          and len(added[0]) < 200, added)
+    status, _, _, _ = https("GET", "/login")
+    check("L60: the server still answers HTTPS after the refused request", status == 200, status)
 except Exception as error:  # noqa: BLE001
     check("the HTTPS checks ran to the end without an error", False, repr(error))
 finally:
