@@ -301,6 +301,9 @@ Sidebar remains identical across all pages.
 
 Never redesign.
 
+On a phone (below 992px) the same sidebar is a menu that slides in over the page, opened by the
+menu button at the left of the header. See Responsive Behavior.
+
 ---
 
 # Header
@@ -638,7 +641,24 @@ Secondary
 
 Laptop
 
-Mobile design is optional.
+Phones and small tablets (Task 17). The Proposal says the system works in browsers on mobile
+devices, so every screen is usable at 360px wide and up. This is not a second design: from 992px
+up the layout is exactly the one above, and print is unchanged. All of it is in
+`static/css/responsive.css`, every rule inside a max-width query.
+
+- **Below 992px (lg).** The sidebar becomes an offcanvas menu: opened by the menu button in
+  the header, closed by its own button, a tap outside it, or choosing a page. The header stays one
+  line: menu button, search button, the "Loaded" time, and the account chip as the avatar alone.
+  The patient search opens under the header from the search button.
+- **Below 768px (md).** The content has 16px sides. Every table scrolls sideways inside its own
+  `.table-responsive` box, never the page; on Patient Records and the Patient Queue the patient name
+  stays in view as the table scrolls. Rows of buttons wrap instead of running off the edge. Fields are
+  one column. Charts follow the width of their box. Stat cards stack.
+- **Dialogs** carry `modal-fullscreen-sm-down`: full screen below 576px.
+- **Tappable size.** Every button, link, checkbox and radio is at least 44 by 44 CSS pixels on a
+  phone (WCAG 2.5.5). A link inside a sentence is exempt.
+- **Checked by** `tests/verify_mobile_layout.py`, which opens every screen in a real browser at 360,
+  390 and 1366px. A new screen must pass it.
 
 ---
 

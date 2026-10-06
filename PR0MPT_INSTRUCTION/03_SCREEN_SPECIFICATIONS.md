@@ -16,7 +16,7 @@ Screens 01 to 15 are the original approved specifications and are unchanged belo
 
 `templates/` holds 29 `.html` files. Twenty-three of them belong to the 21 screens (Patient Profile has a second file, `patient_profile_demographics.html`, the Administrator's demographics-only copy; Medicine Inventory has a second file, `inventory_item.html`, the item page). The other six are not screens, and are not screens for two different reasons (the sixth, `error.html`, is the plain page shown for a 404 or 500):
 
-- **`base.html`** is the shared layout — sidebar, header, content region — that every screen renders inside.
+- **`base.html`** is the shared layout — sidebar, header, content region — that every screen renders inside. Below 992px the sidebar is a slide-in menu and the header gains a menu button and a search button; the phone rules are in 02 (Responsive Behavior) and apply to every screen, so no screen below repeats them.
 - **`_print.html`** and **`_chart_table.html`** are partials, included by the screens that print and the screens that render a chart's underlying figures as a table.
 - **`maintenance.html`** is a *response page*, not a screen. It has no route, no sidebar entry and no URL of its own: `utils/security.py::_maintenance_response()` renders it with a 503 status **instead of** whatever screen the request asked for, while maintenance mode is on. Nothing navigates to it, so it is closer to an error page than to a screen, and counting it as one would imply somewhere to click that does not exist.
 

@@ -451,7 +451,7 @@
           <div class="panel-title no-print">Batches Expiring Soon and Expired</div>
           <div class="panel-sub">Expiring soon: {{ inventory_report.expiring_soon_count }} (within {{ inventory_report.expiring_soon_days }} days) &middot; Expired: {{ inventory_report.expired_count }} &middot; as of {{ report_date | display_date }}</div>
 {%- if inventory_report.expiry_batches %}
-          <div style="overflow-x:auto;">
+          <div class="table-responsive">
             <table class="table" style="font-size:13.5px;">
               <thead>
                 <tr><th scope="col">Item</th><th scope="col">Lot</th><th scope="col">Expiry</th><th scope="col" class="text-end">Amount</th><th scope="col">Status</th></tr>

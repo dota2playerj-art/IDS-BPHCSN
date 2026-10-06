@@ -130,7 +130,7 @@
     <div class="panel-card">
       <div class="section-title">Batches</div>
 {%- if item.batches %}
-      <div style="overflow-x:auto;">
+      <div class="table-responsive">
         <table class="inv-table" id="batchTable">
           <thead>
             <tr>
@@ -258,7 +258,7 @@
 {%- if removals %}
     <div class="panel-card">
       <div class="section-title">Recent removals</div>
-      <div style="overflow-x:auto;">
+      <div class="table-responsive">
         <table class="inv-table">
           <thead><tr><th>Date</th><th>Lot</th><th>Amount</th><th>Reason</th><th>Note</th><th>By</th></tr></thead>
           <tbody>
@@ -279,7 +279,7 @@
 {%- endif %}
 
     <div class="modal fade" id="removeStockModal" tabindex="-1" aria-labelledby="removeStockModalLabel" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-dialog modal-fullscreen-sm-down modal-dialog-centered">
         <form class="modal-content" method="post" action="{{ url_for(remove_stock_endpoint, item_id=item.id) }}" style="border-radius:16px;">
           {{ csrf_field() }}
           <input type="hidden" name="batch_id" id="removeBatchId" value="">

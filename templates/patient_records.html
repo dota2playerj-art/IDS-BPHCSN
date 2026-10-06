@@ -430,7 +430,7 @@
       </div>
 
 {%- if patients %}
-      <div style="overflow-x:auto;">
+      <div class="table-responsive">
         <table class="patient-table" id="patientTable">
           <thead>
             <tr>
@@ -601,7 +601,7 @@
         write, and refuses any other role whatever this page offered. #}
     <div class="modal fade" id="archivePatientModal" tabindex="-1" aria-labelledby="archivePatientModalLabel" aria-hidden="true"
          data-can-declare-death="{{ '1' if can_declare_death else '' }}" data-doctor-only-status="{{ doctor_only_status }}">
-      <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-dialog modal-fullscreen-sm-down modal-dialog-centered">
         <div class="modal-content" style="border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.12);">
           <div class="modal-header">
             <h5 class="modal-title" id="archivePatientModalLabel">Change Patient Status</h5>

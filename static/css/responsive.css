@@ -69,3 +69,120 @@
 
   .content { padding: 20px 16px 40px; }
 }
+
+/* ===================== below md (768px): phones and small tablets ===================== */
+@media (max-width: 767.98px) {
+  .page-title { font-size: 26px; }
+
+  /* TAPPABLE SIZE. Every control a finger has to hit is at least 44 by 44. */
+  .btn, .btn-primary-teal, .btn-outline-teal, .filter-btn, .btn-reset, .bulk-actions button,
+  .sort-option, .nav-tabs .nav-link, .pagination .page-link, .dropdown-item,
+  a.action-icon, button.action-icon {
+    min-height: 44px;
+  }
+  .btn, .btn-primary-teal, .btn-outline-teal { justify-content: center; }
+  .btn-close {
+    width: 44px; height: 44px; padding: 0; background-position: center;
+    background-origin: content-box; background-size: 16px; box-sizing: border-box;
+  }
+  .action-icon { width: 44px; height: 44px; }
+  .pagination .page-link { min-width: 44px; display: flex; align-items: center; justify-content: center; }
+
+  /* Fields are 44px tall and, being the width of their column, easy to hit. 16px type also
+     stops iPhones zooming in when a field is tapped. */
+  .form-control, .form-select { min-height: 44px; font-size: 16px; }
+
+  /* A checkbox on its own in a table row (select a patient, select all): the box is drawn
+     small, the area that takes the tap is 44 by 44. */
+  table input[type=checkbox] {
+    -webkit-appearance: none; appearance: none; position: relative; box-sizing: border-box;
+    width: 44px; height: 44px; margin: -12px; border: 0; background: transparent;
+  }
+  table input[type=checkbox]::before {
+    content: ""; position: absolute; top: 11px; left: 11px; width: 22px; height: 22px;
+    box-sizing: border-box; border: 2px solid #9CA3AF; border-radius: 6px; background: #fff;
+  }
+  table input[type=checkbox]:checked::before {
+    background: var(--teal) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='none' stroke='%23fff' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='m6 10 3 3 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
+    border-color: var(--teal);
+  }
+  table input[type=checkbox]:focus-visible::before { box-shadow: 0 0 0 3px rgba(22, 155, 146, 0.35); }
+
+  /* A checkbox or radio with a label is tapped through the label, so the label is the target. */
+  .form-check { min-height: 44px; display: flex; align-items: center; gap: 10px; padding-left: 0; }
+  .form-check .form-check-input { float: none; margin: 0; flex: none; }
+  .form-check-label { min-height: 44px; display: flex; align-items: center; flex: 1; }
+}
+
+/* ---- below md, continued: rows, links, toolbars ---- */
+@media (max-width: 767.98px) {
+  /* A row of buttons that does not fit goes onto a second line instead of past the edge. */
+  .d-flex.gap-1, .d-flex.gap-2, .d-flex.gap-3 { flex-wrap: wrap; }
+
+  /* Every button, whatever class a page gave it. */
+  button { min-height: 44px; min-width: 44px; }
+  button.btn-close, button.menu-toggle, button.search-toggle { min-height: 0; }
+
+  /* Links that are controls: the breadcrumb, a link in a table cell, a "see more" link under
+     a panel, a calendar arrow, a button drawn on a link. A link in the middle of a sentence
+     stays as it is. */
+  .breadcrumb-nav a, td a, th a, a.panel-link, a.st-link, a.cal-nav-btn, a[class*="btn"],
+  a.action-icon, .list-title a, .alert-title a {
+    display: inline-flex; align-items: center; min-height: 44px; min-width: 44px;
+  }
+  .breadcrumb-nav { flex-wrap: wrap; }
+  td a.btn, td a[class*="btn"] { justify-content: center; }
+
+  /* The search box above a table is as wide as the screen, and its field is 44px tall. */
+  .toolbar-search { min-width: 0; max-width: none; flex: 1 1 100%; padding-top: 0; padding-bottom: 0; }
+  .toolbar-search input { min-height: 44px; font-size: 16px; }
+}
+
+/* A choice drawn as a pill or a row (status, check-in mode, which patient) is the label around a
+   radio button, and the label is what takes the tap. */
+@media (max-width: 767.98px) {
+  .radio-pill, .check-chip, .mode-pill, .patient-option { min-height: 44px; align-items: center; }
+}
+
+/* ---- the sign-in page: the brand panel goes above the form instead of beside it ---- */
+@media (max-width: 767.98px) {
+  .login-page { flex-direction: column; }
+  .brand-panel { flex: none; max-width: 100%; padding: 28px 20px 24px; }
+  .brand-headline { font-size: 26px; margin-top: 24px; }
+  .brand-desc { font-size: 14.5px; }
+  .brand-illustration, .brand-decor-circle { display: none; }
+  .brand-footer { margin-top: 20px; }
+  .login-panel { padding: 24px 16px 32px; align-items: flex-start; }
+  .login-card { padding: 28px 20px 24px; }
+  .eye-toggle { min-width: 44px; min-height: 44px; }
+}
+
+/* ---- patient profile header, panels, and the patient name in a long table ---- */
+@media (max-width: 575.98px) {
+  /* The avatar sits above the details instead of taking a third of the width beside them. */
+  .profile-header { grid-template-columns: minmax(0, 1fr); }
+  .profile-id-block { flex-direction: column; gap: 12px; }
+  .profile-meta-grid { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 16px 20px; }
+  .panel-card { padding: 16px; }
+}
+@media (max-width: 767.98px) {
+  /* While a wide table scrolls sideways the patient's name stays in view: the third column of
+     Patient Records (after the tick box and the ID) and of the Patient Queue (after the number
+     and the appointment ID). The cell needs its own background or the cells passing under it
+     show through. */
+  table.patient-table th:nth-child(3), table.patient-table td:nth-child(3),
+  table#apptTable th:nth-child(3), table#apptTable td:nth-child(3) {
+    position: sticky; left: 0; z-index: 2; background: #fff;
+    box-shadow: 1px 0 0 var(--border-color);
+  }
+}
+
+/* The month calendar is seven columns whatever the width, and its days are not controls, so the
+   columns are allowed to be narrow and the cells smaller. */
+@media (max-width: 575.98px) {
+  .cal-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+  .cal-cell { padding: 4px; min-height: 64px; border-radius: 8px; }
+  .cal-dot-row { gap: 2px; }
+  .cal-count { font-size: 9.5px; }
+  .cal-dow { font-size: 10px; }
+}

@@ -284,7 +284,7 @@
               administrator needs before pressing anything on this screen: the
               password is set here and can never be read back, and the last
               administrator cannot be switched off. #}
-          <div style="overflow-x:auto;">
+          <div class="table-responsive">
             <table class="user-table" id="userTable">
               <thead>
                 <tr>
@@ -517,7 +517,7 @@
          everything in models.users.validate_new_user_form(), which is what runs
          when a POST arrives without this page ever having been loaded. -->
     <div class="modal fade" id="addUserModal" tabindex="-1" aria-labelledby="addUserModalLabel" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+      <div class="modal-dialog modal-fullscreen-sm-down modal-dialog-centered modal-lg modal-dialog-scrollable">
         <div class="modal-content" style="border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.12);">
           <div class="modal-header">
             <h5 class="modal-title" id="addUserModalLabel">Add User</h5>
@@ -655,7 +655,7 @@
 {%- for user in users %}
 {%- if user.is_active and not user.is_last_admin %}
     <div class="modal fade" id="statusModal{{ user.id }}" tabindex="-1" aria-labelledby="statusModalLabel{{ user.id }}" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-dialog modal-fullscreen-sm-down modal-dialog-centered">
         <div class="modal-content" style="border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.12);">
           <div class="modal-header">
             <h5 class="modal-title" id="statusModalLabel{{ user.id }}">Deactivate Account</h5>
@@ -695,7 +695,7 @@
     </div>
 {%- elif not user.is_active %}
     <div class="modal fade" id="statusModal{{ user.id }}" tabindex="-1" aria-labelledby="statusModalLabel{{ user.id }}" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-dialog modal-fullscreen-sm-down modal-dialog-centered">
         <div class="modal-content" style="border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.12);">
           <div class="modal-header">
             <h5 class="modal-title" id="statusModalLabel{{ user.id }}">Reactivate Account</h5>
@@ -749,7 +749,7 @@
 {%- set rstate = reset_state if reset_state and reset_state.user_id == user.id else None %}
 {%- set rerr = rstate.errors if rstate else {} %}
     <div class="modal fade" id="editUserModal{{ user.id }}" tabindex="-1" aria-labelledby="editUserModalLabel{{ user.id }}" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+      <div class="modal-dialog modal-fullscreen-sm-down modal-dialog-centered modal-lg modal-dialog-scrollable">
         <div class="modal-content" style="border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.12);">
           <div class="modal-header">
             <h5 class="modal-title" id="editUserModalLabel{{ user.id }}">Edit User</h5>
@@ -868,7 +868,7 @@
     </div>
 
     <div class="modal fade" id="resetPasswordModal{{ user.id }}" tabindex="-1" aria-labelledby="resetPasswordModalLabel{{ user.id }}" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+      <div class="modal-dialog modal-fullscreen-sm-down modal-dialog-centered modal-lg modal-dialog-scrollable">
         <div class="modal-content" style="border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.12);">
           <div class="modal-header">
             <h5 class="modal-title" id="resetPasswordModalLabel{{ user.id }}">Reset Password</h5>

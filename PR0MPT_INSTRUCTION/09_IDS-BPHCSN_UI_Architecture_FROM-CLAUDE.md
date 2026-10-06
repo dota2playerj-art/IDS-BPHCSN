@@ -87,7 +87,7 @@ Do not re-add an Announcements screen without adding the table and routes behind
 
 ## 2. Navigation Structure
 
-The menus below are transcribed from `templates/base.html`, which renders one sidebar and swaps only the items per role. The accessible and restricted lists are the enforced guards, not a summary of them.
+The menus below are transcribed from `templates/base.html`, which renders one sidebar and swaps only the items per role. On a phone (below 992px) the same menu is an offcanvas panel opened from the header's menu button; the items, their order and their role rules are the same at every width. The accessible and restricted lists are the enforced guards, not a summary of them.
 
 Four screens are reachable but never appear in a sidebar. Three are entered from another screen with a subject already chosen: **Patient Profile** (from Patient Records), **Add/Edit Medicine** (from Medicine Inventory), and **Record / Edit Consultation** (from the queue, or from a patient's Consultation History). The fourth, **My Account**, is entered from the profile chip in the header — it has no sidebar entry because it belongs to no role's menu; every role reaches it the same way.
 

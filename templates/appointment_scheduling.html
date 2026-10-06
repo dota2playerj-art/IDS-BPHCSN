@@ -739,7 +739,7 @@
         <div class="skeleton-row" style="border-bottom:none;"><div class="skel-block" style="width:90px;height:14px;"></div><div class="skel-block" style="width:150px;height:14px;"></div><div class="skel-block" style="width:120px;height:14px;"></div><div class="skel-block" style="width:100px;height:14px;"></div><div class="skel-block" style="width:80px;height:14px;"></div><div class="skel-block" style="width:90px;height:14px;"></div></div>
       </div>
 
-      <div style="overflow-x:auto;{% if not queue %} display:none;{% endif %}" id="tableWrap">
+      <div class="table-responsive"{% if not queue %} style="display:none;"{% endif %} id="tableWrap">
         <table class="appt-table" id="apptTable">
           <thead>
             <tr>
@@ -872,7 +872,7 @@
             &middot; Waiting for the Doctor {{ earlier_counts['Waiting for the Doctor'] }}
           </div>
         </div>
-        <div style="overflow-x:auto;">
+        <div class="table-responsive">
           <table class="appt-table">
             <thead>
               <tr>
@@ -915,7 +915,7 @@
 {%- if care_team_view %}
     <!-- LEFT BEFORE BEING SEEN: the question is asked before anything is saved. -->
     <div class="modal fade" id="leftModal" tabindex="-1" aria-labelledby="leftModalLabel" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-dialog modal-fullscreen-sm-down modal-dialog-centered">
         <div class="modal-content" style="border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.12);">
           <div class="modal-header">
             <h5 class="modal-title" id="leftModalLabel">Mark this patient as left before being seen?</h5>
@@ -948,7 +948,7 @@
 
     <!-- CHANGE SERVICE (Task 6b, D2): correct the service of a visit that is not finished. -->
     <div class="modal fade" id="serviceModal" tabindex="-1" aria-labelledby="serviceModalLabel" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-dialog modal-fullscreen-sm-down modal-dialog-centered">
         <div class="modal-content" style="border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.12);">
           <div class="modal-header">
             <h5 class="modal-title" id="serviceModalLabel">Change the service of this visit</h5>
@@ -1016,7 +1016,7 @@
          not asked on either path -- the server decides it from what today
          already holds, so the two cannot disagree. -->
     <div class="modal fade" id="checkInModal" tabindex="-1" aria-labelledby="checkInModalLabel" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-dialog modal-fullscreen-sm-down modal-dialog-centered">
         <div class="modal-content" style="border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.12);">
           <div class="modal-header">
             <h5 class="modal-title" id="checkInModalLabel">Check In Patient</h5>

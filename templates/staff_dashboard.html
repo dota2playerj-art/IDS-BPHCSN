@@ -202,7 +202,7 @@
         <span class="badge-status badge-waiting">{{ waiting_for_doctor_count }}</span>
       </div>
 {%- if waiting_for_doctor %}
-      <div style="overflow-x:auto;">
+      <div class="table-responsive">
         <table class="dash-table">
           <thead>
             <tr>
@@ -310,7 +310,7 @@
             </div>
             <a href="{{ url_for(appointment_scheduling_endpoint) }}" class="panel-link">View All<span class="material-symbols-outlined" style="font-size:15px;">chevron_right</span></a>
           </div>
-          <div style="overflow-x:auto;">
+          <div class="table-responsive">
             <table class="dash-table">
               <thead>
                 <tr>
