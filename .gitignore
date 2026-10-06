@@ -119,3 +119,15 @@ desktop.ini
 # --- Error log (Task 10) --------------------------------------------------------
 # Error traces can quote what a person typed, so they stay on this computer.
 logs/
+
+# --- HTTPS certificate and key (network mode) ---------------------------------
+# setup_https.py writes them to instance/certs/. A private key in git would let anyone
+# with the code read the health center's network traffic. The file types are ignored
+# everywhere too, as a second guard.
+instance/
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
