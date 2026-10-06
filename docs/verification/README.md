@@ -695,3 +695,8 @@ out of the response body.
 4. Repeat both signed in as Health Center Staff. The lists are the same; the
    Assessment & Plan fields are the only thing that differs between the roles.
 
+
+## mobile/
+
+Task 17 (M51). A screenshot of every page and dialog at 360, 390 and 1366px, per role, made by
+`tests/verify_mobile_layout.py`. See `mobile/README.md`. Not in git, like the rest of this folder.

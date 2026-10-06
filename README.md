@@ -100,10 +100,13 @@ Settings shows which mode is on.
 
 ```
 python tests/run_all.py            # every suite (about 5 minutes)
-python tests/run_all.py --quick    # skips the slow demo-data suite (about 3 minutes)
+python tests/run_all.py --quick    # skips the slow suites: demo data, phone layout (about 4 minutes)
 ```
 
 Use `--quick` while you work, and run the full suite before you push.
+
+The phone-layout checks open every screen in a real browser. Install it once, for development only:
+`pip install -r requirements-dev.txt`, then `python -m playwright install chromium`. Without it that suite prints SKIPPED and the run says it was not run.
 
 Each suite runs on its own fresh test database in the system temp folder, and
 never on `app.db`. The runner prints one line per suite and a total, and exits

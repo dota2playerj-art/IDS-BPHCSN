@@ -23,8 +23,9 @@ LIVE_DB = REPO / "app.db"
 GUARD_EXIT_CODE = 97  # the same value as tests/_support.py
 
 # Suites that take over 60 seconds. `--quick` skips them. verify_demo_data.py builds the
-# demo database twice (about 3 minutes) to prove it is deterministic.
-SLOW_SUITES = ("verify_demo_data.py",)
+# demo database twice (about 3 minutes) to prove it is deterministic. verify_mobile_layout.py
+# builds it once and drives a real browser through every page at three widths.
+SLOW_SUITES = ("verify_demo_data.py", "verify_mobile_layout.py")
 
 # Suite file, and the file name it had in the old temp folder.
 SUITES = [
@@ -54,6 +55,7 @@ SUITES = [
     ("verify_inventory_batches.py", "(new in Task 12)"),
     ("verify_immunization_timing.py", "(new in Task 13)"),
     ("verify_network_mode.py", "(new in Task 16)"),
+    ("verify_mobile_layout.py", "(new in Task 17)"),
 ]
 
 # The suites were written at different times and end with different summary
@@ -70,6 +72,9 @@ SUMMARIES = [
     (re.compile(r"^PASS (\d+)\s+FAIL (\d+)", re.M),
      lambda a, b: (a, a + b)),
 ]
+# A suite that cannot run here (a dev-only package is missing) prints one line starting with
+# this and exits 0. It is reported as skipped, never counted as passed.
+SKIP_LINE = re.compile(r"^SKIPPED: .*$", re.M)
 FAIL_LINE = re.compile(r"^\s*(\[FAIL\]|FAIL\b|FAILED\b|- )")
 
 
@@ -138,6 +143,7 @@ def main(argv):
 
     total_passed = total_checks = 0
     failed_suites = []
+    not_run = []  # suites that stopped themselves with a SKIPPED line: not a pass, not a failure
     for name, _old in chosen:
         output, code, seconds, leftover = run_suite(name)
         if code == GUARD_EXIT_CODE:
@@ -146,6 +152,12 @@ def main(argv):
             print("The whole run was stopped. Nothing else was run.")
             return 2
         summary = parse_summary(output)
+        skip = SKIP_LINE.search(output)
+        if skip and code == 0:
+            not_run.append(name)
+            print(f"{name:40s} SKIPPED, NOT RUN  ({seconds:.0f}s)")
+            print("    " + skip.group(0)[:300])
+            continue
         if summary is None:
             line = f"{name:40s} CRASHED (exit {code}, no summary line)"
             failed_suites.append(name)
@@ -174,8 +186,12 @@ def main(argv):
                     print("    | " + l[:150])
 
     print("-" * 72)
+    ran = len(chosen) - len(not_run)
     print(f"TOTAL: {total_passed}/{total_checks} checks passed in "
-          f"{len(chosen) - len(failed_suites)}/{len(chosen)} suites")
+          f"{ran - len(failed_suites)}/{ran} suites that ran")
+    if not_run:
+        print("SKIPPED, NOT RUN: " + ", ".join(not_run)
+              + " -- these checks did NOT run and are not counted as passed.")
 
     after = fingerprint(LIVE_DB)
     if before != after:
@@ -189,7 +205,11 @@ def main(argv):
     if failed_suites:
         print("FAILED suites: " + ", ".join(failed_suites))
         return 1
-    print("All checks passed.")
+    if not_run:
+        print(("All checks that ran passed. " if ran else "")
+              + "The skipped suite(s) above did not run.")
+    else:
+        print("All checks passed.")
     return 0
 
 

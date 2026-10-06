@@ -1,0 +1,8 @@
+# DEV-only. Not needed to run the system, and not installed on the health center PC.
+# Install with:  pip install -r requirements-dev.txt
+# then once:     python -m playwright install chromium     (downloads the test browser)
+#
+# Drives a real browser (Chromium) through every page at phone and desktop widths for
+# tests/verify_mobile_layout.py. Without it that suite prints one SKIPPED line and does not
+# run; tests/run_all.py reports it as skipped, never as passed. It is used only by tests.
+playwright==1.63.0
