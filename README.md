@@ -25,9 +25,10 @@ masked on the screens that show them to roles outside the care team.
 
 A patient is checked in with a service chosen from a fixed list, then **Waiting**, **In Consultation**,
 and then **Waiting for the Doctor** (the intake is saved and the service needs a diagnosis) or
-**Completed** (immunization, prenatal and dental visits are finished by Staff). The Doctor's diagnosis
-completes a visit. A patient who goes home is marked **Left before being seen**, and it can be undone the
-same day. The flow is described in `PR0MPT_INSTRUCTION/01_PROJECT_BIBLE.md`.
+**Completed** (immunization, prenatal and family planning visits are finished by Staff). The Doctor's
+diagnosis completes a visit. A patient who goes home is marked **Left before being seen**, and a patient the
+health center sends on to the RHU or a hospital is marked **Referred** (with a printable referral slip). Both
+can be undone the same day. The flow is described in `PR0MPT_INSTRUCTION/01_PROJECT_BIBLE.md`.
 
 ## Getting started
 

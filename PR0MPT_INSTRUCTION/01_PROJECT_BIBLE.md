@@ -551,11 +551,13 @@ to 4. Zero stays "0". Audit entries never store a whole phone number: they are w
 comes only on certain days, while Staff take the intake every day. A visit moves like this:
 
 1. **Check-in.** Staff choose the service from one fixed list (Consultation, Follow-up Consultation,
-   Hypertension / Diabetes Monitoring, Prenatal Check-up, Immunization, Dental). The choice is required, has
-   no default, and is checked on the server. Status: *Waiting*.
+   Hypertension / Diabetes Monitoring, Prenatal Check-up, Family Planning, Immunization; Dental was removed
+   in Task 19, see below). The choice is required, has no default, and is checked on the server. Status:
+   *Waiting*.
 2. **Start.** *In Consultation*. One patient at a time.
 3. **Intake saved.** If the service needs a diagnosis (the first three) and none was written: *Waiting for
-   the Doctor*. Otherwise: *Completed*. Prenatal, immunization and dental visits are finished by Staff.
+   the Doctor*. Otherwise: *Completed*. Prenatal, family planning and immunization visits are finished by
+   Staff.
    A visit that needs the Doctor can never be Completed without his diagnosis, by any route: if the intake
    is not written, the queue's button is **Send to the Doctor** (status *Waiting for the Doctor*, one short
    audit entry), and the server refuses "Mark Completed" with "This visit needs the Doctor first."
@@ -567,6 +569,9 @@ comes only on certain days, while Staff take the intake every day. A visit moves
    status. The Administrator's queue stays read-only.
 6. **Correcting the service.** Staff and the Doctor can change a visit's service until it is Completed or
    Left before being seen. Each change is audited. The Administrator cannot.
+7. **Referred (Task 19).** Staff and the Doctor can refer a visit that is Waiting, In Consultation or Waiting
+   for the Doctor to the RHU or a hospital, and undo it the same day. See "Decision Record — Referrals, the
+   Field Data and the Service List".
 
 The Doctor's dashboard lists every visit with the status *Waiting for the Doctor*, oldest first, across all
 days, with how long it has waited. Visits from earlier days are marked. Health Center Staff and the
@@ -793,6 +798,57 @@ leap-year and month-end arithmetic. Age filters and report age groups are unchan
 31, 2026); BCG and Hepatitis B (parent says given, no card). Ask for the vaccination card."). The "not in today's
 queue" sentence, the "next consultation" sentence and the "At next visit" notes are gone.
 
+# Decision Record — Referrals, the Field Data and the Service List (2026-10-10, Task 19)
+
+**The field data (RHU interview, San Francisco, Surigao del Norte).** The RHU doctor visits barangay health
+centers with no fixed schedule. When the health center cannot handle a patient, it refers the patient to the
+RHU, on any day. The RHU in turn refers patients who need hospital care to Caraga Regional Hospital (Surigao
+City). The RHU has no dental service. Family planning is offered every day at the barangay health center,
+immunization on Wednesdays (the barangays take turns), prenatal check-ups on Tuesdays at the RHU, and
+consultation every day.
+
+**D1 — Referred.** A new visit outcome, beside Left before being seen. Staff and the Doctor can set it on a
+visit that is Waiting, In Consultation or Waiting for the Doctor (not on a Completed one, one with a diagnosis,
+or an earlier day's Waiting visit, which offers only Left before being seen). The dialog asks where: one list
+(`REFERRAL_DESTINATIONS` in `models/referrals.py`): Rural Health Unit (RHU), Caraga Regional Hospital, Other
+hospital or facility. "Other" needs a short facility name. An optional reason is clinical free text: care team
+only, encrypted while the visit is sealed (the seal covers it, and lifting the seal opens it), never in an
+audit entry, an export or a count. Setting it records who and when, takes the visit off the Doctor's list and
+writes one short audit entry ("Referred <Name> (PAT-005), visit APT-00081, to the RHU."). The destination
+written is the list entry, never the typed facility name (a facility's name can itself say what a patient has),
+and never the reason. It can be undone the same day, back to the previous status (refused on a later day, and
+refused while another patient is in consultation if the visit was In Consultation). The Administrator sees the
+status "Referred" only: no destination, no reason, no button; the server refuses his POST. Everything goes
+through the one status-by-role mapping in `models/queue_actions.py` (actions `refer`, `undo_referral` and
+`referral_slip`).
+
+**D2 — The referral slip.** A page for a referred visit, for Staff and the Doctor only, plain A4, printed from the
+browser like the other prints. It shows the health center name, the date and time, the patient's name, ID, age
+and sex, the destination, the vital signs and chief complaint from the intake if there is one, the reason, and
+the name of the user who referred, with a line for a signature. For a sealed visit the sealed fields (the chief
+complaint and the reason) print as "Confidential — discuss directly with the receiving doctor." for everyone,
+the Doctor included: the slip leaves the building, so it never decrypts.
+
+**D3 — Reports.** Reports & Analytics, Community Reports and their Excel and PDF files count Referred as its own
+outcome, with a breakdown by destination. The small-count rule applies for the Administrator and the Official: a
+destination with 1 to 4 referrals folds into one "Other (each fewer than 5)" row; the total is exact. A referred
+visit is resolved and counts as having come, so the attendance rate counts it as attended.
+
+**D4 — The service list.** Consultation, Follow-up Consultation, Hypertension / Diabetes Monitoring, Prenatal
+Check-up, Family Planning, Immunization. Dental is no longer offered (the RHU has no dental service). Visits
+saved with Dental keep it as history, still display, and are still counted in "Appointments by service".
+Family Planning does not need the Doctor: Staff's intake completes the visit, and it never goes to Waiting for the
+Doctor. Who sees service names is unchanged (hidden from the Administrator). M35 is closed: the list is
+confirmed from the RHU interview.
+
+**D5 — Demo data.** `seed_demo_data.py` enters a demo Service Schedule from the field data, gives a realistic mix
+with Family Planning visits, and adds referrals (five to the RHU, one to Caraga Regional Hospital, one of the
+five from the Doctor's list). It stays deterministic. No schedule is put into `app.db`: in real use the
+Administrator enters the real days.
+
+**Not decided here.** Whether the RHU wants the slip in another form, and whether the referral should ever be sent
+electronically, were not asked. L11 (a second IPV dose) stays open until the RHU nurse answers.
+
 # Sample Development Workflow
 
 Research
@@ -995,3 +1051,9 @@ can be repeated as a new record. See "Decision Record — Every Dose Judged, and
 Task 15, dates a dose can be given, and ages in weeks: the Due column shows the earliest date a dose can be given,
 the record-elsewhere button waits until the child is old enough, and ages show weeks for a baby. See "Decision
 Record — Dates a Dose Can Be Given, and Ages in Weeks".
+
+Version 3.5 (2026-10-10)
+
+Task 19, referrals and the field data: the visit outcome Referred with a destination list and a referral slip,
+the service list confirmed from the RHU interview (Dental out, Family Planning in), and a demo Service Schedule.
+See "Decision Record — Referrals, the Field Data and the Service List".

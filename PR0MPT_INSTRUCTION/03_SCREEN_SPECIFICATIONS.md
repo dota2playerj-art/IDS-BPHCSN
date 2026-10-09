@@ -425,18 +425,19 @@ refuses Completed on such a visit without a diagnosis ("This visit needs the Doc
 not need him keep **Mark Completed**. Neither button is on the Administrator's queue.
 
 **What each role can do on a row (Task 6d, 2026-10-03).** One mapping, status by role, decides the buttons
-and the server's answer. Waiting: Staff and the Doctor can Start, mark Left before being seen, Change
-service. In Consultation: Staff and the Doctor can open the intake (Record Consultation), Send to the Doctor
-or Mark Completed (by service), mark Left, Change service. Waiting for the Doctor: the Doctor has **See
-patient**; Staff and the Doctor can mark Left and Change service. Completed: view only. Left before being
-seen: view only, plus Undo the same day. The Administrator only views. **See patient** opens the visit's
+and the server's answer. Waiting: Staff and the Doctor can Start, mark Left before being seen, Refer,
+Change service. In Consultation: Staff and the Doctor can open the intake (Record Consultation), Send to the
+Doctor or Mark Completed (by service), mark Left, Refer, Change service. Waiting for the Doctor: the Doctor has
+**See patient**; Staff and the Doctor can mark Left, Refer and Change service. Completed: view only. Left
+before being seen: view only, plus Undo the same day. Referred (Task 19): the Referral slip and Undo the same
+day. The Administrator only views. **See patient** opens the visit's
 consultation record when Staff did the intake, or a new consultation for the visit when they did not (the
 Doctor records vitals, complaint, diagnosis and treatment plan). Saving with a diagnosis makes the visit
 Completed.
 
-**Wording (Task 6d).** The colour legend lists the five statuses: Waiting, In Consultation, Waiting for the
-Doctor, Completed, Left before being seen, each with the colour of its badge; the calendar's dots use them.
-The summary line under the table uses the same five names. There is no Walk-in tag (every visit is a
+**Wording (Task 6d, Task 19).** The colour legend lists the six statuses: Waiting, In Consultation, Waiting for
+the Doctor, Completed, Left before being seen, Referred, each with the colour of its badge; the calendar's dots
+use them. The summary line under the table uses the same six names. There is no Walk-in tag (every visit is a
 walk-in). The vaccine badge says "2 vaccines: no record", or "1 vaccine: due" when none lacks a record.
 
 **Change service never completes a visit (Task 6e).** If a visit that is Waiting for the Doctor is changed
@@ -446,10 +447,30 @@ patient's badge reads **Next in line** (a display label; the stored status is Wa
 
 **Service at check-in (Task 6b).** The Check In dialog has a required **Service** list on both tabs
 (existing patient, new patient), with no default: Consultation, Follow-up Consultation, Hypertension /
-Diabetes Monitoring, Prenatal Check-up, Immunization, Dental. A row has a **Change service** button, with a
+Diabetes Monitoring, Prenatal Check-up, Family Planning, Immunization (Dental was removed in Task 19; old
+Dental visits still display). A row has a **Change service** button, with a
 dialog, while the visit is Waiting, In Consultation or Waiting for the Doctor. Health Center Staff and the
 Doctor only. The Administrator's queue shows no service column, filter or button. An earlier day's Waiting
 visit offers only Left before being seen: no Start and no Change service (Task 13).
+
+**Referred (Task 19, 2026-10-10).** A visit outcome for a patient the health center sends on to the RHU or a
+hospital. Health Center Staff and the Doctor have a **Refer** button on a Waiting, In Consultation or Waiting
+for the Doctor row (not on an earlier day's Waiting row, which offers only Left before being seen). It opens a
+dialog: **Refer to** (Rural Health Unit (RHU), Caraga Regional Hospital, Other hospital or facility), the name of
+the facility (only for Other, required then), and an optional reason. The server checks the list and the
+facility name. It records who and when, takes the visit off the Doctor's list, and writes one audit entry
+("Referred Name (PAT-005), visit APT-00081, to the RHU."; never the reason or the typed facility name). The
+row then shows the badge **Referred**, "To: <destination>", a **Referral slip** button and **Undo** (the same
+day only; refused while another patient is in consultation if the visit was In Consultation). The
+Administrator's queue shows the badge only. The table footer, the calendar and the reports count these visits
+as their own outcome.
+
+**The referral slip (Task 19).** A page at `/staff/appointment_scheduling/referral-slip/<visit>` for Staff and
+the Doctor, with a Print button. A4 portrait. It shows the health center name, the date and time, the patient's
+name, ID, age and sex, where the patient is referred to, the chief complaint, the vital signs, the reason, and
+"Referred by" with a line for a signature. If the visit is sealed, the chief complaint and the reason show
+"Confidential — discuss directly with the receiving doctor." The Administrator and the Barangay Official have no
+route to it.
 
 **Left before being seen (Task 6, 2026-10-02).** A new status for a patient who checked in and went home.
 Health Center Staff and the Doctor have a button on the row. It opens a dialog: "Mark this patient as left
@@ -762,7 +783,8 @@ the check-in date and time, the service, how long it has waited ("2 days"), and 
 (the same one as on the Patient Queue: it opens the saved record, or a new consultation when there is none).
 The list says "Patients who need a diagnosis, oldest first." Health Center Staff see one card, "Waiting for
 the Doctor: N", and no list. The Administrator's dashboard has the same card and no names. Immunization,
-prenatal and dental visits never get this status. A sealed visit is listed by name only and shows no sealed
+prenatal, family planning and immunization visits never get this status, and neither does a referred visit
+(it leaves the list). A sealed visit is listed by name only and shows no sealed
 text.
 
 Widgets

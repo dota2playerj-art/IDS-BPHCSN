@@ -1182,8 +1182,8 @@ The Doctor, Health Center Staff and the Barangay Official are unchanged.
 - *Tasks 6 and 6b (2026-10-02).* The visit flow, as statuses: **Waiting** (checked in, with the service
   Staff chose) -> **In Consultation** -> **Waiting for the Doctor** (intake saved, the service needs a
   diagnosis, none written) or **Completed** (finished by Staff, or the Doctor's diagnosis saved) . A
-  visit can also become **Left before being seen** from Waiting, In Consultation or Waiting for the
-  Doctor, and be undone the same day. The Doctor's dashboard lists the visits Waiting for the Doctor,
+  visit can also become **Left before being seen** or (Task 19) **Referred** from Waiting, In
+  Consultation or Waiting for the Doctor, and be undone the same day. The Doctor's dashboard lists the visits Waiting for the Doctor,
   oldest first, across all days. Staff and the Administrator see the count only. "Completed" counts
   finished visits only. Staff and the Doctor can correct a visit's service until it is finished. The
   Administrator's queue stays read-only and shows no service. Staff see "Still waiting from earlier days"
@@ -1212,6 +1212,14 @@ The Doctor, Health Center Staff and the Barangay Official are unchanged.
   does not count. A dose may have more than one record, so the same dose can be repeated as a new record
   (migration `migrate_immunization_repeats.py`); only one valid record per dose can exist. Corrections are
   checked for sense and judged by the same rule. See `01_PROJECT_BIBLE.md`.
+- *Task 19 (2026-10-10), referrals and the field data.* New visit outcome **Referred** (`models/referrals.py`):
+  Staff and the Doctor refer a Waiting, In Consultation or Waiting for the Doctor visit to the RHU, Caraga
+  Regional Hospital or another facility (one list), with an optional reason (care team only, encrypted while
+  the visit is sealed, never audited), undo it the same day, and print a referral slip (Staff and the Doctor
+  only; sealed fields print as "Confidential — discuss directly with the receiving doctor."). Reports count
+  referrals by destination, with small counts folded for the Administrator and the Official. The service list
+  drops Dental and adds Family Planning, which does not need the Doctor. The demo data has a Service Schedule,
+  Family Planning visits and referrals. Migration `migrate_add_referrals.py`. See `01_PROJECT_BIBLE.md`.
 - *Task 15 (2026-10-04), dates a dose can be given, and ages in weeks.* `dose_due()` gives the Due column the
   earliest date a dose can actually be given ("After <dose>" when a previous dose has no record);
   `may_record_elsewhere()` opens the record-elsewhere button 4 days before the minimum age, on the profile and
