@@ -16,24 +16,27 @@ from utils.dates import now, today
 # writes the diagnosis.
 WAITING_FOR_DOCTOR = "Waiting for the Doctor"
 
-# THE SERVICES STAFF CHOOSE FROM WHEN THEY CHECK A PATIENT IN (Task 6b, D1).
+# THE SERVICES STAFF CHOOSE FROM WHEN THEY CHECK A PATIENT IN (Task 6b, D1; Task 18, D4).
 #
-# One fixed list, a required choice with no default. It is built from the services
-# the code and the reports already name: Prenatal Check-up and Immunization are
-# counted in Reports & Analytics, and the retired booking list held Consultation,
-# Follow-up Consultation, DM / Hypertension Monitoring and Dental. Labels are plain.
+# One fixed list, a required choice with no default, confirmed by the RHU interview (M35):
+# consultation every day, family planning every day at the barangay health center,
+# immunization on Wednesdays, prenatal on Tuesdays at the RHU. The RHU has no dental service,
+# so "Dental" is no longer offered. Visits that were saved with it keep it as history: it still
+# shows on the screens and in the reports, it just cannot be chosen for a new visit. Labels are
+# plain.
 VISIT_SERVICES = (
     "Consultation",
     "Follow-up Consultation",
     "Hypertension / Diabetes Monitoring",
     "Prenatal Check-up",
+    "Family Planning",
     "Immunization",
-    "Dental",
 )
 
 # The services whose visits need a diagnosis from the Doctor: a subset of
-# VISIT_SERVICES. Prenatal Check-up and Immunization are done by midwives and health
-# workers, and Dental is a dentist's service, so they are not here.
+# VISIT_SERVICES. Prenatal Check-up, Family Planning and Immunization are done by midwives and
+# health workers, so they are not here. (An old "Dental" visit is not here either: it was
+# always finished by Staff.)
 #
 # "Walk-in Consultation" is what every visit was called before the service was
 # chosen at check-in. Old rows still carry it, and it needs the Doctor like a

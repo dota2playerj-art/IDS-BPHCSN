@@ -16,9 +16,10 @@ from models.doctor_worklist import (
     waiting_text,
 )
 from models.queue_actions import (
-    CHANGE_SERVICE, MARK_COMPLETED, MARK_LEFT, SEND_TO_DOCTOR, START, UNDO_LEFT,
-    allowed_actions, is_today, statuses_allowing,
+    CHANGE_SERVICE, MARK_COMPLETED, MARK_LEFT, REFER, REFERRED, SEND_TO_DOCTOR, START,
+    UNDO_LEFT, UNDO_REFERRAL, allowed_actions, is_today, statuses_allowing,
 )
+from models.referrals import REFERRABLE_STATUSES, count_by_destination, referral_allowed
 from utils.dates import now, recent_months, resolve_range, today
 from utils.roles import is_care_team
 from utils.small_counts import fold_small_counts, shown_count
@@ -30,6 +31,7 @@ PENDING_STATUSES = ("Scheduled", "Confirmed")
 APPOINTMENT_STATUSES = (
     "Scheduled", "Confirmed", "Waiting", "In Consultation",
     "Waiting for the Doctor", "Completed", "Cancelled", "No-show", "Left before being seen",
+    "Referred",
 )
 
 # The patient has arrived and has not yet been dealt with. These two are what the
@@ -102,6 +104,7 @@ STATUS_BADGE_CLASS = {
     "Cancelled": "badge-cancelled",
     "No-show": "badge-noshow",
     "Left before being seen": "badge-noshow",
+    "Referred": "badge-referred",
 }
 
 # The colour of each status's dot in the calendar and its legend (Task 6d), matching the
@@ -112,6 +115,7 @@ STATUS_DOT_CLASS = {
     "Waiting for the Doctor": "dot-waiting-doctor",
     "Completed": "dot-completed",
     "Left before being seen": "dot-left",
+    "Referred": "dot-referred",
 }
 
 # Where each status sorts in the queue. In Consultation first because that is who
@@ -128,6 +132,7 @@ _STATUS_RANK = {
     "Cancelled": 5,
     "No-show": 5,
     "Left before being seen": 5,
+    "Referred": 5,
 }
 
 
@@ -215,6 +220,7 @@ _QUEUE_SELECT = """
     SELECT a.id, a.patient_id, a.appointment_type, a.appointment_date,
            a.appointment_time, a.status, a.is_walkin, a.checked_in_at,
            a.created_at, a.left_at, a.status_before_left,
+           a.referred_at, a.status_before_referred,
            p.patient_id AS patient_reference,
            p.first_name, p.middle_name, p.last_name, p.sex, p.birth_date,
            u.full_name AS assigned_staff,
@@ -497,6 +503,7 @@ def get_queue_stats(entries=None, active=None):
         "completed": sum(1 for entry in entries if entry["status"] == COMPLETED),
         "waiting_doctor": sum(1 for entry in entries if entry["status"] == WAITING_DOCTOR),
         "left": sum(1 for entry in entries if entry["status"] == LEFT),
+        "referred": sum(1 for entry in entries if entry["status"] == REFERRED),
         "not_arrived": sum(
             1 for entry in entries if entry["status"] in PENDING_STATUSES
         ),
@@ -1178,6 +1185,14 @@ def attach_leave_flags(entries):
             entry["status"] == LEFT and (entry.get("left_at") or "")[:10] == day
             and entry.get("status_before_left") in LEAVABLE_STATUSES
         )
+        # The same two questions for a referral (Task 18): referral_allowed() and
+        # undo_referral() decide, these only decide which buttons are drawn.
+        entry["can_refer"] = referral_allowed(
+            entry["status"], consultation["diagnosis"] if consultation else None)
+        entry["can_undo_referral"] = (
+            entry["status"] == REFERRED and (entry.get("referred_at") or "")[:10] == day
+            and entry.get("status_before_referred") in REFERRABLE_STATUSES
+        )
     return entries
 
 
@@ -1204,6 +1219,8 @@ def attach_actions(entries, role):
                 or (action == MARK_COMPLETED and entry["needs_doctor"])
                 or (action == MARK_LEFT and not entry["can_leave"])
                 or (action == UNDO_LEFT and not entry["can_undo_left"])
+                or (action == REFER and not entry["can_refer"])
+                or (action == UNDO_REFERRAL and not entry["can_undo_referral"])
             )
         )
     return entries
@@ -1281,7 +1298,7 @@ def get_appointment_day_summary(start_date, end_date):
         bucket = summary.setdefault(
             row["day"],
             {"total": 0, "pending": 0, "in_queue": 0, "completed": 0, "cancelled": 0,
-             "left": 0, "waiting_doctor": 0, "waiting": 0, "in_consultation": 0},
+             "left": 0, "referred": 0, "waiting_doctor": 0, "waiting": 0, "in_consultation": 0},
         )
         bucket["total"] += row["count"]
         if row["status"] in PENDING_STATUSES:
@@ -1296,6 +1313,8 @@ def get_appointment_day_summary(start_date, end_date):
             bucket["waiting_doctor"] += row["count"]
         elif row["status"] == LEFT:
             bucket["left"] += row["count"]
+        elif row["status"] == REFERRED:
+            bucket["referred"] += row["count"]
         else:
             bucket["cancelled"] += row["count"]
     return summary
@@ -1318,6 +1337,7 @@ OUTCOME_ATTENDED = "Attended"       # Waiting / In Consultation / Completed
 OUTCOME_AWAITING = "Awaiting"       # Waiting for the Doctor (Task 6b, D6): came, intake saved
 OUTCOME_MISSED = "Missed"           # Cancelled / No-show
 OUTCOME_LEFT = "Left"               # Left before being seen (Task 6, D6)
+OUTCOME_REFERRED = "Referred"       # Sent on to the RHU or a hospital (Task 18, D3)
 
 _OUTCOME_BY_STATUS = {
     "Scheduled": OUTCOME_EXPECTED,
@@ -1329,12 +1349,14 @@ _OUTCOME_BY_STATUS = {
     "Cancelled": OUTCOME_MISSED,
     "No-show": OUTCOME_MISSED,
     "Left before being seen": OUTCOME_LEFT,
+    "Referred": OUTCOME_REFERRED,
 }
 
-OUTCOMES = (OUTCOME_EXPECTED, OUTCOME_ATTENDED, OUTCOME_AWAITING, OUTCOME_MISSED, OUTCOME_LEFT)
+OUTCOMES = (OUTCOME_EXPECTED, OUTCOME_ATTENDED, OUTCOME_AWAITING, OUTCOME_MISSED, OUTCOME_LEFT,
+            OUTCOME_REFERRED)
 
 
-def _outcome_summary(counts, walk_ins, total, services, viewer_role):
+def _outcome_summary(counts, walk_ins, total, services, viewer_role, referrals=None):
     """One period's appointment outcomes, however that period was chosen.
 
     Shared by the year-to-date block and the ranged `window` block below so the
@@ -1347,7 +1369,10 @@ def _outcome_summary(counts, walk_ins, total, services, viewer_role):
     # "Waiting for the Doctor" (Task 6b, D6) is its own figure, so "Attended" counts
     # only finished visits and the people in the clinic right now. The patient did
     # come, so the attendance rate still counts them as attended: it does not move.
-    came = counts[OUTCOME_ATTENDED] + counts[OUTCOME_AWAITING]
+    #
+    # "Referred" (Task 18, D3) is its own figure too. The patient came and the visit is over,
+    # so it is resolved and counts as having come: the attendance rate counts it as attended.
+    came = counts[OUTCOME_ATTENDED] + counts[OUTCOME_AWAITING] + counts[OUTCOME_REFERRED]
     resolved = came + counts[OUTCOME_MISSED] + counts[OUTCOME_LEFT]
     return {
         "total": total,
@@ -1360,6 +1385,15 @@ def _outcome_summary(counts, walk_ins, total, services, viewer_role):
         "awaiting": counts[OUTCOME_AWAITING],
         "missed": counts[OUTCOME_MISSED],
         "left": counts[OUTCOME_LEFT],
+        "referred": counts[OUTCOME_REFERRED],
+        # The referrals by where they went, in the order of REFERRAL_DESTINATIONS. The small-count
+        # rule folds a destination with 1 to 4 referrals for the Administrator and the Official;
+        # the total above is exact.
+        "referral_destinations": fold_small_counts(
+            [{"destination": name, "count": count}
+             for name, count in (referrals or {}).items() if count],
+            viewer_role, label_key="destination", sum_keys=("count",),
+        ),
         "walk_ins": walk_ins,
         "booked": total - walk_ins,
         "resolved": resolved,
@@ -1427,6 +1461,7 @@ def get_appointment_report(months=6, on_date=None, start=None, end=None, *, view
         """,
             (lo, hi),
         ).fetchall()
+        referrals = count_by_destination(conn, lo, hi)
 
     by_month = {}
     ytd = {outcome: 0 for outcome in OUTCOMES}
@@ -1486,6 +1521,7 @@ def get_appointment_report(months=6, on_date=None, start=None, end=None, *, view
             "awaiting": bucket[OUTCOME_AWAITING],
             "missed": bucket[OUTCOME_MISSED],
             "left": bucket[OUTCOME_LEFT],
+            "referred": bucket[OUTCOME_REFERRED],
             "total": bucket["total"],
         })
 
@@ -1498,6 +1534,7 @@ def get_appointment_report(months=6, on_date=None, start=None, end=None, *, view
         "ytd_awaiting": ytd[OUTCOME_AWAITING],
         "ytd_missed": ytd[OUTCOME_MISSED],
         "ytd_left": ytd[OUTCOME_LEFT],
+        "ytd_referred": ytd[OUTCOME_REFERRED],
         "ytd_walk_ins": ytd_walk_ins,
         "ytd_booked": ytd_total - ytd_walk_ins,
         "resolved": ytd_summary["resolved"],
@@ -1516,7 +1553,7 @@ def get_appointment_report(months=6, on_date=None, start=None, end=None, *, view
             "custom": window["custom"],
             **_outcome_summary(
                 scoped_counts, scoped_walk_ins, scoped_total, scoped_services,
-                viewer_role,
+                viewer_role, referrals,
             ),
             # The Prenatal Check-up count printed beside the prenatal note. It is
             # tied to a service, so it reads "Fewer than 5" for those two roles.
@@ -1581,6 +1618,7 @@ def get_calendar_month(month_start=None, on_date=None):
                 "waiting": counts["waiting"] if counts else 0,
                 "in_consultation": counts["in_consultation"] if counts else 0,
                 "left": counts["left"] if counts else 0,
+                "referred": counts["referred"] if counts else 0,
                 "cancelled": counts["cancelled"] if counts else 0,
             })
         grid.append(cells)

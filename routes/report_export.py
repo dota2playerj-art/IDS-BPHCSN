@@ -680,7 +680,7 @@ def _appointments(context):
         _trend_block(
             "Appointment outcomes, by month", appointments["trend"],
             [("Attended", "attended"), ("Waiting for the Doctor", "awaiting"),
-             ("Left before being seen", "left")],
+             ("Left before being seen", "left"), ("Referred", "referred")],
         ),
         figures("Appointment outcomes in this range", [
             ("Appointments", window["total"], "Dated into the range, walk-ins included"),
@@ -690,11 +690,20 @@ def _appointments(context):
              "Intake saved; the Doctor has not written the diagnosis yet"),
             ("Left before being seen", window["left"],
              "Checked in, then went home before the Doctor saw them"),
+            ("Referred", window["referred"],
+             "Sent on to the RHU or a hospital"),
             ("Resolved", window["resolved"],
-             "Attended, waiting for the Doctor and left before being seen"),
+             "Attended, waiting for the Doctor, referred and left before being seen"),
             ("Attendance rate (%)", window["attendance_pct"],
              "Of the resolved appointments only"),
         ] + ([("Older records", window["older"], "")] if window["older"] else [])),
+        _ranked_block(
+            "Referrals by destination", window["referral_destinations"],
+            "destination", "count", ("Destination", "Referrals"),
+            note=("Where the range's referred visits were sent."
+                  + small_count_note(window["referral_destinations"])),
+            empty="No visit was referred in this range.",
+        ),
     ]
 
 

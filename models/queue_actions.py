@@ -20,6 +20,7 @@ WAITING = "Waiting"
 IN_CONSULTATION = "In Consultation"
 COMPLETED = "Completed"
 LEFT = "Left before being seen"
+REFERRED = "Referred"
 
 # The actions.
 START = "start"                      # bring a waiting patient in
@@ -30,25 +31,28 @@ SEE_PATIENT = "see_patient"          # the Doctor sees a visit waiting for him
 MARK_LEFT = "mark_left"              # left before being seen
 UNDO_LEFT = "undo_left"              # same-day undo of the above
 CHANGE_SERVICE = "change_service"    # correct the visit's service
+REFER = "refer"                      # refer the patient to the RHU or a hospital (Task 18)
+UNDO_REFERRAL = "undo_referral"      # same-day undo of the above
+REFERRAL_SLIP = "referral_slip"      # open the printable slip of a referred visit
 
 ACTIONS = (START, OPEN_INTAKE, SEND_TO_DOCTOR, MARK_COMPLETED, SEE_PATIENT,
-           MARK_LEFT, UNDO_LEFT, CHANGE_SERVICE)
+           MARK_LEFT, UNDO_LEFT, CHANGE_SERVICE, REFER, UNDO_REFERRAL, REFERRAL_SLIP)
 
 DOCTOR, STAFF = "doctor", "health staff"
 
 # status -> role -> actions. A status or a role that is not here has no action.
 QUEUE_ACTIONS = {
     WAITING: {
-        STAFF: (START, MARK_LEFT, CHANGE_SERVICE),
-        DOCTOR: (START, MARK_LEFT, CHANGE_SERVICE),
+        STAFF: (START, MARK_LEFT, REFER, CHANGE_SERVICE),
+        DOCTOR: (START, MARK_LEFT, REFER, CHANGE_SERVICE),
     },
     IN_CONSULTATION: {
-        STAFF: (OPEN_INTAKE, SEND_TO_DOCTOR, MARK_COMPLETED, MARK_LEFT, CHANGE_SERVICE),
-        DOCTOR: (OPEN_INTAKE, SEND_TO_DOCTOR, MARK_COMPLETED, MARK_LEFT, CHANGE_SERVICE),
+        STAFF: (OPEN_INTAKE, SEND_TO_DOCTOR, MARK_COMPLETED, MARK_LEFT, REFER, CHANGE_SERVICE),
+        DOCTOR: (OPEN_INTAKE, SEND_TO_DOCTOR, MARK_COMPLETED, MARK_LEFT, REFER, CHANGE_SERVICE),
     },
     WAITING_FOR_DOCTOR: {
-        STAFF: (MARK_LEFT, CHANGE_SERVICE),
-        DOCTOR: (SEE_PATIENT, MARK_LEFT, CHANGE_SERVICE),
+        STAFF: (MARK_LEFT, REFER, CHANGE_SERVICE),
+        DOCTOR: (SEE_PATIENT, MARK_LEFT, REFER, CHANGE_SERVICE),
     },
     # Finished: view only.
     COMPLETED: {},
@@ -57,10 +61,15 @@ QUEUE_ACTIONS = {
         STAFF: (UNDO_LEFT,),
         DOCTOR: (UNDO_LEFT,),
     },
+    # Sent on to the RHU or a hospital (Task 18): the referral slip, plus the same-day undo.
+    REFERRED: {
+        STAFF: (REFERRAL_SLIP, UNDO_REFERRAL),
+        DOCTOR: (REFERRAL_SLIP, UNDO_REFERRAL),
+    },
 }
 
 # The statuses the queue screen is made of, in the order its legend lists them.
-LEGEND_STATUSES = (WAITING, IN_CONSULTATION, WAITING_FOR_DOCTOR, COMPLETED, LEFT)
+LEGEND_STATUSES = (WAITING, IN_CONSULTATION, WAITING_FOR_DOCTOR, COMPLETED, LEFT, REFERRED)
 
 # Saving a consultation record for a visit is allowed from these statuses, each under
 # its own action: Staff and the Doctor take the intake of the visit in progress, and
@@ -77,9 +86,9 @@ RECORD_ACTION_BY_STATUS = {
 # has waited for him since earlier, and an open visit can always be closed.
 TODAY_ONLY = (START,)
 # A Waiting visit from an earlier day offers only "Left before being seen" (Task 13, D6): its
-# patient is probably home, so changing the service of that visit helps nobody. Visits in the
-# other statuses keep Change service on any day.
-EARLIER_DAY_WAITING_REMOVED = (CHANGE_SERVICE,)
+# patient is probably home, so changing the service of that visit helps nobody, and neither does
+# referring them (Task 18). Visits in the other statuses keep both on any day.
+EARLIER_DAY_WAITING_REMOVED = (CHANGE_SERVICE, REFER)
 
 
 def is_today(visit_date, today):

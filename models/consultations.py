@@ -126,9 +126,11 @@ SEALED_FIELDS = DOCTOR_ONLY_FIELDS + SEALED_WITH_RECORD_FIELDS
 
 # The check-in reason lives on the linked queue visit: appointments.notes. It is
 # encrypted with the record and bound to the appointments row, not to the
-# consultation. See _seal_visit_reason().
+# consultation. See _seal_visit_reason(). So is the reason a visit was referred
+# (appointments.referral_reason, Task 18): clinical free text of the same visit.
 VISIT_REASON_TABLE = "appointments"
 VISIT_REASON_FIELD = "notes"
+VISIT_REASON_FIELDS = (VISIT_REASON_FIELD, "referral_reason")
 
 # WHAT A SEALED ENTRY SHOWS INSTEAD, AND WHY IT SHOWS ANYTHING AT ALL.
 # A withheld field is never silently blanked and never quietly dropped from the
@@ -294,40 +296,48 @@ def _encrypt_sealed_fields(conn, consultation_id):
 
 
 def _seal_visit_reason(conn, appointment_id):
-    """Encrypt the check-in reason of one queue visit. No commit. Safe to repeat."""
+    """Encrypt the free text of one queue visit (the check-in reason and the referral
+    reason). No commit. Safe to repeat."""
     if not appointment_id:
         return
     row = conn.execute(
-        f"SELECT {VISIT_REASON_FIELD} FROM {VISIT_REASON_TABLE} WHERE id = ?",
-        (appointment_id,),
-    ).fetchone()
-    if row is None or sealed_crypto.is_encrypted(row[VISIT_REASON_FIELD]):
-        return
-    conn.execute(
-        f"UPDATE {VISIT_REASON_TABLE} SET {VISIT_REASON_FIELD} = ? WHERE id = ?",
-        (sealed_crypto.encrypt(row[VISIT_REASON_FIELD], appointment_id,
-                               VISIT_REASON_FIELD, VISIT_REASON_TABLE),
-         appointment_id),
-    )
-
-
-def _open_visit_reason(conn, appointment_id, role):
-    """The decrypted check-in reason of one queue visit, as (text, ok, row_exists).
-
-    Used when a seal is lifted, so the reason goes back to plain text. Reads
-    through open_sealed_value(), so only the Doctor can get anything.
-    """
-    if not appointment_id:
-        return None, True, False
-    row = conn.execute(
-        f"SELECT {VISIT_REASON_FIELD} FROM {VISIT_REASON_TABLE} WHERE id = ?",
+        f"SELECT {', '.join(VISIT_REASON_FIELDS)} FROM {VISIT_REASON_TABLE} WHERE id = ?",
         (appointment_id,),
     ).fetchone()
     if row is None:
-        return None, True, False
-    text, ok = open_sealed_value(row[VISIT_REASON_FIELD], appointment_id,
-                                 VISIT_REASON_FIELD, role, VISIT_REASON_TABLE)
-    return text, ok, True
+        return
+    for field in VISIT_REASON_FIELDS:
+        if sealed_crypto.is_encrypted(row[field]):
+            continue
+        conn.execute(
+            f"UPDATE {VISIT_REASON_TABLE} SET {field} = ? WHERE id = ?",
+            (sealed_crypto.encrypt(row[field], appointment_id, field, VISIT_REASON_TABLE),
+             appointment_id),
+        )
+
+
+def _open_visit_reason(conn, appointment_id, role):
+    """The decrypted free text of one queue visit, as ({field: text}, ok, row_exists).
+
+    Used when a seal is lifted, so the check-in reason and the referral reason go back to
+    plain text. Reads through open_sealed_value(), so only the Doctor can get anything.
+    """
+    if not appointment_id:
+        return {}, True, False
+    row = conn.execute(
+        f"SELECT {', '.join(VISIT_REASON_FIELDS)} FROM {VISIT_REASON_TABLE} WHERE id = ?",
+        (appointment_id,),
+    ).fetchone()
+    if row is None:
+        return {}, True, False
+    opened = {}
+    for field in VISIT_REASON_FIELDS:
+        text, ok = open_sealed_value(row[field], appointment_id, field, role,
+                                     VISIT_REASON_TABLE)
+        if not ok:
+            return {}, False, True
+        opened[field] = text
+    return opened, True, True
 
 
 def as_date(value):
@@ -1274,7 +1284,7 @@ def set_consultation_restriction(consultation_id, restricted, user_id, role=None
                 if not ok:
                     return "cannot_open"
                 opened.append(text)
-            reason, ok, has_reason = _open_visit_reason(
+            reasons, ok, has_reason = _open_visit_reason(
                 conn, row["appointment_id"], role)
             if not ok:
                 return "cannot_open"
@@ -1285,9 +1295,9 @@ def set_consultation_restriction(consultation_id, restricted, user_id, role=None
             )
             if has_reason:
                 conn.execute(
-                    f"UPDATE {VISIT_REASON_TABLE} SET {VISIT_REASON_FIELD} = ? "
-                    "WHERE id = ?",
-                    (reason, row["appointment_id"]),
+                    f"UPDATE {VISIT_REASON_TABLE} SET "
+                    + ", ".join(f"{f} = ?" for f in VISIT_REASON_FIELDS) + " WHERE id = ?",
+                    [reasons[f] for f in VISIT_REASON_FIELDS] + [row["appointment_id"]],
                 )
 
         conn.execute(

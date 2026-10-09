@@ -235,6 +235,13 @@ CREATE TABLE inventory_removals (
 --                           (Task 6, M5). Set by Staff or the Doctor, and undone the
 --                           same day. left_by, left_at and status_before_left record
 --                           who, when and what the status was before.
+--   Referred                checked in, then sent on to the RHU or a hospital (Task 18).
+--                           Set by Staff or the Doctor, and undone the same day.
+--                           referral_destination (one of REFERRAL_DESTINATIONS in
+--                           models/referrals.py), referral_facility (the name, only for
+--                           "Other hospital or facility"), referral_reason (clinical free
+--                           text, encrypted while the visit is sealed), referred_by,
+--                           referred_at and status_before_referred record it.
 --
 -- is_walkin records whether there was a prior booking. Once a scheduled patient
 -- is checked in their row is otherwise indistinguishable from a walk-in's, so the
@@ -252,7 +259,7 @@ CREATE TABLE appointments (
     appointment_date TEXT NOT NULL,
     appointment_time TEXT,
     assigned_staff_id INTEGER,
-    status TEXT NOT NULL DEFAULT 'Scheduled' CHECK (status IN ('Scheduled', 'Confirmed', 'Waiting', 'In Consultation', 'Waiting for the Doctor', 'Completed', 'Cancelled', 'No-show', 'Left before being seen')),
+    status TEXT NOT NULL DEFAULT 'Scheduled' CHECK (status IN ('Scheduled', 'Confirmed', 'Waiting', 'In Consultation', 'Waiting for the Doctor', 'Completed', 'Cancelled', 'No-show', 'Left before being seen', 'Referred')),
     notes TEXT,
     is_walkin INTEGER NOT NULL DEFAULT 0,
     checked_in_at TEXT,
@@ -261,10 +268,17 @@ CREATE TABLE appointments (
     left_by INTEGER,
     left_at TEXT,
     status_before_left TEXT,
+    referral_destination TEXT,
+    referral_facility TEXT,
+    referral_reason TEXT,
+    referred_by INTEGER,
+    referred_at TEXT,
+    status_before_referred TEXT,
     FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
     FOREIGN KEY (scheduled_by) REFERENCES users(id) ON DELETE RESTRICT,
     FOREIGN KEY (assigned_staff_id) REFERENCES users(id) ON DELETE SET NULL,
-    FOREIGN KEY (left_by) REFERENCES users(id) ON DELETE SET NULL
+    FOREIGN KEY (left_by) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (referred_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
 -- One row per dose a child has had. The schedule these are measured against is

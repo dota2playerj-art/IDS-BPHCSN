@@ -17,6 +17,8 @@ from models.audit import (
     ACTION_CONSULTATION_COMPLETED,
     ACTION_LEFT_BEFORE_SEEN,
     ACTION_LEFT_UNDONE,
+    ACTION_REFERRAL_UNDONE,
+    ACTION_REFERRED,
     ACTION_SENT_TO_DOCTOR,
     ACTION_VISIT_SENT,
     ACTION_SERVICE_CHANGED,
@@ -347,6 +349,23 @@ def left_before_seen(appointment_id, user_id, ip_address=None):
 
 def left_undone(appointment_id, user_id, ip_address=None):
     return _queue_move(ACTION_LEFT_UNDONE, appointment_id, user_id, ip_address)
+
+
+def visit_referred(appointment_id, user_id, ip_address=None):
+    """'Referred <Name> (PAT-005), visit APT-00081, to the RHU.' The destination is from the
+    list; the facility's typed name and the reason are never written."""
+    write = _entry(user_id, ip_address, ACTION_REFERRED, MODULE_APPOINTMENTS)
+
+    def audit(conn, destination):
+        from models.referrals import DESTINATION_PHRASE
+        patient, ref, _ = _visit(conn, appointment_id)
+        write(conn, f"Referred {patient}, visit {ref}, to "
+                    f"{DESTINATION_PHRASE.get(destination, 'another hospital or facility')}.")
+    return audit
+
+
+def referral_undone(appointment_id, user_id, ip_address=None):
+    return _queue_move(ACTION_REFERRAL_UNDONE, appointment_id, user_id, ip_address)
 
 
 def consultation_finished(appointment_id, user_id, ip_address=None):

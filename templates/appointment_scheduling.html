@@ -54,6 +54,7 @@
   .dot-waiting-doctor{background:#6D28D9;}
   .dot-completed{background:var(--success);}
   .dot-left{background:#9CA3AF;}
+  .dot-referred{background:#2563EB;}
   .cal-count{font-size:10.5px; color:var(--text-muted); margin-top:4px;}
 
   .legend-row{display:flex; gap:18px; margin-top:14px; flex-wrap:wrap;}
@@ -128,6 +129,7 @@
   .badge-waiting{background:#FEF3C7; color:#B45309;}
   .badge-inconsult{background:var(--teal-light); color:var(--teal-dark);}
   .badge-noshow{background:#F3F4F6; color:#4B5563;}
+  .badge-referred{background:#DBEAFE; color:#1D4ED8;}
   /* Solid teal against In Consultation's light teal: the two are related states
      -- one is happening, one is about to -- and the weight says which is which
      without needing the words to be read. */
@@ -362,6 +364,30 @@
                     <span class="material-symbols-outlined" style="font-size:16px;">undo</span>Undo
                   </button>
 {%- endif %}
+{#- Referred (Task 18). Refer is offered where refer_visit() would accept it; the slip and
+    the same-day undo are on the Referred row. The server decides again. #}
+{%- if 'refer' in entry.shown %}
+                  <button type="button" class="btn-outline-teal" style="padding:6px 12px; font-size:12.5px;"
+                          data-bs-toggle="modal" data-bs-target="#referModal"
+                          data-appointment="{{ entry.id }}" data-name="{{ patient_name }}"
+                          title="Refer {{ patient_name }} to the RHU or a hospital">
+                    <span class="material-symbols-outlined" style="font-size:16px;">call_made</span>Refer
+                  </button>
+{%- endif %}
+{%- if 'referral_slip' in entry.shown %}
+                  <a href="{{ url_for(referral_slip_endpoint, appointment_id=entry.id) }}"
+                     class="btn-primary-teal" style="padding:6px 12px; font-size:12.5px; text-decoration:none;"
+                     title="Open the referral slip of {{ patient_name }}">
+                    <span class="material-symbols-outlined" style="font-size:16px;">description</span>Referral slip
+                  </a>
+{%- endif %}
+{%- if 'undo_referral' in entry.shown %}
+                  <button type="submit" form="undoReferralForm" name="appointment_id" value="{{ entry.id }}"
+                          class="btn-outline-teal" style="padding:6px 12px; font-size:12.5px;"
+                          title="Put {{ patient_name }} back to {{ entry.status_before_referred }}. Today only.">
+                    <span class="material-symbols-outlined" style="font-size:16px;">undo</span>Undo
+                  </button>
+{%- endif %}
 {%- if 'change_service' in entry.shown %}
                   <button type="button" class="btn-outline-teal" style="padding:6px 12px; font-size:12.5px;"
                           data-bs-toggle="modal" data-bs-target="#serviceModal"
@@ -538,7 +564,7 @@
 {%- set classes = 'cal-cell' ~ ('' if cell.in_month else ' muted') ~ (' today' if cell.is_today else '') %}
 {#- What the day held, by status, with the same names as the legend under the grid. #}
 {%- set parts = [] %}
-{%- for status, key in (('Waiting', 'waiting'), ('In Consultation', 'in_consultation'), ('Waiting for the Doctor', 'waiting_doctor'), ('Completed', 'completed'), ('Left before being seen', 'left')) %}
+{%- for status, key in (('Waiting', 'waiting'), ('In Consultation', 'in_consultation'), ('Waiting for the Doctor', 'waiting_doctor'), ('Completed', 'completed'), ('Left before being seen', 'left'), ('Referred', 'referred')) %}
 {%- if cell[key] %}{% set _ = parts.append(cell[key] ~ ' ' ~ status) %}{% endif %}
 {%- endfor %}
 {%- set summary = cell.total ~ ' visit' ~ ('' if cell.total == 1 else 's') ~ (': ' ~ (parts | join(', ')) if parts else '') %}
@@ -546,7 +572,7 @@
               <div class="cal-date">{{ cell.day }}</div>
 {%- if cell.total %}
               <div class="cal-dot-row">
-{%- for key, dot in (('waiting', 'dot-waiting'), ('in_consultation', 'dot-inconsult'), ('waiting_doctor', 'dot-waiting-doctor'), ('completed', 'dot-completed'), ('left', 'dot-left')) %}
+{%- for key, dot in (('waiting', 'dot-waiting'), ('in_consultation', 'dot-inconsult'), ('waiting_doctor', 'dot-waiting-doctor'), ('completed', 'dot-completed'), ('left', 'dot-left'), ('referred', 'dot-referred')) %}
 {%- for _ in range([cell[key], 3] | min) %}<span class="cal-dot {{ dot }}"></span>{% endfor %}
 {%- endfor %}
               </div>
@@ -804,7 +830,11 @@
 {%- endif %}
               </td>
               <td>{{ entry.arrival_time or '—' }}</td>
-              <td><span class="badge-status {{ entry.display_badge_class }}">{{ entry.display_status }}</span></td>
+              <td><span class="badge-status {{ entry.display_badge_class }}">{{ entry.display_status }}</span>
+{%- if entry.referral_destination %}
+                <div class="reason-text">To: {{ entry.referral_destination }}{% if entry.referral_facility %} &mdash; {{ entry.referral_facility }}{% endif %}</div>
+{%- endif %}
+              </td>
               <td>
 {{ row_actions(entry) }}
               </td>
@@ -823,6 +853,7 @@
       <form id="completeConsultationForm" method="post" action="{{ url_for(complete_consultation_endpoint) }}">{{ csrf_field() }}</form>
       <form id="sendToDoctorForm" method="post" action="{{ url_for(send_to_doctor_endpoint) }}">{{ csrf_field() }}</form>
       <form id="undoLeftForm" method="post" action="{{ url_for(undo_left_endpoint) }}">{{ csrf_field() }}</form>
+      <form id="undoReferralForm" method="post" action="{{ url_for(undo_referral_endpoint) }}">{{ csrf_field() }}</form>
 {%- endif %}
 
       <!-- EMPTY STATE — shown when nobody is booked or checked in for today, and
@@ -854,6 +885,7 @@
           &middot; Waiting for the Doctor {{ queue_stats.waiting_doctor }}
           &middot; Completed {{ queue_stats.completed }}
           &middot; Left before being seen {{ queue_stats.left }}
+          &middot; Referred {{ queue_stats.referred }}
         </div>
       </div>
 
@@ -944,6 +976,68 @@
         document.getElementById('leftAppointmentId').value = trigger.getAttribute('data-appointment');
         document.getElementById('leftPatientName').textContent = trigger.getAttribute('data-name');
       });
+    </script>
+
+    <!-- REFER (Task 18, D1): where the patient goes, the facility name only for "Other", and an
+         optional reason. The destination list is the one constant in models/referrals.py. -->
+    <div class="modal fade" id="referModal" tabindex="-1" aria-labelledby="referModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-fullscreen-sm-down modal-dialog-centered">
+        <div class="modal-content" style="border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.12);">
+          <div class="modal-header">
+            <h5 class="modal-title" id="referModalLabel">Refer this patient</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <form method="post" action="{{ url_for(refer_endpoint) }}" id="referForm">
+            {{ csrf_field() }}
+            <input type="hidden" name="appointment_id" id="referAppointmentId" value="">
+            <div class="modal-body">
+              <p style="font-size:13.5px; margin-bottom:10px;"><strong id="referPatientName"></strong></p>
+              <label class="field-label" for="referDestination">Refer to</label>
+              <select class="form-select" id="referDestination" name="destination" required>
+                <option value="" selected disabled>Choose a place</option>
+{%- for destination in referral_destinations %}
+                <option value="{{ destination }}">{{ destination }}</option>
+{%- endfor %}
+              </select>
+              <div id="referFacilityBox" style="display:none; margin-top:12px;">
+                <label class="field-label" for="referFacility">Name of the hospital or facility</label>
+                <input type="text" class="form-control" id="referFacility" name="facility" maxlength="{{ referral_facility_max }}" autocomplete="off">
+              </div>
+              <label class="field-label" for="referReason" style="margin-top:12px;">Reason (optional)</label>
+              <textarea class="form-control" id="referReason" name="reason" rows="3" maxlength="{{ referral_reason_max }}"></textarea>
+              <p style="font-size:12.5px; color:var(--text-muted); margin:10px 0 0;">
+                The Doctor and Health Staff can read the reason. You can undo this today.
+              </p>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn-reset" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn-primary-teal">Refer patient</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+    <script>
+      (function () {
+        var destination = document.getElementById('referDestination');
+        var box = document.getElementById('referFacilityBox');
+        var facility = document.getElementById('referFacility');
+        var other = {{ referral_other | tojson }};
+        function sync() {
+          var isOther = destination.value === other;
+          box.style.display = isOther ? '' : 'none';
+          facility.required = isOther;
+          if (!isOther) { facility.value = ''; }
+        }
+        destination.addEventListener('change', sync);
+        document.getElementById('referModal').addEventListener('show.bs.modal', function (event) {
+          var trigger = event.relatedTarget;
+          document.getElementById('referAppointmentId').value = trigger.getAttribute('data-appointment');
+          document.getElementById('referPatientName').textContent = trigger.getAttribute('data-name');
+          document.getElementById('referForm').reset();
+          sync();
+        });
+      })();
     </script>
 
     <!-- CHANGE SERVICE (Task 6b, D2): correct the service of a visit that is not finished. -->

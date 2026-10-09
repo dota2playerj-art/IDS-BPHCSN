@@ -495,6 +495,19 @@
             <span class="fig-name">Left before being seen</span>
             <span class="fig-value">{{ appt.left }}</span>
           </div>
+          <div class="fig-row">
+            <span class="fig-name">Referred</span>
+            <span class="fig-value">{{ appt.referred }}</span>
+          </div>
+{%- for row in appt.referral_destinations %}
+          <div class="fig-row">
+            <span class="fig-name"><span class="fig-note">Referred to</span> {{ row.destination }}</span>
+            <span class="fig-value">{{ row.count }}</span>
+          </div>
+{%- endfor %}
+{%- if small_count_note(appt.referral_destinations) %}
+          <div class="snapshot-note">{{ small_count_note(appt.referral_destinations) | trim }}</div>
+{%- endif %}
 {%- if appt.older %}
           <div class="fig-row">
             <span class="fig-name">Older records</span>

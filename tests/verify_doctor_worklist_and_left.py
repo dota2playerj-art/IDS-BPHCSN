@@ -195,16 +195,18 @@ check("every visit on the list has no diagnosis",
           "SELECT c.diagnosis FROM appointments a JOIN consultations c ON c.appointment_id = a.id "
           "WHERE a.status = ?", (WFD,))))
 check("VISIT_SERVICES is one fixed list; the services needing the Doctor are a subset; a blank "
-      "type still needs one; Immunization, Prenatal Check-up and Dental do not",
-      VISIT_SERVICES == (CONSULT, FOLLOW, HTN, "Prenatal Check-up", "Immunization", "Dental")
+      "type still needs one; Immunization, Prenatal Check-up, Family Planning and an old Dental "
+      "visit do not",
+      VISIT_SERVICES == (CONSULT, FOLLOW, HTN, "Prenatal Check-up", "Family Planning", "Immunization")
       and set(SERVICES_NEEDING_DOCTOR) - {"Walk-in Consultation"} <= set(VISIT_SERVICES)
       and "Walk-in Consultation" not in VISIT_SERVICES and needs_doctor(None) and needs_doctor("")
       and needs_doctor("Walk-in Consultation")
-      and not any(needs_doctor(s) for s in ("Immunization", "Prenatal Check-up", "Dental"))
+      and not any(needs_doctor(s) for s in ("Immunization", "Prenatal Check-up", "Family Planning", "Dental"))
       and WAITING_FOR_DOCTOR == WFD)
 check("a service is accepted only if it is in the list, exactly; there is no default",
-      clean_service("Dental") == "Dental" and clean_service(" Dental ") == "Dental"
-      and clean_service("dental") is None and clean_service("") is None
+      clean_service("Family Planning") == "Family Planning" and clean_service(" Family Planning ") == "Family Planning"
+      and clean_service("family planning") is None and clean_service("") is None
+      and clean_service("Dental") is None and clean_service("dental") is None
       and clean_service(None) is None and clean_service("Walk-in Consultation") is None)
 order = [v["id"] for v in listed]
 check("the order is oldest first, across all days",
@@ -313,7 +315,7 @@ for label, data in (("no service at all", {"patient_id": str(PATIENT), "reason":
                     ("the retired name", {"patient_id": str(PATIENT), "reason": "Ubo",
                                           "service": "Walk-in Consultation"}),
                     ("a wrong case", {"patient_id": str(PATIENT), "reason": "Ubo",
-                                      "service": "dental"})):
+                                      "service": "family planning"})):
     r = staff.post(CHECK_IN, data=data)
     check(f"check-in with {label} is refused and nobody is queued",
           r.status_code == 302 and visits_of(PATIENT) == start)
@@ -341,10 +343,10 @@ r = staff.post("/staff/register-patient", data={"check_in_start": "1", "check_in
                                                 "check_in_service": "Massage"})
 check("... and an unknown one", r.status_code == 302 and "check_in=1" not in r.headers.get("Location", ""))
 r = staff.post("/staff/register-patient", data={"check_in_start": "1", "check_in_reason": "Ubo",
-                                                "check_in_service": "Dental"})
+                                                "check_in_service": "Family Planning"})
 check("a valid service is carried into the registration form",
       r.status_code == 302 and r.headers["Location"].endswith("check_in=1")
-      and 'name="check_in_service" value="Dental"' in body(staff.get(r.headers["Location"])))
+      and 'name="check_in_service" value="Family Planning"' in body(staff.get(r.headers["Location"])))
 registered = q1("SELECT COUNT(*) FROM patients")[0]
 form = {"first_name": "Zzwlnew", "last_name": "Wlmark", "birth_date": "1990-05-05", "sex": "Female",
         "civil_status": "Single", "address": "Purok 1", "municipality": "San Francisco",
@@ -354,11 +356,11 @@ form = {"first_name": "Zzwlnew", "last_name": "Wlmark", "birth_date": "1990-05-0
 r = staff.post("/staff/register-patient", data=dict(form))
 check("a forged submit that asks to be checked in with no valid service registers nobody",
       q1("SELECT COUNT(*) FROM patients")[0] == registered)
-r = staff.post("/staff/register-patient", data=dict(form, check_in_service="Dental"))
+r = staff.post("/staff/register-patient", data=dict(form, check_in_service="Family Planning"))
 new_patient = q1("SELECT id FROM patients WHERE first_name = 'Zzwlnew'")
 row = q1("SELECT * FROM appointments WHERE patient_id = ? ", (new_patient[0],)) if new_patient else None
 check("a new patient registered from the dialog is queued with the chosen service",
-      row is not None and row["appointment_type"] == "Dental" and row["status"] == "Waiting")
+      row is not None and row["appointment_type"] == "Family Planning" and row["status"] == "Waiting")
 
 # ---------------------------------------------------------------------------
 section("5. CORRECTING THE SERVICE OF A VISIT THAT IS NOT FINISHED (D2)")
@@ -374,23 +376,23 @@ check("one short audit entry, in the words the task gave, and it names no patien
       len(entries) == 1 and entries[0]["user_id"] == STAFF_ID
       and entries[0]["details"] == f"Corrected the service of visit APT-{fix:05d}."
       and NAMES["Q"] not in entries[0]["details"], entries)
-r = doctor.post(CHANGE, data={"appointment_id": str(fix), "service": "Dental"})
+r = doctor.post(CHANGE, data={"appointment_id": str(fix), "service": "Family Planning"})
 check("the Doctor can correct it too, and the entry names the Doctor",
-      q1("SELECT appointment_type FROM appointments WHERE id = ?", (fix,))[0] == "Dental"
+      q1("SELECT appointment_type FROM appointments WHERE id = ?", (fix,))[0] == "Family Planning"
       and (audits("Changed the service of a visit") or [{}])[-1].get("user_id") == DOCTOR_ID)
 n = len(audits("Changed the service of a visit"))
-staff.post(CHANGE, data={"appointment_id": str(fix), "service": "Dental"})
+staff.post(CHANGE, data={"appointment_id": str(fix), "service": "Family Planning"})
 check("choosing the service the visit already has changes nothing and writes nothing",
       len(audits("Changed the service of a visit")) == n)
-for label, value in (("an unknown service", "Massage"), ("no service", ""), ("a wrong case", "dental")):
+for label, value in (("an unknown service", "Massage"), ("no service", ""), ("a wrong case", "family planning")):
     staff.post(CHANGE, data={"appointment_id": str(fix), "service": value})
 check("an unknown, empty or wrongly written service is refused on the server",
-      q1("SELECT appointment_type FROM appointments WHERE id = ?", (fix,))[0] == "Dental"
+      q1("SELECT appointment_type FROM appointments WHERE id = ?", (fix,))[0] == "Family Planning"
       and len(audits("Changed the service of a visit")) == n)
 refused = {"a Completed visit": ids["E"], "a visit marked left before being seen": ids["H"]}
 for label, appointment in refused.items():
     old = q1("SELECT appointment_type FROM appointments WHERE id = ?", (appointment,))[0]
-    staff.post(CHANGE, data={"appointment_id": str(appointment), "service": "Dental"})
+    staff.post(CHANGE, data={"appointment_id": str(appointment), "service": "Family Planning"})
     check(f"the service of {label} cannot be changed",
           q1("SELECT appointment_type FROM appointments WHERE id = ?", (appointment,))[0] == old)
 check("the refusals wrote no audit entry", len(audits("Changed the service of a visit")) == n)
@@ -398,7 +400,7 @@ for who, client in (("Administrator", admin), ("Barangay Official", official)):
     r = client.post(CHANGE, data={"appointment_id": str(fix), "service": "Immunization"})
     check(f"{who}: POST change-service (valid token) is refused on the server",
           r.status_code == 302 and r.headers.get("Location", "").endswith("dashboard")
-          and q1("SELECT appointment_type FROM appointments WHERE id = ?", (fix,))[0] == "Dental")
+          and q1("SELECT appointment_type FROM appointments WHERE id = ?", (fix,))[0] == "Family Planning")
 check("the Administrator has no /admin/ route for it",
       admin.post("/admin/appointment_scheduling/change-service",
                  data={"appointment_id": str(fix), "service": "Immunization"}).status_code == 404)
@@ -480,7 +482,7 @@ r = doctor.post(f"/staff/consultation/edit/{cid}", data=dict(FULL, diagnosis="A 
 check("the Doctor may change a diagnosis on a Completed visit; it stays Completed",
       status_of(a) == "Completed" and len(audits("Completed consultation")) == before_completed + 1)
 # A visit that needs no Doctor.
-for service in ("Immunization", "Prenatal Check-up", "Dental"):
+for service in ("Immunization", "Prenatal Check-up", "Family Planning", "Dental"):
     b = new_visit(service, "staff only")
     staff.post(f"/staff/consultation/record/{b}", data=INTAKE)
     check(f"{service}: Staff save the intake and the visit is Completed, with no diagnosis and "
@@ -562,7 +564,7 @@ with app.app_context():
           complete_consultation(e_start) == "not-in-consultation" and status_of(e_start) == WFD)
 run_sql("UPDATE appointments SET status = 'Completed' WHERE id IN (?, ?)", (e, e_start))
 # A service that does not need the Doctor still completes from the queue.
-g = new_visit("Dental", "closed dental")
+g = new_visit("Family Planning", "closed family planning")
 staff.post(COMPLETE, data={"appointment_id": str(g)})
 check("Mark Completed still works for a service that does not need the Doctor",
       status_of(g) == "Completed")
@@ -741,7 +743,7 @@ check("the Administrator sees the section read-only: the visits, no Left button,
       and "undoLeftForm" not in admin_queue and "See patient" not in admin_queue
       and "Start Consultation" not in admin_section and "sendToDoctorForm" not in admin_queue)
 check("the Administrator's queue shows no service for any visit (it names a clinical fact)",
-      not any(s in admin_queue for s in ("Prenatal Check-up", "Immunization", "Dental", HTN, FOLLOW)))
+      not any(s in admin_queue for s in ("Prenatal Check-up", "Immunization", "Family Planning", "Dental", HTN, FOLLOW)))
 # The counts: the dashboard, the Staff card and the queue (today plus earlier days) agree.
 with app.app_context():
     from models.doctor_worklist import count_waiting_for_doctor as _count_wfd
@@ -851,16 +853,16 @@ check("the queue's Completed card says it counts finished visits",
       "Finished today" in body(staff.get("/staff/appointment_scheduling")))
 # "Appointments by service" reflects the service chosen at check-in.
 run_sql("UPDATE appointments SET status = 'Completed' WHERE patient_id = ? AND status = 'Waiting'", (PATIENT,))
-before_dental = 0
+before_family = 0
 with app.app_context():
-    before_dental = {e["service"]: e["count"] for e in get_appointment_report(
-        months=6, viewer_role="doctor")["window"]["services"]}.get("Dental", 0)
-staff.post(CHECK_IN, data={"patient_id": str(PATIENT), "reason": "Ngipin", "service": "Dental"})
+    before_family = {e["service"]: e["count"] for e in get_appointment_report(
+        months=6, viewer_role="doctor")["window"]["services"]}.get("Family Planning", 0)
+staff.post(CHECK_IN, data={"patient_id": str(PATIENT), "reason": "Pills", "service": "Family Planning"})
 with app.app_context():
-    after_dental = {e["service"]: e["count"] for e in get_appointment_report(
-        months=6, viewer_role="doctor")["window"]["services"]}.get("Dental", 0)
-check("a check-in with the service 'Dental' adds one to 'Appointments by service' for Dental",
-      after_dental == before_dental + 1, (before_dental, after_dental))
+    after_family = {e["service"]: e["count"] for e in get_appointment_report(
+        months=6, viewer_role="doctor")["window"]["services"]}.get("Family Planning", 0)
+check("a check-in with the service 'Family Planning' adds one to 'Appointments by service' for it",
+      after_family == before_family + 1, (before_family, after_family))
 run_sql("UPDATE appointments SET status = 'Completed' WHERE patient_id = ? AND status = 'Waiting'", (PATIENT,))
 # ---------------------------------------------------------------------------
 section("10. THE SCHEMA AND THE MIGRATION")
@@ -894,7 +896,19 @@ work = Path(tempfile.mkdtemp(prefix="idsleft_"))
 old = work / "old.db"
 con = sqlite3.connect(old)
 # The table as it was before Task 6: the schema without the new status and columns.
-older = (SCHEMA.replace(", 'Left before being seen')", ")").replace("'Waiting for the Doctor', ", "")
+def without_referrals(sql):
+    """The schema as it was before Task 18: no 'Referred' status and no referral columns."""
+    return (sql.replace(", 'Referred')", ")")
+            .replace("    referral_destination TEXT,\n    referral_facility TEXT,\n"
+                     "    referral_reason TEXT,\n    referred_by INTEGER,\n    referred_at TEXT,\n"
+                     "    status_before_referred TEXT,\n", "")
+            .replace("    FOREIGN KEY (left_by) REFERENCES users(id) ON DELETE SET NULL,\n"
+                     "    FOREIGN KEY (referred_by) REFERENCES users(id) ON DELETE SET NULL\n",
+                     "    FOREIGN KEY (left_by) REFERENCES users(id) ON DELETE SET NULL\n"))
+
+
+older = (without_referrals(SCHEMA).replace(", 'Left before being seen')", ")")
+         .replace("'Waiting for the Doctor', ", "")
          .replace("    left_by INTEGER,\n    left_at TEXT,\n    status_before_left TEXT,\n", "")
          .replace("    FOREIGN KEY (assigned_staff_id) REFERENCES users(id) ON DELETE SET NULL,\n"
                   "    FOREIGN KEY (left_by) REFERENCES users(id) ON DELETE SET NULL\n",
@@ -937,7 +951,7 @@ from migrations import migrate_visit_service_and_doctor_status as m2  # noqa: E4
 work2 = Path(tempfile.mkdtemp(prefix="idsdoc_"))
 old2 = work2 / "old.db"
 con = sqlite3.connect(old2)
-before_status = (SCHEMA.replace("'Waiting for the Doctor', ", ""))
+before_status = (without_referrals(SCHEMA).replace("'Waiting for the Doctor', ", ""))
 con.executescript(before_status)
 con.executescript("""
 INSERT INTO users (username, password_hash, full_name, role, is_active) VALUES ('u','h','U','Admin',1);
@@ -1194,16 +1208,17 @@ CARE = ("staff", "doctor")
 # The decided mapping, written out here on purpose: changing queue_actions.py changes the
 # product, so it must change this table too.
 DECIDED = {
-    WAIT: {"staff": {"start", "mark_left", "change_service"},
-           "doctor": {"start", "mark_left", "change_service"}},
-    INCONS: {"staff": {"open_intake", "send_to_doctor", "mark_completed", "mark_left", "change_service"},
-             "doctor": {"open_intake", "send_to_doctor", "mark_completed", "mark_left", "change_service"}},
-    WFD: {"staff": {"mark_left", "change_service"},
-          "doctor": {"see_patient", "mark_left", "change_service"}},
+    WAIT: {"staff": {"start", "mark_left", "refer", "change_service"},
+           "doctor": {"start", "mark_left", "refer", "change_service"}},
+    INCONS: {"staff": {"open_intake", "send_to_doctor", "mark_completed", "mark_left", "refer", "change_service"},
+             "doctor": {"open_intake", "send_to_doctor", "mark_completed", "mark_left", "refer", "change_service"}},
+    WFD: {"staff": {"mark_left", "refer", "change_service"},
+          "doctor": {"see_patient", "mark_left", "refer", "change_service"}},
     "Completed": {},
     LEFT: {"staff": {"undo_left"}, "doctor": {"undo_left"}},
+    "Referred": {"staff": {"referral_slip", "undo_referral"}, "doctor": {"referral_slip", "undo_referral"}},
 }
-ALL_STATUSES = (WAIT, INCONS, WFD, "Completed", LEFT, "Scheduled", "Confirmed", "Cancelled", "No-show")
+ALL_STATUSES = (WAIT, INCONS, WFD, "Completed", LEFT, "Referred", "Scheduled", "Confirmed", "Cancelled", "No-show")
 mapping_diffs = [(st, role, allowed_actions(role, st), DECIDED.get(st, {}).get(role, set()))
                  for st in ALL_STATUSES for role in ("staff", "doctor", "admin", "official")
                  if set(allowed_actions(role, st)) != DECIDED.get(st, {}).get(role, set())]
@@ -1223,6 +1238,9 @@ CASES = [
     ("Completed", dict(status="Completed"), {}),
     ("Left today", dict(status=LEFT, before=WAIT, left_day=0), DECIDED[LEFT]),
     ("Left on an earlier day (undo is for the same day)", dict(status=LEFT, before=WAIT, left_day=1), {}),
+    ("Referred today", dict(status="Referred", before=WAIT, ref_day=0), DECIDED["Referred"]),
+    ("Referred on an earlier day (undo is for the same day)",
+     dict(status="Referred", before=WAIT, ref_day=1), {r: {"referral_slip"} for r in CARE}),
 ]
 MATRIX_PID = 21
 ROLE_CLIENTS = (("staff", staff, QUEUE_URL), ("doctor", doctor, QUEUE_URL),
@@ -1238,6 +1256,11 @@ def build(spec, tag):
         left_at = f"{(today - timedelta(days=spec['left_day'])).isoformat()} 07:00:00"
         run_sql("UPDATE appointments SET status_before_left = ?, left_by = ?, left_at = ? WHERE id = ?",
                 (spec["before"], STAFF_ID, left_at, visit_id))
+    if spec["status"] == "Referred":
+        referred_at = f"{(today - timedelta(days=spec['ref_day'])).isoformat()} 07:00:00"
+        run_sql("UPDATE appointments SET status_before_referred = ?, referral_destination = ?, "
+                "referred_by = ?, referred_at = ? WHERE id = ?",
+                (spec["before"], "Rural Health Unit (RHU)", STAFF_ID, referred_at, visit_id))
     return visit_id, record
 
 
@@ -1259,6 +1282,9 @@ def actions_in(row, visit_id):
         "mark_left": 'data-bs-target="#leftModal"',
         "undo_left": 'form="undoLeftForm"',
         "change_service": 'data-bs-target="#serviceModal"',
+        "refer": 'data-bs-target="#referModal"',
+        "undo_referral": 'form="undoReferralForm"',
+        "referral_slip": f"/referral-slip/{visit_id}",
     }
     return {action for action, mark in marks.items() if mark in row}
 
@@ -1301,12 +1327,22 @@ def perform(action, client, visit_id):
         return client.post(CHANGE, data=dict(data, service=PRENATAL))
     if action == "see_patient":
         return client.get(f"/staff/appointment_scheduling/see-patient/{visit_id}")
+    if action == "refer":
+        return client.post("/staff/appointment_scheduling/refer",
+                           data=dict(data, destination="Rural Health Unit (RHU)"))
+    if action == "undo_referral":
+        return client.post("/staff/appointment_scheduling/undo-referral", data=data)
+    if action == "referral_slip":
+        return client.get(f"/staff/appointment_scheduling/referral-slip/{visit_id}")
     return client.get(f"/staff/consultation/record/{visit_id}")      # open_intake
 
 
 def worked(action, response, visit_id, before, spec, client):
     """Whether the action did what it is for, on the visit built from `spec`."""
     now_state = state_of(visit_id)
+    if action == "referral_slip":
+        return (now_state == before and response.status_code == 200
+                and 'id="referralSlip"' in body(response))
     if action in ("open_intake", "see_patient"):
         if now_state != before:
             return False
@@ -1319,7 +1355,8 @@ def worked(action, response, visit_id, before, spec, client):
         return response.status_code == 200 and 'name="chief_complaint"' in body(response)
     goal = {"start": lambda s: s[0] == INCONS, "send_to_doctor": lambda s: s[0] == WFD,
             "mark_completed": lambda s: s[0] == "Completed", "mark_left": lambda s: s[0] == LEFT,
-            "undo_left": lambda s: s[0] == WAIT, "change_service": lambda s: s[1] == PRENATAL}[action]
+            "undo_left": lambda s: s[0] == WAIT, "change_service": lambda s: s[1] == PRENATAL,
+            "refer": lambda s: s[0] == "Referred", "undo_referral": lambda s: s[0] == WAIT}[action]
     return response.status_code == 302 and goal(now_state)
 
 
@@ -1340,7 +1377,7 @@ for label, spec, expected in CASES:
                     work_problems.append((label, role, action, "offered, but it did not work",
                                           response.status_code, state_of(visit_id)))
             elif state_of(visit_id) != before or (
-                    action in ("open_intake", "see_patient") and response.status_code == 200):
+                    action in ("open_intake", "see_patient", "referral_slip") and response.status_code == 200):
                 work_problems.append((label, role, action, "not offered, but it was accepted",
                                       response.status_code, state_of(visit_id)))
 check(f"each action the queue shows works for that role, and every other one is refused with no change "
@@ -1371,7 +1408,7 @@ section("16. THE LEGEND, THE SUMMARY LINE, THE OVERDUE BADGE AND THE WALK-IN TAG
 from models.immunizations import get_immunization_status  # noqa: E402
 from models.patients import get_patient_by_id  # noqa: E402
 
-STATUS_NAMES = ["Waiting", "In Consultation", "Waiting for the Doctor", "Completed", LEFT]
+STATUS_NAMES = ["Waiting", "In Consultation", "Waiting for the Doctor", "Completed", LEFT, "Referred"]
 queue_pages = {"staff": body(staff.get(QUEUE_URL)), "doctor": body(doctor.get(QUEUE_URL)),
                "admin": body(admin.get("/admin/appointment_scheduling"))}
 
@@ -1387,11 +1424,11 @@ def summary_text(page):
 legends = {role: [re.sub(r"\s+", " ", flat(item)).strip()
                   for item in re.findall(r'<div class="legend-item">(.*?)</div>', legend_block(page), re.S)]
            for role, page in queue_pages.items()}
-check("the colour legend lists the five real statuses, in order, for every role",
+check("the colour legend lists the six real statuses, in order, for every role",
       all(items == STATUS_NAMES for items in legends.values()), legends)
 dots = re.findall(r'<span class="cal-dot (dot-[a-z-]+)"></span>[A-Za-z ]+</div>', legend_block(queue_pages["staff"]))
 check("... each with its own colour, and each colour is defined on the page",
-      len(dots) == 5 and len(set(dots)) == 5
+      len(dots) == 6 and len(set(dots)) == 6
       and all(f".{d}{{background:" in queue_pages["staff"] for d in dots), dots)
 for role, page in queue_pages.items():
     text = " ".join(legends[role]) + " " + summary_text(page)
@@ -1399,10 +1436,10 @@ for role, page in queue_pages.items():
           "legend or the summary line",
           not any(word.lower() in text.lower() for word in
                   ("Scheduled", "not yet arrived", "Cancelled or missed", "Arrived /", "ready to consult")), text)
-    pairs = re.findall(r"(Waiting for the Doctor|Left before being seen|In Consultation|Completed|Waiting) (\d+)", summary_text(page))
+    pairs = re.findall(r"(Waiting for the Doctor|Left before being seen|In Consultation|Completed|Referred|Waiting) (\d+)", summary_text(page))
     counts_now = {st: q1("SELECT COUNT(*) FROM appointments WHERE date(appointment_date) = "
                          "date('now', 'localtime') AND status = ?", (st,))[0] for st in STATUS_NAMES}
-    check(f"{role}: the summary line uses the five status names, in the legend's order, with today's counts",
+    check(f"{role}: the summary line uses the six status names, in the legend's order, with today's counts",
           [name for name, _ in pairs] == STATUS_NAMES and all(int(n) == counts_now[name] for name, n in pairs),
           (summary_text(page), counts_now))
 check("the queue and the Staff dashboard have no Walk-in tag on any row (every visit is a walk-in)",
@@ -1478,7 +1515,7 @@ check("corrected to a service that does need the Doctor, it stays Waiting for th
 v, _ = build(dict(status=WFD), "Cbusy")
 other, _ = add_visit(MATRIX_PID, "Cbusy2", 0, "In Consultation")
 n_audit = len(audits("Changed the service of a visit"))
-staff.post(CHANGE, data={"appointment_id": str(v), "service": "Dental"})
+staff.post(CHANGE, data={"appointment_id": str(v), "service": "Family Planning"})
 check("with the room busy, the correction is refused: status, service and audit unchanged",
       state_of(v)[:2] == (WFD, CONSULT) and len(audits("Changed the service of a visit")) == n_audit,
       state_of(v))
@@ -1500,7 +1537,7 @@ from models.appointments import change_visit_service as _change  # noqa: E402
 
 v, _ = build(dict(status=WFD), "Cmodel")
 with app.app_context():
-    outcome = _change(v, "Dental")
+    outcome = _change(v, "Family Planning")
 check("the model itself does it too, called directly",
       outcome == "changed-in-consultation" and status_of(v) == "In Consultation", outcome)
 run_sql("UPDATE appointments SET status = 'Completed' WHERE id = ?", (v,))
@@ -1514,7 +1551,7 @@ check("the first Waiting patient's badge reads 'Next in line'; the second reads 
       "Next in line" in row_of(queue_html, f"APT-{first:05d}")
       and ">Waiting<" in row_of(queue_html, f"APT-{second:05d}")
       and "Ready to Consult" not in queue_html, badges)
-check("every badge on the queue is one of the five statuses or 'Next in line'",
+check("every badge on the queue is one of the six statuses or 'Next in line'",
       set(badges) <= set(STATUS_NAMES) | {"Next in line"}, set(badges))
 run_sql("UPDATE appointments SET status = 'Completed' WHERE id IN (?, ?)", (first, second))
 

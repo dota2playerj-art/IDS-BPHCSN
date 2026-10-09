@@ -1024,6 +1024,8 @@ def _appointment_export(context, produced_by):
                   else queue_stats["active_name"] or "The clinician is free")),
                 ("Waiting for the Doctor today", queue_stats["waiting_doctor"],
                  "Intake saved; the Doctor has not written the diagnosis yet"),
+                ("Referred today", queue_stats["referred"],
+                 "Sent on to the RHU or a hospital"),
                 ("Completed today", queue_stats["completed"],
                  f"Finished visits, of the {queue_stats['total_today']} checked in today"),
                 (f"Visits in {calendar['label']}", calendar["month_total"], ""),

@@ -15,6 +15,9 @@ from routes.appointment_views import (
     process_check_in,
     process_complete_consultation,
     process_mark_left,
+    process_refer,
+    process_undo_referral,
+    referral_slip_context,
     process_new_patient_check_in,
     process_send_to_doctor,
     process_start_consultation,
@@ -517,6 +520,37 @@ def staff_mark_left():
 def staff_undo_left():
     flash(process_undo_left(request.form, session.get("user_id"), request.remote_addr))
     return redirect(url_for("staff.staff_appointment_scheduling"))
+
+
+# Referring a patient to the RHU or a hospital (Task 18), its same-day undo, and the printable
+# referral slip. Staff and the Doctor only; no /admin/ twin, so the Administrator's queue stays
+# read-only. The rules are in models/referrals.py, and the status x role mapping in
+# models/queue_actions.py is checked before every one of them.
+@staff_bp.route('/appointment_scheduling/refer', methods=["POST"])
+@login_required
+@role_required(*CLINICAL_FLOOR_ROLES)
+def staff_refer_visit():
+    flash(process_refer(request.form, session.get("user_id"), request.remote_addr))
+    return redirect(url_for("staff.staff_appointment_scheduling"))
+
+
+@staff_bp.route('/appointment_scheduling/undo-referral', methods=["POST"])
+@login_required
+@role_required(*CLINICAL_FLOOR_ROLES)
+def staff_undo_referral():
+    flash(process_undo_referral(request.form, session.get("user_id"), request.remote_addr))
+    return redirect(url_for("staff.staff_appointment_scheduling"))
+
+
+@staff_bp.route('/appointment_scheduling/referral-slip/<int:appointment_id>')
+@login_required
+@role_required(*CLINICAL_FLOOR_ROLES)
+def staff_referral_slip(appointment_id):
+    context, message = referral_slip_context(appointment_id)
+    if context is None:
+        flash(message)
+        return redirect(url_for("staff.staff_appointment_scheduling"))
+    return render_template('referral_slip.html', **context)
 
 
 # Completing is what frees the clinician for the next patient, so it is part of

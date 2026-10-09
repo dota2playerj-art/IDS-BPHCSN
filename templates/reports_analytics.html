@@ -375,12 +375,18 @@
                   atrend | map(attribute='label') | list,
                   [{'name': 'Attended',            'values': atrend | map(attribute='attended') | list},
                    {'name': 'Waiting for the Doctor', 'values': atrend | map(attribute='awaiting') | list},
-                   {'name': 'Left before being seen', 'values': atrend | map(attribute='left') | list}]) }}
+                   {'name': 'Left before being seen', 'values': atrend | map(attribute='left') | list},
+                   {'name': 'Referred', 'values': atrend | map(attribute='referred') | list}]) }}
           <div class="mini-legend no-print">
             <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--success);"></span>Attended ({{ appt.attended }})</div>
             <div class="mini-legend-item"><span class="mini-legend-dot" style="background:#6D28D9;"></span>Waiting for the Doctor ({{ appt.awaiting }})</div>
             <div class="mini-legend-item"><span class="mini-legend-dot" style="background:var(--warning);"></span>Left before being seen ({{ appt.left }})</div>
+            <div class="mini-legend-item"><span class="mini-legend-dot" style="background:#2563EB;"></span>Referred ({{ appt.referred }})</div>
           </div>
+{%- if appt.referral_destinations %}
+          <div class="panel-sub" style="margin-top:8px;" id="referralBreakdown">Referred to:
+{%- for row in appt.referral_destinations %} {{ row.destination }} {{ row.count }}{{ ',' if not loop.last }}{% endfor %}.{{ small_count_note(appt.referral_destinations) }}</div>
+{%- endif %}
 {%- if appt.older %}
           <div class="panel-sub" style="margin-top:8px;">Older records: {{ appt.older }}</div>
 {%- endif %}
@@ -825,7 +831,8 @@
       labels: {{ appointment_report.trend | map(attribute='label') | list | tojson }},
       attended: {{ appointment_report.trend | map(attribute='attended') | list | tojson }},
       awaiting: {{ appointment_report.trend | map(attribute='awaiting') | list | tojson }},
-      left: {{ appointment_report.trend | map(attribute='left') | list | tojson }}
+      left: {{ appointment_report.trend | map(attribute='left') | list | tojson }},
+      referred: {{ appointment_report.trend | map(attribute='referred') | list | tojson }}
     },
     consultations: {
       labels: {{ consultation_report_stats.trend | map(attribute='label') | list | tojson }},
@@ -899,7 +906,8 @@
       datasets: [
         { label:'Attended', data:reportData.appointments.attended, backgroundColor: success, borderRadius:4 },
         { label:'Waiting for the Doctor', data:reportData.appointments.awaiting, backgroundColor: purple, borderRadius:4 },
-        { label:'Left before being seen', data:reportData.appointments.left, backgroundColor: warning, borderRadius:4 }
+        { label:'Left before being seen', data:reportData.appointments.left, backgroundColor: warning, borderRadius:4 },
+        { label:'Referred', data:reportData.appointments.referred, backgroundColor: '#2563EB', borderRadius:4 }
       ]
     },
     options: {

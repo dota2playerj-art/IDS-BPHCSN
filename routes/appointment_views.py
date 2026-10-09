@@ -36,14 +36,21 @@ from models.immunizations import get_immunization_alert, get_immunization_status
 from models.patients import get_all_patients, get_patient_by_id
 from models.queue_actions import (
     LEGEND_STATUSES,
-    CHANGE_SERVICE, MARK_COMPLETED, MARK_LEFT, SEE_PATIENT, SEND_TO_DOCTOR, START, UNDO_LEFT,
+    CHANGE_SERVICE, MARK_COMPLETED, MARK_LEFT, REFER, REFERRAL_SLIP, SEE_PATIENT,
+    SEND_TO_DOCTOR, START, UNDO_LEFT, UNDO_REFERRAL,
     action_allowed,
     is_today,
+)
+from models.referrals import (
+    OTHER as OTHER_DESTINATION, REFERRAL_DESTINATIONS, FACILITY_MAX_LENGTH, REASON_MAX_LENGTH,
+    attach_referrals, destination_text, extract_form as extract_referral_form,
+    get_referral_slip, refer_visit, undo_referral, validate_referral,
 )
 from models.service_schedule import get_entries as get_schedule_entries, services_on
 from routes.audit_entries import (
     consultation_completed, consultation_started, left_before_seen, left_undone,
-    patient_checked_in, visit_sent_to_doctor, visit_service_changed,
+    patient_checked_in, referral_undone, visit_referred, visit_sent_to_doctor,
+    visit_service_changed,
 )
 from utils.dates import today
 from utils.roles import is_care_team
@@ -96,6 +103,9 @@ def appointment_scheduling_context(month=None):
     # Visits from earlier days that are still open (Task 10, D1). The Administrator sees
     # them too, read-only: no actions.
     earlier = get_open_earlier_visits(active=active)
+    # Where a referred visit went: the care team only. The Administrator's queue shows the
+    # status and nothing else (Task 18).
+    entries = attach_referrals(entries, role)
     if care_team:
         entries = attach_actions(attach_leave_flags(entries), role)
         earlier = attach_actions(attach_leave_flags(earlier), role)
@@ -168,6 +178,11 @@ def appointment_scheduling_context(month=None):
         "checkin_patients": patients,
         # The one fixed list Staff choose from at check-in and when correcting a visit.
         "visit_services": VISIT_SERVICES,
+        # The one list of places a patient can be referred to, and the form's limits.
+        "referral_destinations": REFERRAL_DESTINATIONS,
+        "referral_other": OTHER_DESTINATION,
+        "referral_facility_max": FACILITY_MAX_LENGTH,
+        "referral_reason_max": REASON_MAX_LENGTH,
         # The colour legend: exactly the statuses a visit can hold in the queue, each with
         # the colour of its badge (Task 6d, D4).
         "legend": [{"status": status, "dot": STATUS_DOT_CLASS[status]}
@@ -505,6 +520,86 @@ def process_undo_left(form_data, user_id=None, ip_address=None):
         return (f"Another patient is in consultation, so {name} cannot go back in "
                 "yet. Try again when that visit is complete.")
     return f"{name} is not marked as left before being seen."
+
+
+def process_refer(form_data, user_id=None, ip_address=None):
+    """Refer one visit to the RHU or a hospital. Returns the message to flash.
+
+    The mapping decides who and which status; the form is checked here; the rules that need
+    the database are refer_visit()'s, which settles them in SQL.
+    """
+    raw_id = (form_data.get("appointment_id") or "").strip()
+    if not raw_id.isdigit():
+        return "Choose a patient from the queue."
+    appointment_id = int(raw_id)
+    appointment = get_appointment_by_id(appointment_id)
+    if appointment is None:
+        return "That queue entry could not be found."
+    name = queue_display_name(appointment)
+    refusal = _refused(appointment, REFER)
+    if refusal:
+        return refusal
+    values = extract_referral_form(form_data)
+    errors = validate_referral(values)
+    if errors:
+        return next(iter(errors.values()))
+    outcome = refer_visit(
+        appointment_id, user_id, values["destination"], values["facility"], values["reason"],
+        audit=visit_referred(appointment_id, user_id, ip_address))
+    if outcome == "referred":
+        return (f"{name} is referred to {destination_text(values['destination'], values['facility'])}. "
+                "You can print the referral slip, or undo this today.")
+    if outcome == "already":
+        return f"{name} is already referred."
+    if outcome == "cannot-seal":
+        return (f"{name}'s referral was not saved. The key that protects sealed records "
+                "cannot be used on this computer.")
+    return (f"{name} cannot be referred. A visit with a diagnosis, or one that is finished, "
+            "cannot be changed here.")
+
+
+def process_undo_referral(form_data, user_id=None, ip_address=None):
+    """Undo a referral on the day it was set. Returns the message to flash."""
+    raw_id = (form_data.get("appointment_id") or "").strip()
+    if not raw_id.isdigit():
+        return "Choose a patient from the queue."
+    appointment_id = int(raw_id)
+    appointment = get_appointment_by_id(appointment_id)
+    if appointment is None:
+        return "That queue entry could not be found."
+    name = queue_display_name(appointment)
+    refusal = _refused(appointment, UNDO_REFERRAL)
+    if refusal:
+        return refusal
+    outcome = undo_referral(
+        appointment_id, audit=referral_undone(appointment_id, user_id, ip_address))
+    if outcome == "undone":
+        return f"{name}'s referral is undone. The visit is back to {appointment['status_before_referred']}."
+    if outcome == "too-late":
+        return (f"{name} was referred on an earlier day. It can only be undone "
+                "on the same day.")
+    if outcome == "busy":
+        return (f"Another patient is in consultation, so {name} cannot go back in "
+                "yet. Try again when that visit is complete.")
+    return f"{name} is not referred."
+
+
+def referral_slip_context(appointment_id):
+    """(context, message) for the referral slip of one referred visit.
+
+    The mapping decides who may open it (Staff and the Doctor, on a Referred visit); the
+    Administrator has no route here at all.
+    """
+    appointment = get_appointment_by_id(appointment_id)
+    if appointment is None:
+        return None, "That queue entry could not be found."
+    refusal = _refused(appointment, REFERRAL_SLIP)
+    if refusal:
+        return None, refusal
+    slip = get_referral_slip(appointment_id)
+    if slip is None:
+        return None, "That visit is not referred."
+    return {"slip": slip}, None
 
 
 def process_change_service(form_data, user_id=None, ip_address=None):
