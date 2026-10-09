@@ -196,19 +196,17 @@ CASES = {
               "Routine childhood immunization",
               "Vaccines given according to the DOH EPI schedule. Mother advised on mild fever and the next dose.",
               ()),
-    # A dental visit is done by Staff and never needs the Doctor (Task 6b).
-    "dental": ("Toothache", ("Gum bleeding", "Tooth extraction follow-up"),
-               "", "", ()),
 }
 
 # The service Staff choose at check-in for each kind of visit (Task 6b, D1). Prenatal
-# check-ups, immunizations and dental visits are finished by Staff without the Doctor;
-# the rest wait for him until he writes a diagnosis. A few acute visits are follow-ups,
+# check-ups, family planning and immunizations are finished by Staff without the Doctor;
+# the rest wait for him until he writes a diagnosis. The RHU has no dental service, so there
+# is no dental visit (Task 19, D4). A few acute visits are follow-ups,
 # picked from the visit date, so the mix is the same on every build.
 SERVICE_BY_CASE = {
     "immun": "Immunization",
     "prenatal": "Prenatal Check-up",
-    "dental": "Dental",
+    "fp": "Family Planning",
     "htn": "Hypertension / Diabetes Monitoring",
     "dm": "Hypertension / Diabetes Monitoring",
     "asthma": "Follow-up Consultation",
@@ -605,7 +603,21 @@ def plan_visits(rng, today, people):
 LEFT_VISITS = 8
 INTAKE_ONLY_VISITS = 6
 STALE_WAITING_VISITS = 2
-DENTAL_VISITS = 10
+FAMILY_PLANNING_EXTRA_VISITS = 10
+
+# The referrals (Task 19, D5): (stage, destination, facility name, reason). The stage says what
+# the visit was when it was referred: "waiting" (checked in, not started), "consult" (started,
+# no intake yet) or "doctor_list" (the intake was saved and the visit waited for the Doctor).
+# Five go to the RHU and one to Caraga Regional Hospital; one of the five comes from the
+# Doctor's list. The reasons are short and name no condition.
+REFERRAL_PLANS = (
+    ("waiting", "RHU", "", "Needs a check-up by the RHU doctor."),
+    ("waiting", "RHU", "", ""),
+    ("consult", "RHU", "", "Needs laboratory tests the health center cannot do."),
+    ("consult", "RHU", "", ""),
+    ("doctor_list", "RHU", "", "The Doctor is not coming this week. Please see the patient at the RHU."),
+    ("consult", "CARAGA", "", "Needs care in a hospital. Please receive the patient."),
+)
 
 
 def plan_extras(rng, today, people, last_day):
@@ -652,10 +664,13 @@ def plan_extras(rng, today, people, last_day):
            for _ in range(INTAKE_ONLY_VISITS)]
         + [("stale", True, (last_day - first_day).days - rng.randint(3, 8))
            for _ in range(STALE_WAITING_VISITS)]
-        # Dental visits, finished by Staff. Added last so everything planned before them is
-        # the same as without them.
-        + [("dental", False, rng.randint(0, (last_day - first_day).days))
-           for _ in range(DENTAL_VISITS)]
+        # Extra family planning visits, finished by Staff (the dental visits of the earlier
+        # builds were here). Added after the visits above so they are the same as before.
+        + [("fp_extra", False, rng.randint(0, (last_day - first_day).days))
+           for _ in range(FAMILY_PLANNING_EXTRA_VISITS)]
+        # The referrals, added last for the same reason.
+        + [(f"referral:{number}", False, rng.randint(0, (last_day - first_day).days))
+           for number in range(len(REFERRAL_PLANS))]
     )
     placed = []
     cursor = 0
@@ -667,7 +682,7 @@ def plan_extras(rng, today, people, last_day):
             person = pool[cursor % len(pool)]
             cursor += 1
             if eligible(person, day, quiet_after):
-                visit = ({"date": day, "case": "dental", "variant": None} if variant == "dental"
+                visit = ({"date": day, "case": "fp", "variant": None} if variant == "fp_extra"
                          else {"date": day, "case": rng.choice(acute), "variant": variant})
                 person["visits"].append(visit)
                 person["visits"].sort(key=lambda v: v["date"])
@@ -760,6 +775,29 @@ def plan_broadcasts(rng, last_day):
         day = weekday_on_or_after(last_day - timedelta(days=rng.randint(10 + number * 33, 40 + number * 33)))
         out.append((day, "admin" if number % 2 == 0 else "official", audience, category, message))
     return sorted(out)
+
+
+# The demo Service Schedule, from the RHU interview (Task 19, D5): consultation and family
+# planning every weekday, immunization every Wednesday (the barangays take turns), prenatal
+# check-ups every Tuesday at the RHU. Weekdays: 1 is Monday.
+SCHEDULE_ENTRIES = (
+    ("Consultation", (1, 2, 3, 4, 5), ""),
+    ("Family Planning", (1, 2, 3, 4, 5), ""),
+    ("Immunization", (3,), "The barangays take turns"),
+    ("Prenatal Check-up", (2,), "At the RHU"),
+)
+
+
+def refer_visit(actor, appointment, plan, moment):
+    """Refer one visit through the same POST route the queue's dialog uses."""
+    from models.referrals import CARAGA, RHU
+
+    _stage, key, facility, reason = plan
+    set_clock(moment)
+    actor.post("/staff/appointment_scheduling/refer", {
+        "appointment_id": str(appointment),
+        "destination": {"RHU": RHU, "CARAGA": CARAGA}[key],
+        "facility": facility, "reason": reason})
 
 
 # ---------------------------------------------------------------------------
@@ -1047,6 +1085,19 @@ def build(path, say=print, show_passwords=True, today_override=None):
                 batch_count += 1
         assert rows(path, "SELECT COUNT(*) FROM inventory_batches")[0][0] == batch_count
 
+        # ---- the service schedule, from the RHU interview (Task 19, D5): the days the Administrator
+        # would enter. Only the demo data has it; the real database gets the real days from the
+        # Administrator.
+        set_clock(at(setup_day, 8, 30))
+        for service, weekdays, note in SCHEDULE_ENTRIES:
+            actors["admin"].post("/admin/service_schedule/add",
+                                 {"service": service, "weekdays": [str(d) for d in weekdays],
+                                  "note": note})
+            stamper.stamp(_clock["now"])
+        # The entries get the simulated day, not the real clock's, so two builds hold the same
+        # rows. updated_at stays empty: nobody has edited them.
+        run_sql(path, "UPDATE service_schedule SET created_at = ?", (utc_text(_clock["now"]),))
+
         # ---- the timeline
         events = []
         for index, person in enumerate(people):
@@ -1063,7 +1114,8 @@ def build(path, say=print, show_passwords=True, today_override=None):
         per_day = {}
         patient_row = {}
         counters = {"registered": 0, "visits": 0, "sealed": 0, "status": 0, "broadcasts": 0,
-                    "left": 0, "stale": 0, "waiting for the Doctor": 0, "finished by Staff": 0}
+                    "left": 0, "stale": 0, "waiting for the Doctor": 0, "finished by Staff": 0,
+                    "referred": 0}
         for moment, _order, kind, index, payload in events:
             day = moment.date()
             if kind == "register":
@@ -1096,6 +1148,15 @@ def build(path, say=print, show_passwords=True, today_override=None):
                     # Checked in and never started: still Waiting on a later day.
                     counters["stale"] += 1
                     continue
+                referral = None
+                if variant and variant.startswith("referral:"):
+                    referral = REFERRAL_PLANS[int(variant.split(":")[1])]
+                if referral and referral[0] == "waiting":
+                    # Referred straight from the queue, before anyone started the visit.
+                    refer_visit(staff, appointment, referral, base + timedelta(minutes=12))
+                    stamper.stamp(_clock["now"])
+                    counters["referred"] += 1
+                    continue
                 if variant == "left":
                     # Went home before being seen: Staff close the visit the same day.
                     set_clock(base + timedelta(minutes=25))
@@ -1108,18 +1169,32 @@ def build(path, say=print, show_passwords=True, today_override=None):
                 staff.post("/staff/appointment_scheduling/start-consultation",
                            {"appointment_id": str(appointment)})
                 stamper.stamp(_clock["now"])
+                if referral and referral[0] == "consult":
+                    # Referred while In Consultation, before the intake was saved.
+                    refer_visit(staff, appointment, referral, base + timedelta(minutes=15))
+                    stamper.stamp(_clock["now"])
+                    counters["referred"] += 1
+                    continue
                 set_clock(base + timedelta(minutes=20))
                 staff.post(f"/staff/consultation/record/{appointment}",
                            consult_form(data, doses, elsewhere))
                 consultation = rows(path, "SELECT id FROM consultations WHERE appointment_id = ?",
                                     (appointment,))[0][0]
                 stamper.stamp(_clock["now"])
+                if referral and referral[0] == "doctor_list":
+                    # The intake was saved, the visit waited for the Doctor, and the Doctor
+                    # referred it from his list.
+                    refer_visit(actors["doctor"], appointment, referral,
+                                base + timedelta(minutes=30))
+                    stamper.stamp(_clock["now"])
+                    counters["referred"] += 1
+                    continue
                 if variant == "intake_only":
                     # Intake taken; the Doctor has not been yet. This is the Doctor's list.
                     counters["visits"] += 1
                     counters["waiting for the Doctor"] += 1
                     continue
-                # A service that does not need the Doctor (immunization, prenatal, dental)
+                # A service that does not need the Doctor (immunization, prenatal, family planning)
                 # was Completed by the intake itself: Staff finish it, no diagnosis.
                 by_staff = not needs_doctor(service)
                 if by_staff:
@@ -1201,6 +1276,10 @@ def build(path, say=print, show_passwords=True, today_override=None):
         "visits": rows(path, "SELECT COUNT(*) FROM consultations")[0][0],
         "sealed visits": rows(path, "SELECT COUNT(*) FROM consultations WHERE is_restricted = 1")[0][0],
         "left before being seen": rows(path, "SELECT COUNT(*) FROM appointments WHERE status = 'Left before being seen'")[0][0],
+        "referred to the RHU": rows(path, "SELECT COUNT(*) FROM appointments WHERE status = 'Referred' AND referral_destination = 'Rural Health Unit (RHU)'")[0][0],
+        "referred to Caraga Regional Hospital": rows(path, "SELECT COUNT(*) FROM appointments WHERE status = 'Referred' AND referral_destination = 'Caraga Regional Hospital'")[0][0],
+        "family planning visits": rows(path, "SELECT COUNT(*) FROM appointments WHERE appointment_type = 'Family Planning'")[0][0],
+        "service schedule entries": rows(path, "SELECT COUNT(*) FROM service_schedule")[0][0],
         "still waiting from earlier days": rows(path, "SELECT COUNT(*) FROM appointments WHERE status = 'Waiting'")[0][0],
         "waiting for the Doctor": count_waiting(path),
         "finished by Staff, no diagnosis": rows(

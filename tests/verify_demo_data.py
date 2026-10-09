@@ -147,7 +147,8 @@ for row in db.execute("SELECT user_id, details FROM audit_logs WHERE action = 'U
         diagnosed.add(int(match.group(1)))
 # Tasks 6 and 6b: some visits have no diagnosis on purpose. A few are Waiting for the Doctor,
 # so his list has something to show. The rest are services Staff finish without him
-# (Immunization, Prenatal Check-up, Dental).
+# (Immunization, Prenatal Check-up, Family Planning). The Doctor can also refer a visit from his list
+# (Task 19): its intake stays, with no diagnosis.
 undiagnosed = {r[0] for r in db.execute(
     "SELECT id FROM consultations WHERE diagnosis IS NULL OR TRIM(diagnosis) = ''")}
 from models.doctor_worklist import VISIT_SERVICES, needs_doctor  # noqa: E402
@@ -158,11 +159,16 @@ waiting_ids = {r[0] for r in db.execute(
 staff_only_ids = {r[0] for r in db.execute(
     "SELECT c.id, a.appointment_type FROM consultations c JOIN appointments a "
     "ON a.id = c.appointment_id") if not needs_doctor(r[1])}
+referred_intake_ids = {r[0] for r in db.execute(
+    "SELECT c.id FROM consultations c JOIN appointments a ON a.id = c.appointment_id "
+    "WHERE a.status = 'Referred'")}
 check("every consultation has a diagnosis and treatment plan that the Doctor account wrote, "
-      "except the six visits Waiting for the Doctor and the visits Staff finish without him "
-      "(Immunization, Prenatal Check-up, Dental), which have neither",
+      "except the six visits Waiting for the Doctor, the visit the Doctor referred from his list, and "
+      "the visits Staff finish without him (Immunization, Prenatal Check-up, Family Planning), which "
+      "have neither",
       diagnosed == set(consultation_ids) - undiagnosed
-      and undiagnosed == waiting_ids | staff_only_ids
+      and undiagnosed == waiting_ids | staff_only_ids | referred_intake_ids
+      and len(referred_intake_ids) == 1
       and len(waiting_ids) == seed.INTAKE_ONLY_VISITS and len(staff_only_ids) > 50
       and not (diagnosed & undiagnosed)
       and db.execute("SELECT COUNT(*) FROM consultations WHERE id IN (%s) AND "
@@ -193,8 +199,10 @@ check("no diagnosis was refused: nobody outside the Doctor tried to write one",
                  "OR action LIKE '%Refused%'").fetchone()[0] == 0)
 admin_actions = {r[0] for r in db.execute(
     "SELECT DISTINCT action FROM audit_logs WHERE user_id = ?", (users["admin"]["id"],))}
-check("the Administrator made no clinical write: only an inventory item and SMS broadcasts",
-      admin_actions <= {"Added inventory item", "Received stock", "Sent community SMS broadcast"},
+check("the Administrator made no clinical write: only an inventory item, SMS broadcasts and the "
+      "Service Schedule",
+      admin_actions <= {"Added inventory item", "Received stock", "Sent community SMS broadcast",
+                        "Added service schedule entry"},
       admin_actions)
 official_actions = {r[0] for r in db.execute(
     "SELECT DISTINCT action FROM audit_logs WHERE user_id = ?", (users["official"]["id"],))}
@@ -208,13 +216,19 @@ check("every dispensing was done by Health Center Staff",
       {r[0] for r in db.execute("SELECT u.role FROM medicine_dispensing d "
                                 "JOIN users u ON u.id = d.dispensed_by")} <= {"Health Center Staff"})
 statuses = dict(db.execute("SELECT status, COUNT(*) FROM appointments GROUP BY status").fetchall())
+REFERRALS = seed.REFERRAL_PLANS
+referred_total = len(REFERRALS)
+referred_with_intake = sum(1 for plan in REFERRALS if plan[0] == "doctor_list")
+referred_started = sum(1 for plan in REFERRALS if plan[0] == "consult")
 check("nobody is in consultation; eight visits were left before being seen, two are still "
-      "waiting from earlier days, six are Waiting for the Doctor; every other visit is completed",
-      set(statuses) == {"Completed", "Left before being seen", "Waiting", "Waiting for the Doctor"}
+      "waiting from earlier days, six are Waiting for the Doctor, six were referred; every other visit "
+      "is completed",
+      set(statuses) == {"Completed", "Left before being seen", "Waiting", "Waiting for the Doctor", "Referred"}
       and statuses["Left before being seen"] == seed.LEFT_VISITS
       and statuses["Waiting"] == seed.STALE_WAITING_VISITS
       and statuses["Waiting for the Doctor"] == seed.INTAKE_ONLY_VISITS
-      and statuses["Completed"] == counts["visits"] - seed.INTAKE_ONLY_VISITS, statuses)
+      and statuses["Referred"] == referred_total
+      and statuses["Completed"] == counts["visits"] - seed.INTAKE_ONLY_VISITS - referred_with_intake, statuses)
 actions = {r[0] for r in db.execute("SELECT DISTINCT action FROM audit_logs")}
 wanted = {"Marked as left before being seen", "Registered patient", "Checked patient in", "Started consultation",
           "Recorded consultation", "Updated consultation record", "Completed consultation",
@@ -232,10 +246,12 @@ def audit_count(action):
 check("each visit has its check-in, start and record entries (the eight left and two waiting visits "
       "have a check-in), every visit that needs the Doctor has an 'Intake saved' entry, and every "
       "visit except the six Waiting for the Doctor has a completion entry",
-      audit_count("Checked patient in") == counts["visits"] + seed.LEFT_VISITS + seed.STALE_WAITING_VISITS
-      and audit_count("Started consultation") == audit_count("Recorded consultation") == counts["visits"]
+      audit_count("Checked patient in") == (counts["visits"] + seed.LEFT_VISITS + seed.STALE_WAITING_VISITS
+                                            + referred_total - referred_with_intake)
+      and audit_count("Started consultation") == counts["visits"] + referred_started
+      and audit_count("Recorded consultation") == counts["visits"]
       and audit_count("Intake saved, waiting for the Doctor") == counts["visits"] - len(staff_only_ids)
-      and audit_count("Completed consultation") == counts["visits"] - seed.INTAKE_ONLY_VISITS,
+      and audit_count("Completed consultation") == counts["visits"] - seed.INTAKE_ONLY_VISITS - referred_with_intake,
       (audit_count("Intake saved, waiting for the Doctor"), audit_count("Completed consultation")))
 check("audit entries carry dates across the year, not the day it was built",
       db.execute("SELECT COUNT(DISTINCT substr(created_at,1,10)) FROM audit_logs").fetchone()[0] > 150)
@@ -249,6 +265,50 @@ check("visits cover the last 12 months and none is today or later",
 check("no visit falls on a weekend",
       all(date.fromisoformat(r[0]).weekday() < 5 for r in db.execute(
           "SELECT DISTINCT substr(consultation_date,1,10) FROM consultations")))
+
+# ===========================================================================
+section("3a. REFERRALS, FAMILY PLANNING AND NO DENTAL SHOW IN THE DEMO (Task 19)")
+from models.referrals import CARAGA, RHU  # noqa: E402
+
+care_ids = {u["id"] for u in users.values() if u["role"] in ("Health Center Staff", "Doctor")}
+referred = db.execute("SELECT * FROM appointments WHERE status = 'Referred' ORDER BY id").fetchall()
+by_destination = {}
+for r in referred:
+    by_destination[r["referral_destination"]] = by_destination.get(r["referral_destination"], 0) + 1
+check("six visits were referred: five to the RHU and one to Caraga Regional Hospital",
+      len(referred) == len(seed.REFERRAL_PLANS) and by_destination == {RHU: 5, CARAGA: 1}, by_destination)
+check("the referrals come from Waiting, from In Consultation and from the Doctor's list (one of them)",
+      sorted(r["status_before_referred"] for r in referred)
+      == sorted({"waiting": "Waiting", "consult": "In Consultation",
+                 "doctor_list": "Waiting for the Doctor"}[plan[0]] for plan in seed.REFERRAL_PLANS)
+      and sum(1 for r in referred if r["status_before_referred"] == "Waiting for the Doctor") == 1,
+      [r["status_before_referred"] for r in referred])
+check("each was set by Staff or the Doctor on the day of the visit, and the Doctor's one by the Doctor",
+      all(r["referred_by"] in care_ids and (r["referred_at"] or "")[:10] == r["appointment_date"][:10]
+          for r in referred)
+      and all(r["referred_by"] == doctor_id for r in referred if r["status_before_referred"] == "Waiting for the Doctor"))
+reasons = [r["referral_reason"] for r in referred if r["referral_reason"]]
+check("some referrals carry a reason and some do not; none is sealed, so the reasons are plain text",
+      0 < len(reasons) < len(referred) and not any(sealed_crypto.is_encrypted(x) for x in reasons)
+      and all(r["referral_facility"] is None for r in referred))
+refer_audit = db.execute("SELECT user_id, details FROM audit_logs WHERE action = 'Referred a patient'").fetchall()
+check("each referral has one audit entry naming the destination, and none holds a reason",
+      len(refer_audit) == len(referred)
+      and all(re.fullmatch(r"Referred .+ \(PAT-\d{3}\), visit APT-\d{5}, to (the RHU|Caraga Regional Hospital)\.",
+                           a["details"]) for a in refer_audit)
+      and not any(plan[3] and plan[3] in a["details"] for a in refer_audit for plan in seed.REFERRAL_PLANS),
+      [a["details"] for a in refer_audit][:2])
+check("a referred visit is not on the Doctor's list: the six visits Waiting for the Doctor are still six",
+      db.execute("SELECT COUNT(*) FROM appointments WHERE status = 'Waiting for the Doctor'").fetchone()[0]
+      == seed.INTAKE_ONLY_VISITS)
+check("the retired service Dental appears nowhere in the demo data",
+      db.execute("SELECT COUNT(*) FROM appointments WHERE appointment_type = 'Dental'").fetchone()[0] == 0)
+family = db.execute("SELECT a.status, c.diagnosis FROM appointments a LEFT JOIN consultations c "
+                    "ON c.appointment_id = a.id WHERE a.appointment_type = 'Family Planning'").fetchall()
+check("there are Family Planning visits (more than twenty), all Completed by Staff with no diagnosis, "
+      "none waiting for the Doctor",
+      len(family) > 20 and all(r["status"] == "Completed" and not (r["diagnosis"] or "").strip() for r in family),
+      len(family))
 
 # ===========================================================================
 section("3b. THE DOCTOR'S LIST AND 'LEFT BEFORE BEING SEEN' SHOW IN THE DEMO (Task 6)")
@@ -340,8 +400,19 @@ _c.row_factory = sqlite3.Row
 check("negative control: the same check flags a visit dated after the patient left",
       len(visits_after_leaving(_c)) == 1)
 _c.close()
-check("the Service Schedule is empty: it holds the real service days, not invented ones",
-      db.execute("SELECT COUNT(*) FROM service_schedule").fetchone()[0] == 0)
+schedule = [(r["service"], r["weekdays"], r["note"] or "") for r in db.execute(
+    "SELECT * FROM service_schedule ORDER BY id")]
+check("the demo Service Schedule is the one from the RHU interview (Task 19): Consultation and Family "
+      "Planning Monday to Friday, Immunization on Wednesdays, Prenatal Check-up on Tuesdays",
+      schedule == [(service, ",".join(str(d) for d in days), note)
+                   for service, days, note in seed.SCHEDULE_ENTRIES]
+      and [s[:2] for s in schedule] == [("Consultation", "1,2,3,4,5"), ("Family Planning", "1,2,3,4,5"),
+                                        ("Immunization", "3"), ("Prenatal Check-up", "2")], schedule)
+check("the schedule entries were made by the Administrator, with the simulated date, and not edited",
+      all(r["created_by"] == users["admin"]["id"] and r["updated_at"] is None
+          and r["created_at"] < f"{date.today().isoformat()}"
+          for r in db.execute("SELECT * FROM service_schedule"))
+      and audit_count("Added service schedule entry") == 4)
 items = db.execute("SELECT * FROM inventory_items").fetchall()
 batches = db.execute("SELECT * FROM inventory_batches").fetchall()
 usable = {i["id"]: sum(b["quantity_remaining"] for b in batches
