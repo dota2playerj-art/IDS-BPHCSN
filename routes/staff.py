@@ -522,7 +522,7 @@ def staff_undo_left():
     return redirect(url_for("staff.staff_appointment_scheduling"))
 
 
-# Referring a patient to the RHU or a hospital (Task 18), its same-day undo, and the printable
+# Referring a patient to the RHU or a hospital (Task 19), its same-day undo, and the printable
 # referral slip. Staff and the Doctor only; no /admin/ twin, so the Administrator's queue stays
 # read-only. The rules are in models/referrals.py, and the status x role mapping in
 # models/queue_actions.py is checked before every one of them.

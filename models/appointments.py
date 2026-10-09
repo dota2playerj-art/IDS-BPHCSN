@@ -1185,7 +1185,7 @@ def attach_leave_flags(entries):
             entry["status"] == LEFT and (entry.get("left_at") or "")[:10] == day
             and entry.get("status_before_left") in LEAVABLE_STATUSES
         )
-        # The same two questions for a referral (Task 18): referral_allowed() and
+        # The same two questions for a referral (Task 19): referral_allowed() and
         # undo_referral() decide, these only decide which buttons are drawn.
         entry["can_refer"] = referral_allowed(
             entry["status"], consultation["diagnosis"] if consultation else None)
@@ -1337,7 +1337,7 @@ OUTCOME_ATTENDED = "Attended"       # Waiting / In Consultation / Completed
 OUTCOME_AWAITING = "Awaiting"       # Waiting for the Doctor (Task 6b, D6): came, intake saved
 OUTCOME_MISSED = "Missed"           # Cancelled / No-show
 OUTCOME_LEFT = "Left"               # Left before being seen (Task 6, D6)
-OUTCOME_REFERRED = "Referred"       # Sent on to the RHU or a hospital (Task 18, D3)
+OUTCOME_REFERRED = "Referred"       # Sent on to the RHU or a hospital (Task 19, D3)
 
 _OUTCOME_BY_STATUS = {
     "Scheduled": OUTCOME_EXPECTED,
@@ -1370,7 +1370,7 @@ def _outcome_summary(counts, walk_ins, total, services, viewer_role, referrals=N
     # only finished visits and the people in the clinic right now. The patient did
     # come, so the attendance rate still counts them as attended: it does not move.
     #
-    # "Referred" (Task 18, D3) is its own figure too. The patient came and the visit is over,
+    # "Referred" (Task 19, D3) is its own figure too. The patient came and the visit is over,
     # so it is resolved and counts as having come: the attendance rate counts it as attended.
     came = counts[OUTCOME_ATTENDED] + counts[OUTCOME_AWAITING] + counts[OUTCOME_REFERRED]
     resolved = came + counts[OUTCOME_MISSED] + counts[OUTCOME_LEFT]

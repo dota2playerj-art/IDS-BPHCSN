@@ -31,7 +31,7 @@ SEE_PATIENT = "see_patient"          # the Doctor sees a visit waiting for him
 MARK_LEFT = "mark_left"              # left before being seen
 UNDO_LEFT = "undo_left"              # same-day undo of the above
 CHANGE_SERVICE = "change_service"    # correct the visit's service
-REFER = "refer"                      # refer the patient to the RHU or a hospital (Task 18)
+REFER = "refer"                      # refer the patient to the RHU or a hospital (Task 19)
 UNDO_REFERRAL = "undo_referral"      # same-day undo of the above
 REFERRAL_SLIP = "referral_slip"      # open the printable slip of a referred visit
 
@@ -61,7 +61,7 @@ QUEUE_ACTIONS = {
         STAFF: (UNDO_LEFT,),
         DOCTOR: (UNDO_LEFT,),
     },
-    # Sent on to the RHU or a hospital (Task 18): the referral slip, plus the same-day undo.
+    # Sent on to the RHU or a hospital (Task 19): the referral slip, plus the same-day undo.
     REFERRED: {
         STAFF: (REFERRAL_SLIP, UNDO_REFERRAL),
         DOCTOR: (REFERRAL_SLIP, UNDO_REFERRAL),
@@ -87,7 +87,7 @@ RECORD_ACTION_BY_STATUS = {
 TODAY_ONLY = (START,)
 # A Waiting visit from an earlier day offers only "Left before being seen" (Task 13, D6): its
 # patient is probably home, so changing the service of that visit helps nobody, and neither does
-# referring them (Task 18). Visits in the other statuses keep both on any day.
+# referring them (Task 19). Visits in the other statuses keep both on any day.
 EARLIER_DAY_WAITING_REMOVED = (CHANGE_SERVICE, REFER)
 
 

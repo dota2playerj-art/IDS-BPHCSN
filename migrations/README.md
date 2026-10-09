@@ -46,6 +46,6 @@ Run a migration only on a database that was built before the change it describes
 | 2026-10-03 | `migrate_immunization_evidence.py` | a dose says what its record rests on: given here, a card, or a parent's report (Task 9). |
 | 2026-10-03 | `migrate_inventory_batches.py` | stock is kept in batches with their own expiry dates, and medicines are named by generic name, strength and form (Task 12). |
 | 2026-10-03 | `migrate_immunization_repeats.py` | a dose can have more than one record, so a dose given too early can be repeated (Task 14). |
-| 2026-10-09 | `migrate_add_referrals.py` | add the "Referred" visit outcome and the columns that record a referral (Task 18). |
+| 2026-10-09 | `migrate_add_referrals.py` | add the "Referred" visit outcome and the columns that record a referral (Task 19). |
 
 Repair scripts that only served the old, archived demo data were deleted in Task 7.

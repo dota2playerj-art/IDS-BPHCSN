@@ -1,4 +1,4 @@
-"""Referring a patient to the RHU or a hospital (Task 18, D1 and D2).
+"""Referring a patient to the RHU or a hospital (Task 19, D1 and D2).
 
 "Referred" is a visit outcome, like "Left before being seen". Staff and the Doctor set it on a
 visit that is Waiting, In Consultation or Waiting for the Doctor, and undo it the same day. The

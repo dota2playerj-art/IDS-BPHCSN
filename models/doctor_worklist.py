@@ -16,7 +16,7 @@ from utils.dates import now, today
 # writes the diagnosis.
 WAITING_FOR_DOCTOR = "Waiting for the Doctor"
 
-# THE SERVICES STAFF CHOOSE FROM WHEN THEY CHECK A PATIENT IN (Task 6b, D1; Task 18, D4).
+# THE SERVICES STAFF CHOOSE FROM WHEN THEY CHECK A PATIENT IN (Task 6b, D1; Task 19, D4).
 #
 # One fixed list, a required choice with no default, confirmed by the RHU interview (M35):
 # consultation every day, family planning every day at the barangay health center,

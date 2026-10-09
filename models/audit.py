@@ -539,7 +539,7 @@ ACTION_CONSULTATION_COMPLETED = "Completed consultation"
 # and the same-day undo. The entry names the patient and the visit, never why.
 ACTION_LEFT_BEFORE_SEEN = "Marked as left before being seen"
 ACTION_LEFT_UNDONE = "Undid left before being seen"
-# A patient sent on to the RHU or a hospital (Task 18), and the same-day undo. The entry names
+# A patient sent on to the RHU or a hospital (Task 19), and the same-day undo. The entry names
 # the patient, the visit and the destination from the list, never the reason or a facility name.
 ACTION_REFERRED = "Referred a patient"
 ACTION_REFERRAL_UNDONE = "Undid a referral"

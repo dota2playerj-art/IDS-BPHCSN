@@ -1,4 +1,4 @@
-"""Migration: the visit outcome "Referred" (Task 18, D1).
+"""Migration: the visit outcome "Referred" (Task 19, D1).
 
 Adds 'Referred' to the appointments.status CHECK and six columns for the referral (destination,
 facility name, reason, who, when, the status before). SQLite cannot change a CHECK, so the table

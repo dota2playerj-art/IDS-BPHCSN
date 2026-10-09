@@ -127,7 +127,7 @@ SEALED_FIELDS = DOCTOR_ONLY_FIELDS + SEALED_WITH_RECORD_FIELDS
 # The check-in reason lives on the linked queue visit: appointments.notes. It is
 # encrypted with the record and bound to the appointments row, not to the
 # consultation. See _seal_visit_reason(). So is the reason a visit was referred
-# (appointments.referral_reason, Task 18): clinical free text of the same visit.
+# (appointments.referral_reason, Task 19): clinical free text of the same visit.
 VISIT_REASON_TABLE = "appointments"
 VISIT_REASON_FIELD = "notes"
 VISIT_REASON_FIELDS = (VISIT_REASON_FIELD, "referral_reason")

@@ -364,7 +364,7 @@
                     <span class="material-symbols-outlined" style="font-size:16px;">undo</span>Undo
                   </button>
 {%- endif %}
-{#- Referred (Task 18). Refer is offered where refer_visit() would accept it; the slip and
+{#- Referred (Task 19). Refer is offered where refer_visit() would accept it; the slip and
     the same-day undo are on the Referred row. The server decides again. #}
 {%- if 'refer' in entry.shown %}
                   <button type="button" class="btn-outline-teal" style="padding:6px 12px; font-size:12.5px;"
@@ -978,7 +978,7 @@
       });
     </script>
 
-    <!-- REFER (Task 18, D1): where the patient goes, the facility name only for "Other", and an
+    <!-- REFER (Task 19, D1): where the patient goes, the facility name only for "Other", and an
          optional reason. The destination list is the one constant in models/referrals.py. -->
     <div class="modal fade" id="referModal" tabindex="-1" aria-labelledby="referModalLabel" aria-hidden="true">
       <div class="modal-dialog modal-fullscreen-sm-down modal-dialog-centered">

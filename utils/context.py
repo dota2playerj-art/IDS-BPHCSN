@@ -103,7 +103,7 @@ def inject_role_context():
             "mark_left_endpoint": "staff_mark_left",
             "undo_left_endpoint": "staff_undo_left",
             # Referring a patient to the RHU or a hospital, undoing it the same day, and the
-            # referral slip (Task 18). Staff and the Doctor only: the other roles get no name.
+            # referral slip (Task 19). Staff and the Doctor only: the other roles get no name.
             "refer_endpoint": "staff_refer_visit",
             "undo_referral_endpoint": "staff_undo_referral",
             "referral_slip_endpoint": "staff_referral_slip",

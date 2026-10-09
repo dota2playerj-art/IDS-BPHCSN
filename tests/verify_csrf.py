@@ -537,7 +537,7 @@ check("setup: a consultation is started from the Patient Queue",
 run_sql("INSERT INTO appointments (patient_id, scheduled_by, appointment_type, appointment_date, "
         "status, is_walkin, checked_in_at) VALUES (?, 2, 'Consultation', date('now', 'localtime'), "
         "'Waiting for the Doctor', 1, datetime('now', 'localtime'))", (free,))
-# The referral slip link (Task 18) appears only for a referred visit.
+# The referral slip link (Task 19) appears only for a referred visit.
 run_sql("INSERT INTO appointments (patient_id, scheduled_by, appointment_type, appointment_date, "
         "status, is_walkin, checked_in_at, status_before_referred, referral_destination, "
         "referred_by, referred_at) VALUES (?, 2, 'Consultation', date('now', 'localtime'), "

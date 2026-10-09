@@ -55,6 +55,7 @@ SUITES = [
     ("verify_inventory_batches.py", "(new in Task 12)"),
     ("verify_immunization_timing.py", "(new in Task 13)"),
     ("verify_network_mode.py", "(new in Task 16)"),
+    ("verify_referrals.py", "(new in Task 19)"),
     ("verify_mobile_layout.py", "(new in Task 17)"),
 ]
 

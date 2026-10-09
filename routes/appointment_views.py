@@ -104,7 +104,7 @@ def appointment_scheduling_context(month=None):
     # them too, read-only: no actions.
     earlier = get_open_earlier_visits(active=active)
     # Where a referred visit went: the care team only. The Administrator's queue shows the
-    # status and nothing else (Task 18).
+    # status and nothing else (Task 19).
     entries = attach_referrals(entries, role)
     if care_team:
         entries = attach_actions(attach_leave_flags(entries), role)

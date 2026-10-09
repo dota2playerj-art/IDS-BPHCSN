@@ -448,6 +448,9 @@ def build_database():
             "record": conn.execute(
                 "SELECT id FROM appointments WHERE status = 'In Consultation' ORDER BY id DESC LIMIT 1").fetchone()[0],
             "edit": conn.execute("SELECT MAX(id) FROM consultations").fetchone()[0],
+            # A referred visit of the demo data, for the referral slip (Task 19).
+            "slip": conn.execute(
+                "SELECT id FROM appointments WHERE status = 'Referred' ORDER BY id DESC LIMIT 1").fetchone()[0],
         }
     finally:
         conn.close()
@@ -494,6 +497,9 @@ def pages_for(role, picks):
             (f"/staff/consultation/record/{picks['record']}", "record consultation", False),
             (f"/staff/consultation/edit/{picks['edit']}", "edit consultation", False),
             (f"/staff/register-patient/{picks['patient']}", "edit patient", False),
+            # The referral slip. The Refer dialog is on the Patient Queue, whose dialogs are all
+            # opened and measured, so it is covered with the rest (Task 19).
+            (f"/staff/appointment_scheduling/referral-slip/{picks['slip']}", "referral slip", False),
         ]
     return extra
 

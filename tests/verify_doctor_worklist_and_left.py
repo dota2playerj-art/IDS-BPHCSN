@@ -897,7 +897,7 @@ old = work / "old.db"
 con = sqlite3.connect(old)
 # The table as it was before Task 6: the schema without the new status and columns.
 def without_referrals(sql):
-    """The schema as it was before Task 18: no 'Referred' status and no referral columns."""
+    """The schema as it was before Task 19: no 'Referred' status and no referral columns."""
     return (sql.replace(", 'Referred')", ")")
             .replace("    referral_destination TEXT,\n    referral_facility TEXT,\n"
                      "    referral_reason TEXT,\n    referred_by INTEGER,\n    referred_at TEXT,\n"
