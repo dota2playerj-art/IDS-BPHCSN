@@ -131,3 +131,8 @@ instance/
 *.cer
 *.p12
 *.pfx
+
+# --- Capstone manuscript -------------------------------------------------------
+# The Word manuscript and its revised copies stay out of git. They are edited by
+# the team in Word, and docs/manuscript-changes.md records what changed in them.
+PR0MPT_INSTRUCTION/manuscript/*.docx
