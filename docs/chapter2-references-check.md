@@ -80,9 +80,9 @@ All three are peer-reviewed Philippine primary care studies from 2019 or later. 
 
 Local Studies now has 6 entries: Joshi, Elepaño, De Mesa, Acacio-Claro, Evio & Bonito, Zuniga.
 
-**Found but not used:** Larosa, A. (2025), "Health Services Monitoring System with Automatic Notification for Brgy Kauswagan," *Innovex* 1(1). It is a single-author paper (affiliation given as "PHINMA COC") in a small journal hosted on an Indonesian academic site (horizon.ac.id). It describes a barangay system that sends **SMS immunization reminders**. I chose the peer-reviewed studies above instead. The team should know that SMS reminders at the barangay level have been described before; the gap sentence below holds only for the studies this chapter reviews.
+**Found but not used:** "Health Services Monitoring System with Automatic Notification for Brgy Kauswagan," INNOVEX 1(1), 2025. It describes a barangay system that sends **SMS immunization reminders**. I chose the peer-reviewed studies above instead. (This note first called it "Larosa, A. (2025)", a single-author paper. Reading the PDF in §6 showed that is wrong: the paper names six other authors.) The team should know that SMS reminders at the barangay level have been described before. The gap sentence was reworded in §6 so that it holds either way.
 
-**Synthesis gap sentence (revised to match the new summaries):** "The reviewed local studies focused on electronic health records, their adoption by health workers, and data exchange between facilities; none described SMS alerts for residents without internet access or role-based protection of sensitive health records, which the IDS-BPHCSN provides."
+**Synthesis gap sentence (revised to match the new summaries; replaced in §6):** "The reviewed local studies focused on electronic health records, their adoption by health workers, and data exchange between facilities; none described SMS alerts for residents without internet access or role-based protection of sensitive health records, which the IDS-BPHCSN provides."
 
 ### Chapter 1, Project Context
 
@@ -104,3 +104,39 @@ Support for each claim:
 - **Diff against the before-final copy:** the only text changes are the Chapter 1 sentences, the Chapter 2 removals and additions, the Synthesis, and the reference list. The only formatting change is the hanging indent. Styles stay Normal, the 10 images are byte-identical, the tables are identical, and the file reopens.
 - **Citation cross-check, Chapters 1–3:** every in-text citation has a reference entry, and every reference entry is cited. The 11 matches are Acacio-Claro 2024, Bhattarai 2022, Cashman 2021, De Mesa 2024, Elepaño 2025, Evio 2024, Joshi 2025, Nathan 2024, Ryu 2013, Tanbeer 2021 and Zuniga 2026. No PSA, DOH, Docot, Cortez, Pescadero, Shaw or "Frontiers" citation remains.
 - **The original manuscript** now lives at `PR0MPT_INSTRUCTION/manuscript/CAPSTONE1_FINAL-CHAP_1-3MAY20-2.docx`. It was never tracked, and `.gitignore` covers it there. `git ls-files '*.docx'` lists nothing.
+
+## 6. The Kauswagan study, Chapter 1 cleanup and the gap sentence
+
+The copy taken before this pass is `CAPSTONE1_FINAL-CHAP_1-3_REVISED_before-larosa.docx`.
+
+### The Kauswagan study: not added
+
+I opened the article page and read the full PDF: [kms-fict.horizon.ac.id/ojs/index.php/innovex/article/view/7](https://kms-fict.horizon.ac.id/ojs/index.php/innovex/article/view/7), PDF at `/article/download/7/8`.
+
+| Item | What the website's metadata says | What the paper (PDF) says |
+|---|---|---|
+| Authors | "ALEXIS LAROSA" (PHINMA COC), the only author | **Hannah S. Angni, Nimriel L. Sigua, Joshua D. Gumahad, John Miguel M. Asilo, Rhon Kenneth C. Trazo, Joejette O. Ferrariz** (BSIT, PHINMA COC, Philippines). The name Larosa does not appear in the paper. |
+| Title | Health Services Monitoring System with Automatic Notification for Brgy Kauswagan | Same |
+| Venue | INNOVEX, Vol. 1, No. 1, pp. 35–39, published 2025-06-23 | "1st International Conference – INNOVEX 2025, Vol. 1, June 2025, **E-ISSN: XXXX-XXXX**". The ISSN is a placeholder. The About page describes INNOVEX as a conference that gathers ideas "from students" (Horizon University Indonesia with Philippine schools). |
+| Content | — | A web-based system at Barangay Kauswagan Health Center Main, built with Agile, with input from 50 stakeholders. Features: digital patient records with search, automated SMS immunization reminders to caregivers, a dashboard of scheduled immunizations, and automated monthly reports. Reported results: 85% of staff saw shorter retrieval time (observed 5 minutes to under 1 minute), monthly immunization rates up 20%, and report time down 75%. It describes no access control, encryption or inventory module. |
+
+**Decision:** not added. The authors cannot be confirmed, because the website and the paper disagree, and an APA entry under "Larosa" would cite someone the paper does not name. If the team accepts the PDF byline as authoritative, the entry would be: Angni, H. S., Sigua, N. L., Gumahad, J. D., Asilo, J. M. M., Trazo, R. K. C., & Ferrariz, J. O. (2025). Health services monitoring system with automatic notification for Brgy Kauswagan. *INNOVEX, 1*(1), 35–39. https://kms-fict.horizon.ac.id/ojs/index.php/innovex/article/view/7. Confirm with the adviser before using it, given that it is a student conference with no ISSN.
+
+### Chapter 1: sentence removed
+
+The Project Context lost its last sentence: "Despite the development of health information systems at the national level, these platforms are designed for large-scale facilities and are not adapted to the localized operational needs of individual barangays." No reviewed source supports it. The paragraph still flows (opening claim, adoption evidence, communication evidence), and the next paragraph ("The problem extends beyond internal operations.") follows on naturally, so no connecting words were changed.
+
+### Synthesis: new gap sentence
+
+> The reviewed local studies focused on electronic health records, their adoption by health workers, and data exchange between facilities. None of the reviewed studies describes a single barangay system that combines SMS alerts for residents without internet access, access to clinical records limited to the care team, encrypted sealed records for legally sensitive cases, and medicine expiry tracking by delivery batch, all of which the IDS-BPHCSN provides.
+
+Why each part is true:
+- **What the chapter's summaries describe.** No study's summary mentions SMS alerts. Cashman describes an integrated record and safer prescribing. Tanbeer describes scheduling, monitoring and information sharing. Ryu describes an integrated public health system. Zuniga describes registries, data exchange and referral dashboards. The rest are assessments or adoption studies. None describes care-team-only access, encrypted sealed records or batch-level expiry tracking.
+- **The claim is about the combination.** It stays true even beside the Kauswagan study, which has SMS reminders but none of the other three features.
+- **The IDS-BPHCSN side** matches the Chapter 1 Scope: clinical information is shown only to the Doctor and Health Center Staff; sealed records are encrypted and Doctor-only; each delivery is a batch with its own expiry date; SMS goes to basic cellphones.
+
+### Checks
+
+- Diff against the before-larosa copy: only the Chapter 1 Project Context paragraph and the second Synthesis paragraph changed.
+- **Citation cross-check:** every in-text citation has a reference entry, and every entry is cited (11 of 11). The reference list is unchanged and keeps its hanging indent.
+- Styles are unchanged (Normal). The 10 images are byte-identical, the tables are identical, and the file reopens.
