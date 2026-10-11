@@ -140,3 +140,30 @@ Why each part is true:
 - Diff against the before-larosa copy: only the Chapter 1 Project Context paragraph and the second Synthesis paragraph changed.
 - **Citation cross-check:** every in-text citation has a reference entry, and every entry is cited (11 of 11). The reference list is unchanged and keeps its hanging indent.
 - Styles are unchanged (Normal). The 10 images are byte-identical, the tables are identical, and the file reopens.
+
+## 7. The Kauswagan study added, citing the paper's byline
+
+The copy taken before this pass is `CAPSTONE1_FINAL-CHAP_1-3_REVISED_before-larosa-add.docx`.
+
+**Authorship follows the PDF byline.** The conference site's metadata lists only one author, "Alexis Larosa". The paper itself (page 35) names six: Hannah S. Angni, Nimriel L. Sigua, Joshua D. Gumahad, John Miguel M. Asilo, Rhon Kenneth C. Trazo and Joejette O. Ferrariz, all BSIT, PHINMA COC. APA 7 cites the authors as they appear on the work. The name Larosa does not appear anywhere in the PDF, so it is not in the entry, and the in-text citation is **Angni et al. (2025)**, not "Larosa et al." The request asked for Larosa first in the author list. That conflicts with the byline, so the byline was followed and the conflict reported.
+
+**Reference (APA 7, conference proceedings; the placeholder ISSN "XXXX-XXXX" is not printed):**
+
+Angni, H. S., Sigua, N. L., Gumahad, J. D., Asilo, J. M. M., Trazo, R. K. C., & Ferrariz, J. O. (2025). Health services monitoring system with automatic notification for Brgy Kauswagan. In *1st International Conference – INNOVEX 2025* (Vol. 1, pp. 35–39). Horizon University Indonesia. https://kms-fict.horizon.ac.id/ojs/index.php/innovex/article/view/7
+
+- The proceedings title, volume and pages are from the PDF's page header ("1st International Conference - INNOVEX 2025, Vol.1, June, 2025", pp. 35–39). The publisher is from the header ("HORIZON UNIVERSITY INDONESIA"). The date (2025-06-23) is from the article page.
+- The entry has the 0.5-inch hanging indent and sits in alphabetical order after Acacio-Claro.
+
+**Body paragraph** (Local Studies, after Evio and Bonito and before Zuniga et al.). It is written from the abstract, sections 2–4 of the paper, and its results:
+- the setting, the Agile method and 50 stakeholders;
+- digital records with search, automated SMS immunization reminders to caregivers, and automated monthly reports;
+- retrieval time from 5 minutes to under 1 minute, monthly immunization rates up 20%, and report time down 75%.
+
+The closing sentence says the paper describes no access control, encryption or inventory module. That is true: it mentions "enhance data security" only as a general design aim.
+
+**Synthesis:** one clause was added, "Angni et al. (2025) reported higher immunization rates after a barangay health center adopted automated SMS reminders". Nothing else changed. The gap sentence is still true: it claims the combination of SMS alerts, care-team-only clinical access, encrypted sealed records and batch-level expiry tracking, and Angni et al. describe only the SMS part. Local Studies now has 7 entries.
+
+**Checks:**
+- Diff against the before-larosa-add copy: only three changes, which are the new body paragraph with its blank line, the Synthesis clause, and the new reference entry with its blank line.
+- **Citation cross-check:** every in-text citation has a reference entry, and every entry is cited (12 of 12).
+- Styles are unchanged (Normal). The 10 images are byte-identical, the tables are identical, and the file reopens.
