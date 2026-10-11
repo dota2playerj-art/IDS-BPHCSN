@@ -4,7 +4,9 @@ Prepared: 2026-10-12. Checked the Chapter 2 references and the body text that ci
 
 **How each source was checked.** Each DOI was resolved through Crossref (authors, title, journal, volume, issue, pages or article number, dates). The abstracts were read on Europe PMC, PubMed Central, the journal's own page or the preprint server. Where a body sentence was corrected, the article text was checked for the exact wording. Nothing in the table comes from memory. A source that could not be opened is marked **UNVERIFIED**, and its entry was left exactly as it was.
 
-**Result.** 11 sources. 8 were verified and corrected. 3 are UNVERIFIED and unchanged: Docot et al., Cortez et al. and Pescadero et al.
+**Result (first pass, 2026-10-12).** 11 sources. 8 were verified and corrected. 3 were UNVERIFIED and left unchanged: Docot et al., Cortez et al. and Pescadero et al.
+
+**Result (final pass, 2026-10-12; see §5).** The 3 UNVERIFIED sources were removed and replaced by 3 verified Philippine studies. All 11 sources in the chapter are now verified. The copy taken before this pass is `CAPSTONE1_FINAL-CHAP_1-3_REVISED_before-final.docx`.
 
 ## 1. Sources
 
@@ -53,3 +55,52 @@ The Project Context says: "According to the Philippine Statistics Authority (202
   - The House CPBRD Policy Brief 2022-01, ["Institutionalizing Digital Health to Promote Universal Health Care"](https://cpbrd.congress.gov.ph/wp-content/uploads/2023/09/PB2022-01-Institutionalizing-Digital-Health-to-Promote-Universal-Health-Care.pdf). It returned 403 and could not be opened. Search snippets say it reports a DOH figure of almost 85% of rural health units using an EMR, which would cut **against** the PSA sentence.
 - **Supporting evidence already in the reference list:** Elepaño et al. (2025) describe EHR adoption in Philippine primary care as still limited. Joshi et al. (2025) report mobile-based communication as an unmet community need (39.2%). Rewording the two Chapter 1 sentences around these verified sources would be safer than citing PSA or DOH without a document.
 - **Recommendation:** remove or reword both sentences, or find the actual PSA and DOH documents before submission.
+
+## 5. Final pass: unverified sources replaced, Chapter 1 citations fixed
+
+### Removed
+
+I tried each source once more: the journal page, the AA Research Index site search, Google Scholar and a web search. Each one was then removed, with its body paragraph, its Synthesis mention and its reference entry.
+
+| Source | Result of the second check |
+|---|---|
+| Docot et al. (2025) | The article page still returns 404. A search for "Docot" on the journal's own site finds only unrelated papers (siomai, transportation, microfinance). The title is found nowhere. |
+| Cortez et al. (2025) | The article page still returns 404, and a search for "Minuyan" on the journal's own site does not list it. Google Scholar has nothing. Only a search-engine snippet shows the title, so the authors, volume, issue and pages remain unverifiable. |
+| Pescadero et al. (2020) | Removed as instructed: it is a blog-hosted sample with no school named (see §1). |
+
+### Added
+
+All three are peer-reviewed Philippine primary care studies from 2019 or later. Each was opened and read: metadata from Crossref, Europe PMC and the journal page; findings from the abstract.
+
+| Source | Verified metadata | What the body paragraph uses |
+|---|---|---|
+| **De Mesa et al. (2024)** · [doi:10.1136/bmjoq-2023-002621](https://doi.org/10.1136/bmjoq-2023-002621) | De Mesa, R. Y. H., Galingana, C. L. T., Tan-Lim, C. S. C., Javelosa, M. A. U., Panganiban, J. M. S., Fabian, N. M. C., Calderon, Y., Rey, M. P., Bernal-Sundiang, N., Sanchez, J. T., Dans, L. F., Casile, R. U., & Dans, A. L. "Facing the digital frontier: Exploring user acceptance of electronic health records in an urban, rural and remote setting in the Philippines." *BMJ Open Quality* 13(2), e002621. | A survey of 128 EHR users (physicians, nurses, midwives, BHWs, administrative staff). Over 94% intended to use the EHR. Self-efficacy was the only significant predictor. The authors conclude that co-production with primary care providers is crucial and that a grassroots EHR was well received. |
+| **Acacio-Claro et al. (2024)** · [doi:10.47895/amp.vi0.8911](https://doi.org/10.47895/amp.vi0.8911) | Acacio-Claro, P. J., Estuar, M. R. J. E., Villamor, D. A. R., Bautista, M. C. G., Pulmano, C. E., & Sugon, Q. M., Jr. "Understanding adoption of electronic medical records (EMRs) during a health emergency…" *Acta Medica Philippina* 58(22), 7–13. Volume and issue are from the journal page and pages from Europe PMC. Crossref has no volume. | More than 270,000 EMR usage-log records from six rural primary health facilities in Western Visayas, before and during COVID-19. In 2020, use ranged from under one hour to over eight hours. Users progressed from basic to complete use of features at different rates. |
+| **Evio & Bonito (2024)** · [doi:10.47895/amp.v58i12.9289](https://doi.org/10.47895/amp.v58i12.9289) | Evio, B. D., & Bonito, S. R. "Formative evaluation of the implementation of eHealth in the Philippines: A qualitative study." *Acta Medica Philippina* 58(12), 35–47. | A qualitative study of 15 early-adopter municipalities and cities, most using EMRs. Contextual, process and content factors affect implementation: ICT training, equipment, stable internet, power supply, and a design that adapts to the local context and can exchange information with other systems. |
+
+Local Studies now has 6 entries: Joshi, Elepaño, De Mesa, Acacio-Claro, Evio & Bonito, Zuniga.
+
+**Found but not used:** Larosa, A. (2025), "Health Services Monitoring System with Automatic Notification for Brgy Kauswagan," *Innovex* 1(1). It is a single-author paper (affiliation given as "PHINMA COC") in a small journal hosted on an Indonesian academic site (horizon.ac.id). It describes a barangay system that sends **SMS immunization reminders**. I chose the peer-reviewed studies above instead. The team should know that SMS reminders at the barangay level have been described before; the gap sentence below holds only for the studies this chapter reviews.
+
+**Synthesis gap sentence (revised to match the new summaries):** "The reviewed local studies focused on electronic health records, their adoption by health workers, and data exchange between facilities; none described SMS alerts for residents without internet access or role-based protection of sensitive health records, which the IDS-BPHCSN provides."
+
+### Chapter 1, Project Context
+
+| Before | After |
+|---|---|
+| According to the Philippine Statistics Authority (2020), a significant number of barangay health centers across the country still operate without any form of digital health record system, resulting in systemic inefficiencies in data management and service delivery. | Although electronic health record systems have been developed for Philippine primary care, their adoption remains limited, and their implementation depends on resources such as ICT equipment, a stable internet connection, and power supply (Elepaño et al., 2025; Evio & Bonito, 2024). |
+| The Department of Health (2019) further identified the absence of a centralized, accessible platform for community health notifications as a persistent and unresolved gap in local health governance. | Communication with residents is a further gap: in a baseline assessment in Quezon Province, Joshi et al. (2025) found mobile-based communication (39.2%) among the key unmet community health needs, even though 94.4% of Barangay Health Workers owned a mobile phone. |
+
+Support for each claim:
+- "Adoption remains limited" is from Elepaño et al.'s introduction: "Despite the development of many EHR systems tailored for rural primary care facilities in the Philippines, adoption remains limited."
+- The resource factors are from Evio and Bonito's abstract.
+- Both figures are from Joshi et al.'s abstract.
+
+**Still unsupported, not in scope:** the paragraph's last sentence ("Despite the development of health information systems at the national level, these platforms are designed for large-scale facilities and are not adapted to the localized operational needs of individual barangays.") has no citation, and no reviewed source states it. It repeats the claim that was wrongly attributed to Nathan et al. The team should soften or remove it.
+
+### Formatting and checks
+
+- Every reference entry (11) now has an APA 7 hanging indent of 0.5 inch (left 720 twips, hanging 720 twips). Font and spacing are unchanged.
+- **Diff against the before-final copy:** the only text changes are the Chapter 1 sentences, the Chapter 2 removals and additions, the Synthesis, and the reference list. The only formatting change is the hanging indent. Styles stay Normal, the 10 images are byte-identical, the tables are identical, and the file reopens.
+- **Citation cross-check, Chapters 1–3:** every in-text citation has a reference entry, and every reference entry is cited. The 11 matches are Acacio-Claro 2024, Bhattarai 2022, Cashman 2021, De Mesa 2024, Elepaño 2025, Evio 2024, Joshi 2025, Nathan 2024, Ryu 2013, Tanbeer 2021 and Zuniga 2026. No PSA, DOH, Docot, Cortez, Pescadero, Shaw or "Frontiers" citation remains.
+- **The original manuscript** now lives at `PR0MPT_INSTRUCTION/manuscript/CAPSTONE1_FINAL-CHAP_1-3MAY20-2.docx`. It was never tracked, and `.gitignore` covers it there. `git ls-files '*.docx'` lists nothing.
