@@ -32,7 +32,30 @@ Abbreviations for the sources:
 
 ---
 
-## TO COMPLETE (Chapter 5)
+## TO COMPLETE (current, in CAPSTONE1_FINAL-CHAP_1-5_DRAFT.docx)
+
+Yellow items still pending (5):
+
+1. §4.2, after the module list: "Screenshots to be refreshed from the final build before submission."
+2. §4.6 User Feedback (2): "A duplicate-patient check is being added to patient registration and editing."
+3. §4.6, the note after it: "[update to 'was added and retested' after Task 20]"
+4. §4.7: "[confirm whether he performed the tasks or observed a demonstration]"
+5. §4.8, under Table 4.6: "[Durations are proposed in this draft; confirm them with the team and the health center.]"
+
+Also: insert the scans of the signed evaluation forms under Appendix C.
+
+Cleared on 2026-10-12: the team confirmed that both evaluators rated every statement 5 on their signed forms, so the yellow
+highlight and "[TO BE CONFIRMED]" were removed from the Chapter 5 rating sentences (5.1, 5.2 Security, 5.2 closing) and
+from the three 5.2 sentences on UAT-10/11, UAT-03 to 09 and 16, and UAT-14/15. Recommendation B2 now cites the RHU
+interview (Question 13, answer "Yes"; Appendix D) instead of "[TO BE CONFIRMED]". Chapter 3 Phase 1 now says
+"(see Appendix D)". Appendix D was added from `rhu-real_data.docx` (the file named in the brief,
+`Interview-rhu-realdata.docx`, does not exist; this is the only interview file in the folder): purpose, position (Nurse),
+location, and every question with its recorded answer, no name. Typing fixes: "everything Tuesday and Thursday" to
+"every Tuesday and Thursday" (Q5); "as long has it has time" to "as long as it has time" (Q10).
+
+(History) the earlier Chapter 5 list of yellow items is superseded:
+
+
 
 Yellow-highlighted in Chapter 5:
 
