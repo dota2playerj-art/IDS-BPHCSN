@@ -34,13 +34,18 @@ Abbreviations for the sources:
 
 ## TO COMPLETE (current, in CAPSTONE1_FINAL-CHAP_1-5_DRAFT.docx)
 
-Yellow items still pending (5):
+Yellow items still pending (4):
 
 1. §4.2, after the module list: "Screenshots to be refreshed from the final build before submission."
 2. §4.6 User Feedback (2): "A duplicate-patient check is being added to patient registration and editing."
 3. §4.6, the note after it: "[update to 'was added and retested' after Task 20]"
-4. §4.7: "[confirm whether he performed the tasks or observed a demonstration]"
-5. §4.8, under Table 4.6: "[Durations are proposed in this draft; confirm them with the team and the health center.]"
+4. §4.8, under Table 4.6: "[Durations are proposed in this draft; confirm them with the team and the health center.]"
+
+Cleared 2026-10-12 (demonstration fix): the team confirmed the RHU nurse performed the UAT tasks herself and the Barangay Health
+Committee member (a senior citizen with little technology experience) did not operate the system; the researchers demonstrated each task
+and he then completed the rating form himself. §4.3 F and G, §4.7 (with a note under Table 4.5: "Passed" refers to the tasks performed by
+the RHU nurse), §4.6 (one interpretation sentence, tied to Joshi et al. (2025), whose Chapter 2 summary says BHW proficiency was mostly
+limited to basic tasks), §5.1, §5.2 and §5.3 A1/A2 were made consistent. The yellow "[confirm whether he performed the tasks ...]" was removed.
 
 Also: insert the scans of the signed evaluation forms under Appendix C.
 
