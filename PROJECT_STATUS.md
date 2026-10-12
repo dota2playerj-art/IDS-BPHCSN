@@ -1,7 +1,7 @@
 # IDS-BPHCSN — Project Status
 
-Last updated: 2026-10-10
-Updated by: Task 19 — referrals and the RHU field data
+Last updated: 2026-10-12
+Updated by: test totals from the full run of 2026-10-12 (Chapter 4 and 5 drafts)
 
 Sections 1–7 started as a read-only status audit. The Task Log below says what each task after it changed. The live `app.db` has only ever been opened read-only by these tasks.
 
@@ -84,12 +84,12 @@ python tests/run_all.py rbac       only the suites whose names contain "rbac"
 - The live `app.db` is never used. A guard stops the whole run if any database path is inside the project folder. The runner also checks that `app.db` has the same size, time and checksum after the run.
 - Test accounts use test-only passwords (`tests/_support.py`), not the demo passwords.
 - All test data is made up. The old suites used a real staff member's name for account 4; the tests now use `bhwtest` / "Test Health Worker".
-- "All passing" looks like: one `ok` line per suite, then `TOTAL: 5085/5085 checks passed in 28/28 suites that ran` and `All checks passed.` A suite that cannot run here prints `SKIPPED, NOT RUN` and the run says so. Exit code 0.
-- **Today (after Task 19): 5085/5085, all 28 suites pass** (2130 of them are the phone-layout suite, which needs the dev browser: see README). Before Task 1b it was 906/921; every failure came from H5. (The Task 17 figures in the table were out of date: dispensing was 131, not 133, and the phone-layout suite had 2080 checks after Task 18, not 1901.)
+- "All passing" looks like: one `ok` line per suite, then `TOTAL: 5121/5121 checks passed in 28/28 suites that ran` and `All checks passed.` A suite that cannot run here prints `SKIPPED, NOT RUN` and the run says so. Exit code 0.
+- **Today (full run of 2026-10-12): 5121/5121, all 28 suites pass** (2166 of them are the phone-layout suite, which needs the dev browser: see README). Before Task 1b it was 906/921; every failure came from H5. (After Task 19 the run gave 5085/5085 with 2130 phone-layout checks; the run of 2026-10-12, with no code change, counted 2166 phone-layout checks and every other suite the same; the reason for the 36 extra checks was not investigated. The Task 17 figures in the table were out of date: dispensing was 131, not 133, and the phone-layout suite had 2080 checks after Task 18, not 1901.)
 - Every POST needs a form token (Task 3). The suites' clients add a valid one for their own session (`tests/_support.py`, `TokenClient`); `verify_csrf.py` uses plain clients to test refusals.
 - Run from `.venv` (`source .venv/Scripts/activate` on this laptop). The global Python install has no `python-dotenv`, and the suites fail to import `config` without it.
 
-| Suite | Checks | Result after Task 19 |
+| Suite | Checks | Result on 2026-10-12 |
 |---|---|---|
 | verify_epi.py | 15 | 15/15 |
 | verify_staff_capabilities.py | 27 | 27/27 |
@@ -117,7 +117,7 @@ python tests/run_all.py rbac       only the suites whose names contain "rbac"
 | verify_inventory_batches.py (Task 12) | 126 | 126/126 |
 | verify_immunization_timing.py (Task 13, 14, 15) | 126 | 126/126 |
 | verify_network_mode.py (Task 16, 17) | 56 | 56/56 |
-| verify_mobile_layout.py (Task 17) | 2130 | 2130/2130 |
+| verify_mobile_layout.py (Task 17) | 2166 | 2166/2166 |
 | verify_referrals.py (Task 19) | 122 | 122/122 |
 
 Not brought in: the four `d4d04b0e_*` scripts (they print values but have no pass/fail checks; they were only compared between two code trees), the three retired originals that `*_ported.py` replaced, the mutation worktrees, and one Doctor-suite check that ran old code from a worktree (L13).

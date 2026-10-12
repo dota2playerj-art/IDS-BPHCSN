@@ -1,9 +1,23 @@
-# Chapter 4 — where each number comes from
+# Chapters 4 and 5 — where each number and statement comes from
 
 Draft: `PR0MPT_INSTRUCTION/manuscript/CAPSTONE1_FINAL-CHAP_1-4_DRAFT.docx` (git-ignored; made on
 2026-10-12 from `CAPSTONE1_FINAL-CHAP_1-3_REVISED.docx`, which was not modified). Chapters 1–3
-of the draft are XML-identical to the input (all 239 body elements and the section settings);
+of the draft were XML-identical to the input (all 239 body elements and the section settings);
 `styles.xml` is unchanged.
+
+**Corrections of 2026-10-12, before Chapter 5** (backup `..._DRAFT_before-fixes.docx`; a paragraph
+diff shows exactly these five paragraphs changed and nothing else):
+- Chapter 3, Phase 4: the evaluators are now "a member of the Barangay Health Committee of
+  Barangay Poblacion and a nurse of the Rural Health Unit of San Francisco, Surigao del Norte".
+- Chapter 3, Phase 5: "Feedback gathered from the evaluators during this phase".
+- Chapter 4, §4.1 and §4.3 intro: the latest full run is now 5,121 checks in 28 suites, on
+  October 12, 2026; §4.3 C: the phone suite's latest-run count is now 2,166 (it was 2,130; changed
+  with the total so that both describe the same run).
+
+**Chapter 5** was then inserted after Chapter 4 and before Appendix A (backup
+`..._DRAFT_before-ch5.docx`): every other body element is XML-identical before and after;
+`numbering.xml` gained two list instances (numIds 9 and 10) of the manuscript's existing decimal
+list (abstractNum 2), so that lists A and B each start at 1. Word opens the file (115 pages).
 
 Abbreviations for the sources:
 - **EV** = `docs/chapter4-evidence.md` (section number given)
@@ -18,7 +32,32 @@ Abbreviations for the sources:
 
 ---
 
-## TO COMPLETE (yellow-highlighted in the draft)
+## TO COMPLETE (Chapter 5)
+
+Yellow-highlighted in Chapter 5:
+
+1. §5.1, last paragraph: "Both evaluators rated every criterion (Functionality, Usability,
+   Reliability, Performance and Security) at a mean of 5.00, interpreted as Strongly Agree.
+   [TO BE CONFIRMED]"
+2. §5.2, Objective 1: "The evaluators' Security rating (mean of 5.00) and the passing of UAT-18
+   are consistent with this conclusion. [TO BE CONFIRMED]"
+3. §5.2, Objective 2: "The user acceptance tasks for receiving a delivery and dispensing a
+   medicine (UAT-10 and UAT-11) passed."
+4. §5.2, Objective 3: "The user acceptance tasks for the queue, the referral and vaccine doses
+   (UAT-03 to UAT-09) and for SMS (UAT-16, in Simulated mode) passed."
+5. §5.2, Objective 4: "The user acceptance tasks for the dashboard and for the 12-month report
+   with its PDF export (UAT-14 and UAT-15) passed."
+6. §5.2, closing: "The user evaluation showed strong acceptance by the two evaluators, but with
+   only two evaluators the results cannot be generalized to all intended users. [TO BE
+   CONFIRMED]"
+7. §5.3 B, item 2: "The RHU said that it would accept reports through a computer system.
+   [TO BE CONFIRMED]" — given in the Chapter 5 brief; not recorded in Chapter 4, Chapter 1 or
+   EV, so it is marked for confirmation.
+
+Items 3 to 5 depend on the user evaluation (yellow by the brief's rule) but are not ratings, so
+they carry no "[TO BE CONFIRMED]".
+
+## TO COMPLETE (Chapter 4, yellow-highlighted in the draft)
 
 1. §4.2, after the module list: "Screenshots to be refreshed from the final build before
    submission." (The 21 screenshots were taken on 2026-10-09, before the referral feature of
@@ -44,7 +83,7 @@ Also to do (not highlighted): insert the scans of the signed evaluation forms un
 | 5.3 (Bootstrap) | MS Chapter 1 Scope; Chapter 3 Table 1 |
 | four user roles | EV §1; MS Chapter 1 Scope |
 | ten modules | EV §1.1–1.10 (1.11 dashboards are "supporting") |
-| 5,085 checks, 28 suites, all passed | PS "How to run the tests": "Today (after Task 19): 5085/5085, all 28 suites pass". Note: a full run on 2026-10-12 (this task, no code change) gave `TOTAL: 5121/5121 checks passed in 28/28 suites`; the difference is the phone suite (2166 checks, 2130 in PS). The draft keeps the PS figures as the brief asked; update PS and the draft together if the newer total is wanted. |
+| 5,121 checks, 28 suites, all passed; October 12, 2026 | Full run of 2026-10-12: `TOTAL: 5121/5121 checks passed in 28/28 suites that ran`, live `app.db` unchanged; PS "How to run the tests" updated to match ("Today (full run of 2026-10-12): 5121/5121"). The earlier figure, 5,085 after Task 19, differed only in the phone suite (2130 then, 2166 now; no code change; cause not investigated). |
 | October 10, 2026 (referral feature) | PS Task Log, Task 19 row |
 | October 2, 2026 (final audit) | EV §2.4; FA |
 | October 9, 2026 (performance) | PERF header "2026-10-09 15:53" |
@@ -79,12 +118,12 @@ Also to do (not highlighted): insert the scans of the signed evaluation forms un
 
 | Number | Source |
 |---|---|
-| 5,085 checks, 28 suites | PS "How to run the tests" |
+| 5,121 checks, 28 suites; October 12, 2026 | Full run of 2026-10-12; PS "How to run the tests" |
 | 747 birth dates | EV §3 F31 retest; PS Task 15 |
 | October 2, 2026; 10 claims; 93 page addresses (URL rules); four roles; 8 of 10 passed; 2 failed; corrected by October 3, 2026 | EV §2.4 "Final pre-defense audit"; FA |
 | clean-copy install: failed at the seed step, then worked | EV §2.4 "Clean-copy install test"; F19 (M36) |
 | 360, 390 and 1,366 pixels | EV §2.4 "Mobile layout checks" |
-| 2,130 checks (phone suite, latest run) | PS "How to run the tests": "2130 of them are the phone-layout suite" |
+| 2,166 checks (phone suite, latest run) | Full run of 2026-10-12 (`verify_mobile_layout.py 2166/2166`); PS "How to run the tests" and the suite table |
 | 26,287 elements, 63 pages, 992 pixels and above, one time label | EV §2.4; PS Task 17 D6 ("only the width of the 'Loaded HH:MM' text moved") |
 | 2,552 requests; 633 / 593 / 653 / 673; 830 readable responses; 0 markers; Doctor 0 server errors | EV §2.4 "Adversarial role testing"; FA "Adversarial results" (633+593+653+673 = 2,552) |
 | 30-minute idle, 12-hour session | EV §1.1 |
@@ -190,10 +229,55 @@ Also to do (not highlighted): insert the scans of the signed evaluation forms un
   (TO COMPLETE item 4).
 - Implementation durations: no source (TO COMPLETE item 5).
 
-## Conflicts with Chapters 1–3 (not changed; Chapters 1–3 must stay as they are)
+## Conflicts with Chapters 1–3 (both corrected on 2026-10-12; see the top of this file)
 
 - Chapter 3, Phase 4 says user acceptance testing "were conducted with Barangay Health Workers and
   the Barangay Captain". The evaluation of 2026-10-12 was with a Barangay Health Committee member
   (Kagawad) and an RHU nurse (UE). Chapter 4 states the actual evaluators.
 - Chapter 3, Phase 5 says feedback from "health center staff and barangay officials" was used for
   final refinements; the only recorded feedback is the RHU nurse's two comments.
+
+---
+
+# Chapter 5 — sources of its statements
+
+Chapter 5 adds no new finding. **C4** = Chapter 4 of the draft; **C1** = Chapter 1; **C2** =
+Chapter 2; **C3** = Chapter 3.
+
+| Chapter 5 statement | Source |
+|---|---|
+| §5.1 the problem (logbooks, manual inventory, unstructured visits, posting and word of mouth) | C1 Project Context; C4 §4.1 |
+| ten modules; four roles; one server computer; browser on computers and phones | C4 §4.1, §4.2 |
+| Agile, one module at a time, testing after each module, revisions on the adviser's feedback | C3 Methodology (Phases 2 to 4) |
+| 5,121 checks, 28 suites, October 12, 2026 | C4 §4.1, §4.3 (see the 4.1 table above) |
+| 2,552 requests; no clinical data to the Administrator or the Official; no sealed text to Staff | C4 §4.3 D |
+| thirty-six defects, all corrected and retested | C4 Appendix B (F01 to F36) |
+| 14 actions within 3,000 ms at the 95th percentile; one computer, one user; PDF export 1,402 ms | C4 §4.5, Table 4.3 |
+| October 12, 2026 evaluators; 18 UAT tasks passed; means of 5.00 (yellow) | C4 §4.6, §4.7; UE |
+| §5.2 each objective's wording | C1 Specific Objectives (quoted) |
+| Objective 1: under a second; no leak; encryption; audit; retrieval in daily use not measured; manual backups | C4 §4.5 Objective 1 |
+| Objective 2: FEFO, expired batch never used, refusal; stock-outs not measured | C4 §4.5 Objective 2 |
+| Objective 3: queue rules, referral, eligibility; SMS simulated; flow only after deployment | C4 §4.5 Objective 3 |
+| Objective 4: six report types, 12 months, Excel and PDF rows match, within target, small counts; decisions not measured | C4 §4.5 Objective 4 |
+| closing: SMS, stock-outs and effect in use not shown; tests do not prove absence of errors; one computer, one user; two evaluators | C4 §4.5 "Overall Discussion", §4.6 |
+| §5.3 A1 training and adoption | C4 Table 4.6 (User training) |
+| A2 Administrator and Data Protection Officer | Brief (RA 10173 requires personal information controllers to designate a DPO); C1 Scope (RA 10173) |
+| A3 privacy notice | Brief; C1 Scope (RA 10173) |
+| A4 key envelope; full-disk encryption; key on the same disk | C4 Table 4.6, Table 4.7 risks 2 and 4; EV §7.1 step 5 |
+| A5 regular encrypted backups on a separate device; not scheduled | C4 §4.5 Objective 1, Table 4.7 risk 3 |
+| A6 Semaphore account; every message simulated | C4 §4.2 Module 6, §4.5 Objective 3 |
+| A7 fixed address; certificate warnings | C4 Table 4.6, Table 4.7 risk 7 |
+| A8 UPS | Brief; C4 Table 4.7 risk 1 (power interruption) |
+| A9 audit logs | C4 §4.2 Module 9 |
+| A10 user feedback; RHU comments on the slip | C4 §4.6 User Feedback (1) |
+| B1 electronic referral; slip only; RHU nurse stressed referral | C4 §4.6; C1 Limitation (no electronic referrals or reports to the RHU) |
+| B2 electronic reports to the RHU | C1 Limitation; the RHU statement is from the brief (yellow, item 7 above) |
+| B3 Philippine Health Information Exchange | C1 Limitation |
+| B4 one system for the RHU and its barangay health centers | C3 Phase 1 (the RHU coordinates the barangay health centers); C1 Limitation (Barangay Poblacion only) |
+| B5 automatic SMS reminders; Angni et al. (2025) | C2 (Angni et al., 2025); C4 §4.2 Module 4 (the date each remaining dose can be given) |
+| B6 valid sequence; outbreak campaigns; previous dose on file and valid; routine DOH schedule only | C4 §4.2 Module 4, §4.4 (F29 paragraph); C1 Limitation; PS issue L55 ("Counting doses by valid sequence (CDC practice) is a deeper change, deferred") |
+| B7 backup-restore screen | C1 Limitation; C4 §4.2 Module 10 |
+| B8 two-factor authentication | C1 Limitation |
+| B9 installable mobile application | C1 Limitation |
+| B10 several users at once over Wi-Fi and HTTPS, larger database | C4 §4.5 (limits of Table 4.3) |
+| B11 wider evaluation (BHWs, midwives, doctors); two evaluators | C4 §4.6 |
