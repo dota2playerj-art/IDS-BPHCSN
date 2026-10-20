@@ -268,6 +268,40 @@ Required fields.
 
 Duplicate patient detection.
 
+**Possible-duplicate check (Task 20, 2026-10-20).** One check, `find_possible_duplicates()` in
+`models/patients.py`, runs on registration, and on an edit that changes the first, middle or last
+name or the birth date. An edit of any other field does not run it, and an edit never matches the
+record being edited. There is no suffix field; a suffix typed inside a name field is ignored.
+
+Names are compared lowercased, without accents ("Peña" = "Pena"), and without spaces, hyphens,
+periods and apostrophes ("De la Cruz" = "Dela Cruz" = "Delacruz"). A first name starting "Ma." or
+"Ma" is read as "Maria", and Jr, Sr, II, III and IV are dropped. A record is a possible duplicate when:
+
+- **Rule A:** same first name, same last name, same birth date. Reason shown: "Same name and birth date".
+- **Rule B:** same birth date, last names at least 0.85 alike and first names at least 0.80 alike
+  (`difflib.SequenceMatcher`), or one first name starts with the other (3 letters or more), or the
+  first names differ only by two neighbouring letters swapped ("Jhon" / "John"). Reason: "Similar
+  name, same birth date".
+- **Rule C:** same first and last name, the same birth year, and the day and month swapped
+  (2020-03-07 / 2020-07-03) or one digit different in the day or the month. Reason: "Same name,
+  birth date may be mistyped".
+
+Records of every status are searched; Deceased and Inactive ones are labelled. At most 5 are
+listed, Rule A first, then B, then C.
+
+A match stops the save. The form comes back with every typed value and, above the buttons, the
+warning "This patient may already be registered." / "Please check the records below. If one of
+them is the same person, open that record instead of creating a new one." (on Edit Patient:
+"... instead of saving these changes."). The table lists Patient ID, Name, Birth date, Sex,
+Purok / Address, Status, Reason and an "Open record" link (new tab), demographic fields only. The
+save buttons stay disabled until "I checked these records. This is a different person." is ticked,
+or until a name or the birth date is changed so the check can run again.
+
+The server saves only when the box is ticked and every record that matches now was on the page;
+otherwise the warning comes back. A save over a warning writes one more audit entry with patient
+IDs only: "Saved patient PAT-021 after a possible-duplicate warning (matched PAT-004)". Records are
+never merged. Only the Doctor and Health Center Staff reach this screen.
+
 ---
 
 # SCREEN 05

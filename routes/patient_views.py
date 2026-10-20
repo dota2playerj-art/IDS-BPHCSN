@@ -59,8 +59,8 @@ from models.patients import (
     update_patient,
     validate_patient_form,
 )
-from routes.audit_entries import (patient_registered, patient_status_changed,
-                                  patient_updated)
+from routes.audit_entries import (patient_registered, patient_saved_despite_duplicates,
+                                  patient_status_changed, patient_updated)
 from routes.consultation_views import (
     RESTRICT_ACTION_FIELD,
     RESTRICT_CONSULTATION_FIELD,
@@ -101,7 +101,7 @@ MIXED_STATUS_MESSAGE = (
 #
 # What the check-in path adds is only a destination. Carrying it as two hidden
 # fields means it survives the round trips the form already makes -- a validation
-# failure, or the "a similar patient already exists" acknowledgement -- because
+# failure, or the possible-duplicate warning -- because
 # those redisplay the form and resubmit it. A session flag or a query string
 # alone would be lost at the first of those, leaving a patient registered but
 # never queued, which is the exact two-step problem this path removes.
@@ -858,8 +858,72 @@ def patient_to_form(patient):
     return form
 
 
+# THE POSSIBLE-DUPLICATE WARNING (Task 20). The form shows the matches with a
+# checkbox; the operator must tick it to save a record the check flagged. The
+# ids of the records shown ride along as hidden fields, so the server can tell
+# whether the tick covers every record that matches NOW: the check is run again
+# on the confirmed submit, and a match the operator was never shown brings the
+# warning back. The tick alone, or the hidden ids alone, saves nothing.
+DUPLICATE_CONFIRM_FIELD = "confirm_duplicate"
+DUPLICATE_CONFIRM_VALUE = "yes"
+DUPLICATE_SEEN_FIELD = "duplicate_seen"
+# The fields whose change on Edit Patient runs the check. There is no suffix
+# column: a suffix is typed inside a name field, so it is covered by these.
+DUPLICATE_CHECK_FIELDS = ("first_name", "middle_name", "last_name", "birth_date")
+
+
+def _duplicate_fields_changed(values, patient):
+    """True when an edit changes a name or the birth date. Compared as stored."""
+    return any(
+        ((values.get(field) or "").strip() or None) != ((patient.get(field) or "").strip() or None)
+        for field in DUPLICATE_CHECK_FIELDS
+    )
+
+
+def _possible_duplicates(values, errors, patient):
+    """The matches to warn about for this submit, or [] when the check does not run.
+
+    It does not run on an edit that leaves the names and the birth date alone, or
+    while a name or the birth date is itself invalid (there is nothing to match).
+    """
+    if any(field in errors for field in DUPLICATE_CHECK_FIELDS):
+        return []
+    if patient is not None and not _duplicate_fields_changed(values, patient):
+        return []
+    return find_possible_duplicates(
+        values["first_name"], values["middle_name"], values["last_name"],
+        values["birth_date"],
+        exclude_patient_id=patient["id"] if patient is not None else None,
+    )
+
+
+def _duplicates_confirmed(form_data, duplicates):
+    """True only when the box is ticked AND every current match was on the page."""
+    if (form_data.get(DUPLICATE_CONFIRM_FIELD) or "").strip() != DUPLICATE_CONFIRM_VALUE:
+        return False
+    seen = set(selected_patient_ids(form_data.getlist(DUPLICATE_SEEN_FIELD)))
+    return all(match["id"] in seen for match in duplicates)
+
+
+def _with_duplicate_entry(audit, duplicates, patient_id_of, user_id, ip_address):
+    """`audit` plus the Task 20 entry, when the record was saved over a warning.
+
+    `patient_id_of(args)` picks the saved record's row id out of the arguments the
+    model hands the audit callback, which differ between an insert and an update.
+    """
+    if not duplicates:
+        return audit
+    extra = patient_saved_despite_duplicates(
+        [match["patient_id"] for match in duplicates], user_id, ip_address)
+
+    def both(conn, *args):
+        audit(conn, *args)
+        extra(conn, patient_id_of(args))
+    return both
+
+
 def register_patient_context(form=None, errors=None, duplicates=None,
-                             acknowledge_duplicate=False, patient=None,
+                             duplicate_confirmed=False, patient=None,
                              check_in=False, check_in_reason_text="",
                              check_in_service_text=""):
     """Context for the patient form.
@@ -887,10 +951,13 @@ def register_patient_context(form=None, errors=None, duplicates=None,
         "next_patient_id": patient["patient_id"] if patient else generate_next_patient_id(),
         "form": form or {},
         "errors": errors or {},
+        # The possible-duplicate warning (Task 20): the matches, whether the
+        # "different person" box is shown ticked, and the field names it posts.
         "duplicates": duplicates or [],
-        # Rendered as a hidden field. Its presence is what turns the next submit
-        # of this same form into an acknowledged one.
-        "acknowledge_duplicate": acknowledge_duplicate,
+        "duplicate_confirmed": bool(duplicate_confirmed) and bool(duplicates),
+        "duplicate_confirm_field": DUPLICATE_CONFIRM_FIELD,
+        "duplicate_confirm_value": DUPLICATE_CONFIRM_VALUE,
+        "duplicate_seen_field": DUPLICATE_SEEN_FIELD,
         "options": FORM_OPTIONS,
         # Same mechanism, one screen further out: rendered as hidden fields so
         # the check-in intent survives a validation failure or a duplicate
@@ -942,10 +1009,15 @@ def process_register_patient(form_data, patient=None, user_id=None, ip_address=N
 
     `patient` set means edit mode. Validation is identical either way -- the
     same validate_patient_form() with the same required fields and format rules.
-    The duplicate check is skipped entirely when editing: the record is already
-    identified, so a name-and-birthdate match against itself (or against a real
-    namesake) carries none of the "are these two the same person?" risk the
-    warning exists to catch.
+
+    THE POSSIBLE-DUPLICATE CHECK (Task 20) runs on a registration, and on an
+    edit that changes a name or the birth date; an edit never matches the record
+    being edited. When it finds a match and the operator has not ticked "This is
+    a different person" for every record it found, nothing is saved and the form
+    comes back with every typed value and the warning. A save over a warning
+    writes one more audit entry naming the patient IDs. Nothing is ever merged.
+    The warning is shown beside validation errors too, so the operator sees
+    everything at once.
 
     Returns (patient_row_id, context). Exactly one is meaningful: a row id means
     the caller should redirect to that profile, a context means the caller should
@@ -964,32 +1036,28 @@ def process_register_patient(form_data, patient=None, user_id=None, ip_address=N
     service = check_in_service(form_data)
 
     errors = validate_patient_form(values)
-    if errors:
+    duplicates = _possible_duplicates(values, errors, patient)
+    confirmed = _duplicates_confirmed(form_data, duplicates)
+    if errors or (duplicates and not confirmed):
         return None, register_patient_context(
             form=values,
             errors=errors,
+            duplicates=duplicates,
+            # Kept ticked through a validation error, so the operator does not
+            # confirm the same records twice. Never ticked for a new match.
+            duplicate_confirmed=confirmed,
             patient=patient,
-            # Carry an acknowledgment already given through a later validation
-            # failure, so the operator is not warned about the same match twice.
-            acknowledge_duplicate=form_data.get("confirm_duplicate") == "yes",
             check_in=check_in,
             check_in_reason_text=reason,
             check_in_service_text=service,
         )
 
     if patient is not None:
-        update_patient(patient["id"], values,
-                       audit=patient_updated(patient["id"], user_id, ip_address))
+        update_patient(patient["id"], values, audit=_with_duplicate_entry(
+            patient_updated(patient["id"], user_id, ip_address), duplicates,
+            lambda args: patient["id"], user_id, ip_address))
         return patient["id"], None
 
-    duplicates = find_possible_duplicates(
-        values["first_name"], values["last_name"], values["birth_date"]
-    )
-    if duplicates and form_data.get("confirm_duplicate") != "yes":
-        return None, register_patient_context(
-            form=values, duplicates=duplicates, acknowledge_duplicate=True,
-            check_in=check_in, check_in_reason_text=reason,
-            check_in_service_text=service,
-        )
-
-    return create_patient(values, audit=patient_registered(user_id, ip_address)), None
+    return create_patient(values, audit=_with_duplicate_entry(
+        patient_registered(user_id, ip_address), duplicates,
+        lambda args: args[0], user_id, ip_address)), None

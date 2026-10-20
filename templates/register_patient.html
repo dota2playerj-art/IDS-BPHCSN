@@ -63,6 +63,26 @@
   .alert-ids .material-symbols-outlined{font-size:20px; margin-top:1px;}
   .alert-ids strong{display:block; font-size:13.5px; margin-bottom:2px;}
   .alert-ids .alert-close{margin-left:auto; cursor:pointer; opacity:0.6;}
+  .alert-ids .duplicate-jump{color:inherit; font-weight:600;}
+
+  /* POSSIBLE DUPLICATE (Task 20): the warning above the buttons */
+  .duplicate-warning{margin-bottom:24px;}
+  .duplicate-body{flex:1; min-width:0;}
+  /* position:relative makes this box, which scrolls, the containing block of the
+     visually-hidden heading inside it. Without it that heading is placed against
+     the .alert and widens the whole page on a phone. */
+  .duplicate-table-wrap{position:relative; margin:12px 0; background:#fff; border:1px solid #FDE68A; border-radius:10px;}
+  .duplicate-table{font-size:13px; color:var(--text-dark);}
+  .duplicate-table th{font-size:12px; font-weight:600; color:var(--text-muted); white-space:nowrap;}
+  .duplicate-table td, .duplicate-table th{padding:8px 10px;}
+  .duplicate-table a{color:var(--teal-dark); font-weight:600;}
+  .duplicate-confirm{margin-top:4px;}
+  .duplicate-confirm .form-check-label{font-weight:600; color:#92400E;}
+  /* The status badge, as Patient Records draws it. */
+  .badge-status{display:inline-flex; align-items:center; font-size:12px; font-weight:600; padding:4px 11px; border-radius:999px; white-space:nowrap;}
+  .badge-active{background:#DCFCE7; color:#15803D;}
+  .badge-archived{background:#F3F4F6; color:#4B5563;}
+  .badge-inactive{background:#F3F4F6; color:#4B5563;}
 
   /* FOOTER ACTION BAR */
   .form-actions{
@@ -121,16 +141,13 @@
 {%- endif %}
 
 {%- if duplicates %}
-    <!-- SOFT DUPLICATE WARNING - informs, never blocks. Submitting again carries
-         the hidden confirm_duplicate field below and saves a separate record. -->
+    <!-- The form comes back at the top, and the full warning is above the
+         buttons at the bottom, so this line says where to look. -->
     <div class="alert-ids alert-warning-ids">
       <span class="material-symbols-outlined">warning</span>
       <div>
-        <strong>A similar patient record already exists — please verify before continuing</strong>
-        {% for match in duplicates %}{{ match.first_name }} {{ match.last_name }} (ID: {{ match.patient_id }}), born {{ match.birth_date | long_date }}{{ "; " if not loop.last else "" }}{% endfor %}.
-        Nothing has been saved yet. Check the details below — if this really is a different
-        person, press <strong style="display:inline;">{% if check_in %}Save &amp; Check In{% else %}Save Patient Record{% endif %}</strong> again to
-        register them as a separate record.
+        <strong>This patient may already be registered.</strong>
+        Nothing was saved. <a href="#duplicateWarning" class="duplicate-jump">See the records above the Save button.</a>
       </div>
     </div>
 {%- endif %}
@@ -146,11 +163,8 @@
 
     <form method="post" novalidate>
       {{ csrf_field() }}
-{%- if acknowledge_duplicate %}
-      <input type="hidden" name="confirm_duplicate" value="yes">
-{%- endif %}
 {%- if check_in %}
-      <!-- Same mechanism as confirm_duplicate above: the intent rides along with
+      <!-- The intent rides along with
            the form, so it survives a validation failure or a duplicate warning
            and is still in effect on whichever submit finally saves. A patient can
            therefore never end up registered but not queued. -->
@@ -390,6 +404,62 @@
         </div>
       </div>
 
+{%- if duplicates %}
+      <!-- POSSIBLE DUPLICATE (Task 20). Demographic fields only: nothing clinical
+           is read for this list (models/patients.py find_possible_duplicates()).
+           The hidden ids are the records shown here; the server saves only when
+           the box is ticked and these cover every record that matches now. -->
+      <div class="alert alert-warning alert-ids alert-warning-ids duplicate-warning" id="duplicateWarning" role="alert" tabindex="-1">
+        <span class="material-symbols-outlined">warning</span>
+        <div class="duplicate-body">
+          <strong>This patient may already be registered.</strong>
+          {%- if patient %}
+          Please check the records below. If one of them is the same person, open that record instead of saving these changes.
+          {%- else %}
+          Please check the records below. If one of them is the same person, open that record instead of creating a new one.
+          {%- endif %}
+          <div class="table-responsive duplicate-table-wrap">
+            <table class="table table-sm align-middle mb-0 duplicate-table">
+              <thead>
+                <tr>
+                  <th scope="col">Patient ID</th>
+                  <th scope="col" class="pin-name">Name</th>
+                  <th scope="col">Birth date</th>
+                  <th scope="col">Sex</th>
+                  <th scope="col">Purok / Address</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Reason</th>
+                  <th scope="col"><span class="visually-hidden">Open</span></th>
+                </tr>
+              </thead>
+              <tbody>
+              {%- for match in duplicates %}
+                <tr>
+                  <td class="text-nowrap">{{ match.patient_id }}</td>
+                  <td class="pin-name">{{ match.full_name }}</td>
+                  <td class="text-nowrap">{{ match.birth_date | long_date }}</td>
+                  <td>{{ match.sex or "—" }}</td>
+                  <td>{{ match.address or "—" }}</td>
+                  <td><span class="badge-status {{ match.status_badge_class }}">{{ match.status }}</span></td>
+                  <td>{{ match.reason }}</td>
+                  <td class="text-nowrap"><a href="{{ url_for(patient_profile_endpoint, patient_id=match.id) }}" target="_blank" rel="noopener">Open record</a></td>
+                </tr>
+              {%- endfor %}
+              </tbody>
+            </table>
+          </div>
+          {%- for match in duplicates %}
+          <input type="hidden" name="{{ duplicate_seen_field }}" value="{{ match.id }}">
+          {%- endfor %}
+          <div class="form-check duplicate-confirm">
+            <input class="form-check-input" type="checkbox" id="confirmDuplicate" name="{{ duplicate_confirm_field }}" value="{{ duplicate_confirm_value }}"{% if duplicate_confirmed %} checked{% endif %}>
+            <label class="form-check-label" for="confirmDuplicate">I checked these records. This is a different person.</label>
+          </div>
+          <div class="form-text-hint">Tick the box to save. If you corrected the name or birth date, you can press Save to check again.</div>
+        </div>
+      </div>
+{%- endif %}
+
       <!-- FORM ACTIONS -->
       <div class="form-actions">
         <div class="req-legend"><span class="req">*</span> Indicates a required field</div>
@@ -532,5 +602,34 @@
     ageDisplay.value = plural(years, 'year');
   }
   if(birthDate){ birthDate.addEventListener('change', refreshAge); refreshAge(); }
+
+  // The possible-duplicate warning (Task 20). The save buttons stay disabled
+  // until "This is a different person" is ticked. Changing a name or the birth
+  // date enables them too, so a corrected record can be checked again. This is
+  // only the page: the server runs the check again and decides.
+  var confirmDuplicate = document.getElementById('confirmDuplicate');
+  if(confirmDuplicate){
+    var patientForm = confirmDuplicate.form;
+    var saveButtons = patientForm.querySelectorAll('button[type="submit"]');
+    var watched = ['first_name', 'middle_name', 'last_name', 'birth_date']
+      .map(function(name){ return patientForm.elements[name]; })
+      .filter(function(field){ return !!field; });
+    var originals = watched.map(function(field){ return field.value; });
+    function corrected(){
+      return watched.some(function(field, index){ return field.value !== originals[index]; });
+    }
+    function syncSaveButtons(){
+      var allowed = confirmDuplicate.checked || corrected();
+      saveButtons.forEach(function(button){ button.disabled = !allowed; });
+    }
+    confirmDuplicate.addEventListener('change', syncSaveButtons);
+    // Reset changes the fields without an input event; read them once it is done.
+    patientForm.addEventListener('reset', function(){ setTimeout(syncSaveButtons, 0); });
+    watched.forEach(function(field){
+      field.addEventListener('input', syncSaveButtons);
+      field.addEventListener('change', syncSaveButtons);
+    });
+    syncSaveButtons();
+  }
 </script>
 {% endblock %}

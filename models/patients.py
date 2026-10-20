@@ -6,7 +6,10 @@ composed address) that do not exist as columns. sqlite3.Row is read-only, so the
 row is copied into a dict and the derived keys are added alongside.
 """
 import calendar
+import difflib
 import json
+import re
+import unicodedata
 from datetime import date, datetime
 
 from database.connection import db_connection
@@ -831,25 +834,193 @@ def validate_patient_form(values):
     return errors
 
 
-def find_possible_duplicates(first_name, last_name, birth_date):
-    """Existing patients sharing a name and birthdate, matched case-insensitively.
+# ---------------------------------------------------------------------------
+# THE POSSIBLE-DUPLICATE CHECK (Task 20)
+#
+# The one duplicate check in the system. Register Patient runs it before a new
+# record is saved, and Edit Patient runs it when a name or the birth date
+# changes (routes/patient_views.py). It only warns: two residents really can
+# share a name and a birthday, so the operator decides, and nothing is merged.
+#
+# Names are compared after normalize_name(), so "De la Cruz", "Dela Cruz" and
+# "Delacruz" are one name, as are "Ma. Cristina" and "Maria Cristina", and
+# "Peña" and "Pena". The three rules are in _match_rule().
+# ---------------------------------------------------------------------------
 
-    Used for a non-blocking warning: two residents genuinely can share a name and
-    birthday, so this informs the operator rather than refusing the record.
+# Suffixes typed inside a name field ("Juan Jr.", "Dela Cruz III"). There is no
+# suffix column, so these are dropped before names are compared.
+NAME_SUFFIXES = frozenset({"jr", "sr", "ii", "iii", "iv"})
+# What separates the parts of a name: spaces, hyphens, periods, apostrophes, commas.
+_NAME_SEPARATORS = re.compile(r"[\s.\-'‘’`,]+")
+
+# Rule B's thresholds, for difflib.SequenceMatcher().ratio() on normalized names.
+LAST_NAME_SIMILARITY = 0.85
+FIRST_NAME_SIMILARITY = 0.80
+# "juan" and "juancarlos": one first name starting with the other counts as
+# similar when the shorter one has at least this many letters.
+FIRST_NAME_PREFIX_MIN = 3
+
+# The most matches the warning lists.
+MAX_DUPLICATE_MATCHES = 5
+
+# Rule -> (order, the reason the warning prints). Lower order is the stronger match.
+DUPLICATE_RULES = {
+    "A": (0, "Same name and birth date"),
+    "B": (1, "Similar name, same birth date"),
+    "C": (2, "Same name, birth date may be mistyped"),
+}
+
+
+def normalize_name(value, first_name=False):
+    """A name as the duplicate check compares it.
+
+    Lowercase, accents removed (ñ -> n, é -> e), suffixes dropped, and spaces,
+    hyphens, periods and apostrophes removed: "De la Cruz Jr." -> "delacruz".
+    With first_name=True a leading "Ma." or "Ma" is read as "Maria", the common
+    Filipino abbreviation: "Ma. Cristina" -> "mariacristina".
+
+    A name that is nothing but a suffix keeps it, so it is never emptied.
     """
+    text = unicodedata.normalize("NFKD", str(value or ""))
+    text = "".join(char for char in text if not unicodedata.combining(char))
+    parts = [part for part in _NAME_SEPARATORS.split(text.strip().lower()) if part]
+    without_suffixes = [part for part in parts if part not in NAME_SUFFIXES]
+    if without_suffixes:
+        parts = without_suffixes
+    if first_name and parts and parts[0] == "ma":
+        parts[0] = "maria"
+    return "".join(parts)
+
+
+def _similarity(first, second):
+    return difflib.SequenceMatcher(None, first, second).ratio()
+
+
+def _is_neighbour_swap(first, second):
+    """True when the two differ only by two neighbouring letters swapped ("jhon", "john")."""
+    if len(first) != len(second) or first == second:
+        return False
+    differ = [index for index, (a, b) in enumerate(zip(first, second)) if a != b]
+    return (len(differ) == 2 and differ[1] == differ[0] + 1
+            and first[differ[0]] == second[differ[1]]
+            and first[differ[1]] == second[differ[0]])
+
+
+def _first_names_similar(first, second):
+    """Rule B's first-name test, on normalized first names."""
+    if _similarity(first, second) >= FIRST_NAME_SIMILARITY:
+        return True
+    shorter, longer = sorted((first, second), key=len)
+    if len(shorter) >= FIRST_NAME_PREFIX_MIN and longer.startswith(shorter):
+        return True
+    # A common typing slip that the ratio scores at 0.75 for a four-letter name.
+    return _is_neighbour_swap(first, second)
+
+
+def _birth_date_mistyped(typed, stored):
+    """Rule C's date test: the same year, and the day and month swapped, or one
+    digit different in the day or the month. Both are dates; equal dates are not."""
+    if typed == stored or typed.year != stored.year:
+        return False
+    if (typed.month, typed.day) == (stored.day, stored.month):
+        return True
+    typed_digits = f"{typed.month:02d}{typed.day:02d}"
+    stored_digits = f"{stored.month:02d}{stored.day:02d}"
+    return sum(a != b for a, b in zip(typed_digits, stored_digits)) == 1
+
+
+def _match_rule(typed, stored):
+    """'A', 'B', 'C' or None for one stored patient, strongest rule first.
+
+    A  same normalized first name, same normalized last name, same birth date.
+    B  same birth date, last names >= LAST_NAME_SIMILARITY alike, and first names
+       similar (>= FIRST_NAME_SIMILARITY, one starts with the other, or two
+       neighbouring letters swapped).
+    C  same normalized first and last name, and the birth date has the day and
+       month swapped or one digit different in the day or the month, same year.
+    """
+    same_names = typed["first"] == stored["first"] and typed["last"] == stored["last"]
+    same_date = typed["birth_date"] == stored["birth_date"]
+    if same_names and same_date:
+        return "A"
+    if same_date and _similarity(typed["last"], stored["last"]) >= LAST_NAME_SIMILARITY \
+            and _first_names_similar(typed["first"], stored["first"]):
+        return "B"
+    if same_names and _birth_date_mistyped(typed["birth_date"], stored["birth_date"]):
+        return "C"
+    return None
+
+
+def find_possible_duplicates(first_name, middle_name, last_name, birth_date,
+                             exclude_patient_id=None):
+    """Patients who may be the same person as the one typed, strongest first.
+
+    Records of every status are searched, Deceased and Inactive included: a
+    duplicate of either is still a duplicate. `exclude_patient_id` is the row id
+    of the record being edited, so it never matches itself.
+
+    The database narrows the search to the birth year, which every rule needs,
+    and the names are compared here. Only demographic columns are read.
+
+    At most MAX_DUPLICATE_MATCHES, ordered by rule (A, B, then C), then a
+    matching middle name first, then the closer name, then the patient ID. Each
+    is a dict: id, patient_id, full_name, birth_date, sex, address, status,
+    status_badge_class, rule and reason (the plain words the warning prints).
+    The middle name is not one of the rules: it only orders the list.
+    """
+    born = _parse_birth_date(birth_date)
+    typed = {
+        "first": normalize_name(first_name, first_name=True),
+        "middle": normalize_name(middle_name),
+        "last": normalize_name(last_name),
+        "birth_date": born,
+    }
+    if born is None or not typed["first"] or not typed["last"]:
+        return []
+
+    sql = (
+        "SELECT id, patient_id, first_name, middle_name, last_name, birth_date, "
+        "sex, address, status FROM patients WHERE substr(birth_date, 1, 4) = ?"
+    )
+    parameters = [f"{born.year:04d}"]
+    if exclude_patient_id is not None:
+        sql += " AND id != ?"
+        parameters.append(int(exclude_patient_id))
     with db_connection() as conn:
-        rows = conn.execute(
-            """
-        SELECT id, patient_id, first_name, last_name, birth_date
-        FROM patients
-        WHERE LOWER(TRIM(first_name)) = LOWER(TRIM(?))
-          AND LOWER(TRIM(last_name))  = LOWER(TRIM(?))
-          AND birth_date = ?
-        ORDER BY patient_id
-        """,
-            (first_name or "", last_name or "", birth_date or ""),
-        ).fetchall()
-    return [dict(row) for row in rows]
+        rows = conn.execute(sql, parameters).fetchall()
+
+    found = []
+    for row in rows:
+        stored = {
+            "first": normalize_name(row["first_name"], first_name=True),
+            "middle": normalize_name(row["middle_name"]),
+            "last": normalize_name(row["last_name"]),
+            "birth_date": _parse_birth_date(row["birth_date"]),
+        }
+        if stored["birth_date"] is None:
+            continue
+        rule = _match_rule(typed, stored)
+        if rule is None:
+            continue
+        order, reason = DUPLICATE_RULES[rule]
+        middle_matches = bool(typed["middle"]) and typed["middle"] == stored["middle"]
+        closeness = (_similarity(typed["first"], stored["first"])
+                     + _similarity(typed["last"], stored["last"]))
+        found.append(((order, not middle_matches, -closeness, row["patient_id"]), {
+            "id": row["id"],
+            "patient_id": row["patient_id"],
+            "full_name": _full_name(row),
+            "birth_date": row["birth_date"],
+            "sex": row["sex"],
+            "address": (row["address"] or "").strip(),
+            "status": row["status"],
+            "status_badge_class": STATUS_BADGE_CLASS.get(row["status"], "badge-inactive"),
+            "rule": rule,
+            "reason": reason,
+        }))
+
+    found.sort(key=lambda pair: pair[0])
+    return [match for _, match in found[:MAX_DUPLICATE_MATCHES]]
 
 
 def _build_record(values):

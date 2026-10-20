@@ -424,7 +424,8 @@ How these are done now (2026-09-29):
   be replaced by the person at their first sign-in, before any other screen opens.
 - No screen prints text taken from the address bar.
 - Every health-record write is in the audit trail (added 2026-09-29, Task 4): patient
-  registration, edits and status changes, a death declaration and its reversal, new
+  registration, edits and status changes, a death declaration and its reversal, a save
+  after the possible-duplicate warning (Task 20, patient IDs only), new
   consultations, doses recorded at a visit, dispensing, inventory changes and the Patient
   Queue. Each entry is one short line naming who, what and which record, written in the
   same transaction as the change. None of it quotes a diagnosis, a treatment plan, a sealed

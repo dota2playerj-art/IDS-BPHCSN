@@ -507,6 +507,9 @@ ACTION_PATIENT_UPDATED = "Updated patient record"
 ACTION_PATIENT_STATUS_CHANGED = "Changed patient status"
 ACTION_PATIENT_DECLARED_DECEASED = "Declared patient deceased"
 ACTION_PATIENT_DEATH_REVERSED = "Reversed death declaration"
+# Task 20: a record saved after the possible-duplicate warning, because the
+# operator ticked "This is a different person". Patient IDs only, never names.
+ACTION_PATIENT_DUPLICATE_CONFIRMED = "Saved patient after a possible-duplicate warning"
 # Consultation Records. A new consultation. Edits keep ACTION_CONSULTATION_UPDATED.
 ACTION_CONSULTATION_RECORDED = "Recorded consultation"
 # Immunization Records, written when a new consultation records doses. The

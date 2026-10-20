@@ -334,7 +334,7 @@ Staff's in every row below.
 | Login Page | Card, Form (Input Group + Validation), Button, Icons (via Material Symbols, not Bootstrap Icons) |
 | Administrator / Staff / Official Dashboards | Grid (Cards), Navbar/Sidebar (custom), Badge, Dropdown (profile), Offcanvas (mobile sidebar collapse), Toast (alerts) |
 | Patient Records | Table, Pagination, Dropdown (filter), Input Group (search), Badge (status), Button Group (actions) |
-| Register Patient | Form, Accordion (sectioned: Personal/Emergency/Medical), Button, Alert (validation errors) |
+| Register Patient | Form, Accordion (sectioned: Personal/Emergency/Medical), Button, Alert (validation errors; the possible-duplicate warning with its table and "different person" checkbox, Task 20) |
 | Patient Profile | Nav Tabs/Pills, Card, Table (history logs), Breadcrumb, Button |
 | Medicine Inventory | Table, Badge (stock/expiry status), Progress (stock level bar), Modal (quick edit), Pagination |
 | Add/Edit Medicine | Form, Modal (if inline) or standalone page, Button, Alert (validation) |

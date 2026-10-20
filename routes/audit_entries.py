@@ -34,6 +34,7 @@ from models.audit import (
     ACTION_PATIENT_CHECKED_IN,
     ACTION_PATIENT_DEATH_REVERSED,
     ACTION_PATIENT_DECLARED_DECEASED,
+    ACTION_PATIENT_DUPLICATE_CONFIRMED,
     ACTION_PATIENT_REGISTERED,
     ACTION_PATIENT_STATUS_CHANGED,
     ACTION_PATIENT_UPDATED,
@@ -132,6 +133,25 @@ def patient_updated(patient_id, user_id, ip_address=None):
     def audit(conn, changed):
         names = ", ".join(PATIENT_FIELD_LABELS.get(f, f) for f in changed)
         write(conn, f"{_patient(conn, patient_id)} — Changed: {names}")
+    return audit
+
+
+def patient_saved_despite_duplicates(matched_codes, user_id, ip_address=None):
+    """Task 20: the operator ticked "This is a different person" and saved.
+
+    Patient IDs only -- no names -- for the saved record and every record the
+    warning listed: "Saved patient PAT-021 after a possible-duplicate warning
+    (matched PAT-004, PAT-009)". Called with the saved record's row id.
+    """
+    write = _entry(user_id, ip_address, ACTION_PATIENT_DUPLICATE_CONFIRMED, MODULE_PATIENTS)
+
+    def audit(conn, patient_id):
+        row = conn.execute(
+            "SELECT patient_id FROM patients WHERE id = ?", (patient_id,)
+        ).fetchone()
+        saved = row["patient_id"] if row else f"#{patient_id}"
+        write(conn, f"Saved patient {saved} after a possible-duplicate warning "
+                    f"(matched {', '.join(matched_codes)})")
     return audit
 
 

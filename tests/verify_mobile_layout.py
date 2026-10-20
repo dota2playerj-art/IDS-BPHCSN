@@ -451,6 +451,10 @@ def build_database():
             # A referred visit of the demo data, for the referral slip (Task 19).
             "slip": conn.execute(
                 "SELECT id FROM appointments WHERE status = 'Referred' ORDER BY id DESC LIMIT 1").fetchone()[0],
+            # A demo patient to type in again, for the possible-duplicate warning (Task 20).
+            "duplicate": tuple(conn.execute(
+                "SELECT first_name, last_name, birth_date FROM patients "
+                "WHERE birth_date IS NOT NULL ORDER BY id LIMIT 1").fetchone()),
         }
     finally:
         conn.close()
@@ -587,7 +591,70 @@ def run_checks(browser, passwords, picks):
                     check(f"{role} @{width}: the menu can be checked", False, str(problem)[:300])
             context.close()
 
+    if not ONLY_ROLES or "staff1" in ONLY_ROLES:
+        duplicate_warning_checks(browser, states["staff1"], picks)
     broken_layout_checks(browser, states["admin"], {"table": "/admin/patient_records"})
+
+
+def duplicate_warning_checks(browser, state, picks):
+    """Task 20: the possible-duplicate warning, which only a submitted form shows.
+
+    A demo patient's name and birth date are typed into Register Patient and submitted.
+    The page that comes back is checked like every other page, and its save buttons are
+    checked to stay disabled until "This is a different person" is ticked. Nothing is
+    saved: the form is never submitted a second time.
+    """
+    section("3. THE POSSIBLE-DUPLICATE WARNING (Task 20)")
+    first, last, birth = picks["duplicate"]
+    label = "register patient, possible duplicate"
+    buttons = ("() => Array.from(document.getElementById('confirmDuplicate').form"
+               ".querySelectorAll('button[type=submit]')).map(b => b.disabled)")
+    for width in WIDTHS:
+        context = browser.context(width, state)
+        page = context.new_page()
+        holder = watch_errors(page)
+        try:
+            page.goto("/staff/register-patient")
+            page.wait_for_load_state("networkidle")
+            for name, value in (("first_name", first), ("last_name", last), ("birth_date", birth),
+                                ("address", "Purok 1"), ("emergency_contact_name", "Test Relative"),
+                                ("emergency_contact_number", "09000000001")):
+                page.fill(f'input[name="{name}"]', value)
+            for name, value in (("civil_status", "Single"), ("municipality", "San Francisco"),
+                                ("province", "Surigao del Norte"),
+                                ("emergency_contact_relationship", "Sibling")):
+                page.select_option(f'select[name="{name}"]', value)
+            page.check('input[name="sex"][value="Female"]')
+            page.click("button.btn-primary-teal[type=submit]")
+            page.wait_for_load_state("networkidle")
+            if not check(f"staff1 {label} @{width}: the warning is shown",
+                         page.locator("#duplicateWarning").count() == 1):
+                continue
+            page.wait_for_timeout(250)
+            view_checks(page, width, label, role="staff1")
+            shot(page, "staff1", label, width)
+            states = page.evaluate(buttons)
+            check(f"staff1 {label} @{width}: every save button is disabled until the box is ticked",
+                  states and all(states), states)
+            page.check("#confirmDuplicate")
+            states = page.evaluate(buttons)
+            check(f"staff1 {label} @{width}: ticking the box enables them",
+                  states and not any(states), states)
+            page.uncheck("#confirmDuplicate")
+            page.fill('input[name="first_name"]', first + "a")
+            states = page.evaluate(buttons)
+            check(f"staff1 {label} @{width}: a corrected name enables them, to check again",
+                  states and not any(states), states)
+            page.fill('input[name="first_name"]', first)
+            states = page.evaluate(buttons)
+            check(f"staff1 {label} @{width}: undoing the correction disables them again",
+                  states and all(states), states)
+            check(f"staff1 {label} @{width}: no script errors", not holder["errors"],
+                  "\n".join(holder["errors"][:3]))
+        except Exception as problem:
+            check(f"staff1 {label} @{width}: the page can be checked", False, str(problem)[:300])
+        finally:
+            context.close()
 
 
 def menu_checks(page, role, width, menu):
@@ -649,7 +716,7 @@ def menu_checks(page, role, width, menu):
 
 def broken_layout_checks(browser, state, base_path):
     """The checks must notice a broken layout. Break one on purpose, in the browser only."""
-    section("3. THE CHECKS FAIL WHEN THE LAYOUT IS BROKEN")
+    section("4. THE CHECKS FAIL WHEN THE LAYOUT IS BROKEN")
     width = 390
     context = browser.context(width, state)
     page = context.new_page()

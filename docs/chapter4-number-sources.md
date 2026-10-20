@@ -37,7 +37,7 @@ Abbreviations for the sources:
 Yellow items still pending (4):
 
 1. §4.2, after the module list: "Screenshots to be refreshed from the final build before submission."
-2. §4.6 User Feedback (2): "A duplicate-patient check is being added to patient registration and editing."
+2. §4.6 User Feedback (2): "A duplicate-patient check is being added to patient registration and editing." (Task 20 is done in the code, 2026-10-20; the manuscript still says "is being added".)
 3. §4.6, the note after it: "[update to 'was added and retested' after Task 20]"
 4. §4.8, under Table 4.6: "[Durations are proposed in this draft; confirm them with the team and the health center.]"
 
@@ -203,7 +203,7 @@ Also to do (not highlighted): insert the scans of the signed evaluation forms un
 | Part C, 17 statements, five criteria, 1–5 | UE |
 | scale 4.21–5.00 Strongly Agree; 3.41–4.20 Agree; 2.61–3.40 Neutral; 1.81–2.60 Disagree; 1.00–1.80 Strongly Disagree | UE |
 | Table 4.4: every mean 5.00, "Strongly Agree"; n = 2 | UE |
-| duplicate check at registration: exact first name, last name and birth date; not run on edit | CODE `models/patients.py` `find_possible_duplicates()`; `routes/patient_views.py` (the edit branch returns before the duplicate check). **Conflict reported:** the brief said the check "is being added"; a warning on an exact match already exists at registration (since the initial commit). The draft states both. |
+| duplicate check at registration: exact first name, last name and birth date; not run on edit | CODE `models/patients.py` `find_possible_duplicates()`; `routes/patient_views.py` (the edit branch returns before the duplicate check). **Conflict reported:** the brief said the check "is being added"; a warning on an exact match already exists at registration (since the initial commit). The draft states both. **Changed by Task 20 (2026-10-20):** the check now also runs on an edit that changes a name or the birth date, and it catches different spellings (Rules A, B and C, `03_SCREEN_SPECIFICATIONS.md` Screen 04). The manuscript text is the team's to update. |
 | referral slip designed from the interview, not an RHU form | PS issue L68 |
 
 ## 4.7 User Acceptance Testing
