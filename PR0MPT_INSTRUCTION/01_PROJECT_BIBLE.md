@@ -850,6 +850,38 @@ Administrator enters the real days.
 **Not decided here.** Whether the RHU wants the slip in another form, and whether the referral should ever be sent
 electronically, were not asked. L11 (a second IPV dose) stays open until the RHU nurse answers.
 
+# Decision Record — Civil Status by Age, and the Address from the Place Lists (2026-10-22, Task 22)
+
+Two data rules for the patient record, found in testing during the freeze. Display and validation
+only, plus one new column; no role, permission or screen changes.
+
+**D1 — Civil status.** The stored civil status is one of Single, Married, Widowed, Separated. "Minor"
+is not a civil status: it is an age, which the system already computes from the birth date, and a
+child stored as "Minor" stayed "Minor" after turning 18. Under Philippine law a person under 18 cannot
+marry (Republic Act No. 11596, the Prohibition of Child Marriage Law, 2021), so a patient under 18 on
+the day of registration or edit is Single and nothing else. The age is `calculate_age()` in
+`models/patients.py`, the one age rule every screen uses; `civil_statuses_for()` turns it into the
+allowed list, and `validate_patient_form()` enforces it on Register and Edit. Every rule about
+children (the SMS audience for parents, the vaccine schedule, the paediatric form) already used the
+age; the only place that used "Minor" to mean a child was the demo data, which now uses the age too.
+`migrations/migrate_civil_status_minor_to_single.py` changed the stored "Minor" values to "Single"
+and nothing else.
+
+**D2 — Address.** The address is chosen Province -> City/Municipality -> Barangay. The health center
+is in Barangay Poblacion, San Francisco (formerly Anao-aon), Surigao del Norte; Surigao City is a
+separate city and the provincial capital. The Province list is "Surigao del Norte" or "Other
+province"; under Surigao del Norte the City/Municipality is one of its 21 LGUs, and for San Francisco
+the Barangay is one of its 11 barangays; under Other province all three are typed. The lists are one
+file, `models/places.py`, used by the server and (as JSON) by the page; the server enforces the
+pairing on Register and Edit. A Surigao del Norte municipality typed with "Surigao del Sur" is refused
+(the mix-up the old Province list invited; no Surigao del Sur municipality shares a name with the 21).
+
+**D3 — The barangay column.** The barangay used to be a fixed, disabled box that was never stored, so
+it had nowhere to go. `patients.barangay` (nullable TEXT) was added by
+`migrations/migrate_add_patient_barangay.py`; it is the only schema change. Stored addresses are never
+changed automatically: a record saved before has no barangay, and Edit Patient shows its stored values
+and asks for the barangay (and for any other value the rules now refuse) before it can be saved.
+
 # Sample Development Workflow
 
 Research
@@ -1058,3 +1090,9 @@ Version 3.5 (2026-10-10)
 Task 19, referrals and the field data: the visit outcome Referred with a destination list and a referral slip,
 the service list confirmed from the RHU interview (Dental out, Family Planning in), and a demo Service Schedule.
 See "Decision Record — Referrals, the Field Data and the Service List".
+
+Version 3.6 (2026-10-22)
+
+Task 22, civil status by age and the address from the place lists: no "Minor"; under 18 is Single (RA
+11596); Province -> City/Municipality -> Barangay from `models/places.py`, with a new `patients.barangay`
+column. See "Decision Record — Civil Status by Age, and the Address from the Place Lists".

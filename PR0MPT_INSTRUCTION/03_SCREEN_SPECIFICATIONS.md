@@ -315,6 +315,51 @@ otherwise the warning comes back. A save over a warning writes one more audit en
 IDs only: "Saved patient PAT-021 after a possible-duplicate warning (matched PAT-004)". Records are
 never merged. Only the Doctor and Health Center Staff reach this screen.
 
+**Civil status follows the age (Task 22, 2026-10-22).** The options are Single, Married, Widowed and
+Separated. There is no "Minor": it is an age, not a civil status, and the age is already shown
+(and was wrong as a stored value once the child turned 18). The age is `calculate_age()` on the
+birth date, the same rule as the Age box. Under 18 on the day of registration or edit, the list
+holds only Single, selected, with the hint "Patients under 18 are recorded as Single (Republic Act
+No. 11596)."; 18 and over, the four options. The list changes as soon as the birth date is entered
+or changed. When the change makes the choice invalid (an adult's choice when the patient becomes
+under 18 is replaced by Single; a Single that was only there because the patient was under 18, or a
+stored value no list holds, when the patient becomes 18 or over), the choice is cleared and the page
+says "Please choose the civil status again for this birth date." The server applies the same rule
+on Register and Edit and refuses with "Patients under 18 are recorded as Single (Republic Act No.
+11596). Choose Single." or "Choose a civil status from the list.", keeping every typed value.
+
+**Address: Province -> City/Municipality -> Barangay (Task 22).** The lists are one file,
+`models/places.py`, which the server checks against and the page receives as JSON.
+
+- **Province**: "Surigao del Norte" (default) or "Other province". Surigao del Sur is no longer
+  offered.
+- **Surigao del Norte**: City/Municipality is a dropdown of the 21 LGUs, in this order: Alegria,
+  Bacuag, Burgos, Claver, Dapa, Del Carmen, General Luna, Gigaquit, Mainit, Malimono, Pilar, Placer,
+  San Benito, San Francisco, San Isidro, Santa Monica, Sison, Socorro, Surigao City, Tagana-an,
+  Tubod (default San Francisco). For **San Francisco** the Barangay is a dropdown of its 11
+  barangays: Amontay, Balite, Banbanon, Diaz, Honrado, Jubgan, Linongganan, Macopa, Magtangale,
+  Oslao, Poblacion (default Poblacion). For any other of the 21 the barangay is typed (required).
+- **Other province**: province, city/municipality and barangay are typed and required. A typed
+  "Surigao del Norte" is refused ("Surigao del Norte is on the list. Choose it from the Province
+  list instead."), and so is a Surigao del Norte municipality typed with "Surigao del Sur" (no
+  Surigao del Sur municipality has one of those 21 names). Other typed pairs are accepted: other
+  provinces have a San Francisco too (Agusan del Sur, Cebu, Quezon, Southern Leyte).
+- Changing the province clears the city/municipality and the barangay; changing the
+  city/municipality clears the barangay. Only the dropdown or the typed box of each pair is shown
+  and enabled; the other is disabled and never submitted.
+- House No. / Street / Purok and Zip Code are unchanged. The barangay is stored in its own column
+  (`patients.barangay`) and appears in the address on the profile, the patient list and the
+  exports ("Purok 3, Diaz, San Francisco, Surigao del Norte, 8401").
+- The server applies the same pairing on Register and Edit and refuses a mismatch with a plain
+  message, keeping every typed value.
+
+**Records saved under the old rules.** Edit Patient opens such a record with its stored values (a
+stored name that is not on a list is shown as "<name> (not on the list)" or "(not allowed)") and a
+notice, "Some details on file need correcting", with each field to correct marked: a stored
+"Minor", a patient under 18 recorded as Married, a province/municipality pair the lists refuse, or
+no barangay ("No barangay is recorded for this patient. Choose it before saving."). Stored
+addresses are never changed automatically.
+
 ---
 
 # SCREEN 05

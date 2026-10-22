@@ -620,8 +620,9 @@ def duplicate_warning_checks(browser, state, picks):
                                 ("address", "Purok 1"), ("emergency_contact_name", "Test Relative"),
                                 ("emergency_contact_number", "09000000001")):
                 page.fill(f'input[name="{name}"]', value)
-            for name, value in (("civil_status", "Single"), ("municipality", "San Francisco"),
-                                ("province", "Surigao del Norte"),
+            # Province first: choosing it clears the city/municipality and the barangay (Task 22).
+            for name, value in (("civil_status", "Single"), ("province", "Surigao del Norte"),
+                                ("municipality", "San Francisco"), ("barangay", "Poblacion"),
                                 ("emergency_contact_relationship", "Sibling")):
                 page.select_option(f'select[name="{name}"]', value)
             page.check('input[name="sex"][value="Female"]')

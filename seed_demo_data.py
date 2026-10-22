@@ -948,17 +948,22 @@ def consult_form(details, doses, elsewhere, with_diagnosis=False, dispense=()):
     return data
 
 
-def register_form(person):
+def register_form(person, on_date):
+    from models.patients import ADULT_AGE, calculate_age
+
+    # The age on the day of registration decides, as on the form (Task 22): under 18 is Single
+    # (RA 11596). There is no "Minor". An adult woman is recorded as Married, anyone else Single.
+    adult = calculate_age(person["birth"], on_date) >= ADULT_AGE
     data = {
         "first_name": person["first"], "middle_name": person["middle"],
         "last_name": person["last"], "birth_date": person["birth"].isoformat(),
         "sex": person["sex"],
-        "civil_status": ("Minor" if person["kind"] in ("infant", "toddler", "child")
-                         else ("Married" if person["kind"] == "adult" and person["sex"] == "Female"
-                               else "Single")),
+        "civil_status": ("Married" if adult and person["kind"] == "adult"
+                         and person["sex"] == "Female" else "Single"),
         "blood_type": "Unknown",
-        "address": f"Purok {person['purok']}, Barangay Poblacion",
-        "municipality": "San Francisco", "province": "Surigao del Norte", "zip_code": "8401",
+        "address": f"Purok {person['purok']}",
+        "province": "Surigao del Norte", "municipality": "San Francisco",
+        "barangay": "Poblacion", "zip_code": "8401",
         "contact_number": person["contact"],
         "emergency_contact_name": person["emergency_name"],
         "emergency_contact_relationship": person["relationship"],
@@ -1121,7 +1126,7 @@ def build(path, say=print, show_passwords=True, today_override=None):
             if kind == "register":
                 person = people[index]
                 set_clock(at(day, 7, 30))
-                actors[staff_cycle[index % 2]].post("/staff/register-patient", register_form(person))
+                actors[staff_cycle[index % 2]].post("/staff/register-patient", register_form(person, day))
                 stamper.stamp(_clock["now"])
                 patient_row[index] = rows(path, "SELECT MAX(id) FROM patients")[0][0]
                 counters["registered"] += 1

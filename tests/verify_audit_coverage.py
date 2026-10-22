@@ -160,7 +160,7 @@ check("a bulk change writes one entry per patient changed",
 register = {
     "first_name": "Lorna", "last_name": "Dimaculangit", "birth_date": "1991-04-04",
     "sex": "Female", "civil_status": "Single", "address": "Purok 5, Barangay Poblacion",
-    "municipality": "San Francisco", "province": "Surigao del Norte", "zip_code": "8405",
+    "municipality": "San Francisco", "barangay": "Poblacion", "province": "Surigao del Norte", "zip_code": "8405",
     "emergency_contact_name": "Test Relative", "emergency_contact_relationship": "Sibling",
     "emergency_contact_number": "09000002001", "confirm_duplicate": "yes",
 }

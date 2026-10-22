@@ -59,6 +59,8 @@ SUITES = [
     ("verify_duplicate_check.py", "(new in Task 20)"),
     ("verify_time_format.py", "(new in Task 21)"),
     ("verify_time_format_browser.py", "(new in Task 21)"),
+    ("verify_patient_form_rules.py", "(new in Task 22)"),
+    ("verify_patient_form_browser.py", "(new in Task 22)"),
     ("verify_mobile_layout.py", "(new in Task 17)"),
 ]
 

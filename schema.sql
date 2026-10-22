@@ -28,6 +28,18 @@ CREATE TABLE users (
 -- Register Patient form pairs fixed checkbox chips with a free-text "other"
 -- note, and that free text can itself contain commas.
 --
+-- civil_status is one of Single, Married, Widowed, Separated (models/patients.py
+-- CIVIL_STATUSES). There is no "Minor": a patient under 18 is Single (RA 11596), and
+-- the age always comes from birth_date. migrate_civil_status_minor_to_single.py
+-- changed the old stored "Minor" values (Task 22).
+--
+-- province, municipality and barangay are the address chosen Province -> City/
+-- Municipality -> Barangay (models/places.py): under Surigao del Norte the
+-- municipality is one of its 21 LGUs and, for San Francisco, the barangay one of its
+-- 11; under another province all three are typed. barangay is last because
+-- migrate_add_patient_barangay.py added it with ALTER TABLE (Task 22); it is NULL on
+-- records saved before then. address holds the house number, street and purok.
+--
 -- status is a soft lifecycle flag: patient records are never hard-deleted. Only
 -- Health Center Staff and Administrator may change it; Barangay Official never can.
 CREATE TABLE patients (
@@ -53,7 +65,8 @@ CREATE TABLE patients (
     allergies TEXT,
     status TEXT NOT NULL DEFAULT 'Active' CHECK (status IN ('Active', 'Inactive', 'Deceased')),
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    barangay TEXT
 );
 
 -- One row per visit written up. The four clinical text fields are what the

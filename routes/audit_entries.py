@@ -67,6 +67,7 @@ PATIENT_FIELD_LABELS = {
     "civil_status": "Civil status",
     "blood_type": "Blood type",
     "address": "Address",
+    "barangay": "Barangay",
     "municipality": "Municipality",
     "province": "Province",
     "zip_code": "ZIP code",

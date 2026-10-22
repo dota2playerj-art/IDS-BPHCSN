@@ -512,9 +512,17 @@ check("every emergency contact name is built from the same lists",
 check("every sex matches the first name's list",
       all((p["first_name"] in seed.FEMALE_FIRST) == (p["sex"] == "Female") for p in patients))
 check("addresses are Purok 1 to 7, Barangay Poblacion, San Francisco, Surigao del Norte",
-      all(re.fullmatch(r"Purok [1-7], Barangay Poblacion", p["address"])
+      all(re.fullmatch(r"Purok [1-7]", p["address"]) and p["barangay"] == "Poblacion"
           and p["municipality"] == "San Francisco" and p["province"] == "Surigao del Norte"
           for p in patients))
+# Task 22: no "Minor"; under 18 on the day of registration is Single (RA 11596).
+from models.patients import ADULT_AGE, calculate_age  # noqa: E402
+from utils.dates import to_clinic_time  # noqa: E402
+
+check("no patient's civil status is Minor, and every patient under 18 is Single",
+      all(p["civil_status"] in ("Single", "Married", "Widowed", "Separated") for p in patients)
+      and all(p["civil_status"] == "Single" for p in patients
+              if (calculate_age(p["birth_date"], to_clinic_time(p["created_at"]).date()) or 0) < ADULT_AGE))
 phone = re.compile(seed.PHONE_PATTERN)
 check("every patient and emergency phone number is 0900000NNNN",
       all(phone.match(p["contact_number"]) and phone.match(p["emergency_contact_number"])

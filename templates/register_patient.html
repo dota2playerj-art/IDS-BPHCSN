@@ -151,7 +151,17 @@
       </div>
     </div>
 {%- endif %}
-{%- if errors %}
+{%- if stored_problems %}
+    {#- Edit Patient, on opening a record saved under older rules (Task 22). Nothing has been
+        submitted yet, so this is a request to correct, not a refusal. #}
+    <div class="alert-ids alert-warning-ids" id="storedProblems">
+      <span class="material-symbols-outlined">edit_note</span>
+      <div>
+        <strong>Some details on file need correcting</strong>
+        The {{ stored_problems|length }} highlighted field{{ "s" if stored_problems|length != 1 else "" }} below {{ "do" if stored_problems|length != 1 else "does" }} not meet the current rules. The stored values are shown. Correct them before saving.
+      </div>
+    </div>
+{%- elif errors %}
     <div class="alert-ids alert-danger-ids">
       <span class="material-symbols-outlined">error</span>
       <div>
@@ -225,13 +235,25 @@
             <div class="form-text-hint">Auto-calculated</div>
           </div>
           <div class="col-md-3">
-            <label class="field-label">Civil Status<span class="req">*</span></label>
-            <select class="form-select{% if errors.civil_status %} is-invalid{% endif %}" name="civil_status">
+            {#- Task 22. The options follow the birth date: under 18 only Single (RA 11596), otherwise
+                the adult list. The server renders the list for the birth date on the form and checks
+                it again on save; the script below rebuilds it when the birth date changes. A stored
+                value the rule refuses (an old "Minor") is still shown, marked, so it can be corrected. #}
+            {%- set minor_only = civil_status_options | length == 1 %}
+            <label class="field-label" for="civilStatus">Civil Status<span class="req">*</span></label>
+            <select class="form-select{% if errors.civil_status %} is-invalid{% endif %}" id="civilStatus" name="civil_status" data-minor="{{ 'yes' if minor_only else 'no' }}">
+              {%- if not minor_only %}
               <option value="">Select…</option>
-              {%- for option in options.civil_statuses %}
-              <option value="{{ option }}"{% if form.civil_status == option %} selected{% endif %}>{{ option }}</option>
+              {%- endif %}
+              {%- if form.civil_status and form.civil_status not in civil_status_options %}
+              <option value="{{ form.civil_status }}" selected>{{ form.civil_status }} (not allowed)</option>
+              {%- endif %}
+              {%- for option in civil_status_options %}
+              <option value="{{ option }}"{% if form.civil_status == option or (minor_only and not form.civil_status) %} selected{% endif %}>{{ option }}</option>
               {%- endfor %}
             </select>
+            <div class="form-text-hint" id="civilStatusHint"{% if not minor_only %} hidden{% endif %}>{{ minor_civil_status_hint }}</div>
+            <div class="form-text-hint text-danger" id="civilStatusAgain" hidden>Please choose the civil status again for this birth date.</div>
             {%- if errors.civil_status %}<div class="invalid-feedback d-block">{{ errors.civil_status }}</div>{% endif %}
           </div>
           <div class="col-md-3">
@@ -264,51 +286,92 @@
           </div>
         </div>
 
+        {#- Task 22. Chosen in this order: Province -> City/Municipality -> Barangay. The lists are
+            models/places.py, the one copy the server checks against; the script below rebuilds the
+            dropdowns from the same lists (patientFormData). Each pair of a dropdown and a typed box
+            shows one of the two: the other is hidden AND disabled, so it is never submitted. A
+            stored name that is not on a list (an old record) is still shown, marked, to be corrected. #}
+        {%- set other_province = form.province == place_data.otherProvince %}
+        {%- set municipality_value = form.municipality or '' %}
+        {%- if other_province %}{% set barangay_mode = 'typed' %}
+        {%- elif municipality_value == options.san_francisco %}{% set barangay_mode = 'list' %}
+        {%- elif municipality_value %}{% set barangay_mode = 'typed' %}
+        {%- else %}{% set barangay_mode = 'wait' %}{% endif %}
         <div class="row g-3 mb-3">
-          <div class="col-md-6">
-            <label class="field-label">House No. / Street / Purok<span class="req">*</span></label>
-            <input type="text" class="form-control{% if errors.address %} is-invalid{% endif %}" name="address" value="{{ form.address or '' }}" placeholder="e.g., Purok 6">
-            {%- if errors.address %}<div class="invalid-feedback d-block">{{ errors.address }}</div>{% endif %}
-          </div>
-          <div class="col-md-6">
-            <!-- Fixed for this health center, so it is shown but never submitted:
-                 there is no barangay column on patients, and every patient this
-                 register holds lives in the one barangay the center serves. The
-                 value is the stored setting (models/settings.py) rather than a
-                 literal, so renaming the barangay on Settings renames it here
-                 too instead of leaving this box naming the old one. -->
-            <label class="field-label">Barangay<span class="req">*</span></label>
-            <input type="text" class="form-control" value="{{ health_center.barangay }}" disabled>
-          </div>
-        </div>
-
-        <div class="row g-3">
           <div class="col-md-4">
-            <label class="field-label">Municipality / City<span class="req">*</span></label>
-            <select class="form-select{% if errors.municipality %} is-invalid{% endif %}" name="municipality">
-              <option value="">Select…</option>
-              {%- for option in options.municipalities %}
-              <option value="{{ option }}"{% if form.municipality == option %} selected{% endif %}>{{ option }}</option>
-              {%- endfor %}
-            </select>
-            {%- if errors.municipality %}<div class="invalid-feedback d-block">{{ errors.municipality }}</div>{% endif %}
-          </div>
-          <div class="col-md-4">
-            <label class="field-label">Province<span class="req">*</span></label>
-            <select class="form-select{% if errors.province %} is-invalid{% endif %}" name="province">
-              <option value="">Select…</option>
+            <label class="field-label" for="provinceChoice">Province<span class="req">*</span></label>
+            <select class="form-select{% if errors.province %} is-invalid{% endif %}" id="provinceChoice" name="province">
               {%- for option in options.provinces %}
               <option value="{{ option }}"{% if form.province == option %} selected{% endif %}>{{ option }}</option>
               {%- endfor %}
             </select>
             {%- if errors.province %}<div class="invalid-feedback d-block">{{ errors.province }}</div>{% endif %}
           </div>
+          <div class="col-md-4" id="provinceTypedWrap"{% if not other_province %} hidden{% endif %}>
+            <label class="field-label" for="provinceTyped">Province name<span class="req">*</span></label>
+            <input type="text" class="form-control{% if errors.province_other %} is-invalid{% endif %}" id="provinceTyped" name="province_other" value="{{ form.province_other or '' }}" placeholder="Type the province"{% if not other_province %} disabled{% endif %}>
+            {%- if errors.province_other %}<div class="invalid-feedback d-block">{{ errors.province_other }}</div>{% endif %}
+          </div>
+        </div>
+
+        <div class="row g-3 mb-3">
           <div class="col-md-4">
-            <label class="field-label">Zip Code</label>
-            <input type="text" class="form-control{% if errors.zip_code %} is-invalid{% endif %}" name="zip_code" value="{{ form.zip_code or '' }}" placeholder="e.g., 8401">
+            <label class="field-label" for="{{ 'municipalityTyped' if other_province else 'municipalitySelect' }}" id="municipalityLabel">City / Municipality<span class="req">*</span></label>
+            <div id="municipalitySelectWrap"{% if other_province %} hidden{% endif %}>
+              <select class="form-select{% if errors.municipality %} is-invalid{% endif %}" id="municipalitySelect" name="municipality"{% if other_province %} disabled{% endif %}>
+                <option value="">Select…</option>
+                {%- if not other_province and municipality_value and municipality_value not in options.municipalities %}
+                <option value="{{ municipality_value }}" selected>{{ municipality_value }} (not on the list)</option>
+                {%- endif %}
+                {%- for option in options.municipalities %}
+                <option value="{{ option }}"{% if not other_province and municipality_value == option %} selected{% endif %}>{{ option }}</option>
+                {%- endfor %}
+              </select>
+              {%- if errors.municipality %}<div class="invalid-feedback d-block">{{ errors.municipality }}</div>{% endif %}
+            </div>
+            <div id="municipalityTypedWrap"{% if not other_province %} hidden{% endif %}>
+              <input type="text" class="form-control{% if errors.municipality_other %} is-invalid{% endif %}" id="municipalityTyped" name="municipality_other" value="{{ form.municipality_other or '' }}" placeholder="Type the city or municipality"{% if not other_province %} disabled{% endif %}>
+              {%- if errors.municipality_other %}<div class="invalid-feedback d-block">{{ errors.municipality_other }}</div>{% endif %}
+            </div>
+          </div>
+          <div class="col-md-4">
+            <label class="field-label" for="{{ 'barangayTyped' if barangay_mode == 'typed' else 'barangaySelect' }}" id="barangayLabel">Barangay<span class="req">*</span></label>
+            <div id="barangaySelectWrap"{% if barangay_mode == 'typed' %} hidden{% endif %}>
+              <select class="form-select{% if errors.barangay %} is-invalid{% endif %}" id="barangaySelect" name="barangay"{% if barangay_mode != 'list' %} disabled{% endif %}>
+                {%- if barangay_mode == 'list' %}
+                <option value="">Select…</option>
+                {%- if form.barangay and form.barangay not in options.barangays %}
+                <option value="{{ form.barangay }}" selected>{{ form.barangay }} (not on the list)</option>
+                {%- endif %}
+                {%- for option in options.barangays %}
+                <option value="{{ option }}"{% if form.barangay == option %} selected{% endif %}>{{ option }}</option>
+                {%- endfor %}
+                {%- else %}
+                <option value="">Choose the city or municipality first</option>
+                {%- endif %}
+              </select>
+              {%- if errors.barangay %}<div class="invalid-feedback d-block">{{ errors.barangay }}</div>{% endif %}
+            </div>
+            <div id="barangayTypedWrap"{% if barangay_mode != 'typed' %} hidden{% endif %}>
+              <input type="text" class="form-control{% if errors.barangay_other %} is-invalid{% endif %}" id="barangayTyped" name="barangay_other" value="{{ form.barangay_other or '' }}" placeholder="Type the barangay"{% if barangay_mode != 'typed' %} disabled{% endif %}>
+              {%- if errors.barangay_other %}<div class="invalid-feedback d-block">{{ errors.barangay_other }}</div>{% endif %}
+            </div>
+          </div>
+          <div class="col-md-4">
+            <label class="field-label" for="zipCode">Zip Code</label>
+            <input type="text" class="form-control{% if errors.zip_code %} is-invalid{% endif %}" id="zipCode" name="zip_code" value="{{ form.zip_code or '' }}" placeholder="e.g., 8401">
             {%- if errors.zip_code %}<div class="invalid-feedback d-block">{{ errors.zip_code }}</div>{% endif %}
           </div>
         </div>
+
+        <div class="row g-3">
+          <div class="col-md-8">
+            <label class="field-label" for="streetAddress">House No. / Street / Purok<span class="req">*</span></label>
+            <input type="text" class="form-control{% if errors.address %} is-invalid{% endif %}" id="streetAddress" name="address" value="{{ form.address or '' }}" placeholder="e.g., Purok 6">
+            {%- if errors.address %}<div class="invalid-feedback d-block">{{ errors.address }}</div>{% endif %}
+          </div>
+        </div>
+        <script type="application/json" id="patientFormData">{{ {"places": place_data, "adultCivilStatuses": options.civil_statuses, "minorCivilStatus": civil_status_minor} | tojson }}</script>
       </div>
 
       <!-- EMERGENCY CONTACT -->
@@ -557,6 +620,16 @@
     return new Date(year, month, Math.min(value.getDate(), lastDay));
   }
 
+  // Whole years from born to today: models/patients.py calculate_age(), the one age rule. The
+  // Age box below and the civil status list (Task 22) both read it, so the page cannot show an
+  // age of 18 while offering only the under-18 list, or the other way round.
+  function wholeYears(born, today){
+    var years = today.getFullYear() - born.getFullYear();
+    var beforeBirthday = (today.getMonth() < born.getMonth()) ||
+      (today.getMonth() === born.getMonth() && today.getDate() < born.getDate());
+    return beforeBirthday ? years - 1 : years;
+  }
+
   function plural(count, noun){
     return count + ' ' + noun + (count === 1 ? '' : 's');
   }
@@ -571,10 +644,7 @@
     var now = new Date();
     var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    var years = today.getFullYear() - born.getFullYear();
-    var beforeBirthday = (today.getMonth() < born.getMonth()) ||
-      (today.getMonth() === born.getMonth() && today.getDate() < born.getDate());
-    if(beforeBirthday){ years -= 1; }
+    var years = wholeYears(born, today);
 
     if(years < 0 || years >= 150){ ageDisplay.value = ''; return; }
 
@@ -602,6 +672,133 @@
     ageDisplay.value = plural(years, 'year');
   }
   if(birthDate){ birthDate.addEventListener('change', refreshAge); refreshAge(); }
+
+  // CIVIL STATUS AND ADDRESS (Task 22). Only the page: the server applies the same rules on
+  // save (models/patients.py validate_patient_form(), models/places.py address_errors()).
+  var patientFormData = JSON.parse(document.getElementById('patientFormData').textContent);
+  var places = patientFormData.places;
+
+  function makeOption(value, text){
+    var item = document.createElement('option');
+    item.value = value;
+    item.textContent = text;
+    return item;
+  }
+  // Replace a dropdown's options; `placeholder` null means no empty first option.
+  function fillSelect(select, values, placeholder){
+    select.innerHTML = '';
+    if(placeholder !== null){ select.appendChild(makeOption('', placeholder)); }
+    values.forEach(function(value){ select.appendChild(makeOption(value, value)); });
+    select.value = '';
+  }
+
+  // Under 18 only Single, selected, with the RA 11596 hint. 18 and over the adult list. When the
+  // birth date moves a patient out of the under-18 list, or leaves a value the new list does not
+  // hold, the choice is cleared and the operator is asked to choose again.
+  var civilStatus = document.getElementById('civilStatus');
+  var civilStatusHint = document.getElementById('civilStatusHint');
+  var civilStatusAgain = document.getElementById('civilStatusAgain');
+  var wasUnder18 = civilStatus && civilStatus.getAttribute('data-minor') === 'yes';
+
+  function ageInYears(value){
+    if(!value){ return null; }
+    var born = new Date(value + 'T00:00:00');
+    if(isNaN(born.getTime())){ return null; }
+    var now = new Date();
+    var years = wholeYears(born, new Date(now.getFullYear(), now.getMonth(), now.getDate()));
+    return (years < 0 || years >= 150) ? null : years;
+  }
+
+  function refreshCivilStatus(){
+    if(!civilStatus || !birthDate){ return; }
+    var years = ageInYears(birthDate.value);
+    var minor = years !== null && years < 18;
+    var current = civilStatus.value;
+    civilStatusAgain.hidden = true;
+    if(minor){
+      fillSelect(civilStatus, [patientFormData.minorCivilStatus], null);
+      civilStatus.value = patientFormData.minorCivilStatus;
+      civilStatusHint.hidden = false;
+    } else {
+      var adult = patientFormData.adultCivilStatuses;
+      fillSelect(civilStatus, adult, 'Select…');
+      civilStatusHint.hidden = true;
+      if(current && !wasUnder18 && adult.indexOf(current) !== -1){
+        civilStatus.value = current;
+      } else if(current){
+        civilStatusAgain.hidden = false;
+      }
+    }
+    wasUnder18 = minor;
+  }
+  if(birthDate && civilStatus){ birthDate.addEventListener('change', refreshCivilStatus); }
+
+  // Province -> City/Municipality -> Barangay. Each dropdown has a typed box beside it; only one
+  // of the two is shown and enabled, so the hidden one is never submitted. Changing the province
+  // clears the city/municipality and the barangay; changing the city/municipality clears the
+  // barangay. A change event that leaves the value as it was clears nothing.
+  var provinceChoice = document.getElementById('provinceChoice');
+  var provinceTypedWrap = document.getElementById('provinceTypedWrap');
+  var provinceTyped = document.getElementById('provinceTyped');
+  var municipalitySelectWrap = document.getElementById('municipalitySelectWrap');
+  var municipalitySelect = document.getElementById('municipalitySelect');
+  var municipalityTypedWrap = document.getElementById('municipalityTypedWrap');
+  var municipalityTyped = document.getElementById('municipalityTyped');
+  var municipalityLabel = document.getElementById('municipalityLabel');
+  var barangaySelectWrap = document.getElementById('barangaySelectWrap');
+  var barangaySelect = document.getElementById('barangaySelect');
+  var barangayTypedWrap = document.getElementById('barangayTypedWrap');
+  var barangayTyped = document.getElementById('barangayTyped');
+  var barangayLabel = document.getElementById('barangayLabel');
+
+  function showPart(wrapper, field, on){
+    wrapper.hidden = !on;
+    field.disabled = !on;
+  }
+
+  // 'list' the 11 barangays of San Francisco, 'typed' a typed barangay, 'wait' no
+  // city/municipality chosen yet.
+  function setBarangay(mode){
+    showPart(barangaySelectWrap, barangaySelect, mode !== 'typed');
+    showPart(barangayTypedWrap, barangayTyped, mode === 'typed');
+    barangayTyped.value = '';
+    if(mode === 'list'){
+      fillSelect(barangaySelect, places.barangays, 'Select…');
+    } else {
+      fillSelect(barangaySelect, [], 'Choose the city or municipality first');
+      barangaySelect.disabled = true;
+    }
+    barangayLabel.htmlFor = mode === 'typed' ? 'barangayTyped' : 'barangaySelect';
+  }
+
+  function provinceChanged(){
+    if(provinceChoice.value === provinceChoice.getAttribute('data-previous')){ return; }
+    provinceChoice.setAttribute('data-previous', provinceChoice.value);
+    var other = provinceChoice.value === places.otherProvince;
+    showPart(provinceTypedWrap, provinceTyped, other);
+    provinceTyped.value = '';
+    showPart(municipalitySelectWrap, municipalitySelect, !other);
+    showPart(municipalityTypedWrap, municipalityTyped, other);
+    municipalityTyped.value = '';
+    fillSelect(municipalitySelect, places.municipalities, 'Select…');
+    municipalitySelect.setAttribute('data-previous', '');
+    municipalityLabel.htmlFor = other ? 'municipalityTyped' : 'municipalitySelect';
+    setBarangay(other ? 'typed' : 'wait');
+  }
+
+  function municipalityChanged(){
+    var value = municipalitySelect.value;
+    if(value === municipalitySelect.getAttribute('data-previous')){ return; }
+    municipalitySelect.setAttribute('data-previous', value);
+    setBarangay(value === places.sanFrancisco ? 'list' : (value ? 'typed' : 'wait'));
+  }
+
+  if(provinceChoice && municipalitySelect){
+    provinceChoice.setAttribute('data-previous', provinceChoice.value);
+    municipalitySelect.setAttribute('data-previous', municipalitySelect.value);
+    provinceChoice.addEventListener('change', provinceChanged);
+    municipalitySelect.addEventListener('change', municipalityChanged);
+  }
 
   // The possible-duplicate warning (Task 20). The save buttons stay disabled
   // until "This is a different person" is ticked. Changing a name or the birth

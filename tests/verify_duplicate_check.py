@@ -137,7 +137,7 @@ def add_patient(first, last, birth, middle=None, sex="Female", address="Purok 3,
     columns = {
         "id": patient_id, "patient_id": f"PAT-{patient_id:03d}", "first_name": first,
         "middle_name": middle, "last_name": last, "birth_date": birth, "sex": sex,
-        "civil_status": "Single", "address": address, "municipality": "San Francisco",
+        "civil_status": "Single", "address": address, "municipality": "San Francisco", "barangay": "Poblacion",
         "province": "Surigao del Norte", "status": status,
     }
     columns.update(extra)
@@ -324,7 +324,7 @@ section("5. REGISTRATION: BLOCKED, KEPT, CONFIRMED, RE-CHECKED")
 FORM = {
     "first_name": "Ma. Cristina", "middle_name": "", "last_name": "Dela Cruz", "birth_date": "1990-03-07",
     "sex": "Female", "civil_status": "Single", "address": "Purok 9, Zztypedaddress",
-    "municipality": "San Francisco", "province": "Surigao del Norte", "zip_code": "8405",
+    "municipality": "San Francisco", "barangay": "Poblacion", "province": "Surigao del Norte", "zip_code": "8405",
     "contact_number": "09000003002", "emergency_contact_name": "Zztyped Kin",
     "emergency_contact_relationship": "Sibling", "emergency_contact_number": "09000003001",
     "medical_conditions_note": "Zztypednote",

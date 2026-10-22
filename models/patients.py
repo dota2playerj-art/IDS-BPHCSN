@@ -13,6 +13,7 @@ import unicodedata
 from datetime import date, datetime
 
 from database.connection import db_connection
+from models.places import address_errors
 from utils.dates import (
     day_start_utc,
     days_ago,
@@ -29,29 +30,21 @@ from utils.small_counts import fold_small_counts, shown_count
 # The vocabularies the Register Patient form offers. The template renders its
 # <select>/radio/chip options from these same tuples, so a constrained field
 # cannot accept a value the form never offered, and the two cannot drift apart.
-CIVIL_STATUSES = ("Single", "Married", "Widowed", "Separated", "Minor")
-SEXES = ("Female", "Male")
-# The health center is in Barangay Poblacion, San Francisco (formerly Anao-Aon),
-# Surigao del Norte -- a coastal municipality of 11 barangays, Surigao City about
-# 12 km to the east. San Francisco is listed first because it is where nearly
-# every patient lives; the other three are the LGUs it actually shares a land
-# border with (Surigao City east, Malimono and Sison south -- the Bohol Sea is
-# north and the Surigao Strait west, so there are no others). A patient who
-# walked in from farther away than that is rare enough to belong in a
-# conversation about the record, not in a list that invites a wrong pick.
 #
-# These previously read ("San Francisco", "Bunawan", "Rosario") and
-# ("Agusan del Sur", "Surigao del Sur", "Davao de Oro") -- Agusan del Sur
-# municipalities and provinces around a *different* San Francisco, ~150 km away
-# in the wrong province. Nothing in the approved Capstone Proposal ever named a
-# province; the value was invented here and then spread into real records. See
-# a repair script (since deleted) that fixed the eleven records it reached.
-MUNICIPALITIES = ("San Francisco", "Surigao City", "Malimono", "Sison")
-# Surigao del Norte is the province the health center is in. Surigao del Sur is
-# kept because it genuinely adjoins Surigao del Norte to the south, so a patient
-# really can live there -- unlike Agusan del Sur and Davao de Oro, which border
-# neither and were only ever artefacts of the wrong municipality.
-PROVINCES = ("Surigao del Norte", "Surigao del Sur")
+# "Minor" is not on the list (Task 22): it is an age, not a civil status, and a child saved
+# as "Minor" stayed "Minor" after turning 18. The age comes from the birth date instead.
+CIVIL_STATUSES = ("Single", "Married", "Widowed", "Separated")
+# Republic Act No. 11596 (the Prohibition of Child Marriage Law, 2021): a person under 18
+# cannot marry, so a patient under 18 is recorded as Single and nothing else.
+ADULT_AGE = 18
+MINOR_CIVIL_STATUS = "Single"
+MINOR_CIVIL_STATUS_HINT = "Patients under 18 are recorded as Single (Republic Act No. 11596)."
+MINOR_CIVIL_STATUS_ERROR = MINOR_CIVIL_STATUS_HINT + " Choose Single."
+SEXES = ("Female", "Male")
+# The address lists (Province -> City/Municipality -> Barangay) and their pairing rule live in
+# models/places.py, the one copy the server and the page both read (Task 22). They replace the
+# four-municipality list and the Province list that offered Surigao del Sur beside San
+# Francisco.
 EMERGENCY_RELATIONSHIPS = (
     "Mother", "Father", "Spouse", "Son/Daughter", "Sibling", "Grandchild",
     "Guardian", "Other",
@@ -78,8 +71,6 @@ REQUIRED_FIELDS = {
     "civil_status": "Civil status is required.",
     "sex": "Gender is required.",
     "address": "House No. / Street / Purok is required.",
-    "municipality": "Municipality / City is required.",
-    "province": "Province is required.",
     "emergency_contact_name": "Emergency contact name is required.",
     "emergency_contact_relationship": "Emergency contact relationship is required.",
     "emergency_contact_number": "Emergency contact number is required.",
@@ -90,7 +81,7 @@ REQUIRED_FIELDS = {
 # column's DEFAULT CURRENT_TIMESTAMP.
 PATIENT_FIELDS = (
     "first_name", "middle_name", "last_name", "birth_date", "sex", "civil_status",
-    "blood_type", "address", "municipality", "province", "zip_code",
+    "blood_type", "address", "barangay", "municipality", "province", "zip_code",
     "contact_number", "emergency_contact_name", "emergency_contact_relationship",
     "emergency_contact_number", "emergency_contact_address",
     "medical_conditions", "allergies",
@@ -248,6 +239,18 @@ def _unit(count, noun):
     return f"{count} {noun}{'' if count == 1 else 's'}"
 
 
+def civil_statuses_for(birth_date, on_date=None):
+    """The civil statuses a patient with this birth date may have today (Task 22).
+
+    Under ADULT_AGE (18) by calculate_age() -- the same age rule every screen's age comes
+    from -- only Single (RA 11596). Otherwise, or with no usable birth date, the full list.
+    """
+    years = calculate_age(birth_date, on_date)
+    if years is not None and 0 <= years < ADULT_AGE:
+        return (MINOR_CIVIL_STATUS,)
+    return CIVIL_STATUSES
+
+
 def format_age(birth_date, on_date=None):
     """Age as every screen prints it, or None when birth_date is unusable (Task 15, D3).
 
@@ -322,8 +325,10 @@ def _initials(row):
     return ((first[:1] or "") + (last[:1] or "")).upper() or "?"
 
 
-def _display_address(row, keys=("address", "municipality", "province", "zip_code")):
-    return ", ".join(str(row[key]).strip() for key in keys if row[key])
+def _display_address(row, keys=("address", "barangay", "municipality", "province", "zip_code")):
+    # A row read before the barangay column existed (an old backup) simply has no barangay.
+    return ", ".join(str(row[key]).strip() for key in keys
+                     if key in row.keys() and row[key])
 
 
 def _to_patient(row):
@@ -802,13 +807,20 @@ def validate_patient_form(values):
     for field, allowed, label in (
         ("civil_status", CIVIL_STATUSES, "civil status"),
         ("sex", SEXES, "gender"),
-        ("municipality", MUNICIPALITIES, "municipality"),
-        ("province", PROVINCES, "province"),
         ("emergency_contact_relationship", EMERGENCY_RELATIONSHIPS, "relationship"),
     ):
         value = (values.get(field) or "").strip()
         if value and field not in errors and value not in allowed:
             errors[field] = f"Choose a {label} from the list."
+
+    # Under 18 on the day of registration or edit: Single only (RA 11596).
+    if "civil_status" not in errors and "birth_date" not in errors:
+        allowed = civil_statuses_for(birth_date)
+        if (values.get("civil_status") or "").strip() not in allowed:
+            errors["civil_status"] = MINOR_CIVIL_STATUS_ERROR
+
+    # Province -> City/Municipality -> Barangay, paired by models/places.py.
+    errors.update(address_errors(values))
 
     blood_type = (values.get("blood_type") or "").strip()
     if blood_type and blood_type not in BLOOD_TYPES:

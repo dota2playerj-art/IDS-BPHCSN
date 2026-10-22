@@ -39,11 +39,12 @@ from models.patients import (
     CONDITION_OPTIONS,
     DOCTOR_ONLY_STATUS,
     EMERGENCY_RELATIONSHIPS,
-    MUNICIPALITIES,
+    MINOR_CIVIL_STATUS,
+    MINOR_CIVIL_STATUS_HINT,
     PATIENT_STATUSES,
-    PROVINCES,
     SEXES,
     can_declare_death,
+    civil_statuses_for,
     collect_list_field,
     create_patient,
     find_possible_duplicates,
@@ -58,6 +59,18 @@ from models.patients import (
     status_change_needs_doctor,
     update_patient,
     validate_patient_form,
+)
+from models.places import (
+    ADDRESS_FORM_FIELDS,
+    DEFAULT_ADDRESS,
+    PROVINCE_CHOICES,
+    SAN_FRANCISCO,
+    SAN_FRANCISCO_BARANGAYS,
+    SURIGAO_DEL_NORTE_LGUS,
+    address_errors,
+    address_to_form,
+    page_data,
+    resolve_address,
 )
 from routes.audit_entries import (patient_registered, patient_saved_despite_duplicates,
                                   patient_status_changed, patient_updated)
@@ -207,9 +220,9 @@ def save_and_register_another_requested(form_data):
 # The address fields the fresh form keeps. Everybody registered in one sitting at
 # a health drive is from the same purok, so re-typing the address for each of them
 # is the whole cost the button is meant to remove; everything else on the form is
-# unique to a person and must arrive blank. Barangay is not here because it is not
-# a field: it is fixed to this centre and rendered disabled, never submitted.
-ADDRESS_PREFILL_FIELDS = ("address", "municipality", "province", "zip_code")
+# unique to a person and must arrive blank. The province, city/municipality and
+# barangay go back through models/places.py address_to_form(), like Edit Patient.
+ADDRESS_PREFILL_FIELDS = ("address", "zip_code")
 
 
 # THE URL CARRIES A PATIENT ID, NOT AN ADDRESS. It used to carry the address text
@@ -244,6 +257,9 @@ def address_prefill_form(args):
         value = str(source.get(field) or "").strip()
         if value:
             values[field] = value
+    if source.get("province"):
+        values.update(address_to_form(source.get("province"), source.get("municipality"),
+                                      source.get("barangay")))
     return values or None
 
 
@@ -267,8 +283,10 @@ def registered_patient_name(form_data):
 FORM_OPTIONS = {
     "civil_statuses": CIVIL_STATUSES,
     "sexes": SEXES,
-    "municipalities": MUNICIPALITIES,
-    "provinces": PROVINCES,
+    "provinces": PROVINCE_CHOICES,
+    "municipalities": SURIGAO_DEL_NORTE_LGUS,
+    "san_francisco": SAN_FRANCISCO,
+    "barangays": SAN_FRANCISCO_BARANGAYS,
     "relationships": EMERGENCY_RELATIONSHIPS,
     "blood_types": BLOOD_TYPES,
     "conditions": CONDITION_OPTIONS,
@@ -845,12 +863,15 @@ def patient_to_form(patient):
         field: patient.get(field) or ""
         for field in (
             "first_name", "middle_name", "last_name", "birth_date", "sex",
-            "civil_status", "blood_type", "address", "municipality", "province",
+            "civil_status", "blood_type", "address",
             "zip_code", "contact_number", "emergency_contact_name",
             "emergency_contact_relationship", "emergency_contact_number",
             "emergency_contact_address",
         )
     }
+    # The stored province, city/municipality and barangay, in the fields the form shows them in.
+    form.update(address_to_form(patient.get("province"), patient.get("municipality"),
+                                patient.get("barangay")))
     form["medical_conditions_selected"] = condition_chips
     form["medical_conditions_note"] = condition_note
     form["allergies_selected"] = allergy_chips
@@ -922,6 +943,27 @@ def _with_duplicate_entry(audit, duplicates, patient_id_of, user_id, ip_address)
     return both
 
 
+# Stored values the current rules refuse, and what to say about each. A missing barangay is
+# worded for what it is on an old record: never recorded, not forgotten just now.
+STORED_BARANGAY_MISSING = "No barangay is recorded for this patient. Choose it before saving."
+
+
+def stored_record_problems(form):
+    """{field: message} for a stored record's civil status and address under the current rules."""
+    problems = {}
+    status = (form.get("civil_status") or "").strip()
+    if status and status not in civil_statuses_for(form.get("birth_date")):
+        problems["civil_status"] = (
+            MINOR_CIVIL_STATUS_HINT + " Choose Single."
+            if status in CIVIL_STATUSES
+            else f'"{status}" is not a civil status. Choose one from the list.')
+    for field, message in address_errors(form).items():
+        if message in ("Barangay is required.", "Type the barangay."):
+            message = STORED_BARANGAY_MISSING
+        problems[field] = message
+    return problems
+
+
 def register_patient_context(form=None, errors=None, duplicates=None,
                              duplicate_confirmed=False, patient=None,
                              check_in=False, check_in_reason_text="",
@@ -941,15 +983,25 @@ def register_patient_context(form=None, errors=None, duplicates=None,
     by re-saving their record.
 
     """
+    stored_problems = {}
     if patient is not None and form is None:
         form = patient_to_form(patient)
+        # A record saved under the old rules (a stored "Minor", a patient under 18 recorded
+        # as Married, no barangay, a province/municipality pair the lists refuse) opens with
+        # its stored values and the fields to correct marked, before anyone presses Save.
+        stored_problems = stored_record_problems(form)
+        errors = {**stored_problems, **(errors or {})}
+    elif patient is None:
+        # A new registration opens on the health center's own place.
+        form = {**DEFAULT_ADDRESS, **(form or {})}
 
     check_in = bool(check_in) and patient is None
+    form = form or {}
 
     return {
         "patient": patient,
         "next_patient_id": patient["patient_id"] if patient else generate_next_patient_id(),
-        "form": form or {},
+        "form": form,
         "errors": errors or {},
         # The possible-duplicate warning (Task 20): the matches, whether the
         # "different person" box is shown ticked, and the field names it posts.
@@ -959,6 +1011,13 @@ def register_patient_context(form=None, errors=None, duplicates=None,
         "duplicate_confirm_value": DUPLICATE_CONFIRM_VALUE,
         "duplicate_seen_field": DUPLICATE_SEEN_FIELD,
         "options": FORM_OPTIONS,
+        # The place lists as the page's script reads them (models/places.py), the civil
+        # statuses allowed for the birth date on the form, and the under-18 hint.
+        "place_data": page_data(),
+        "civil_status_options": civil_statuses_for(form.get("birth_date")),
+        "minor_civil_status_hint": MINOR_CIVIL_STATUS_HINT,
+        "civil_status_minor": MINOR_CIVIL_STATUS,
+        "stored_problems": stored_problems,
         # Same mechanism, one screen further out: rendered as hidden fields so
         # the check-in intent survives a validation failure or a duplicate
         # acknowledgement instead of being dropped on the first round trip.
@@ -986,11 +1045,11 @@ def _extract_form(form_data):
         key: (form_data.get(key) or "").strip()
         for key in (
             "first_name", "middle_name", "last_name", "birth_date", "sex",
-            "civil_status", "blood_type", "address", "municipality", "province",
+            "civil_status", "blood_type", "address",
             "zip_code", "contact_number", "emergency_contact_name",
             "emergency_contact_relationship", "emergency_contact_number",
             "emergency_contact_address", "medical_conditions_note", "allergies_note",
-        )
+        ) + ADDRESS_FORM_FIELDS
     }
     values["medical_conditions"] = collect_list_field(
         form_data.getlist("medical_conditions"), values["medical_conditions_note"]
@@ -1052,12 +1111,17 @@ def process_register_patient(form_data, patient=None, user_id=None, ip_address=N
             check_in_service_text=service,
         )
 
+    # What is stored: the province, city/municipality and barangay the choices resolve to
+    # (models/places.py). `values` itself stays as typed, for a redisplay.
+    province, municipality, barangay = resolve_address(values)
+    record = {**values, "province": province, "municipality": municipality,
+              "barangay": barangay}
     if patient is not None:
-        update_patient(patient["id"], values, audit=_with_duplicate_entry(
+        update_patient(patient["id"], record, audit=_with_duplicate_entry(
             patient_updated(patient["id"], user_id, ip_address), duplicates,
             lambda args: patient["id"], user_id, ip_address))
         return patient["id"], None
 
-    return create_patient(values, audit=_with_duplicate_entry(
+    return create_patient(record, audit=_with_duplicate_entry(
         patient_registered(user_id, ip_address), duplicates,
         lambda args: args[0], user_id, ip_address)), None

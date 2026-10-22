@@ -349,7 +349,7 @@ check("a valid service is carried into the registration form",
       and 'name="check_in_service" value="Family Planning"' in body(staff.get(r.headers["Location"])))
 registered = q1("SELECT COUNT(*) FROM patients")[0]
 form = {"first_name": "Zzwlnew", "last_name": "Wlmark", "birth_date": "1990-05-05", "sex": "Female",
-        "civil_status": "Single", "address": "Purok 1", "municipality": "San Francisco",
+        "civil_status": "Single", "address": "Purok 1", "municipality": "San Francisco", "barangay": "Poblacion",
         "province": "Surigao del Norte", "zip_code": "8405", "emergency_contact_name": "Test Relative",
         "emergency_contact_relationship": "Sibling", "emergency_contact_number": "09000000001",
         "confirm_duplicate": "yes", "check_in": "1", "check_in_reason": "Ubo"}

@@ -435,6 +435,7 @@ ALLOWED = {
      '["git", "log", "--all", "--format=%H", "--", "models/users.py"],'): (1, "a git commit hash"),
 }
 for name in ("migrate_add_left_before_seen", "migrate_add_must_change_password",
+             "migrate_add_patient_barangay", "migrate_civil_status_minor_to_single",
              "migrate_add_referrals", "migrate_admin_minimum_necessary",
              "migrate_immunization_evidence", "migrate_immunization_repeats",
              "migrate_inventory_batches", "migrate_redact_clinical_audit_text",
