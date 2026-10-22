@@ -5,7 +5,7 @@ from io import BytesIO
 from flask import send_file
 
 from models.settings import health_center_name
-from utils.dates import display_date, long_date, now, today
+from utils.dates import display_date, format_datetime, long_date, now, today
 from utils.document import PDF_MIMETYPE, render
 from utils.security import get_current_user
 from utils.small_counts import ranking_note, small_count_note
@@ -182,7 +182,7 @@ def _document(context, screen, produced_by):
     selection = context["selection"]
     window = context["report_window"]
     stamped = now()
-    exported = stamped.strftime("%B %d, %Y at %I:%M %p")
+    exported = format_datetime(stamped, "%B %d, %Y", " at ")
     footer_left = f"{config.SYSTEM_SHORT_NAME} · Exported {exported}"
     if produced_by:
         footer_left += f" by {produced_by}"
@@ -267,7 +267,7 @@ def _cover_sheet(context, screen, sections, produced_by):
             if window["custom"] else
             f"Default window — the last {len(window['months'])} clinic months",
         ),
-        ("Exported", stamped.strftime("%B %d, %Y at %I:%M %p")),
+        ("Exported", format_datetime(stamped, "%B %d, %Y", " at ")),
         ("Exported by", produced_by or "—"),
         ("Source", f"{health_center_name()} records, via {config.SYSTEM_SHORT_NAME}"),
     ]

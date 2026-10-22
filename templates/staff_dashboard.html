@@ -218,7 +218,7 @@
 {%- for visit in waiting_for_doctor %}
             <tr>
               <td class="pat-name">{{ visit.name }}<div class="panel-sub" style="margin:0;">{{ visit.patient_reference }}</div></td>
-              <td>{{ (visit.checked_in.strftime('%b %d, %Y') ~ ' · ' ~ visit.checked_in.strftime('%I:%M %p').lstrip('0')) if visit.checked_in else '—' }}
+              <td>{{ visit.checked_in | format_datetime or '—' }}
 </td>
               <td>{{ visit.service }}</td>
               <td>{{ visit.waiting }}</td>

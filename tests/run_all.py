@@ -57,6 +57,8 @@ SUITES = [
     ("verify_network_mode.py", "(new in Task 16)"),
     ("verify_referrals.py", "(new in Task 19)"),
     ("verify_duplicate_check.py", "(new in Task 20)"),
+    ("verify_time_format.py", "(new in Task 21)"),
+    ("verify_time_format_browser.py", "(new in Task 21)"),
     ("verify_mobile_layout.py", "(new in Task 17)"),
 ]
 

@@ -3,8 +3,12 @@
 Dates are stored as ISO text ('2026-07-07', or '2026-07-07 09:15:00' for the
 CURRENT_TIMESTAMP columns). The screens display them as 'Jul 07, 2026' or
 'July 7, 2026', so the conversion lives here rather than in the models.
+
+Every time of day a person reads is on the 12-hour clock, '2:21 PM', built by
+format_time() below and nowhere else. Stored values stay 24-hour ISO text.
 """
-from datetime import datetime, time, timedelta, timezone
+import re
+from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 MISSING = "—"
@@ -257,6 +261,87 @@ def full_date(value, fallback=MISSING):
             f"{parsed.day}, {parsed.year}")
 
 
+# The stored shapes of a time of day, with or without the date in front:
+# '14:21', '14:21:05', '2026-10-12 11:34', '2026-10-12T11:34:05', and SQLite's
+# fractional '2026-10-12 11:34:05.123'. The same pattern as static/js/time-format.js,
+# so the server and the browser accept exactly the same text. Written out rather
+# than left to fromisoformat(), which also takes '24:00' and offsets.
+_CLOCK_TEXT = re.compile(
+    r"^(?:(\d{4})-(\d{2})-(\d{2})[T ])?(\d{1,2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?$"
+)
+
+
+def _moment(value):
+    """A value -> (datetime or time, whether it carries a time of day), or (None, False).
+
+    Takes a datetime, a time, a date, the text shapes in _CLOCK_TEXT, or a plain
+    'YYYY-MM-DD'. An aware datetime is moved to clinic time first, so a UTC hour
+    can never be printed as a Manila one. Naive values and text are read as
+    written: converting a stored UTC column is to_clinic_time()'s job, and the
+    caller does it before formatting.
+    """
+    if value is None:
+        return None, False
+    if isinstance(value, datetime):
+        return (value.astimezone(CLINIC_TIMEZONE) if value.tzinfo else value), True
+    if isinstance(value, time):
+        return value, True
+    if isinstance(value, date):
+        return datetime.combine(value, time.min), False
+    text = str(value).strip()
+    try:
+        match = _CLOCK_TEXT.match(text)
+        if match:
+            year, month, day, hour, minute, second = match.groups()
+            clock = time(int(hour), int(minute), int(second or 0))
+            if not year:
+                return clock, True
+            return datetime.combine(date(int(year), int(month), int(day)), clock), True
+        if re.match(r"^\d{4}-\d{2}-\d{2}$", text):
+            return datetime.combine(date.fromisoformat(text), time.min), False
+    except ValueError:
+        pass
+    return None, False
+
+
+def format_time(value, seconds=False):
+    """A time of day -> '2:21 PM' (or '2:21:05 PM' with seconds). Empty -> ''.
+
+    The one 12-hour rule for every screen, export and printout. It does not use
+    strftime's %p, which follows the computer's locale and can come back empty or
+    in another language, or %-I / %#I, which work on only one platform each. The
+    hour is computed: 0 -> 12 AM, 12 -> 12 PM, 13 -> 1 PM.
+
+    Accepts what _moment() accepts. A plain date, an unreadable value, None or ''
+    gives '' rather than an exception or an invented midnight.
+    """
+    moment, has_time = _moment(value)
+    if moment is None or not has_time:
+        return ""
+    hour = moment.hour
+    text = f"{(hour + 11) % 12 + 1}:{moment.minute:02d}"
+    if seconds:
+        text += f":{moment.second:02d}"
+    return f"{text} {'AM' if hour < 12 else 'PM'}"
+
+
+def format_datetime(value, date_format="%b %d, %Y", separator=" · ", seconds=False):
+    """A moment -> 'Oct 12, 2026 · 11:34 AM'. Empty or unreadable -> ''.
+
+    The date keeps whatever style the screen already uses (`date_format`, and the
+    `separator` between the two halves: the exports write 'October 22, 2026 at
+    2:21 PM'); only the time half is fixed here, through format_time(). A value
+    with no time of day returns the date alone rather than a fabricated midnight.
+    """
+    moment, has_time = _moment(value)
+    if moment is None or not isinstance(moment, datetime):
+        return ""
+    day = moment.strftime(date_format)
+    if not has_time:
+        return day
+    return f"{day}{separator}{format_time(moment, seconds=seconds)}"
+
+
 def display_timestamp(value, fallback=MISSING):
     """A stored UTC timestamp -> 'Jul 07, 2026 · 6:00 AM' at the health center.
 
@@ -271,9 +356,7 @@ def display_timestamp(value, fallback=MISSING):
         return fallback
     if len(str(value).strip()) <= 10:
         return local.strftime("%b %d, %Y")
-
-    # %I zero-pads the hour on every platform; the lstrip is what turns 06 into 6.
-    return f"{local.strftime('%b %d, %Y')} · {local.strftime('%I:%M %p').lstrip('0')}"
+    return format_datetime(local)
 
 
 def clock_time(value=None, fallback=MISSING):
@@ -296,8 +379,7 @@ def clock_time(value=None, fallback=MISSING):
         local = to_clinic_time(value)
     if local is None:
         return fallback
-    # %I zero-pads the hour on every platform; the lstrip is what turns 04 into 4.
-    return local.strftime("%I:%M %p").lstrip("0")
+    return format_time(local) or fallback
 
 
 def register_date_filters(app):
@@ -306,3 +388,5 @@ def register_date_filters(app):
     app.jinja_env.filters["full_date"] = full_date
     app.jinja_env.filters["display_timestamp"] = display_timestamp
     app.jinja_env.filters["clock_time"] = clock_time
+    app.jinja_env.filters["format_time"] = format_time
+    app.jinja_env.filters["format_datetime"] = format_datetime

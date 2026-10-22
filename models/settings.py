@@ -4,6 +4,7 @@ import re
 from flask import g, has_request_context
 
 from database.connection import db_connection
+from utils.dates import format_time
 
 # ---------------------------------------------------------------------------
 # THE KEYS, AND WHAT THE SYSTEM DOES WITHOUT THEM
@@ -321,13 +322,9 @@ def display_time(value):
     Falls back to the stored string when it cannot be parsed, so a hand-edited
     row shows what it actually holds instead of a blank.
     """
-    minutes = to_minutes(value)
-    if minutes is None:
+    if to_minutes(value) is None:
         return value or ""
-    hour, minute = divmod(minutes, 60)
-    suffix = "AM" if hour < 12 else "PM"
-    hour12 = hour % 12 or 12
-    return f"{hour12}:{minute:02d} {suffix}"
+    return format_time(value)
 
 
 # ---------------------------------------------------------------------------

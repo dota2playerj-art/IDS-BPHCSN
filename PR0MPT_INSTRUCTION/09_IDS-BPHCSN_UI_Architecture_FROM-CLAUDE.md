@@ -259,7 +259,7 @@ Every screen — regardless of role — must be built from the same four regions
 | Region | Spec | Behavior |
 |--------|------|----------|
 | **Sidebar** | 280px fixed width, left, teal `#169B92` background, white text/icons | **Identical structure app-wide.** Only the *menu items* change per role (see Section 2) — never the styling, icon set, active/hover treatment, or position. |
-| **Header** | 80px fixed height, white background | **Identical across all screens a role can reach.** Contains: global patient search, a "Loaded HH:MM" pill, and the user avatar + role label + dropdown. Never redesigned per screen — but two of the four are scoped to the role, on the same grounds §2 scopes the sidebar, and the detail is below this table. |
+| **Header** | 80px fixed height, white background | **Identical across all screens a role can reach.** Contains: global patient search, a "Loaded 4:34 PM" pill (12-hour clock, as every time in the system), and the user avatar + role label + dropdown. Never redesigned per screen — but two of the four are scoped to the role, on the same grounds §2 scopes the sidebar, and the detail is below this table. |
 | **Main Content Area** | Fluid, Bootstrap 12-column grid, `#F5F7FA` background | **The only region that changes.** Houses the screen-specific cards, tables, forms, and charts defined in the Screen Specifications. |
 | **Footer** | No persistent footer bar observed in approved UI; system status/version info is anchored at the bottom of the sidebar instead (e.g., "System Online," version number) | Retain this sidebar-footer pattern — do not introduce a separate horizontal page footer, to stay consistent with the approved Dashboard. |
 
@@ -278,7 +278,7 @@ Staff's in every row below.
 | Element | Administrator | Health Center Staff | Barangay Official | Notes |
 |---|---|---|---|---|
 | **Global patient search** | Yes | Yes | **Absent** | A real form. It submits `search` to that role's Patient Records URL and introduces no matching rule of its own — Patient Records' toolbar box has matched patient ID / name / contact number / address as a lower-cased substring since that screen was built, and it is what runs the term. The Barangay Official has no Patient Records (§2), so there is no destination to give the box; `patient_records_endpoint` is simply absent for that role and the header renders nothing. |
-| **"Loaded HH:MM" pill** | Yes | Yes | Yes | Was "Synced just now". Nothing in this system syncs: one SQLite file, no background job, no second store. What it prints instead is the moment the page was rendered, from `utils.dates.now()` — the same clock every date on the screen comes from. Reload and it changes, which is what makes it checkable. |
+| **"Loaded 4:34 PM" pill** | Yes | Yes | Yes | Was "Synced just now". Nothing in this system syncs: one SQLite file, no background job, no second store. What it prints instead is the moment the page was rendered, from `utils.dates.now()` — the same clock every date on the screen comes from. Reload and it changes, which is what makes it checkable. |
 | **Notification bell** | **Absent** | **Absent** | **Absent** | Removed in Task 7, with the Notifications screen it linked to. No role has a bell. |
 | **Red unread dot** | — | — | — | Removed for every role. There is no notifications table and nothing writes one, so there was no count behind it. Removed rather than zeroed, for the same reason the sidebar's hard-coded "5" badge went: a zero badge reads as an alert that is not there. |
 

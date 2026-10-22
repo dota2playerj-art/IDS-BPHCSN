@@ -9,7 +9,7 @@ import config
 from models.settings import health_center_name
 from routes.audit_views import PAGE_SIZE
 from routes.report_export import _download  # noqa: F401  (re-exported below)
-from utils.dates import now
+from utils.dates import format_datetime, now
 from utils.document import PDF_MIMETYPE, render
 from utils.workbook import XLSX_MIMETYPE, build, safe_filename, sheet, table
 
@@ -73,7 +73,7 @@ def audit_document(context, produced_by=""):
     """
     sheets, stem = _assemble(context, produced_by)
     stamped = now()
-    exported = stamped.strftime("%B %d, %Y at %I:%M %p")
+    exported = format_datetime(stamped, "%B %d, %Y", " at ")
     footer_left = f"{config.SYSTEM_SHORT_NAME} · Exported {exported}"
     if produced_by:
         footer_left += f" by {produced_by}"
@@ -130,7 +130,7 @@ def _cover_sheet(context, produced_by):
         ("Screen", "Audit Logs"),
         ("Module filter", _scope_label(context)),
         ("Entries in this file", total),
-        ("Exported", stamped.strftime("%B %d, %Y at %I:%M %p")),
+        ("Exported", format_datetime(stamped, "%B %d, %Y", " at ")),
         ("Exported by", produced_by or "—"),
         ("Source", f"{health_center_name()} records, via {config.SYSTEM_SHORT_NAME}"),
     ]

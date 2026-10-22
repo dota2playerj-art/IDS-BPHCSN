@@ -486,6 +486,9 @@
 
     Ordinary DOM work that needs no library does NOT need the wrapper and should
     stay where it is; only the calls into `bootstrap` need to wait. #}
+  {#- The 12-hour clock for times the browser writes (IDSTime). Before the block,
+      so a page script can use it while the page is still being parsed. #}
+  <script src="{{ url_for('static', filename='js/time-format.js') }}"></script>
 {% block scripts %}{% endblock %}
 
   <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>

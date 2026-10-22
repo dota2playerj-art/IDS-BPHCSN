@@ -9,7 +9,9 @@ from models.consultations import RESTRICTED_PLACEHOLDER
 from models.inventory import get_expiry_batches
 from models.settings import health_center_name
 from routes.report_export import _download  # noqa: F401  (re-exported below)
-from utils.dates import display_date, display_timestamp, long_date, now, today
+from utils.dates import (
+    display_date, display_timestamp, format_datetime, long_date, now, today,
+)
 from utils.document import LANDSCAPE, render
 from utils.workbook import XLSX_MIMETYPE, build, figures, safe_filename, sheet, table
 
@@ -217,7 +219,8 @@ def _document(export, produced_by):
     does not.
     """
     stamped = now()
-    footer_left = f"{config.SYSTEM_SHORT_NAME} · Exported {stamped.strftime('%B %d, %Y at %I:%M %p')}"
+    footer_left = (f"{config.SYSTEM_SHORT_NAME} · Exported "
+                   f"{format_datetime(stamped, '%B %d, %Y', ' at ')}")
     if produced_by:
         footer_left += f" by {produced_by}"
     payload = render(
@@ -284,7 +287,7 @@ def _cover_sheet(screen, subtitle, produced_by, detail, controls, index, intro,
         ("Screen", screen),
         ("Document", subtitle),
         *detail,
-        ("Exported", stamped.strftime("%B %d, %Y at %I:%M %p")),
+        ("Exported", format_datetime(stamped, "%B %d, %Y", " at ")),
         ("Exported by", produced_by or "—"),
         ("Source", f"{health_center_name()} records, via {config.SYSTEM_SHORT_NAME}"),
     ]

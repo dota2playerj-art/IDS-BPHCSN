@@ -66,7 +66,7 @@ from models.audit import (
     get_audit_logs,
     get_audit_stats,
 )
-from utils.dates import to_clinic_time
+from utils.dates import format_datetime, format_time, to_clinic_time
 from utils.names import initials
 
 # How many entries one page of the trail shows. The screen has no paging
@@ -423,12 +423,9 @@ def _decorate(entry):
 
     return {
         **entry,
-        "time_text": local.strftime("%I:%M %p").lstrip("0") if local else "—",
+        "time_text": format_time(local) or "—",
         "date_text": local.strftime("%b %d, %Y") if local else "—",
-        "full_text": (
-            f"{local.strftime('%b %d, %Y')}, {local.strftime('%I:%M:%S %p').lstrip('0')}"
-            if local else "—"
-        ),
+        "full_text": format_datetime(local, separator=", ", seconds=True) or "—",
         "initials": _initials(entry.get("user_name")),
         "summary": lead,
         "changes": changes,

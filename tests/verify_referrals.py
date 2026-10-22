@@ -495,10 +495,13 @@ for label, client, uid in (("Staff", staff, STAFF_ID), ("the Doctor", doctor, DO
     patient = q1("SELECT * FROM patients WHERE id = ?", (sl_pid,))
     row = row_of(sl_v)
     stamp = row["referred_at"]
+    # The time is printed on the 12-hour clock: '14:05' is '2:05 PM'.
+    hour = int(stamp[11:13])
+    slip_time = f"{(hour + 11) % 12 + 1}:{stamp[14:16]} {'AM' if hour < 12 else 'PM'}"
     check(f"{label} can open the slip, an A4 page with its own print rules and a Print button",
           r.status_code == 200 and "size:A4 portrait" in page and "window.print()" in page)
     check(f"{label}: the slip prints the health center, the date and time, name, ID, age and sex",
-          CENTER in text and display_date(stamp[:10]) in text and stamp[11:16] in text
+          CENTER in text and display_date(stamp[:10]) in text and slip_time in text
           and NAMES["Slip"] in text and patient["patient_id"] in text
           and (format_age(patient["birth_date"]) or "?") in text and patient["sex"] in text, text[:400])
     check(f"{label}: ... the destination with the facility name, the complaint, the vitals and the reason",

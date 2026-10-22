@@ -20,7 +20,7 @@ from models.queue_actions import (
     UNDO_LEFT, UNDO_REFERRAL, allowed_actions, is_today, statuses_allowing,
 )
 from models.referrals import REFERRABLE_STATUSES, count_by_destination, referral_allowed
-from utils.dates import now, recent_months, resolve_range, today
+from utils.dates import format_time, now, recent_months, resolve_range, today
 from utils.roles import is_care_team
 from utils.small_counts import fold_small_counts, shown_count
 
@@ -177,21 +177,15 @@ def queue_display_name(entry):
 
 
 def _clock(value):
-    """A stored timestamp or time rendered as 'HH:MM', or None.
+    """A stored timestamp or time rendered as '2:21 PM', or None.
 
-    Accepts both what checked_in_at holds ('YYYY-MM-DD HH:MM:SS') and what
-    appointment_time holds ('HH:MM'), because the queue shows the two side by
-    side and neither should need its own formatting rule at the call site.
+    Accepts both what checked_in_at holds ('YYYY-MM-DD HH:MM:SS', clinic-local)
+    and what appointment_time holds ('HH:MM'), because the queue shows the two
+    side by side and neither should need its own formatting rule at the call
+    site. The 12-hour rule itself is utils.dates.format_time(). The queue is
+    ordered by the stored values, never by this text.
     """
-    if not value:
-        return None
-    text = str(value).strip()
-    if " " in text:
-        text = text.split(" ", 1)[1]
-    parts = text.split(":")
-    if len(parts) < 2 or not (parts[0].isdigit() and parts[1].isdigit()):
-        return None
-    return f"{int(parts[0]):02d}:{parts[1][:2]}"
+    return format_time(value) or None
 
 
 def get_appointments_for_patient(patient_id, viewer_role):

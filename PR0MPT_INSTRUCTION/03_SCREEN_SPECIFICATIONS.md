@@ -39,6 +39,19 @@ Each screen specification includes:
 
 The Login Page and Administrator Dashboard are the official visual references for the entire system.
 
+**Times on every screen (Task 21, 2026-10-22).** Every time shown to a person uses the 12-hour clock,
+the everyday format in the Philippines: "2:21 PM" (no leading zero, one space, AM or PM in capitals);
+with a date, the screen's own date style and then the time, "Oct 12, 2026 · 11:34 AM". Noon is
+"12:00 PM" and midnight "12:00 AM". Where a screen shows seconds (the Audit Logs detail) they stay:
+"2:21:05 PM". This covers the header's "Loaded" time, the Patient Queue's Arrived column and the open
+visits from earlier days, the dashboards, the Appointment History, the referral slip, the Audit Logs,
+SMS history, User Management, Settings (clinic hours, last saved, backups), the printed-page stamp and
+the "Exported" stamp and time columns of every Excel and PDF file ("October 22, 2026 at 2:21 PM"). The
+rule is one helper on each side: `utils/dates.py` `format_time()` / `format_datetime()` (Jinja filters
+of the same names) and `static/js/time-format.js`. Stored values, form values and
+`<input type="time">` fields stay 24-hour, and lists are ordered by the stored value, never by the
+displayed text. `tests/verify_time_format.py` fails if a display path formats a time any other way.
+
 Every screen must reuse the same design system.
 
 ---
@@ -500,7 +513,7 @@ Administrator's queue shows the badge only. The table footer, the calendar and t
 as their own outcome.
 
 **The referral slip (Task 19).** A page at `/staff/appointment_scheduling/referral-slip/<visit>` for Staff and
-the Doctor, with a Print button. A4 portrait. It shows the health center name, the date and time, the patient's
+the Doctor, with a Print button. A4 portrait. It shows the health center name, the date and time ("Oct 22, 2026 · 2:21 PM"), the patient's
 name, ID, age and sex, where the patient is referred to, the chief complaint, the vital signs, the reason, and
 "Referred by" with a line for a signature. If the visit is sealed, the chief complaint and the reason show
 "Confidential — discuss directly with the receiving doctor." The Administrator and the Barangay Official have no

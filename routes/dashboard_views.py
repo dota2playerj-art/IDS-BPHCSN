@@ -28,7 +28,7 @@ from models.patients import (
     get_patient_stats,
     get_registration_trend,
 )
-from utils.dates import to_clinic_time, today
+from utils.dates import format_datetime, format_time, to_clinic_time, today
 from models.doctor_worklist import count_waiting_for_doctor, get_waiting_for_doctor
 from utils.roles import holds_clinical_authority, is_care_team
 from utils.security import current_role
@@ -86,7 +86,7 @@ def _recent_registrations(limit):
         stamp = to_clinic_time(patient["created_at"])
         rows.append({
             **patient,
-            "registered_time": stamp.strftime("%I:%M %p").lstrip("0") if stamp else "",
+            "registered_time": format_time(stamp),
             "registered_date": stamp.strftime("%b %d, %Y") if stamp else "",
         })
     return rows
@@ -124,7 +124,7 @@ def _recent_consultations(limit, reference):
             # format_age(), not calculate_age(): this column prints the value,
             # and the numeric form is what makes an infant read as "0".
             "age": format_age(entry.get("birth_date"), on_date=reference),
-            "recorded_time": stamp.strftime("%I:%M %p").lstrip("0") if stamp else "—",
+            "recorded_time": format_time(stamp) or "—",
         })
     return rows
 
@@ -148,8 +148,7 @@ def _activity_feed(limit):
         stamp = to_clinic_time(entry.get("created_at"))
         events.append({
             **entry,
-            "when": (f"{stamp.strftime('%b %d')} · "
-                     f"{stamp.strftime('%I:%M %p').lstrip('0')}") if stamp else "—",
+            "when": format_datetime(stamp, "%b %d") or "—",
         })
     return events
 

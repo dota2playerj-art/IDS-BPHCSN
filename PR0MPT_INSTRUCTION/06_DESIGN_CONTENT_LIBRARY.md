@@ -546,6 +546,21 @@ Example
 
 8:30 AM
 
+Rules (Task 21, 2026-10-22). Every time a person reads, on a screen, in an Excel or PDF file or on
+a printout, uses this format:
+
+- Time only: "2:21 PM". No leading zero on the hour, one space, AM or PM in capitals.
+- Date and time: the screen's own date style, then the time: "Oct 12, 2026 · 11:34 AM". The
+  exports' stamp reads "October 22, 2026 at 2:21 PM".
+- Noon is "12:00 PM", midnight is "12:00 AM", 00:05 is "12:05 AM".
+- Where seconds are shown (the Audit Logs detail), they stay: "2:21:05 PM".
+- Stored values, form values and `<input type="time">` fields stay 24-hour ("14:21"); the browser
+  shows a time field in its own way.
+
+One helper builds it on each side: `utils/dates.py` `format_time()` / `format_datetime()` (also
+the Jinja filters `format_time` and `format_datetime`) and `static/js/time-format.js`
+(`IDSTime.formatTime()`, `IDSTime.formatDateTime()`).
+
 ---
 
 # Currency

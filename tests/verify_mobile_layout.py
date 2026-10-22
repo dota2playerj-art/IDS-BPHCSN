@@ -214,7 +214,7 @@ PROBE = r"""
 }
 """
 
-# Text in the "Loaded 20:41" pill changes every minute; nothing else on a page is time-based.
+# Text in the "Loaded 8:41 PM" pill changes every minute; nothing else on a page is time-based.
 MASK_CLOCK = "document.querySelectorAll('.sync-pill').forEach(e => e.style.visibility = 'hidden')"
 
 

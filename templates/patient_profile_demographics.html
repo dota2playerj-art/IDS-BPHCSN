@@ -109,9 +109,8 @@
   // The printed date is stamped at print time, as on the full profile.
   (function(){
     function stamp(){
-      var when = new Date().toLocaleString(undefined, {
-        year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit'
-      });
+      // static/js/time-format.js: the 12-hour clock whatever the browser's language.
+      var when = IDSTime.formatDateTime(new Date());
       document.querySelectorAll('.print-stamp').forEach(function(el){ el.textContent = when; });
     }
     window.addEventListener('beforeprint', stamp);

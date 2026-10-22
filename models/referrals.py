@@ -17,7 +17,7 @@ from database.connection import db_connection
 from models.doctor_worklist import has_diagnosis
 from models.queue_actions import REFER, REFERRED, statuses_allowing
 from utils import sealed_crypto
-from utils.dates import now, today
+from utils.dates import format_time, now, today
 
 # THE ONE LIST OF DESTINATIONS. The form offers exactly these, the server accepts exactly
 # these, and the reports break the referrals down by them.
@@ -295,7 +295,7 @@ def get_referral_slip(appointment_id):
     reason = (row["referral_reason"] or "").strip()
     name = " ".join(part for part in (row["first_name"], row["middle_name"], row["last_name"])
                     if part)
-    referred_at = (row["referred_at"] or "")[:16]
+    referred_at = row["referred_at"] or ""
     return {
         "reference": f"APT-{row['id']:05d}",
         "patient_name": name,
@@ -304,7 +304,8 @@ def get_referral_slip(appointment_id):
         "sex": row["sex"] or "",
         "destination": destination_text(row["referral_destination"], row["referral_facility"]),
         "referred_on": referred_at[:10],
-        "referred_time": referred_at[11:16],
+        # referred_at is clinic-local (now(), not CURRENT_TIMESTAMP): no conversion.
+        "referred_time": format_time(referred_at),
         "referred_by": row["referred_by_name"] or "",
         "vitals": vitals,
         "has_intake": intake is not None,
