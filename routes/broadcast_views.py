@@ -175,7 +175,11 @@ def sms_notifications_context(compose=None, errors=None):
 
 
 def _extract_compose(form_data):
-    return {field: (form_data.get(field) or "").strip() for field in COMPOSE_FIELDS}
+    # A browser posts a textarea's line breaks as CRLF but its counter sees LF. They are
+    # stored and sent as LF, so the server counts each line break as one character,
+    # exactly as the counter on the screen did (audit B05).
+    return {field: (form_data.get(field) or "").replace("\r\n", "\n").strip()
+            for field in COMPOSE_FIELDS}
 
 
 def _sent_message(broadcast):

@@ -18,7 +18,7 @@ from models.audit import (
 from models.service_schedule import (
     FIELD_LABELS,
     NOTE_MAX_LENGTH,
-    SERVICE_MAX_LENGTH,
+    SCHEDULE_SERVICES,
     WEEK_ORDINALS,
     WEEKDAY_NAMES,
     by_weekday,
@@ -29,7 +29,6 @@ from models.service_schedule import (
     get_entries,
     get_entry,
     next_dates,
-    service_names,
     services_on,
     update_entry,
     validate_entry,
@@ -95,10 +94,9 @@ def service_schedule_context(mode=None, target=None, form=None, errors=None):
         "todays_services": services_on(day, entries),
         "can_edit": can_edit,
         "panel": panel,
-        "service_suggestions": service_names(entries),
+        "service_options": SCHEDULE_SERVICES,
         "weekday_names": WEEKDAY_NAMES,
         "week_ordinals": WEEK_ORDINALS,
-        "service_max_length": SERVICE_MAX_LENGTH,
         "note_max_length": NOTE_MAX_LENGTH,
     }
 

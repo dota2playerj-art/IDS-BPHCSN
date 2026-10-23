@@ -589,6 +589,23 @@ no-show", "Never closed" or "not yet arrived". A visit still carrying one of tho
 counted in one line, "Older records: N", on the reports, the community report and the files, and only when N
 is above 0.
 
+**One open visit per patient per day (Task 23, 2026-10-24, audit B03).** A patient whose visit today is
+still open — Waiting, In Consultation or Waiting for the Doctor — cannot be checked in again. The server
+refuses it with "This patient already has an open visit today. Open it from the queue instead." and a link
+to that visit's row (each row carries the anchor `#visit-<id>`); the Check In list shows "Already <status>"
+beside the name. A new check-in is allowed once the visit is closed (Completed, Left before being seen or
+Referred).
+
+**Deceased patients (Task 23, audit B04).** A visit of a patient marked Deceased shows a "Deceased" tag and
+offers no clinical action: no Start, Record Consultation, Send to the Doctor, See patient or Refer, and the
+server refuses each with "This patient is marked Deceased, so no clinical action can be recorded. Close the
+open visit with Left before being seen." Left before being seen, Mark Completed, Change service, the two
+Undos and the referral slip stay, so an open visit can still be closed. Check-in was already refused. No
+new dose (consultation form or "Record dose given elsewhere") or dispensing is recorded for such a patient;
+an existing record can still be corrected. The Doctor cannot declare a death while the patient has an open
+visit of any day: "Close this patient's open visits first.", with a link to each. Nothing is closed
+automatically and no status was added.
+
 Purpose
 
 Work today's queue: record who has arrived, in the order they arrived, and see
@@ -655,7 +672,10 @@ Message Editor
 
 SMS Preview
 
-Character Counter
+Character Counter (Task 23, 2026-10-24, audit B05: GSM-7 is 160 characters in one segment and 153 per
+part; a message with any other character is UCS-2, counted in 16-bit units — 70 in one segment, 67 per
+part — so an emoji counts as two. A line break counts once: the server stores it as LF, as the counter
+sees it. The counter and the server use the same rule.)
 
 Delivery Status
 
@@ -1100,6 +1120,21 @@ Every figure comes from `reports_analytics_context()` rather than being counted 
 
 Export Excel and Export PDF are both real (`routes/report_export.py`), and Print works. Figures the schema cannot establish are reported as absent rather than invented.
 
+**One range for every report type (Task 23, 2026-10-24, audit B08).** The chosen range drives every report
+type — Full, Consultations, Registrations, Vaccination, Health Concerns, Notifications — on the screen, in
+the charts, in the sub-lines and in the Excel and PDF files. `community_reports_context()` hands the range
+it parsed (never the raw query string) to the Reports & Analytics builder; before this, the four types that
+Screen 10 does not offer fell back to the default window under the chosen dates.
+
+**Coverage is never as of a future day (audit B09).** Immunization coverage is judged as of the range's
+end, or as of today when the range ends later; then the label says so: "as of Oct 24, 2026 (today)".
+
+**Plain sub-lines (audits B10, B11).** The "Immunization Doses Given Here" card names only the children
+dosed here ("given to 2 children", or "no doses given here in this range"), with any dose given elsewhere
+in its own sentence. The attendance rate says what it counts: "Patients who came (attended, waiting for the
+Doctor or referred) out of the N finished appointments"; the same words are in the Excel and PDF files and
+on Screen 10.
+
 ---
 
 # SCREEN 19
@@ -1214,6 +1249,10 @@ Backend Notes
 One template, `record_consultation.html`, rendered by two blueprints with one shared context builder in `routes/consultation_views.py`, so the Administrator's variant and the clinical floor's (Health Center Staff and Doctor) cannot drift apart. Each route keeps its own role guard and its own redirect target.
 
 Only the Doctor is drawn, required and allowed to save the diagnosis and treatment plan. For the Administrator and Health Center Staff the panel is titled "Notes & Follow-up" and says the Doctor records the assessment. A diagnosis in a submission from either role is discarded server-side. See "Clinical Authority and the Doctor Role".
+
+**Required only where the service needs the Doctor (Task 23, 2026-10-24, audit B01).** The diagnosis and treatment plan are required of the Doctor only on a visit whose service needs a diagnosis (`needs_doctor()`: Consultation, Follow-up Consultation, Hypertension / Diabetes Monitoring, and a record with no queue visit). On an Immunization, Prenatal Check-up or Family Planning visit, or an old Dental one, the two fields are marked "(optional for this service)", carry no asterisk, and the Doctor's save or edit goes through without them. The form and the server ask the same function. A Consultation visit still cannot be Completed without a diagnosis.
+
+**Deceased patients (audit B04).** Record Consultation is refused for a patient marked Deceased. Edit still corrects an existing record, but refuses one that adds a dose, another vaccination or a dispensing line.
 
 Recording is anchored to a queue entry and completes it on save.
 
@@ -1330,7 +1369,9 @@ Add / Edit / Delete panel (Administrator only)
 
 Fields
 
-Service — typed; names already on the schedule are suggested
+Service — chosen from the Patient Queue's own service list (`VISIT_SERVICES`, the one source the Check
+In dialog reads; Task 23, 2026-10-24, audit B06). An entry saved before this rule with another name is
+still shown, tagged "Not a queue service", and must be given a listed service before it can be saved again.
 
 Days it runs — Monday to Sunday, at least one
 
@@ -1344,7 +1385,8 @@ Add to schedule, Save changes, Delete entry (Administrator only)
 
 Validation
 
-A service is required, 80 characters at most. At least one day. Weeks are 1st to 4th only, and
+A service is required and must be on the Patient Queue's list ("Choose a service from the list. The
+schedule uses the same services as the Patient Queue."); case and spaces are ignored. At least one day. Weeks are 1st to 4th only, and
 ticking all four is refused with a message to leave them blank, since four is not "every week" in a
 month with a 5th occurrence. A note of 300 characters at most. An exact duplicate of an existing
 entry is refused. A refused submit re-renders the screen at 200 with the panel holding exactly what

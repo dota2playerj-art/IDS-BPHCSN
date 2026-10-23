@@ -16,9 +16,14 @@ from models.doctor_worklist import (
     waiting_text,
 )
 from models.queue_actions import (
-    CHANGE_SERVICE, MARK_COMPLETED, MARK_LEFT, REFER, REFERRED, SEND_TO_DOCTOR, START,
-    UNDO_LEFT, UNDO_REFERRAL, allowed_actions, is_today, statuses_allowing,
+    CHANGE_SERVICE, DECEASED_REFUSED, MARK_COMPLETED, MARK_LEFT, REFER, REFERRED,
+    SEND_TO_DOCTOR, START, UNDO_LEFT, UNDO_REFERRAL, allowed_actions, is_today,
+    statuses_allowing,
 )
+
+# The patients.status value of a patient declared dead (models/patients.py
+# DOCTOR_ONLY_STATUS, the same string). The queue rows carry it to hide clinical actions.
+PATIENT_DECEASED = "Deceased"
 from models.referrals import REFERRABLE_STATUSES, count_by_destination, referral_allowed
 from utils.dates import format_time, now, recent_months, resolve_range, today
 from utils.roles import is_care_team
@@ -150,6 +155,8 @@ def _to_queue_entry(row):
     entry["is_waiting"] = entry["status"] == WAITING
     entry["is_in_consultation"] = entry["status"] == IN_CONSULTATION
     entry["in_queue"] = entry["status"] in QUEUE_STATUSES
+    # Audit B04: a visit of a patient marked Deceased offers no clinical action.
+    entry["patient_deceased"] = entry.get("patient_status") == PATIENT_DECEASED
     # A visit of a service that needs the Doctor is sent to him, not closed (Task 6c).
     entry["needs_doctor"] = needs_doctor(entry.get("appointment_type"))
     entry["walk_in"] = bool(entry.get("is_walkin"))
@@ -217,6 +224,7 @@ _QUEUE_SELECT = """
            a.referred_at, a.status_before_referred,
            p.patient_id AS patient_reference,
            p.first_name, p.middle_name, p.last_name, p.sex, p.birth_date,
+           p.status AS patient_status,
            u.full_name AS assigned_staff,
            b.full_name AS booked_by
     FROM appointments a
@@ -589,9 +597,16 @@ def find_todays_appointment(patient_id, on_date=None):
 
 
 def find_active_queue_entry(patient_id, on_date=None):
-    """This patient's row for today that is already in the queue, or None."""
+    """This patient's OPEN visit for today, or None (audit B03).
+
+    Open is Waiting, In Consultation or Waiting for the Doctor (OPEN_STATUSES). It
+    used to be only the first two, so a patient whose visit was Waiting for the
+    Doctor could be checked in again and have two open visits the same day. A visit
+    that is Completed, Left before being seen or Referred is closed, and the patient
+    may be checked in again after it.
+    """
     day = (on_date or today()).isoformat()
-    placeholders = ", ".join("?" for _ in QUEUE_STATUSES)
+    placeholders = ", ".join("?" for _ in OPEN_STATUSES)
     with db_connection() as conn:
         row = conn.execute(
             f"""
@@ -602,7 +617,7 @@ def find_active_queue_entry(patient_id, on_date=None):
         ORDER BY id
         LIMIT 1
         """,
-            (patient_id, day, *QUEUE_STATUSES),
+            (patient_id, day, *OPEN_STATUSES),
         ).fetchone()
     return dict(row) if row else None
 
@@ -614,7 +629,8 @@ def check_in_patient(patient_id, reason, user_id, on_date=None, audit=None, *, s
 
         "updated"        they had a booking for today; that row became Waiting
         "created"        no booking, so a walk-in record was created
-        "already"        they are already Waiting or In Consultation
+        "already"        they already have an open visit today (Waiting, In
+                         Consultation or Waiting for the Doctor)
 
     Converting an existing booking rather than inserting alongside it is the
     whole point of the lookup: a patient who booked and then arrived must not end
@@ -1215,6 +1231,7 @@ def attach_actions(entries, role):
                 or (action == UNDO_LEFT and not entry["can_undo_left"])
                 or (action == REFER and not entry["can_refer"])
                 or (action == UNDO_REFERRAL and not entry["can_undo_referral"])
+                or (action in DECEASED_REFUSED and entry.get("patient_deceased"))
             )
         )
     return entries
@@ -1223,6 +1240,32 @@ def attach_actions(entries, role):
 # The statuses of a visit that is still open: nobody has finished it. A visit from an
 # earlier day in one of these is listed on the Patient Queue (Task 10), whatever its status.
 OPEN_STATUSES = (WAITING, IN_CONSULTATION, WAITING_DOCTOR)
+
+
+def get_open_visits_for_patients(patient_ids):
+    """Every open visit, of any day, of these patients: {patient_id: [visit, ...]}.
+
+    Open is OPEN_STATUSES. Used to refuse declaring a patient dead while a visit of
+    theirs is still open (audit B04, D2). Reads ids, dates and statuses only.
+    """
+    ids = [int(i) for i in patient_ids]
+    if not ids:
+        return {}
+    marks = ", ".join("?" for _ in ids)
+    statuses = ", ".join("?" for _ in OPEN_STATUSES)
+    with db_connection() as conn:
+        rows = conn.execute(
+            f"SELECT id, patient_id, appointment_date, status FROM appointments "
+            f"WHERE patient_id IN ({marks}) AND status IN ({statuses}) "
+            f"ORDER BY appointment_date, id",
+            (*ids, *OPEN_STATUSES),
+        ).fetchall()
+    found = {}
+    for row in rows:
+        visit = dict(row)
+        visit["reference"] = f"APT-{visit['id']:05d}"
+        found.setdefault(visit["patient_id"], []).append(visit)
+    return found
 
 
 def get_open_earlier_visits(active=None):

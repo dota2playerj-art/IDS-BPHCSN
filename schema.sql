@@ -40,8 +40,10 @@ CREATE TABLE users (
 -- migrate_add_patient_barangay.py added it with ALTER TABLE (Task 22); it is NULL on
 -- records saved before then. address holds the house number, street and purok.
 --
--- status is a soft lifecycle flag: patient records are never hard-deleted. Only
--- Health Center Staff and Administrator may change it; Barangay Official never can.
+-- status is a soft lifecycle flag: patient records are never hard-deleted. Health
+-- Center Staff and the Doctor move a record between Active and Inactive; only the
+-- Doctor sets or reverses Deceased, and not while the patient has an open visit.
+-- The Administrator and the Barangay Official never change it.
 CREATE TABLE patients (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     patient_id TEXT NOT NULL UNIQUE,

@@ -96,8 +96,8 @@ from models.immunizations import (
 )
 from models.patients import get_patient_by_id
 from routes.sealed_access import log_unopenable
-from models.doctor_worklist import WAITING_FOR_DOCTOR as WAITING_DOCTOR, has_diagnosis
-from models.queue_actions import RECORD_ACTION_BY_STATUS, action_allowed
+from models.doctor_worklist import WAITING_FOR_DOCTOR as WAITING_DOCTOR, has_diagnosis, needs_doctor
+from models.queue_actions import DECEASED_MESSAGE, RECORD_ACTION_BY_STATUS, action_allowed
 from routes.audit_entries import (
     consultation_completed,
     consultation_finished,
@@ -109,6 +109,11 @@ from routes.audit_entries import (
 )
 from utils.dates import display_date, today
 from utils.security import current_role
+
+# Audit B04, D1. A patient marked Deceased gets no new clinical record.
+PATIENT_DECEASED = "Deceased"
+DECEASED_DOSES_MESSAGE = ("This patient is marked Deceased, so no dose, vaccination or "
+                          "medicine can be added. Your changes have not been saved.")
 
 # The consultation form posts one checkbox per scheduled dose under this name,
 # each valued "CODE:DOSE". Named once so the template, the parser and the audit
@@ -616,6 +621,28 @@ def _submitted_reported_doses(form_data):
     }
 
 
+def visit_appointment(appointment=None, consultation=None):
+    """The queue visit a record belongs to: the one given, or the edited record's own."""
+    if appointment is not None:
+        return appointment
+    if consultation is not None and consultation.get("appointment_id"):
+        return get_appointment_by_id(consultation["appointment_id"])
+    return None
+
+
+def diagnosis_required(appointment=None, consultation=None):
+    """Whether this visit needs a diagnosis and treatment plan (audit B01).
+
+    The same rule the queue uses to send a visit to the Doctor: models/doctor_worklist.py
+    needs_doctor(). A visit of a service that needs no diagnosis (Immunization, Prenatal
+    Check-up, Family Planning, an old Dental visit) saves without one, for the Doctor
+    too. A record with no queue visit is treated as a consultation, as needs_doctor()
+    treats a blank service.
+    """
+    visit = visit_appointment(appointment, consultation)
+    return needs_doctor(visit.get("appointment_type") if visit else None)
+
+
 def consultation_form_context(patient, appointment=None, consultation=None,
                               form=None, errors=None, ticked=None,
                               general_submitted=None, dispensing_submitted=None,
@@ -707,6 +734,9 @@ def consultation_form_context(patient, appointment=None, consultation=None,
         # nothing else about roles -- it does not compare role strings, so it
         # cannot come to disagree with the server about who may diagnose.
         "can_diagnose": may_diagnose,
+        # Whether the two Doctor-only fields are required on this visit. The form marks
+        # them with the asterisk only then, and the server asks the same function.
+        "diagnosis_required": diagnosis_required(appointment, consultation),
         "sealed_unopenable": sealed_unopenable,
         # The chief complaint and additional notes of a sealed visit, for a role
         # that may not read them: the template prints the placeholder instead.
@@ -813,6 +843,10 @@ def record_consultation_context(appointment_id):
     patient = get_patient_by_id(appointment["patient_id"])
     if patient is None:
         return None, "That patient record could not be found."
+    # Audit B04, D1: nothing clinical is written for a patient marked Deceased --
+    # no intake, no consultation, and so no dose or dispensing at one.
+    if patient.get("status") == PATIENT_DECEASED:
+        return None, DECEASED_MESSAGE
 
     return consultation_form_context(patient, appointment=appointment), None
 
@@ -911,7 +945,8 @@ def process_record_consultation(appointment_id, form_data, user_id,
     restrict = _submitted_restriction(form_data) and may_diagnose
 
     errors = validate_consultation_form(
-        values, age_context, require_diagnosis=may_diagnose
+        values, age_context,
+        require_diagnosis=may_diagnose and diagnosis_required(appointment=appointment),
     )
     errors.update(general_errors)
     errors.update(reported_errors)
@@ -1422,8 +1457,26 @@ def process_edit_consultation(consultation_id, form_data, user_id, ip_address=No
 
     restrict = (_submitted_restriction(form_data) and may_diagnose) or unopenable
 
+    # Audit B04, D1: an existing record of a patient marked Deceased may still be
+    # corrected, but no new dose, other vaccination or dispensing is added to it.
+    recorded_here = ({(dose["vaccine_code"], dose["dose_number"])
+                      for dose in get_immunizations_for_consultation(consultation_id)}
+                     if patient.get("status") == PATIENT_DECEASED else set())
+    new_doses = [pair for pair in parse_dose_keys(ticked) if pair not in recorded_here]
+    if patient.get("status") == PATIENT_DECEASED and (
+            new_doses or reported_entries or general_entries or dispense_entries):
+        return None, consultation_form_context(
+            patient, consultation=before, form=values, errors={}, ticked=set(ticked),
+            general_submitted=general_submitted,
+            dispensing_submitted=dispense_submitted,
+            restrict_submitted=restrict if may_diagnose else None,
+            reported_submitted=reported_submitted,
+        ), DECEASED_DOSES_MESSAGE
+
     errors = validate_consultation_form(
-        values, age_context, require_diagnosis=may_diagnose and not unopenable
+        values, age_context,
+        require_diagnosis=(may_diagnose and not unopenable
+                           and diagnosis_required(consultation=before)),
     )
     errors.update(general_errors)
     errors.update(reported_errors)

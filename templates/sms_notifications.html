@@ -725,7 +725,8 @@
       else if(GSM_BASIC.has(character)){ length += 1; }
       else { unicodeForced = true; length += 1; }
     });
-    if(unicodeForced){ length = Array.from(text).length; }
+    // UCS-2 counts 16-bit units, as utils/sms.py does: an emoji is two (audit B05).
+    if(unicodeForced){ length = text.length; }
 
     var single = unicodeForced ? SMS_LIMITS.unicode_single : SMS_LIMITS.gsm_single;
     var concatenated = unicodeForced ? SMS_LIMITS.unicode_concatenated : SMS_LIMITS.gsm_concatenated;

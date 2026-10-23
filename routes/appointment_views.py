@@ -7,6 +7,9 @@ each keeps its own role_required guard and its own redirect target.
 
 This mirrors routes/patient_views.py and routes/inventory_views.py exactly.
 """
+from flask import url_for
+from markupsafe import Markup
+
 from models.appointments import (
     attach_actions,
     attach_leave_flags,
@@ -18,6 +21,7 @@ from models.appointments import (
     get_appointment_by_id,
     get_calendar_month,
     count_open_by_status,
+    OPEN_STATUSES,
     get_open_earlier_visits,
     get_queue_entry,
     get_queue_stats,
@@ -35,7 +39,7 @@ from models.doctor_worklist import VISIT_SERVICES, clean_service
 from models.immunizations import get_immunization_alert, get_immunization_status
 from models.patients import get_all_patients, get_patient_by_id
 from models.queue_actions import (
-    LEGEND_STATUSES,
+    DECEASED_MESSAGE, DECEASED_REFUSED, LEGEND_STATUSES,
     CHANGE_SERVICE, MARK_COMPLETED, MARK_LEFT, REFER, REFERRAL_SLIP, SEE_PATIENT,
     SEND_TO_DOCTOR, START, UNDO_LEFT, UNDO_REFERRAL,
     action_allowed,
@@ -135,9 +139,13 @@ def appointment_scheduling_context(month=None):
     # operator find out only after submitting. Keyed by patient row id.
     today_by_patient = {}
     for entry in entries:
-        # First wins: entries arrive in queue order, so an active queue row is
-        # seen before a later Completed one for the same person.
-        today_by_patient.setdefault(entry["patient_id"], entry)
+        # An open visit wins over a closed one for the same person (audit B03): the
+        # dialog says "Already Waiting for the Doctor" exactly when the server will
+        # refuse the check-in.
+        held = today_by_patient.get(entry["patient_id"])
+        if held is None or (entry["status"] in OPEN_STATUSES
+                            and held["status"] not in OPEN_STATUSES):
+            today_by_patient[entry["patient_id"]] = entry
 
     patients = []
     for patient in (get_all_patients() if care_team else []):
@@ -146,7 +154,7 @@ def appointment_scheduling_context(month=None):
         patient = dict(patient)
         entry = today_by_patient.get(patient["id"])
         patient["today_status"] = entry["status"] if entry else None
-        patient["today_in_queue"] = bool(entry and entry["in_queue"])
+        patient["today_in_queue"] = bool(entry and entry["status"] in OPEN_STATUSES)
         patients.append(patient)
 
     reference = today()
@@ -232,6 +240,8 @@ def _refused(appointment, action):
     from (models/queue_actions.py, Task 6d). Whatever the page showed, a forged or stale
     POST gets the same answer.
     """
+    if action in DECEASED_REFUSED and appointment.get("patient_deceased"):
+        return DECEASED_MESSAGE
     on_today = is_today(appointment.get("appointment_date"), today())
     if action_allowed(current_role(), appointment["status"], action, on_today):
         return None
@@ -383,14 +393,29 @@ def _check_in_message(full_name, appointment_id, outcome, patient=None):
     note = _immunization_note(patient)
 
     if outcome == "already":
-        status = entry.get("display_status") if entry else "in today's queue"
-        return f"{full_name} is already in today's queue ({status})." + note
+        return open_visit_message(appointment_id)
     if outcome == "updated":
         return (
             f"{full_name} checked in for their scheduled appointment{at}. {placement}"
             + note
         )
     return f"{full_name} checked in as a walk-in{at}. {placement}" + note
+
+
+OPEN_VISIT_MESSAGE = ("This patient already has an open visit today. "
+                      "Open it from the queue instead.")
+
+
+def open_visit_message(appointment_id):
+    """The refusal of a second check-in, with a link to the open visit (audit B03).
+
+    Markup, so the flash keeps the link: flask's session serializer carries Markup
+    through as Markup, and base.html prints it unescaped. Everything in it is built
+    here from an id; nothing typed is in it.
+    """
+    href = url_for("staff.staff_appointment_scheduling", _anchor=f"visit-{int(appointment_id)}")
+    return Markup('{} <a href="{}">Go to visit APT-{:05d}</a>').format(
+        OPEN_VISIT_MESSAGE, href, int(appointment_id))
 
 
 def process_new_patient_check_in(patient_id, reason, user_id, ip_address=None, *, service):

@@ -1130,7 +1130,7 @@
                             data-dose-key="{{ item.key }}" data-evidence="{{ item.evidence }}"
                             data-date="{{ item.date_administered or '' }}" data-place="{{ item.place_given or '' }}"><span class="material-symbols-outlined" style="font-size:18px;">edit</span></button>
 {%- endif %}
-{%- if record_elsewhere_endpoint is defined and item.can_record_elsewhere %}
+{%- if record_elsewhere_endpoint is defined and item.can_record_elsewhere and patient.status != 'Deceased' %}
                     <button type="button" class="btn-outline-teal" style="padding:5px 10px; font-size:12px; white-space:nowrap;"
                             title="Record {{ item.label }} as given elsewhere. Ask for the vaccination card first."
                             data-bs-toggle="modal" data-bs-target="#elsewhereModal"

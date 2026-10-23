@@ -435,8 +435,10 @@ FULL = dict(INTAKE, diagnosis="Flow diagnosis", treatment_plan="Flow plan")
 def new_visit(service, tag, pid=None):
     """Check the flow patient in through the real route, then start the consultation."""
     pid = pid or PATIENT
-    run_sql("UPDATE appointments SET status = 'Completed' WHERE status IN ('Waiting', 'In Consultation')"
-            " AND patient_id = ?", (pid,))
+    # 'Waiting for the Doctor' too: a patient with an open visit today cannot be checked
+    # in again (audit B03), and this helper stands in for that visit having been closed.
+    run_sql("UPDATE appointments SET status = 'Completed' WHERE status IN ('Waiting', 'In Consultation',"
+            " 'Waiting for the Doctor') AND patient_id = ?", (pid,))
     staff.post(CHECK_IN, data={"patient_id": str(pid), "reason": tag, "service": service})
     appointment = q1("SELECT id FROM appointments WHERE patient_id = ? ORDER BY id DESC LIMIT 1",
                      (pid,))[0]

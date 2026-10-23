@@ -26,6 +26,7 @@
 
   label.field-label{font-size:13px; font-weight:600; color:var(--text-dark); margin-bottom:6px; display:inline-block;}
   label.field-label .req{color:var(--danger); margin-left:2px;}
+  label.field-label .field-optional{font-weight:400; color:var(--text-muted); font-size:12px;}
   .form-control, .form-select{
     height:48px; border-radius:12px; border:1px solid var(--border-color); font-size:14px; color:var(--text-dark);
   }
@@ -930,7 +931,7 @@
         </div>
 {%- elif can_diagnose %}
         <div class="mb-3">
-          <label class="field-label">{{ field_labels.diagnosis }}<span class="req">*</span></label>
+          <label class="field-label">{{ field_labels.diagnosis }}{% if diagnosis_required %}<span class="req">*</span>{% else %} <span class="field-optional">(optional for this service)</span>{% endif %}</label>
           <textarea class="form-control{% if errors.diagnosis %} is-invalid{% endif %}{% if sealed_on_screen %} sealed-field{% endif %}" name="diagnosis"
                     placeholder="e.g. Acute viral upper respiratory infection">{{ form.diagnosis or '' }}</textarea>
 {%- if sealed_on_screen %}
@@ -940,7 +941,7 @@
         </div>
 
         <div class="mb-3">
-          <label class="field-label">{{ field_labels.treatment_plan }}<span class="req">*</span></label>
+          <label class="field-label">{{ field_labels.treatment_plan }}{% if diagnosis_required %}<span class="req">*</span>{% else %} <span class="field-optional">(optional for this service)</span>{% endif %}</label>
           <textarea class="form-control{% if errors.treatment_plan %} is-invalid{% endif %}{% if sealed_on_screen %} sealed-field{% endif %}" name="treatment_plan"
                     placeholder="e.g. Paracetamol 500mg every 6 hours for 3 days; increased fluids; return if fever persists past 3 days">{{ form.treatment_plan or '' }}</textarea>
           {%- if errors.treatment_plan %}<div class="invalid-feedback d-block">{{ errors.treatment_plan }}</div>

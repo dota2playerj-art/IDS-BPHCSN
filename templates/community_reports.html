@@ -242,7 +242,7 @@
           <span class="panel-sub" style="margin-left:8px;">
 {%- if window.custom %}Generated range &middot; {{ selection.type_label }}.
 {%- else %}Default window &middot; the last {{ window.months | length }} clinic months.{% endif %}
-            Consultations and registrations are counted inside it.<br>Immunisation coverage is as of {{ window.end | display_date }}.
+            Consultations and registrations are counted inside it.<br>Immunisation coverage is as of {{ immunization_coverage.as_of | display_date }}{% if immunization_coverage.as_of_clipped %} (today){% endif %}.
           </span>
         </div>
       </div>
@@ -334,7 +334,7 @@
           <div class="stat-label">Children Up to Date on the DOH Schedule</div>
           <div class="stat-trend" style="color:var(--text-muted);">
             {{ immunization_coverage.up_to_date_children }} of {{ immunization_coverage.eligible_children }} registered children
-            as of {{ window.end | display_date }}
+            as of {{ immunization_coverage.as_of | display_date }}{% if immunization_coverage.as_of_clipped %} (today){% endif %}
           </div>
 {%- else %}
           <div class="stat-value" style="font-size:16px; color:var(--text-muted);">No children</div>
@@ -357,10 +357,18 @@
           <div class="stat-value">{{ immunization_coverage.window.doses_administered }}</div>
           <div class="stat-label">Immunization Doses Given Here</div>
           <div class="stat-trend" style="color:var(--text-muted);">
+{#- Audit B10: the line names only the children dosed HERE, so it can never read
+    "0 doses ... to 1 child". Doses given elsewhere are a separate sentence. #}
+{%- set dosed_here = immunization_coverage.window.children_dosed_here %}
             {{ window.start | display_date }} &ndash; {{ window.end | display_date }} &middot;
-            to {{ immunization_coverage.window.children_dosed }} child{{ '' if immunization_coverage.window.children_dosed == 1 else 'ren' }}
+{%- if immunization_coverage.window.doses_administered %}
+            given to {{ dosed_here }} child{{ '' if dosed_here == 1 else 'ren' }}
+{%- else %}
+            no doses given here in this range
+{%- endif %}
 {%- if immunization_coverage.window.doses_elsewhere %}
-            <span style="display:block;">plus {{ immunization_coverage.window.doses_elsewhere }} dated in this range and given elsewhere (card seen)</span>
+{%- set elsewhere = immunization_coverage.window.doses_elsewhere %}
+            <span style="display:block;">Also {{ elsewhere }} dose{{ '' if elsewhere == 1 else 's' }} given at another facility in this range (card seen), not counted above</span>
 {%- endif %}
 {%- if immunization_coverage.window.doses_parent_report %}
             <span style="display:block;">Parent says given, no card: {{ immunization_coverage.window.doses_parent_report }}</span>
@@ -515,7 +523,7 @@
           </div>
 {%- endif %}
           <div class="fig-row">
-            <span class="fig-name">Attendance rate<span class="fig-note">Of the {{ appt.resolved }} that have resolved</span></span>
+            <span class="fig-name">Attendance rate<span class="fig-note">Patients who came (attended, waiting for the Doctor or referred) out of the {{ appt.resolved }} finished appointments</span></span>
 {%- if appt.attendance_pct is not none %}
             <span class="fig-value">{{ appt.attendance_pct }}%</span>
 {%- else %}
@@ -572,7 +580,7 @@
       
       {{ selection.type_label }} &middot; {{ window.start | long_date }} to {{ window.end | long_date }}
       &middot; generated from {{ health_center.name }} records by {{ system_short_name }}.<br>
-      Counted from stored records. Immunisation coverage is as of {{ window.end | long_date }}.
+      Counted from stored records. Immunisation coverage is as of {{ immunization_coverage.as_of | long_date }}{% if immunization_coverage.as_of_clipped %} (today){% endif %}.
     
     </div>
 {% endblock %}

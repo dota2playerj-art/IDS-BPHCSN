@@ -469,6 +469,16 @@ check(f"no helper box or leftover note is on any of {sum(len(v) for v in role_pa
 staff_c = client_as(STAFF_ID)
 audit_before = q("SELECT COUNT(*) FROM audit_logs")[0][0]
 log_file = Path(config.LOG_DIR) / "errors.log"
+# The project's own logs/ belongs to the running server (port 5001 writes it, and git
+# ignores it). The test run must not touch it, so it is compared before and after.
+project_log = REPO / "logs" / "errors.log"
+
+
+def _log_state(path):
+    return (path.stat().st_size, path.stat().st_mtime_ns) if path.exists() else None
+
+
+project_log_before = _log_state(project_log)
 with mock.patch("routes.staff.dashboard_context", side_effect=RuntimeError("SECRET-DETAIL-4417")):
     r = staff_c.get("/staff/dashboard")
 page = r.get_data(as_text=True)
@@ -499,7 +509,8 @@ check("a script request gets a short JSON answer, with no detail",
 ignored = subprocess.run(["git", "check-ignore", "-q", "logs/errors.log"], cwd=str(REPO)).returncode == 0
 check("logs/ is ignored by git", ignored and "\nlogs/" in (REPO / ".gitignore").read_text(encoding="utf-8"))
 check("the test run wrote its log in its own temporary folder, not in the project",
-      str(log_file).startswith(str(Path(_support.TEST_DIR))) and not (REPO / "logs").exists())
+      str(log_file).startswith(str(Path(_support.TEST_DIR)))
+      and _log_state(project_log) == project_log_before)
 
 section("Task 15: THE AGE IS SHOWN IN WEEKS FOR A BABY, FROM ONE HELPER (format_age)")
 from datetime import date, timedelta  # noqa: E402

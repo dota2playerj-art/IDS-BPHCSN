@@ -30,6 +30,7 @@ assert mig.returncode == 0, mig.stdout + mig.stderr
 
 import utils.dates as dates  # noqa: E402
 from app import create_app  # noqa: E402
+from models.doctor_worklist import VISIT_SERVICES  # noqa: E402
 
 REAL_NOW = dates.now
 app = create_app()
@@ -137,8 +138,12 @@ for role, account in ACCOUNTS.items():
 
 admin_page = text(admin.get("/admin/service_schedule"))
 check("Admin: empty screen still offers the Add form", 'action="/admin/service_schedule/add"' in admin_page)
-check("Admin: empty form suggests no service names",
-      re.search(r'<datalist id="scheduleServiceNames">\s*</datalist>', admin_page) is not None)
+# Audit B06: the form offers the Patient Queue's own service list, from the one source.
+service_select = re.search(r'(?s)<select[^>]*id="scheduleService".*?</select>', admin_page)
+check("Admin: the service field is a list of exactly the Patient Queue's services",
+      service_select is not None
+      and re.findall(r'<option value="([^"]+)"', service_select.group(0)) == list(VISIT_SERVICES),
+      service_select.group(0)[:600] if service_select else admin_page[:300])
 for role in ("Doctor", "Health Center Staff", "Barangay Official"):
     page = text(client_for(ACCOUNTS[role]).get(PREFIX[role] + "/service_schedule?edit=1&delete=1"))
     check(f"{role}: no form, no Edit/Delete controls, even with ?edit=/?delete=",
@@ -156,7 +161,7 @@ r = admin.post("/admin/service_schedule/add", data={
 page = text(r)
 check("blank service: 200 re-render, not a redirect", r.status_code == 200, r.status_code)
 check("blank service: message beside the field",
-      "Enter the service, such as the name the health center uses for it." in page)
+      "Choose the service from the list." in page)
 check("blank service: summary says nothing was saved and typing is kept",
       "The entry was not saved." in page)
 check("blank service: ticked Tuesday and Thursday still ticked",
@@ -164,22 +169,25 @@ check("blank service: ticked Tuesday and Thursday still ticked",
       and not re.search(r'name="weekdays" value="3" checked', page))
 check("blank service: ticked 2nd week still ticked", re.search(r'name="weeks" value="2" checked', page))
 check("blank service: note text preserved", ">Only when the midwife is in</textarea>" in page)
-check("blank service: service input is marked invalid", 'form-control is-invalid" id="scheduleService"' in page)
+check("blank service: service list is marked invalid", 'form-select is-invalid" id="scheduleService"' in page)
 
-r = admin.post("/admin/service_schedule/add", data={"service": "Well-baby clinic", "note": ""})
+r = admin.post("/admin/service_schedule/add", data={"service": "Family Planning", "note": ""})
 page = text(r)
 check("no day ticked: refused with 'Tick at least one day'",
       r.status_code == 200 and "Tick at least one day the service runs." in page)
-check("no day ticked: service value preserved", 'value="Well-baby clinic"' in page)
+check("no day ticked: chosen service still selected", 'value="Family Planning" selected' in page)
 
 long_service = "S" * 81
 long_note = "n" * 301
 r = admin.post("/admin/service_schedule/add", data={
     "service": long_service, "weekdays": ["1"], "note": long_note})
 page = text(r)
-check("81-char service refused, with its length", "this one is 81" in page and "Keep the service name to 80" in page)
+check("a service not on the Patient Queue's list is refused (audit B06)",
+      "Choose a service from the list. The schedule uses the same services as the Patient Queue." in page)
 check("301-char note refused, with its length", "Keep the note to 300 characters; this one is 301." in page)
-check("over-long values preserved exactly", f'value="{long_service}"' in page and f">{long_note}</textarea>" in page)
+check("over-long note preserved exactly; the unlisted name is shown but not selectable",
+      f">{long_note}</textarea>" in page
+      and f"<option value=\"\" disabled>{long_service} (not on the Patient Queue's list)</option>" in page)
 
 r = admin.post("/admin/service_schedule/add", data={
     "service": "Check-up", "weekdays": ["3"], "weeks": ["1", "2", "3", "4"]})
@@ -298,7 +306,7 @@ page = text(r)
 check("invalid edit: 200 re-render on the EDIT panel for this entry",
       r.status_code == 200 and f'action="/admin/service_schedule/{pid}/edit"' in page and "Edit entry" in page)
 check("invalid edit: errors beside both fields",
-      "Enter the service" in page and "Tick at least one day the service runs." in page)
+      "Choose the service from the list." in page and "Tick at least one day the service runs." in page)
 check("invalid edit: panel holds what was typed, not the stored values",
       ">typed but refused</textarea>" in page and re.search(r'name="weeks" value="3" checked', page)
       and not re.search(r'name="weekdays" value="2" checked', page))

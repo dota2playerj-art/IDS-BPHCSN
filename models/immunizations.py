@@ -1112,14 +1112,29 @@ def get_immunization_coverage(on_date=None, start=None, end=None, months=6):
     enrolled = len({row["patient_id"] for row in rows if row["evidence"] != EVIDENCE_PARENT})
     scoped_children = len({row["patient_id"] for row in rows
                            if row["evidence"] != EVIDENCE_PARENT and in_window(row)})
+    # Only the children this health center itself dosed in the window. The card that
+    # counts "doses given here" names these, so it never reads "0 doses ... to 1 child"
+    # when the only doses in the range were given elsewhere (audit B10).
+    scoped_children_here = len({row["patient_id"] for row in rows
+                                if row["evidence"] == EVIDENCE_GIVEN_HERE and in_window(row)})
 
     here = by_evidence.get(EVIDENCE_GIVEN_HERE, 0)
     card = by_evidence.get(EVIDENCE_CARD, 0)
     scoped_here = scoped_by_evidence.get(EVIDENCE_GIVEN_HERE, 0)
     scoped_card = scoped_by_evidence.get(EVIDENCE_CARD, 0)
 
-    alert = get_immunization_alert(on_date=on_date)
+    # Coverage is a reading of stored records, so it is never taken as of a day that
+    # has not come yet (audit B09): a range that ends after today is judged as of
+    # today, and `as_of_clipped` tells the screens and files to say so.
+    current = today()
+    as_of = on_date or current
+    as_of_clipped = as_of > current
+    if as_of_clipped:
+        as_of = current
+    alert = get_immunization_alert(on_date=as_of)
     return {
+        "as_of": as_of,
+        "as_of_clipped": as_of_clipped,
         "window": {
             "start": window["start"],
             "end": window["end"],
@@ -1129,6 +1144,7 @@ def get_immunization_coverage(on_date=None, start=None, end=None, months=6):
             "doses_elsewhere": scoped_card,
             "doses_parent_report": scoped_by_evidence.get(EVIDENCE_PARENT, 0),
             "children_dosed": scoped_children,
+            "children_dosed_here": scoped_children_here,
         },
         "enrolled": enrolled,
         "doses_given": here + card,

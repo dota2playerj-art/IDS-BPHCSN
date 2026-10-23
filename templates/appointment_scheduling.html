@@ -116,6 +116,7 @@
   table.appt-table tbody tr:hover{background:#FAFBFC;}
   table.appt-table tbody tr:last-child td{border-bottom:none;}
   .pat-name{font-weight:600;}
+  .deceased-tag{display:inline-block; margin-left:6px; padding:1px 7px; border-radius:10px; font-size:11px; font-weight:600; background:#F3F4F6; color:#4B5563; border:1px solid #D1D5DB;}
   .appt-id{color:var(--text-muted); font-size:12.5px;}
 
   .badge-status{
@@ -786,7 +787,7 @@
     the same answer. #}
 {%- for entry in queue %}
 {%- set patient_name = entry.first_name ~ ' ' ~ entry.last_name %}
-            <tr class="queue-row{% if entry.is_in_consultation %} row-inconsult{% elif entry.is_ready %} row-ready{% endif %}"
+            <tr id="visit-{{ entry.id }}" class="queue-row{% if entry.is_in_consultation %} row-inconsult{% elif entry.is_ready %} row-ready{% endif %}"
                 data-search="{{ (entry.first_name ~ ' ' ~ (entry.middle_name or '') ~ ' ' ~ entry.last_name ~ ' ' ~ entry.patient_reference ~ ' ' ~ ('' if entry.reason_sealed else (entry.notes or '')) ~ ' ' ~ ((entry.appointment_type or '') if care_team_view else '')) | lower }}"
                 data-service="{{ ((entry.appointment_type or 'Consultation') if care_team_view else '') | lower }}"
                 data-status="{{ (entry.display_status or '') | lower }}">
@@ -802,7 +803,7 @@
               </td>
               <td class="appt-id">{{ entry.reference }}</td>
               <td class="pin-name">
-                <div class="pat-name"><a href="{{ url_for(patient_profile_endpoint, patient_id=entry.patient_id) }}">{{ entry.first_name }}{% if entry.middle_name %} {{ entry.middle_name }}{% endif %} {{ entry.last_name }}</a>{% if entry.is_next_up and not entry.is_ready %}<span class="next-tag">Next</span>{% endif %}
+                <div class="pat-name"><a href="{{ url_for(patient_profile_endpoint, patient_id=entry.patient_id) }}">{{ entry.first_name }}{% if entry.middle_name %} {{ entry.middle_name }}{% endif %} {{ entry.last_name }}</a>{% if entry.patient_deceased %}<span class="deceased-tag" title="No clinical action can be recorded. Close the visit with Left before being seen.">Deceased</span>{% endif %}{% if entry.is_next_up and not entry.is_ready %}<span class="next-tag">Next</span>{% endif %}
 {#- A child in the building who has a dose due, with no record, or with only a parent's word. Put on the row
     rather than left to the profile because this is the moment it can be acted
     on -- once the parent has gone home the information is worth much less. The
@@ -921,9 +922,9 @@
             </thead>
             <tbody>
 {%- for entry in earlier_open %}
-              <tr>
+              <tr id="visit-{{ entry.id }}">
                 <td class="appt-id">{{ entry.reference }}</td>
-                <td><div class="pat-name"><a href="{{ url_for(patient_profile_endpoint, patient_id=entry.patient_id) }}">{{ entry.first_name }} {{ entry.last_name }}</a></div><div class="po-meta">{{ entry.patient_reference }}</div></td>
+                <td><div class="pat-name"><a href="{{ url_for(patient_profile_endpoint, patient_id=entry.patient_id) }}">{{ entry.first_name }} {{ entry.last_name }}</a>{% if entry.patient_deceased %}<span class="deceased-tag">Deceased</span>{% endif %}</div><div class="po-meta">{{ entry.patient_reference }}</div></td>
                 <td>{{ entry.checked_in_date | display_date }}{% if entry.arrival_time %} &middot; {{ entry.arrival_time }}{% endif %}</td>
                 <td>{{ entry.waiting_text }}</td>
 {%- if care_team_view %}

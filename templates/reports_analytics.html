@@ -279,7 +279,7 @@
                get_appointment_report() for why the not-yet-happened ones are
                excluded rather than counted as failures. -->
           <div class="stat-trend" style="color:var(--text-muted);">
-            {%- if appt.attendance_pct is not none %}{{ appt.attendance_pct }}% attended &middot; {{ appt.walk_ins }} walk-in{{ '' if appt.walk_ins == 1 else 's' }}
+            {%- if appt.attendance_pct is not none %}<span title="Attended, waiting for the Doctor or referred, out of the finished appointments">{{ appt.attendance_pct }}% of finished visits attended</span> &middot; {{ appt.walk_ins }} walk-in{{ '' if appt.walk_ins == 1 else 's' }}
             {%- else %}None resolved in this range{% endif -%}
           </div>
         </div>

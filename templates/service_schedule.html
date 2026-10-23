@@ -27,6 +27,7 @@
   .today-list li:last-child{border-bottom:none;}
   .today-list .material-symbols-outlined{color:var(--teal); font-size:20px; margin-top:1px;}
   .svc-name{font-weight:600; color:var(--text-dark); font-size:14px;}
+  .legacy-tag{display:inline-block; margin-left:6px; padding:1px 7px; border-radius:10px; font-size:11px; font-weight:600; background:#FEF3C7; color:#92400E;}
   .svc-days{font-size:12.5px; color:var(--text-muted);}
   .svc-note{font-size:12.5px; color:var(--text-dark); margin-top:3px; background:var(--bg); border-radius:8px; padding:6px 10px;}
 
@@ -200,7 +201,7 @@
               <tbody>
 {%- for entry in entries %}
                 <tr id="entry-{{ entry.id }}"{% if panel and panel.target and panel.target.id == entry.id %} class="row-target"{% endif %}>
-                  <td class="svc-name">{{ entry.service }}</td>
+                  <td class="svc-name">{{ entry.service }}{% if not entry.on_service_list %} <span class="legacy-tag" title="Saved before the schedule used the Patient Queue's services. Edit it to choose one.">Not a queue service</span>{% endif %}</td>
                   <td>
                     {{ entry.days_text }}
 {%- if entry.upcoming %}
@@ -278,18 +279,24 @@
 
             <div class="mb-3">
               <label class="field-label" for="scheduleService">Service<span class="req">*</span></label>
-              <input type="text" class="form-control{% if errors.service %} is-invalid{% endif %}" id="scheduleService"
-                     name="service" value="{{ form.service }}" list="scheduleServiceNames" autocomplete="off"
-                     aria-describedby="scheduleServiceHint">
-              <datalist id="scheduleServiceNames">
-{%- for name in service_suggestions %}
-                <option value="{{ name }}">
+{#- Audit B06: the same services the Patient Queue checks patients in for. An entry saved
+    before that rule may carry another name: it is shown, but cannot be saved again. #}
+              <select class="form-select{% if errors.service %} is-invalid{% endif %}" id="scheduleService"
+                      name="service" aria-describedby="scheduleServiceHint">
+                <option value=""{% if not form.service %} selected{% endif %}>Choose a service</option>
+{%- set listed = namespace(found=false) %}
+{%- for name in service_options %}
+{%- if form.service and form.service | lower == name | lower %}{% set listed.found = true %}{% endif %}
+                <option value="{{ name }}"{% if form.service and form.service | lower == name | lower %} selected{% endif %}>{{ name }}</option>
 {%- endfor %}
-              </datalist>
+{%- if form.service and not listed.found %}
+                <option value="" disabled>{{ form.service }} (not on the Patient Queue's list)</option>
+{%- endif %}
+              </select>
 {%- if errors.service %}
               <div class="field-error">{{ errors.service }}</div>
 {%- endif %}
-              <div class="form-text-hint" id="scheduleServiceHint">Up to {{ service_max_length }} characters.</div>
+              <div class="form-text-hint" id="scheduleServiceHint">The same services as the Patient Queue's Check In.</div>
             </div>
 
             <div class="mb-3">

@@ -106,8 +106,11 @@ def message_metrics(text):
 
     if needs_unicode:
         encoding = "UCS-2"
-        # Every character is one 16-bit unit; the extension table does not apply.
-        length = len(text)
+        # Counted in 16-bit units, as the network carries it. Most characters are one
+        # unit, but an emoji or any other character outside the Basic Multilingual
+        # Plane is two (a surrogate pair), so counting characters under-stated the
+        # segments and the cost (audit B05). The extension table does not apply.
+        length = len(text.encode("utf-16-le")) // 2
         single, concatenated = SINGLE_SEGMENT_UNICODE, CONCATENATED_SEGMENT_UNICODE
     else:
         encoding = "GSM-7"

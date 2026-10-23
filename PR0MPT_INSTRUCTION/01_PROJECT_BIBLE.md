@@ -109,7 +109,7 @@ Responsibilities
 - Diagnose, and record the treatment plan
 - Mark a consultation Restricted when it holds privileged information, and lift that mark
 - Read a Restricted consultation in full
-- Declare a patient deceased, and reverse that status
+- Declare a patient deceased, and reverse that status (only once the patient has no open visit)
 - Everything Health Center Staff do on the clinical floor: register patients, work the patient
   queue, record consultations, dispense medicines, update inventory, view SMS notifications
 - Read Reports & Analytics — the consultation counts and top-diagnoses ranking — with the same
@@ -554,7 +554,9 @@ comes only on certain days, while Staff take the intake every day. A visit moves
 1. **Check-in.** Staff choose the service from one fixed list (Consultation, Follow-up Consultation,
    Hypertension / Diabetes Monitoring, Prenatal Check-up, Family Planning, Immunization; Dental was removed
    in Task 19, see below). The choice is required, has no default, and is checked on the server. Status:
-   *Waiting*.
+   *Waiting*. A patient whose visit today is still open (Waiting, In Consultation or Waiting for the Doctor)
+   is not checked in again: "This patient already has an open visit today. Open it from the queue
+   instead.", with a link to that visit (Task 23, audit B03).
 2. **Start.** *In Consultation*. One patient at a time.
 3. **Intake saved.** If the service needs a diagnosis (the first three) and none was written: *Waiting for
    the Doctor*. Otherwise: *Completed*. Prenatal, family planning and immunization visits are finished by
@@ -564,6 +566,9 @@ comes only on certain days, while Staff take the intake every day. A visit moves
    audit entry), and the server refuses "Mark Completed" with "This visit needs the Doctor first."
 4. **Diagnosis saved by the Doctor.** *Completed*. If the Doctor records the whole consultation himself, with a
    diagnosis, it goes straight to *Completed*. He may write a diagnosis on any visit; it stays *Completed*.
+   The diagnosis and treatment plan are required of him only on a visit whose service needs them (the
+   first three, or a record with no queue visit); on a prenatal, family planning, immunization or old
+   Dental visit he saves without them, as Staff do (Task 23, audit B01).
 5. **Left before being seen.** Staff and the Doctor can set it, after a confirmation, on a visit that is
    Waiting, In Consultation or Waiting for the Doctor. It is refused on a visit with a diagnosis or a finished
    one. It is recorded (who and when) and audited, and can be undone the same day, back to the previous
@@ -573,6 +578,11 @@ comes only on certain days, while Staff take the intake every day. A visit moves
 7. **Referred (Task 19).** Staff and the Doctor can refer a visit that is Waiting, In Consultation or Waiting
    for the Doctor to the RHU or a hospital, and undo it the same day. See "Decision Record — Referrals, the
    Field Data and the Service List".
+8. **A patient marked Deceased (Task 23, audit B04).** No clinical action is recorded for him: no check-in,
+   Start, intake or consultation, Send to the Doctor, See patient, referral, dose or dispensing; the buttons
+   are hidden and the server refuses each in plain words. An open visit can still be closed (Left before
+   being seen). The Doctor cannot declare a death while the patient has an open visit: "Close this
+   patient's open visits first." Nothing is closed automatically.
 
 The Doctor's dashboard lists every visit with the status *Waiting for the Doctor*, oldest first, across all
 days, with how long it has waited. Visits from earlier days are marked. Health Center Staff and the
@@ -1096,3 +1106,12 @@ Version 3.6 (2026-10-22)
 Task 22, civil status by age and the address from the place lists: no "Minor"; under 18 is Single (RA
 11596); Province -> City/Municipality -> Barangay from `models/places.py`, with a new `patients.barangay`
 column. See "Decision Record — Civil Status by Age, and the Address from the Place Lists".
+
+Version 3.7 (2026-10-24)
+
+Task 23, fixes from the 2026-10-23 audit: Community Reports count every report type over the chosen range
+(B08); coverage is never "as of" a future day (B09); plainer report sub-lines (B10, B11); the Doctor's
+diagnosis is required only where the service needs it (B01); one open visit per patient per day (B03); no
+clinical action for a patient marked Deceased, and no death declared over an open visit (B04); SMS segments
+counted in 16-bit units (B05); the Service Schedule uses the Patient Queue's service list (B06). See the visit
+flow above and `03_SCREEN_SPECIFICATIONS.md`.

@@ -317,6 +317,16 @@ def _cover_sheet(context, screen, sections, produced_by):
     )
 
 
+def _coverage_as_of(coverage):
+    """The day immunisation coverage was judged on, as printed (audit B09).
+
+    Never a day after today: a range that ends later is judged as of today, and
+    the label says "(today)" so the reader knows the range's own end was not used.
+    """
+    text = display_date(coverage["as_of"])
+    return f"{text} (today)" if coverage.get("as_of_clipped") else text
+
+
 def _summary_sheet(context, sections):
     """The stat cards, as rows. One place a reader can check the headline totals.
 
@@ -343,14 +353,15 @@ def _summary_sheet(context, sections):
         appointments = context["appointment_report"]["window"]
         rows.append(("Appointments", appointments["total"], ranged))
         rows.append(("Attendance rate (%)", appointments["attendance_pct"],
-                     f"Of the {appointments['resolved']} that have resolved, {ranged}"))
+                     f"Patients who came (attended, waiting for the Doctor or referred) "
+                     f"out of the {appointments['resolved']} finished appointments, {ranged}"))
     if "vaccination" in sections:
         coverage = context["immunization_coverage"]
         rows.append(("Children up to date on the DOH schedule (%)",
                      coverage["up_to_date_pct"],
                      f"{coverage['up_to_date_children']} of "
                      f"{coverage['eligible_children']} registered children, as of "
-                     f"{display_date(window['end'])}"))
+                     f"{_coverage_as_of(coverage)}"))
         # Split rather than totalled. This sheet is the summary somebody quotes
         # from, and "doses given" has to mean doses this health center gave.
         rows.append(("Immunisation doses given here",
@@ -695,7 +706,8 @@ def _appointments(context):
             ("Resolved", window["resolved"],
              "Attended, waiting for the Doctor, referred and left before being seen"),
             ("Attendance rate (%)", window["attendance_pct"],
-             "Of the resolved appointments only"),
+             "Patients who came (attended, waiting for the Doctor or referred) out of "
+             "the resolved appointments. Left before being seen counts as not attended"),
         ] + ([("Older records", window["older"], "")] if window["older"] else [])),
         _ranked_block(
             "Referrals by destination", window["referral_destinations"],
@@ -728,7 +740,7 @@ def _services(context):
 def _vaccination(context):
     coverage = context["immunization_coverage"]
     window = context["report_window"]
-    closing = display_date(window["end"])
+    closing = _coverage_as_of(coverage)
     return [
         figures("Immunisation coverage", [
             ("Registered children the schedule applies to",
@@ -743,13 +755,12 @@ def _vaccination(context):
              f"As of {closing}. The dose may have been given elsewhere"),
             ("Children awaiting a first dose", coverage["awaiting_first_dose"],
              "Needing attention and with no dose on record yet"),
-        ], note=("Coverage is a judgement about a child made on one day, so it is "
-                 f"reported as of the range's closing date, {closing}. There is no "
-                 "such thing as a child being up to date \"during\" a period.")),
+        ], note=(f"Coverage is judged on one day: {closing}, the range's last day, or "
+                 "today if the range ends later. A child is not up to date \"during\" a period.")),
         figures("Doses", [
             ("Doses given here in this range",
              coverage["window"]["doses_administered"],
-             f"{display_date(window['start'])} to {closing}"),
+             f"{display_date(window['start'])} to {display_date(window['end'])}"),
             ("Doses given elsewhere (card seen), in this range",
              coverage["window"]["doses_elsewhere"],
              "Given at another facility; the vaccination card was seen here. A "
@@ -757,8 +768,11 @@ def _vaccination(context):
             ("Parent says given, no card, in this range",
              coverage["window"]["doses_parent_report"],
              "Not counted as given. Ask for the card"),
-            ("Children dosed in this range", coverage["window"]["children_dosed"],
-             "Distinct children"),
+            ("Children given a dose here in this range",
+             coverage["window"]["children_dosed_here"],
+             "Distinct children. Doses given elsewhere are not counted here"),
+            ("Children with any counted dose in this range", coverage["window"]["children_dosed"],
+             "Distinct children, given here or elsewhere with the card seen"),
             ("Doses on record, all time", coverage["doses_given"],
              f"{coverage['doses_administered']} given here, "
              f"{coverage['doses_elsewhere']} given elsewhere (card seen). "

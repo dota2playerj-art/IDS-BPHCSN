@@ -1,6 +1,23 @@
 """Which services the health center runs on which days."""
 from database.connection import db_connection
+from models.doctor_worklist import VISIT_SERVICES
 from utils.dates import today
+
+# THE SERVICES (audit B06). The schedule names the same services the Patient Queue
+# checks patients in for, from the one list in models/doctor_worklist.py, so the
+# queue's "Services today" strip and its Check In list cannot disagree. Entries saved
+# before this rule may hold another name; they are shown as they are, flagged, and
+# changed only when the Administrator edits them.
+SCHEDULE_SERVICES = VISIT_SERVICES
+
+
+def queue_service(name):
+    """The list's own spelling of `name`, or None when it is not on the list.
+
+    Case and runs of spaces are ignored, so "  family   planning " is Family Planning.
+    """
+    folded = " ".join(str(name or "").split()).casefold()
+    return next((s for s in SCHEDULE_SERVICES if s.casefold() == folded), None)
 
 # ---------------------------------------------------------------------------
 # THE VOCABULARY OF A DAY
@@ -25,10 +42,6 @@ WORKING_WEEK = (1, 2, 3, 4, 5)
 # weekday and only some have a fifth, so a service on "the 5th Wednesday" would
 # quietly not run in most months. No interview described one.
 WEEK_ORDINALS = {1: "1st", 2: "2nd", 3: "3rd", 4: "4th"}
-
-# Long enough for "Maternal and Child Health -- Prenatal Check-up" and short
-# enough to sit on one line of the Patient Queue's panel.
-SERVICE_MAX_LENGTH = 80
 
 # Room for the RHU's own kind of condition -- "everyday as long as there's a
 # request from the doctor, and if there's no medtech then no laboratory" is 88
@@ -128,6 +141,7 @@ def _decorate(row):
     # service that runs every week.
     entry["weeks_short"] = " & ".join(WEEK_ORDINALS[w] for w in entry["weeks"])
     entry["note"] = (row["note"] or "").strip()
+    entry["on_service_list"] = queue_service(row["service"]) is not None
     return entry
 
 
@@ -146,19 +160,6 @@ def get_entry(entry_id):
             "SELECT * FROM service_schedule WHERE id = ?", (entry_id,)
         ).fetchone()
     return _decorate(row) if row else None
-
-
-def service_names(entries=None):
-    """Every distinct service already on the schedule, for the form's suggestions.
-
-    This is the only list of services this system offers anybody, and it is
-    made of what the Administrator typed. It is empty until they type one.
-    """
-    entries = get_entries() if entries is None else entries
-    seen = {}
-    for entry in entries:
-        seen.setdefault(entry["service"].casefold(), entry["service"])
-    return sorted(seen.values(), key=str.casefold)
 
 
 # ---------------------------------------------------------------------------
@@ -276,23 +277,6 @@ def form_values(entry):
     }
 
 
-def _canonical_service(service, entries, editing_id=None):
-    """The spelling already on the schedule, if this is the same name retyped.
-
-    "family planning" typed beside an existing "Family Planning" is the same
-    service, and storing both spellings would split it in two on every screen
-    that groups by name. Only case and runs of spaces are folded; anything else
-    is a different name and is stored as typed.
-    """
-    folded = " ".join(service.split()).casefold()
-    for entry in entries:
-        if entry["id"] == editing_id:
-            continue
-        if " ".join(entry["service"].split()).casefold() == folded:
-            return entry["service"]
-    return " ".join(service.split())
-
-
 def validate_entry(values, entries=None, editing_id=None):
     """Server-side validation. Returns {field: message}; empty means valid.
 
@@ -307,11 +291,11 @@ def validate_entry(values, entries=None, editing_id=None):
 
     service = values.get("service") or ""
     if not service:
-        errors["service"] = "Enter the service, such as the name the health center uses for it."
-    elif len(service) > SERVICE_MAX_LENGTH:
+        errors["service"] = "Choose the service from the list."
+    elif queue_service(service) is None:
         errors["service"] = (
-            f"Keep the service name to {SERVICE_MAX_LENGTH} characters; this one is "
-            f"{len(service)}. Anything longer belongs in the note."
+            "Choose a service from the list. The schedule uses the same services as "
+            "the Patient Queue."
         )
 
     raw_days = values.get("weekdays") or []
@@ -373,7 +357,7 @@ def _stored(values, entries, editing_id=None):
     weekdays = _parse_numbers(",".join(values["weekdays"]), WEEKDAY_NAMES)
     weeks = _parse_numbers(",".join(values["weeks"]), WEEK_ORDINALS)
     return {
-        "service": _canonical_service(values["service"], entries, editing_id),
+        "service": queue_service(values["service"]),
         "weekdays": ",".join(str(d) for d in weekdays),
         "weeks_of_month": ",".join(str(w) for w in weeks) or None,
         "note": values["note"] or None,

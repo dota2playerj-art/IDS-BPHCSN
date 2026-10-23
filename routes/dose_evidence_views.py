@@ -101,11 +101,18 @@ def _early_note(patient, code, dose_number):
     return ""
 
 
+DECEASED_DOSE_MESSAGE = ("This patient is marked Deceased, so no vaccine dose can be "
+                         "recorded. Nothing was saved.")
+
+
 def process_record_elsewhere(patient_id, form_data, user_id, ip_address=None):
     """Record one dose given elsewhere. Returns (patient_id, reopen, message)."""
     patient = get_patient_by_id(patient_id)
     if patient is None:
         return None, None, "That patient record could not be found."
+    # Audit B04, D1: no new dose is recorded for a patient marked Deceased.
+    if patient.get("status") == "Deceased":
+        return patient_id, None, DECEASED_DOSE_MESSAGE
     keys = parse_dose_keys([form_data.get(DOSE_FIELD)])
     if len(keys) != 1:
         return patient_id, None, "Choose a dose from the schedule."

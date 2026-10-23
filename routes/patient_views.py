@@ -6,13 +6,15 @@ the same data. The queries live here so the two role variants cannot drift
 apart; the routes stay thin and each keeps its own role_required guard and its
 own redirect target.
 """
-from flask import request, session
+from flask import request, session, url_for
+from markupsafe import Markup
 
 from models.appointments import (
     IN_CONSULTATION,
     WAITING,
     find_active_queue_entry,
     get_appointments_for_patient,
+    get_open_visits_for_patients,
 )
 from models.audit import (
     ACTION_RESTRICTED_WITHHELD,
@@ -431,6 +433,24 @@ def patient_selection_context(form_data):
     }
 
 
+CLOSE_OPEN_VISITS_MESSAGE = "Close this patient's open visits first."
+
+
+def open_visits_refusal(open_visits):
+    """The refusal of a death declaration, with a link to each open visit (audit B04).
+
+    Markup so the flash keeps the links; it holds only visit references built here
+    from ids, never a name or anything typed.
+    """
+    links = Markup(", ").join(
+        Markup('<a href="{}">{}</a>').format(
+            url_for("staff.staff_appointment_scheduling", _anchor=f"visit-{visit['id']}"),
+            visit["reference"])
+        for visits in open_visits.values() for visit in visits
+    )
+    return Markup("{} Open visits: {}.").format(CLOSE_OPEN_VISITS_MESSAGE, links)
+
+
 def process_archive_patients(form_data, user_id=None, ip_address=None):
     """Apply Screen 03's status action. Returns the message to flash.
 
@@ -492,6 +512,14 @@ def process_archive_patients(form_data, user_id=None, ip_address=None):
             "clinical decision. Nothing was changed."
         )
 
+    # Audit B04, D2: a death is not declared over an open visit. The visit is closed
+    # first (Left before being seen, or finished), so no visit of a dead patient is
+    # left waiting in the queue or on the Doctor's list. No visit is closed here.
+    if status == DOCTOR_ONLY_STATUS:
+        open_visits = get_open_visits_for_patients(ids)
+        if open_visits:
+            return open_visits_refusal(open_visits)
+
     # One audit entry per patient changed, in the same transaction (H3). A death
     # declaration and its reversal have their own phrases.
     changed = set_patient_status(
@@ -537,6 +565,9 @@ def immunization_next_step(patient, immunization):
     so the template renders nothing rather than an empty panel.
     """
     if not immunization["attention_count"]:
+        return None
+    # Audit B04: no dose is recorded for a patient marked Deceased, so no link offers it.
+    if patient.get("status") == "Deceased":
         return None
 
     name = patient["first_name"]

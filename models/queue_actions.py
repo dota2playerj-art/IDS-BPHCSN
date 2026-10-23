@@ -84,6 +84,15 @@ RECORD_ACTION_BY_STATUS = {
 # visit checked in TODAY. A Waiting visit from an earlier day offers only Left before being
 # seen. The other actions work on a visit of any day: the Doctor still sees a patient who
 # has waited for him since earlier, and an open visit can always be closed.
+# The clinical actions refused on a visit of a patient marked Deceased (audit B04, D1).
+# Starting the visit, writing it up (intake, or the Doctor's See patient), sending it on
+# to the Doctor and referring it are clinical acts on a living patient. What stays is
+# what closes or corrects a visit: Left before being seen, Mark Completed, Change
+# service, the two Undos and the referral slip, so an open visit can still be closed.
+DECEASED_REFUSED = (START, OPEN_INTAKE, SEND_TO_DOCTOR, SEE_PATIENT, REFER)
+DECEASED_MESSAGE = ("This patient is marked Deceased, so no clinical action can be "
+                    "recorded. Close the open visit with Left before being seen.")
+
 TODAY_ONLY = (START,)
 # A Waiting visit from an earlier day offers only "Left before being seen" (Task 13, D6): its
 # patient is probably home, so changing the service of that visit helps nobody, and neither does

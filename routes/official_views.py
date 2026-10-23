@@ -341,7 +341,15 @@ def community_reports_context(args=None):
     # The whole report is built from the one selection, so every panel on the
     # sheet covers the range the letterhead prints -- there is no second window
     # anywhere on this screen for a figure to be counted over by accident.
-    reports = reports_analytics_context(args=args)
+    #
+    # The builder below is handed the range this screen already parsed, never the
+    # raw query string. It used to get the raw string, and it reads "type" against
+    # Screen 10's own list: "registrations", "vaccination", "concerns" and
+    # "notifications" are not on that list, so it refused the type and dropped
+    # the dates with it, and those four reports printed the default window's
+    # figures under the typed range (audit B08).
+    inner_args = {"from": start.isoformat(), "to": end.isoformat()} if start and end else {}
+    reports = reports_analytics_context(args=inner_args)
     patients = reports["patient_report"]
     consultations = reports["consultation_report_stats"]
 
