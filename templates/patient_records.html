@@ -973,7 +973,10 @@
       // The empty state doubles as the no-matches message.
       if(empty){ empty.classList.toggle('show', shown === 0); }
       if(footer){ footer.style.display = shown === 0 ? 'none' : ''; }
-      table.closest('div[style]').style.display = shown === 0 ? 'none' : '';
+      // The table's own scroll box (Task 17 made it .table-responsive; it used to be the
+      // div with an inline style, and the old lookup failed on every keystroke, audit B25).
+      var tableBox = table.closest('.table-responsive') || table.parentElement;
+      if(tableBox){ tableBox.style.display = shown === 0 ? 'none' : ''; }
     };
 
     clearFilters = function(){

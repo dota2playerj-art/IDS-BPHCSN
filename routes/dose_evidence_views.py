@@ -186,6 +186,11 @@ def process_change_elsewhere(form_data, user_id, ip_address=None):
     if outcome == "duplicate":
         return patient["id"], None, (
             f"{label} for {name} already has a dose that counts. Nothing was changed.")
+    if outcome == "has-report":
+        # Audit B12: refused in words, with the dialog reopened on what was typed.
+        return patient["id"], _reopen("change", form_data, {PROOF_FIELD: (
+            f"{label} already has a parent's report. A dose keeps one; change or remove "
+            "that record instead.")}, label, record_id=record["id"]), None
     return patient["id"], None, "That dose record could not be changed."
 
 

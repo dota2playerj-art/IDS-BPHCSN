@@ -89,7 +89,21 @@ def _is_number(value):
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
-def _cell(value):
+# A table row taller than a page cannot be drawn: fpdf2 raises, and the whole export used
+# to fail with a server error (audit B24). render() first draws every cell in full; only if a
+# row is too tall does it draw the document again with long cells shortened to these lengths,
+# each ending in "...", until it fits. The Excel file always holds the full text.
+CELL_CAPS = (None, 600, 200, 60)
+SHORTENED = "…"
+
+
+def _shorten(text, cap):
+    if cap is None or len(text) <= cap:
+        return text
+    return text[:cap].rstrip() + SHORTENED
+
+
+def _cell(value, cap=None):
     """What actually goes in a table cell.
 
     None becomes the em dash rather than a blank or a zero: an absent figure and a
@@ -107,7 +121,7 @@ def _cell(value):
         return f"{value:,.1f}"
     if isinstance(value, (date, datetime)):
         return value.isoformat()[:10]
-    return _text(value)
+    return _shorten(_text(value), cap)
 
 
 class _Report(FPDF):
@@ -202,6 +216,17 @@ def render(sheets, org, org_sub, doc_title, range_label, footer_left,
     by being turned sideways. See the constant's own note above for when a caller
     should ask.
     """
+    for cap in CELL_CAPS:
+        try:
+            return _draw(sheets, org, org_sub, doc_title, range_label, footer_left,
+                         orientation, cap)
+        except ValueError as problem:
+            if "too high" not in str(problem) or cap == CELL_CAPS[-1]:
+                raise
+    raise AssertionError("unreachable")
+
+
+def _draw(sheets, org, org_sub, doc_title, range_label, footer_left, orientation, cap):
     pdf = _Report(org, org_sub, doc_title, range_label, footer_left, orientation)
     pdf.set_auto_page_break(True, margin=_BOTTOM_MARGIN)
     pdf.add_page()
@@ -216,7 +241,7 @@ def render(sheets, org, org_sub, doc_title, range_label, footer_left,
             _intro(pdf, spec.get("intro"))
         for block in spec["blocks"]:
             if block:
-                _block(pdf, block)
+                _block(pdf, block, cap)
 
     return bytes(pdf.output())
 
@@ -254,7 +279,7 @@ def _intro(pdf, text, lead=False):
     pdf.ln(2)
 
 
-def _block(pdf, block):
+def _block(pdf, block, cap=None):
     if block.get("kind") == "note":
         _note(pdf, block.get("text"))
         return
@@ -312,7 +337,7 @@ def _block(pdf, block):
             line = table.row()
             for index in range(len(columns)):
                 value = data[index] if index < len(data) else None
-                line.cell(_cell(value))
+                line.cell(_cell(value, cap))
     pdf.ln(3)
 
 

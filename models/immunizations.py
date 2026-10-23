@@ -1760,6 +1760,8 @@ def update_elsewhere_dose(record_id, evidence, date_given, place, audit=None):
         "duplicate"    the change would leave the dose with two valid records
         "not-allowed"  the record was given here: it is corrected on its own path
         "invalid"      bad evidence, or a card with no date
+        "has-report"   the dose already has another parent's report; a dose holds one
+                       (audit B12; it used to reach the unique index and fail with an error)
         "missing"      no such record
 
     `audit(conn, outcome)` is called before the commit, only when something changed.
@@ -1780,6 +1782,10 @@ def update_elsewhere_dose(record_id, evidence, date_given, place, audit=None):
             return "unchanged"
         records, birth = _records_in(conn, row["patient_id"])
         key = (row["vaccine_code"], row["dose_number"])
+        if evidence == EVIDENCE_PARENT and any(
+                r["id"] != record_id and r["evidence"] == EVIDENCE_PARENT
+                and (r["vaccine_code"], r["dose_number"]) == key for r in records):
+            return "has-report"
         if _would_double_count(records, birth, record_id,
                                {"evidence": evidence, "date_administered": day}, key):
             return "duplicate"

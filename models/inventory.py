@@ -9,6 +9,7 @@ and brand. A batch past its expiry date is Expired and is never counted or dispe
 The read functions return plain dicts rather than sqlite3.Row objects: the screens render
 a stock status, a badge class and a progress bar that are derived, not stored.
 """
+import math
 import re
 from datetime import datetime
 
@@ -548,16 +549,20 @@ def get_low_stock_alert(limit=None):
 
 # --- validation ---------------------------------------------------------------------------
 
+# Plain digits only (audit B13, B14): int() and float() also read "1_000", "+5", "1e9",
+# "inf" and "nan", and a number too big for SQLite failed with a server error.
+_WHOLE_NUMBER = re.compile(r"[0-9]+")
+_DECIMAL_NUMBER = re.compile(r"[0-9]+(?:\.[0-9]+)?")
+MAX_REORDER_LEVEL = 100000
+MAX_UNIT_COST = 1000000
+
+
 def _parse_int(raw):
     """(12, True) for a valid non-negative integer, (None, False) otherwise."""
     text = str(raw or "").strip()
-    if not text:
+    if not text or not _WHOLE_NUMBER.fullmatch(text) or len(text) > 9:
         return None, False
-    try:
-        value = int(text)
-    except ValueError:
-        return None, False
-    return value, value >= 0
+    return int(text), True
 
 
 def _parse_decimal(raw):
@@ -565,11 +570,10 @@ def _parse_decimal(raw):
     text = str(raw or "").strip()
     if not text:
         return None, False
-    try:
-        value = float(text)
-    except ValueError:
+    if not _DECIMAL_NUMBER.fullmatch(text) or len(text) > 15:
         return None, False
-    return value, value >= 0
+    value = float(text)
+    return value, math.isfinite(value) and value >= 0
 
 
 def _get(values, field):
@@ -630,15 +634,19 @@ def validate_inventory_form(values, item_id=None):
     if not raw:
         errors["low_stock_threshold"] = "Reorder level is required."
     else:
-        _, ok = _parse_int(raw)
+        level, ok = _parse_int(raw)
         if not ok:
             errors["low_stock_threshold"] = "Reorder level must be a whole number of 0 or more."
+        elif level > MAX_REORDER_LEVEL:
+            errors["low_stock_threshold"] = f"Enter a reorder level of {MAX_REORDER_LEVEL:,} or less."
 
     unit_cost = _get(values, "unit_cost")
     if unit_cost:
-        _, ok = _parse_decimal(unit_cost)
+        cost, ok = _parse_decimal(unit_cost)
         if not ok:
-            errors["unit_cost"] = "Unit cost must be a number of 0 or more."
+            errors["unit_cost"] = "Unit cost must be a number of 0 or more, such as 2.50."
+        elif cost > MAX_UNIT_COST:
+            errors["unit_cost"] = f"Enter a unit cost of {MAX_UNIT_COST:,} or less."
 
     if not errors:
         generic, strength, form = _item_identity(values)
