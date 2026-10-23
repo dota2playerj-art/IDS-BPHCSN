@@ -93,6 +93,37 @@ LIST_FIELDS = ("medical_conditions", "allergies")
 SCALAR_FIELDS = tuple(field for field in PATIENT_FIELDS if field not in LIST_FIELDS)
 
 EARLIEST_BIRTH_YEAR = 1900
+# The oldest age the form accepts (audit B21): a birth date further back is almost
+# certainly a typing slip ("1900" for "2000").
+MAX_AGE_YEARS = 120
+
+# Maximum lengths (audit B21), checked on the server and set as maxlength on the form.
+# A record saved before these limits keeps its text, displays and exports in full, and
+# is asked to be shortened only when it is edited and saved again.
+NAME_MAX_LENGTH = 100
+ADDRESS_MAX_LENGTH = 200
+NOTE_MAX_LENGTH = 2000
+TEXT_LIMITS = {
+    "first_name": NAME_MAX_LENGTH,
+    "middle_name": NAME_MAX_LENGTH,
+    "last_name": NAME_MAX_LENGTH,
+    "emergency_contact_name": NAME_MAX_LENGTH,
+    "address": ADDRESS_MAX_LENGTH,
+    "emergency_contact_address": ADDRESS_MAX_LENGTH,
+    "province": ADDRESS_MAX_LENGTH,
+    "municipality": ADDRESS_MAX_LENGTH,
+    "barangay": ADDRESS_MAX_LENGTH,
+    "province_other": ADDRESS_MAX_LENGTH,
+    "municipality_other": ADDRESS_MAX_LENGTH,
+    "barangay_other": ADDRESS_MAX_LENGTH,
+    "medical_conditions_note": NOTE_MAX_LENGTH,
+    "allergies_note": NOTE_MAX_LENGTH,
+}
+
+
+def too_long_message(limit, length):
+    """The one sentence every form uses for text over its maximum length."""
+    return f"Use {limit:,} characters or fewer. This has {length:,}."
 
 # Republic Act 9994 defines a Philippine senior citizen as 60 years and over.
 # The "Senior Citizen Patients" stat card on Screen 03 counts against this.
@@ -802,6 +833,14 @@ def validate_patient_form(values):
                 errors["birth_date"] = "Birthdate cannot be in the future."
             elif parsed.year < EARLIEST_BIRTH_YEAR:
                 errors["birth_date"] = f"Birthdate cannot be earlier than {EARLIEST_BIRTH_YEAR}."
+            elif (calculate_age(parsed) or 0) > MAX_AGE_YEARS:
+                errors["birth_date"] = (
+                    f"Check the birthdate: it makes the patient over {MAX_AGE_YEARS} years old.")
+
+    for field, limit in TEXT_LIMITS.items():
+        value = values.get(field)
+        if isinstance(value, str) and len(value.strip()) > limit and field not in errors:
+            errors[field] = too_long_message(limit, len(value.strip()))
 
     # Constrained fields: reject anything the form does not itself offer.
     for field, allowed, label in (

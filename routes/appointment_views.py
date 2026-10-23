@@ -51,6 +51,7 @@ from models.referrals import (
     get_referral_slip, refer_visit, undo_referral, validate_referral,
 )
 from models.service_schedule import get_entries as get_schedule_entries, services_on
+from routes.patient_views import CHECK_IN_REASON_MAX
 from routes.audit_entries import (
     consultation_completed, consultation_started, left_before_seen, left_undone,
     patient_checked_in, referral_undone, visit_referred, visit_sent_to_doctor,
@@ -283,6 +284,10 @@ def process_check_in(form_data, user_id, ip_address=None):
     reason = (form_data.get("reason") or "").strip()
     if not reason:
         return "Enter a reason for the visit before checking the patient in."
+    # The same 200 characters as the new-patient path (audit B21; the dialog's maxlength).
+    if len(reason) > CHECK_IN_REASON_MAX:
+        return (f"Use {CHECK_IN_REASON_MAX} characters or fewer for the reason for visit. "
+                f"This has {len(reason)}. Nobody was checked in.")
 
     # A required choice with no default, checked here and again in check_in_patient().
     service = clean_service(form_data.get("service"))

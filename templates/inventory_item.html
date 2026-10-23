@@ -187,7 +187,7 @@
         <div class="row g-3 mb-3">
           <div class="col-md-4">
             <label class="field-label" for="rLot">Lot number<span class="req">*</span></label>
-            <input type="text" class="form-control{% if receive_errors.lot_number %} is-invalid{% endif %}" name="lot_number" id="rLot" value="{{ receive_form.lot_number or '' }}">
+            <input type="text" class="form-control{% if receive_errors.lot_number %} is-invalid{% endif %}" name="lot_number" maxlength="{{ batch_text_max }}" id="rLot" value="{{ receive_form.lot_number or '' }}">
             {%- if receive_errors.lot_number %}<div class="invalid-feedback d-block">{{ receive_errors.lot_number }}</div>{% endif %}
             <div class="form-check mt-2">
               <input class="form-check-input" type="checkbox" name="no_lot" id="rNoLot" value="1"{% if receive_form.no_lot %} checked{% endif %}>
@@ -223,7 +223,8 @@
           </div>
           <div class="col-md-4">
             <label class="field-label" for="rBrand">Brand name</label>
-            <input type="text" class="form-control" name="brand_name" id="rBrand" value="{{ receive_form.brand_name or '' }}" placeholder="Optional">
+            <input type="text" class="form-control{% if receive_errors.brand_name %} is-invalid{% endif %}" name="brand_name" maxlength="{{ batch_text_max }}" id="rBrand" value="{{ receive_form.brand_name or '' }}" placeholder="Optional">
+            {%- if receive_errors.brand_name %}<div class="invalid-feedback d-block">{{ receive_errors.brand_name }}</div>{% endif %}
           </div>
         </div>
         <div class="d-flex justify-content-end">

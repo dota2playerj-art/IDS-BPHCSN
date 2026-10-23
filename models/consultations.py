@@ -38,6 +38,7 @@ INFANT_AGE_YEARS = 1
 # appointment_id, consultation_date and created_at are absent on purpose: they
 # are set once, when the record is created, and an edit must not move them.
 CLINICAL_TEXT_FIELDS = ("chief_complaint", "diagnosis", "treatment_plan", "remarks")
+CLINICAL_TEXT_MAX_LENGTH = 2000
 VITAL_FIELDS = ("temperature", "blood_pressure", "pulse_rate", "respiratory_rate", "weight")
 GROWTH_FIELDS = ("height", "head_circumference")
 CONSULTATION_FIELDS = (
@@ -1002,6 +1003,16 @@ def validate_consultation_form(values, age_context, require_diagnosis=True):
     for field, message in required.items():
         if not str(values.get(field) or "").strip():
             errors[field] = message
+
+    # Maximum length of the written fields (audit B21). A record saved before the limit keeps
+    # its text and shows it; it is asked to be shortened only when it is edited and saved.
+    for field in CLINICAL_TEXT_FIELDS:
+        if sealed_crypto.is_encrypted(values.get(field)):
+            continue  # a sealed field kept as stored, not typed: its length is the cipher's
+        length = len(str(values.get(field) or "").strip())
+        if length > CLINICAL_TEXT_MAX_LENGTH and field not in errors:
+            errors[field] = (f"Use {CLINICAL_TEXT_MAX_LENGTH:,} characters or fewer. "
+                             f"This has {length:,}.")
 
     allowed = allowed_growth_fields(age_context)
     for field, label, unit, low, high, whole in NUMERIC_LIMITS:

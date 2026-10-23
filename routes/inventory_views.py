@@ -11,6 +11,8 @@ one batch, with a reason.
 """
 from config import EXPIRING_SOON_DAYS
 from models.inventory import (
+    ITEM_TEXT_LIMITS,
+    TEXT_MAX_LENGTH,
     DOSAGE_FORMS,
     DRUG_CLASSES,
     FORM_FIELDS,
@@ -132,6 +134,7 @@ def add_edit_medicine_context(form=None, errors=None, item=None):
         "form": form or {},
         "errors": errors or {},
         "options": FORM_OPTIONS,
+        "item_text_limits": ITEM_TEXT_LIMITS,
     }
 
 
@@ -216,6 +219,7 @@ def item_page_context(item_id, receive_form=None, receive_errors=None):
         "receive_form": receive_form or {"date_received": today().isoformat()},
         "receive_errors": receive_errors or {},
         "expiring_soon_days": EXPIRING_SOON_DAYS,
+        "batch_text_max": TEXT_MAX_LENGTH,
     }
 
 

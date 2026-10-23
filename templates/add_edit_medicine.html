@@ -132,12 +132,12 @@
           <div class="row g-3 mb-3">
             <div class="col-md-4">
               <label class="field-label" for="fGeneric">Generic name<span class="req">*</span></label>
-              <input type="text" class="form-control{% if errors.generic_name %} is-invalid{% endif %}" name="generic_name" id="fGeneric" value="{{ form.generic_name or '' }}" placeholder="e.g., Paracetamol">
+              <input type="text" class="form-control{% if errors.generic_name %} is-invalid{% endif %}" name="generic_name" maxlength="{{ item_text_limits.generic_name }}" id="fGeneric" value="{{ form.generic_name or '' }}" placeholder="e.g., Paracetamol">
               {%- if errors.generic_name %}<div class="invalid-feedback d-block">{{ errors.generic_name }}</div>{% endif %}
             </div>
             <div class="col-md-4">
               <label class="field-label" for="fStrength">Strength<span class="req">*</span></label>
-              <input type="text" class="form-control{% if errors.dosage_strength %} is-invalid{% endif %}" name="dosage_strength" id="fStrength" value="{{ form.dosage_strength or '' }}" placeholder="e.g., 500 mg or 250 mg/5 mL">
+              <input type="text" class="form-control{% if errors.dosage_strength %} is-invalid{% endif %}" name="dosage_strength" maxlength="{{ item_text_limits.dosage_strength }}" id="fStrength" value="{{ form.dosage_strength or '' }}" placeholder="e.g., 500 mg or 250 mg/5 mL">
               {%- if errors.dosage_strength %}<div class="invalid-feedback d-block">{{ errors.dosage_strength }}</div>{% endif %}
             </div>
             <div class="col-md-4">
@@ -172,12 +172,13 @@
           <div class="row g-3 mb-3">
             <div class="col-md-4">
               <label class="field-label" for="fItemName">Item name<span class="req">*</span></label>
-              <input type="text" class="form-control{% if errors.item_name %} is-invalid{% endif %}" name="item_name" id="fItemName" value="{{ form.item_name or '' }}" placeholder="e.g., Gauze pad">
+              <input type="text" class="form-control{% if errors.item_name %} is-invalid{% endif %}" name="item_name" maxlength="{{ item_text_limits.item_name }}" id="fItemName" value="{{ form.item_name or '' }}" placeholder="e.g., Gauze pad">
               {%- if errors.item_name %}<div class="invalid-feedback d-block">{{ errors.item_name }}</div>{% endif %}
             </div>
             <div class="col-md-4">
               <label class="field-label" for="fSize">Size or specification</label>
-              <input type="text" class="form-control" name="size" id="fSize" value="{{ form.size or '' }}" placeholder="e.g., 4 x 4 in">
+              <input type="text" class="form-control{% if errors.size %} is-invalid{% endif %}" name="size" maxlength="{{ item_text_limits.size }}" id="fSize" value="{{ form.size or '' }}" placeholder="e.g., 4 x 4 in">
+              {%- if errors.size %}<div class="invalid-feedback d-block">{{ errors.size }}</div>{% endif %}
             </div>
           </div>
         </div>
@@ -212,22 +213,26 @@
         <div class="row g-3 mb-3">
           <div class="col-md-4">
             <label class="field-label">Manufacturer</label>
-            <input type="text" class="form-control" name="manufacturer" value="{{ form.manufacturer or '' }}">
+            <input type="text" class="form-control{% if errors.manufacturer %} is-invalid{% endif %}" name="manufacturer" maxlength="{{ item_text_limits.manufacturer }}" value="{{ form.manufacturer or '' }}">
+            {%- if errors.manufacturer %}<div class="invalid-feedback d-block">{{ errors.manufacturer }}</div>{% endif %}
           </div>
           <div class="col-md-4">
             <label class="field-label">Supplier</label>
-            <input type="text" class="form-control" name="supplier" value="{{ form.supplier or '' }}">
+            <input type="text" class="form-control{% if errors.supplier %} is-invalid{% endif %}" name="supplier" maxlength="{{ item_text_limits.supplier }}" value="{{ form.supplier or '' }}">
+            {%- if errors.supplier %}<div class="invalid-feedback d-block">{{ errors.supplier }}</div>{% endif %}
           </div>
           <div class="col-md-4">
             <label class="field-label">Storage location</label>
-            <input type="text" class="form-control" name="storage_location" value="{{ form.storage_location or '' }}" placeholder="e.g., Cabinet A, Shelf 1">
+            <input type="text" class="form-control{% if errors.storage_location %} is-invalid{% endif %}" name="storage_location" maxlength="{{ item_text_limits.storage_location }}" value="{{ form.storage_location or '' }}" placeholder="e.g., Cabinet A, Shelf 1">
+            {%- if errors.storage_location %}<div class="invalid-feedback d-block">{{ errors.storage_location }}</div>{% endif %}
           </div>
         </div>
 
         <div class="row g-3 mb-3">
           <div class="col-12">
             <label class="field-label">Notes</label>
-            <textarea class="form-control" name="notes">{{ form.notes or '' }}</textarea>
+            <textarea class="form-control{% if errors.notes %} is-invalid{% endif %}" name="notes" maxlength="{{ item_text_limits.notes }}">{{ form.notes or '' }}</textarea>
+            {%- if errors.notes %}<div class="invalid-feedback d-block">{{ errors.notes }}</div>{% endif %}
           </div>
         </div>
 

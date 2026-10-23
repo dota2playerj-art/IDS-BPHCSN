@@ -23,6 +23,7 @@ from models.audit import (
     log_action,
 )
 from models.consultations import (
+    CLINICAL_TEXT_MAX_LENGTH,
     CONSULTATION_FIELDS,
     DOCTOR_ONLY_FIELDS,
     FIELD_LABELS,
@@ -749,6 +750,8 @@ def consultation_form_context(patient, appointment=None, consultation=None,
         ),
         "unopenable_text": UNOPENABLE_TEXT,
         "restrict_field": RESTRICT_FIELD,
+        # Maximum length of the written fields (audit B21), as the server checks it.
+        "clinical_text_max": CLINICAL_TEXT_MAX_LENGTH,
         # Ticked from what was submitted when a save bounced, and otherwise from
         # the stored record -- so a rejected form comes back still holding the
         # seal the clinician had just ticked, rather than quietly losing it and

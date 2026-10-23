@@ -555,6 +555,26 @@ _WHOLE_NUMBER = re.compile(r"[0-9]+")
 _DECIMAL_NUMBER = re.compile(r"[0-9]+(?:\.[0-9]+)?")
 MAX_REORDER_LEVEL = 100000
 MAX_UNIT_COST = 1000000
+# Maximum lengths (audit B14, B21): item text fields 200, the item's notes 2,000, a lot or a
+# brand 200, the removal note 200 (the form's own limit). Checked here and set as maxlength on
+# the forms; an item saved before these limits is asked to shorten only when it is edited.
+TEXT_MAX_LENGTH = 200
+NOTES_MAX_LENGTH = 2000
+REMOVAL_NOTE_MAX_LENGTH = 200
+ITEM_TEXT_LIMITS = {
+    "generic_name": TEXT_MAX_LENGTH, "item_name": TEXT_MAX_LENGTH,
+    "dosage_strength": TEXT_MAX_LENGTH, "size": TEXT_MAX_LENGTH,
+    "manufacturer": TEXT_MAX_LENGTH, "supplier": TEXT_MAX_LENGTH,
+    "storage_location": TEXT_MAX_LENGTH, "notes": NOTES_MAX_LENGTH,
+}
+
+
+def _too_long(values, limits, errors):
+    """Add "Use N characters or fewer" for every field over its limit."""
+    for field, limit in limits.items():
+        length = len(_get(values, field))
+        if length > limit and field not in errors:
+            errors[field] = f"Use {limit:,} characters or fewer. This has {length:,}."
 
 
 def _parse_int(raw):
@@ -647,6 +667,8 @@ def validate_inventory_form(values, item_id=None):
             errors["unit_cost"] = "Unit cost must be a number of 0 or more, such as 2.50."
         elif cost > MAX_UNIT_COST:
             errors["unit_cost"] = f"Enter a unit cost of {MAX_UNIT_COST:,} or less."
+
+    _too_long(values, ITEM_TEXT_LIMITS, errors)
 
     if not errors:
         generic, strength, form = _item_identity(values)
@@ -830,6 +852,7 @@ def validate_receive_form(values, item):
     no_lot = bool(_get(values, "no_lot"))
     if not no_lot and not _get(values, "lot_number"):
         errors["lot_number"] = "Enter the lot number, or tick No lot number."
+    _too_long(values, {"lot_number": TEXT_MAX_LENGTH, "brand_name": TEXT_MAX_LENGTH}, errors)
 
     expiry = _get(values, "expiry_date")
     if not expiry:
@@ -911,6 +934,7 @@ def remove_from_batch(item_id, batch_id, values, removed_by=None, audit=None):
     quantity, ok = _parse_int(values.get("quantity"))
     if not ok or quantity < 1:
         errors["quantity"] = "Enter the amount as a whole number of 1 or more."
+    _too_long(values, {"note": REMOVAL_NOTE_MAX_LENGTH}, errors)
     if errors:
         return None, errors
 

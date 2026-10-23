@@ -351,7 +351,7 @@
           {{ unopenable_text }}
         </div>
 {%- else %}
-        <textarea class="form-control{% if errors.chief_complaint %} is-invalid{% endif %}{% if sealed_on_screen %} sealed-field{% endif %}" name="chief_complaint"
+        <textarea class="form-control{% if errors.chief_complaint %} is-invalid{% endif %}{% if sealed_on_screen %} sealed-field{% endif %}" name="chief_complaint" maxlength="{{ clinical_text_max }}"
                   placeholder="e.g. Fever and cough for three days, worse at night">{{ form.chief_complaint or '' }}</textarea>
 {%- if sealed_on_screen %}
         <div class="sealed-print-note">Sealed — not printed</div>
@@ -932,7 +932,7 @@
 {%- elif can_diagnose %}
         <div class="mb-3">
           <label class="field-label">{{ field_labels.diagnosis }}{% if diagnosis_required %}<span class="req">*</span>{% else %} <span class="field-optional">(optional for this service)</span>{% endif %}</label>
-          <textarea class="form-control{% if errors.diagnosis %} is-invalid{% endif %}{% if sealed_on_screen %} sealed-field{% endif %}" name="diagnosis"
+          <textarea class="form-control{% if errors.diagnosis %} is-invalid{% endif %}{% if sealed_on_screen %} sealed-field{% endif %}" name="diagnosis" maxlength="{{ clinical_text_max }}"
                     placeholder="e.g. Acute viral upper respiratory infection">{{ form.diagnosis or '' }}</textarea>
 {%- if sealed_on_screen %}
           <div class="sealed-print-note">Sealed — not printed</div>
@@ -942,7 +942,7 @@
 
         <div class="mb-3">
           <label class="field-label">{{ field_labels.treatment_plan }}{% if diagnosis_required %}<span class="req">*</span>{% else %} <span class="field-optional">(optional for this service)</span>{% endif %}</label>
-          <textarea class="form-control{% if errors.treatment_plan %} is-invalid{% endif %}{% if sealed_on_screen %} sealed-field{% endif %}" name="treatment_plan"
+          <textarea class="form-control{% if errors.treatment_plan %} is-invalid{% endif %}{% if sealed_on_screen %} sealed-field{% endif %}" name="treatment_plan" maxlength="{{ clinical_text_max }}"
                     placeholder="e.g. Paracetamol 500mg every 6 hours for 3 days; increased fluids; return if fever persists past 3 days">{{ form.treatment_plan or '' }}</textarea>
           {%- if errors.treatment_plan %}<div class="invalid-feedback d-block">{{ errors.treatment_plan }}</div>
 {#- This hint used to end "Stock deduction is not linked to this yet", which was
@@ -1012,8 +1012,9 @@
             {{ unopenable_text }}
           </div>
 {%- else %}
-          <textarea class="form-control{% if sealed_on_screen %} sealed-field{% endif %}" name="remarks"
+          <textarea class="form-control{% if errors.remarks %} is-invalid{% endif %}{% if sealed_on_screen %} sealed-field{% endif %}" name="remarks" maxlength="{{ clinical_text_max }}"
                     placeholder="Anything else worth recording — advice given, referrals, observations">{{ form.remarks or '' }}</textarea>
+          {%- if errors.remarks %}<div class="invalid-feedback d-block">{{ errors.remarks }}</div>{% endif %}
 {%- if sealed_on_screen %}
           <div class="sealed-print-note">Sealed — not printed</div>
 {%- endif %}

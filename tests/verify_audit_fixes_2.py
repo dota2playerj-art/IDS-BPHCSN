@@ -3,6 +3,7 @@
 B12  A second parent's report for one dose is refused in words, not with a server error.
 B13  A huge reorder level is refused; B14 "inf", "nan", "1e9" and other non-numbers too.
 B24  A PDF export never fails on long text; B25 the Patient Records search runs clean.
+B20  One compose form sends one SMS broadcast. B21, B14 maximum lengths.
 The sections for the later batches are added below as each batch is done.
 Every name, date and number below is made up.
 """
@@ -262,6 +263,188 @@ check("a malformed reference: refused, nothing sent", r.status_code == 200 and b
 r = admin.post(SEND, data={"message": "QA no form", "audience": "all_patients", "category": ""})
 check("a post with no compose form (the demo seed's path) still sends once, under the next reference",
       r.status_code == 302 and broadcasts() == n0 + 3)
+
+from html.parser import HTMLParser  # noqa: E402
+
+
+class _FormFields(HTMLParser):
+    """The fields the page's first POST form with no action would submit (no JavaScript)."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.fields, self.in_form, self.done = [], False, False
+        self.select = self.textarea = None
+
+    def handle_starttag(self, tag, attrs):
+        a = dict(attrs)
+        if tag == "form" and not self.done and (a.get("method") or "").lower() == "post" and not a.get("action"):
+            self.in_form = True
+        if not self.in_form:
+            return
+        name = a.get("name")
+        if tag == "input" and name and "disabled" not in a:
+            kind = (a.get("type") or "text").lower()
+            if kind in ("checkbox", "radio") and "checked" not in a:
+                return
+            if kind not in ("submit", "button", "file"):
+                self.fields.append((name, a.get("value", "")))
+        elif tag == "select" and name and "disabled" not in a:
+            self.select = [name, None, None]
+        elif tag == "option" and self.select is not None:
+            if self.select[2] is None:
+                self.select[2] = a.get("value", "")
+            if "selected" in a:
+                self.select[1] = a.get("value", "")
+        elif tag == "textarea" and name and "disabled" not in a:
+            self.textarea = [name, ""]
+
+    def handle_data(self, data):
+        if self.textarea is not None:
+            self.textarea[1] += data
+
+    def handle_endtag(self, tag):
+        if tag == "select" and self.select is not None:
+            value = self.select[1] if self.select[1] is not None else self.select[2]
+            if value is not None:
+                self.fields.append((self.select[0], value))
+            self.select = None
+        elif tag == "textarea" and self.textarea is not None:
+            self.fields.append((self.textarea[0], self.textarea[1].lstrip("\n")))
+            self.textarea = None
+        elif tag == "form" and self.in_form:
+            self.in_form, self.done = False, True
+
+
+def form_fields(page):
+    parser = _FormFields()
+    parser.feed(page)
+    data = {}
+    for name, value in parser.fields:
+        data.setdefault(name, []).append(value)
+    return {k: (v[0] if len(v) == 1 else v) for k, v in data.items()}
+
+
+# ===========================================================================
+section("B21, B14. MAXIMUM LENGTHS, ON THE SERVER AND IN THE FORMS")
+# ===========================================================================
+REG = {"first_name": "Qalength", "middle_name": "", "last_name": "Testperson", "birth_date": "1991-02-03",
+       "sex": "Female", "civil_status": "Single", "address": "Purok 9", "municipality": "San Francisco",
+       "barangay": "Poblacion", "province": "Surigao del Norte", "zip_code": "8405", "contact_number": "09000004001",
+       "emergency_contact_name": "Qa Kin", "emergency_contact_relationship": "Sibling",
+       "emergency_contact_number": "09000004002", "medical_conditions_note": ""}
+
+
+def register(**change):
+    data = dict(REG)
+    data.update(change)
+    before = q1("SELECT COUNT(*) FROM patients")[0]
+    r = staff.post("/staff/register-patient", data=data)
+    return r, q1("SELECT COUNT(*) FROM patients")[0] - before
+
+
+serial = [0]
+for field, limit in (("first_name", 100), ("middle_name", 100), ("last_name", 100), ("emergency_contact_name", 100),
+                     ("address", 200), ("emergency_contact_address", 200), ("medical_conditions_note", 2000)):
+    serial[0] += 1
+    over = "Q" * (limit + 1)
+    change = {field: over, "birth_date": f"1980-01-{serial[0]:02d}"}
+    if field not in ("first_name", "last_name"):
+        change["first_name"] = f"Qaover{serial[0]:02d}"
+    r, added = register(**change)
+    check(f"{field}: {limit + 1} characters refused beside the field, nothing saved",
+          r.status_code == 200 and added == 0
+          and f"Use {limit:,} characters or fewer. This has {limit + 1:,}." in body(r), (r.status_code, added))
+    check(f"{field}: the typed text is kept", over in body(r))
+    exact = ("Qa" + "q" * (limit - 2)) if field in ("first_name", "last_name") else ("Q" * limit)
+    change = {field: exact, "birth_date": f"1981-01-{serial[0]:02d}"}
+    if field not in ("first_name", "last_name"):
+        change["first_name"] = f"Qaexact{serial[0]:02d}"
+    r, added = register(**change)
+    check(f"{field}: exactly {limit} characters is accepted", r.status_code == 302 and added == 1,
+          (r.status_code, added))
+page = body(staff.get("/staff/register-patient"))
+check("the form sets maxlength from the same limits (100 / 200 / 2,000)",
+      'name="first_name" maxlength="100"' in page and 'name="address" maxlength="200"' in page
+      and 'name="medical_conditions_note" maxlength="2000"' in page)
+old = TODAY.replace(year=TODAY.year - 121)
+r, added = register(first_name="Qaancient", birth_date=old.isoformat())
+check("a birth date over 120 years ago is refused", added == 0 and "over 120 years old" in body(r))
+edge = TODAY.replace(year=TODAY.year - 120)
+r, added = register(first_name="Qacentenarian", birth_date=edge.isoformat())
+check("exactly 120 years old is accepted", added == 1, body(r)[:200])
+
+# An old record longer than the limits: shown and exported in full, asked to shorten on edit.
+LONGADDR = "Purok 1 " + "Q" * 400
+run_sql("UPDATE patients SET address = ? WHERE id = 4", (LONGADDR,))
+check("an old over-long address is shown in full on the profile",
+      LONGADDR in body(staff.get("/staff/patient_profile/4")))
+xl = staff.get("/staff/patient_records/export.xlsx").data
+check("... and exported in full", any(LONGADDR in str(c) for ws in load_workbook(io.BytesIO(xl)).worksheets
+                                      for row in ws.iter_rows(values_only=True) for c in row if c))
+edit_page = body(staff.get("/staff/register-patient/4"))
+check("... and opened for editing with its full text", LONGADDR in edit_page)
+data = form_fields(edit_page)
+r = staff.post("/staff/register-patient/4", data=data)
+check("saving it unchanged asks for the address to be shortened (Use 200 characters or fewer)",
+      r.status_code == 200 and "Use 200 characters or fewer. This has" in body(r)
+      and q1("SELECT address FROM patients WHERE id = 4")[0] == LONGADDR, body(r)[:300])
+run_sql("UPDATE patients SET address = 'Purok 1, Barangay Poblacion' WHERE id = 4")
+
+from models.consultations import CLINICAL_TEXT_MAX_LENGTH, consultation_age_context  # noqa: E402
+from models.consultations import validate_consultation_form  # noqa: E402
+
+with app.app_context():
+    from models.patients import get_patient_by_id
+    age_adult = consultation_age_context(get_patient_by_id(1), on_date=TODAY)
+    base = {"chief_complaint": "QA", "diagnosis": "QA", "treatment_plan": "QA"}
+    e_over = validate_consultation_form(dict(base, remarks="R" * 2001), age_adult)
+    e_ok = validate_consultation_form(dict(base, remarks="R" * 2000), age_adult)
+    e_seal = validate_consultation_form(dict(base, diagnosis="enc:v1:" + "A" * 4000), age_adult)
+check("consultation remarks: 2,001 refused, 2,000 accepted (limit 2,000)",
+      CLINICAL_TEXT_MAX_LENGTH == 2000 and "remarks" in e_over and "remarks" not in e_ok, (e_over, e_ok))
+check("a sealed field kept as stored (cipher text) is not measured", "diagnosis" not in e_seal, e_seal)
+page = body(doctor.get("/staff/consultation/edit/1"))
+check("the consultation form sets maxlength 2000 on the written fields",
+      page.count('maxlength="2000"') >= 3, page.count('maxlength="2000"'))
+
+for field, limit in (("generic_name", 200), ("dosage_strength", 200), ("manufacturer", 200), ("supplier", 200),
+                     ("storage_location", 200), ("notes", 2000)):
+    change = {field: "Q" * (limit + 1)}
+    if field != "generic_name":
+        change["generic_name"] = "Qalong" + field[:4]
+    r, added = add_item(**change)
+    check(f"item {field}: {limit + 1} characters refused beside the field", r.status_code == 200 and added == 0
+          and f"Use {limit:,} characters or fewer." in body(r), (r.status_code, added))
+item = q1("SELECT id FROM inventory_items WHERE generic_name = 'Qanumberol'")[0]
+for field in ("lot_number", "brand_name"):
+    n0 = q1("SELECT COUNT(*) FROM inventory_batches WHERE inventory_item_id = ?", (item,))[0]
+    r = admin.post(f"/admin/medicine_inventory/{item}/receive", data={
+        "lot_number": "QA-LOT", "expiry_date": (TODAY + timedelta(days=400)).isoformat(), "quantity": "50",
+        "date_received": TODAY.isoformat(), "source": "DOH", "brand_name": "", field: "L" * 201})
+    check(f"receive {field}: 201 characters refused beside the field, typed value kept",
+          r.status_code == 200 and "Use 200 characters or fewer." in body(r) and "L" * 201 in body(r)
+          and q1("SELECT COUNT(*) FROM inventory_batches WHERE inventory_item_id = ?", (item,))[0] == n0)
+admin.post(f"/admin/medicine_inventory/{item}/receive", data={
+    "lot_number": "QA-LOT", "expiry_date": (TODAY + timedelta(days=400)).isoformat(), "quantity": "50",
+    "date_received": TODAY.isoformat(), "source": "DOH", "brand_name": ""})
+batch = q1("SELECT id, quantity_remaining FROM inventory_batches WHERE inventory_item_id = ?", (item,))
+admin.post(f"/admin/medicine_inventory/{item}/remove", data={"batch_id": str(batch["id"]), "quantity": "1",
+                                                             "reason": "Damaged", "note": "N" * 201})
+check("remove stock: a 201-character note is refused (the form's limit is 200)",
+      q1("SELECT quantity_remaining FROM inventory_batches WHERE id = ?", (batch["id"],))[0]
+      == batch["quantity_remaining"])
+page = body(admin.get("/admin/add_edit_medicine"))
+check("the item form sets maxlength 200 / 2000", 'name="generic_name" maxlength="200"' in page
+      and 'name="notes" maxlength="2000"' in page)
+run_sql("UPDATE appointments SET status = 'Completed' WHERE patient_id = 12 AND status IN "
+        "('Waiting', 'In Consultation', 'Waiting for the Doctor')")
+for length, expected in ((201, 0), (200, 1)):
+    n0 = q1("SELECT COUNT(*) FROM appointments WHERE patient_id = 12")[0]
+    staff.post("/staff/appointment_scheduling/check-in", data={"patient_id": "12", "service": "Consultation",
+                                                               "reason": "R" * length})
+    check(f"check-in reason of {length} characters: {'accepted' if expected else 'refused'} (limit 200 on both paths)",
+          q1("SELECT COUNT(*) FROM appointments WHERE patient_id = 12")[0] - n0 == expected)
+run_sql("UPDATE appointments SET status = 'Completed' WHERE patient_id = 12 AND status = 'Waiting'")
 
 # ---------------------------------------------------------------------------
 failed = [name for name, ok in results if not ok]

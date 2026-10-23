@@ -35,6 +35,7 @@ from models.immunizations import (
 )
 from models.doctor_worklist import clean_service
 from models.patients import (
+    TEXT_LIMITS,
     ALLERGY_OPTIONS,
     BLOOD_TYPES,
     CIVIL_STATUSES,
@@ -1059,6 +1060,8 @@ def register_patient_context(form=None, errors=None, duplicates=None,
         "check_in_flag_field": CHECK_IN_FLAG_FIELD,
         "check_in_reason_field": CHECK_IN_REASON_FIELD,
         "check_in_reason_max": CHECK_IN_REASON_MAX,
+        # Maximum lengths (audit B21), the same table the server checks.
+        "text_limits": TEXT_LIMITS,
         # Save & Register Another's name/value, so the button and the route read
         # the same two strings and cannot drift out of agreement.
         "save_action_field": SAVE_ACTION_FIELD,
