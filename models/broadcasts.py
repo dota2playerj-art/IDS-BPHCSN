@@ -6,6 +6,8 @@ from the per-patient reminders the rest of the system deals in: it belongs to no
 patient record, and its history is a record of what the barangay said to the
 community rather than of anyone's care.
 """
+import re
+
 from database.connection import db_connection
 from models.consultations import PEDIATRIC_AGE_YEARS
 from models.patients import SENIOR_AGE, calculate_age
@@ -327,7 +329,66 @@ def generate_next_reference(conn=None):
     return f"SMS-{year}-{highest + 1:04d}"
 
 
-def send_broadcast(message, audience, category, sent_by):
+class BroadcastNotSent(Exception):
+    """A send that was refused before any message left (audit B20).
+
+    `reason` is ALREADY_SENT (this compose form's reference is already on a broadcast:
+    a second press, a resubmitted page, or two requests at once) or REFERENCE_TAKEN
+    (another broadcast took the next reference while this one was being written).
+    `existing` is the broadcast that holds the reference, for ALREADY_SENT.
+    """
+
+    def __init__(self, reason, existing=None):
+        super().__init__(reason)
+        self.reason = reason
+        self.existing = existing
+
+
+ALREADY_SENT = "already-sent"
+REFERENCE_TAKEN = "reference-taken"
+# The compose form carries the reference its broadcast will be stored under. It is the
+# form's one-time token: the server claims it before anything is sent, so one form sends
+# once (audit B20).
+SEND_REFERENCE_FIELD = "send_reference"
+SEND_REFERENCE_PATTERN = re.compile(r"SMS-[0-9]{4}-[0-9]{4,6}")
+
+
+def _claim_reference(conn, reference, row):
+    """Insert the broadcast row under `reference` inside one write transaction.
+
+    BEGIN IMMEDIATE takes SQLite's write lock first, so two requests cannot both find
+    the reference free. Returns the new row id, or raises BroadcastNotSent. A `reference`
+    of None claims the next free one (callers with no compose form).
+    """
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        if reference is not None:
+            held = conn.execute("SELECT id FROM sms_broadcasts WHERE reference = ?",
+                                (reference,)).fetchone()
+            if held:
+                raise BroadcastNotSent(ALREADY_SENT, held["id"])
+            if reference != generate_next_reference(conn):
+                raise BroadcastNotSent(REFERENCE_TAKEN)
+        else:
+            reference = generate_next_reference(conn)
+        cursor = conn.execute(
+            """
+        INSERT INTO sms_broadcasts
+            (reference, message, category, audience, audience_label,
+             recipient_count, sent_count, failed_count, segments, encoding,
+             status, delivery_mode, sent_by)
+        VALUES (?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?)
+        """,
+            (reference, *row),
+        )
+        conn.commit()
+        return cursor.lastrowid
+    except BaseException:
+        conn.rollback()
+        raise
+
+
+def send_broadcast(message, audience, category, sent_by, reference=None):
     """Deliver one broadcast to its audience and record what happened.
 
     Every recipient is attempted individually, because that is what the gateway's
@@ -348,6 +409,16 @@ def send_broadcast(message, audience, category, sent_by):
     """
     recipients, merged = resolve_recipients(audience)
     metrics = message_metrics(message)
+
+    # Claimed BEFORE anything is sent (audit B20): a second press of Send, a resubmitted
+    # page or two requests at once find the reference taken and send nothing. The row is
+    # written as Failed with no counts and completed below, so a send that stops halfway
+    # still leaves a record of having started.
+    with db_connection() as conn:
+        broadcast_id = _claim_reference(conn, reference, (
+            message, category or None, audience, AUDIENCES[audience]["label"],
+            len(recipients), metrics["segments"], metrics["encoding"], STATUS_FAILED,
+            LIVE if gateway_configured() else SIMULATED, sent_by))
 
     results = []
     for recipient in recipients:
@@ -374,23 +445,11 @@ def send_broadcast(message, audience, category, sent_by):
         status = STATUS_PARTIAL
 
     with db_connection() as conn:
-        reference = generate_next_reference(conn)
-        cursor = conn.execute(
-            """
-        INSERT INTO sms_broadcasts
-            (reference, message, category, audience, audience_label,
-             recipient_count, sent_count, failed_count, segments, encoding,
-             status, delivery_mode, sent_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-            (
-                reference, message, category or None, audience,
-                AUDIENCES[audience]["label"], len(recipients), sent_count,
-                failed_count, metrics["segments"], metrics["encoding"], status,
-                delivery_mode, sent_by,
-            ),
+        conn.execute(
+            "UPDATE sms_broadcasts SET sent_count = ?, failed_count = ?, status = ?, "
+            "delivery_mode = ? WHERE id = ?",
+            (sent_count, failed_count, status, delivery_mode, broadcast_id),
         )
-        broadcast_id = cursor.lastrowid
 
         for recipient, outcome in results:
             conn.execute(

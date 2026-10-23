@@ -575,6 +575,9 @@
           <div class="modal-body">
             <form id="composeForm" method="post" action="{{ url_for(send_broadcast_endpoint) }}" novalidate>
               {{ csrf_field() }}
+              {#- Audit B20: the reference this broadcast will get. The server claims it before
+                  sending, so this form sends once however often Send is pressed. #}
+              <input type="hidden" name="{{ send_reference_field }}" value="{{ send_reference }}">
 
               <label class="field-label" for="composeMessage">Message<span class="req">*</span></label>
               <textarea class="form-control{% if errors.message %} is-invalid{% endif %}" id="composeMessage"
@@ -650,7 +653,7 @@
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button type="submit" form="composeForm" class="btn-primary-teal">
+            <button type="submit" form="composeForm" class="btn-primary-teal" id="composeSend">
               <span class="material-symbols-outlined" style="font-size:18px;">send</span>Send Broadcast
             </button>
           </div>
@@ -807,6 +810,18 @@
   // DOMContentLoaded rather than a polling retry: the Bootstrap tag is an
   // ordinary parser-inserted <script src>, so it has run by the time the event
   // fires. Same wait, same reason, as patient_profile.html's tab note.
+  // Audit B20: one press sends. The button is disabled once the form is on its way, so a
+  // second click does nothing; the server refuses a repeat of the same form as well.
+  (function(){
+    var form = document.getElementById('composeForm');
+    var send = document.getElementById('composeSend');
+    if(!form || !send){ return; }
+    form.addEventListener('submit', function(event){
+      if(form.dataset.sending === '1'){ event.preventDefault(); return; }
+      form.dataset.sending = '1';
+      setTimeout(function(){ send.disabled = true; send.setAttribute('aria-busy', 'true'); }, 0);
+    });
+  })();
 {%- if compose_open %}
   document.addEventListener('DOMContentLoaded', function(){
     var composeModal = document.getElementById('composeBroadcastModal');

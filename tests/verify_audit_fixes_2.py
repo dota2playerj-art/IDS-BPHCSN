@@ -201,6 +201,68 @@ check("the table sits in a .table-responsive box and the empty message is outsid
       re.search(r'<div class="table-responsive">\s*<table class="patient-table" id="patientTable">', page) is not None
       and page.find('id="emptyState"') > page.find("</table>"))
 
+# ===========================================================================
+section("B20. ONE COMPOSE FORM SENDS ONE BROADCAST")
+# ===========================================================================
+import threading  # noqa: E402
+
+SEND = "/admin/sms_notifications/send"
+
+
+def page_reference(client, url="/admin/sms_notifications"):
+    m = re.search(r'name="send_reference" value="(SMS-\d{4}-\d{4,6})"', body(client.get(url)))
+    return m.group(1) if m else None
+
+
+def broadcasts():
+    return q1("SELECT COUNT(*) FROM sms_broadcasts")[0]
+
+
+ref = page_reference(admin)
+check("the compose form carries the next reference as its one-time token", ref is not None, ref)
+page = body(admin.get("/admin/sms_notifications"))
+check("the Send button disables itself after the first click (script present)",
+      'id="composeSend"' in page and "form.dataset.sending" in page and "send.disabled = true" in page)
+recipients = None
+form = {"message": "QA double press test", "audience": "all_patients", "category": "", "send_reference": ref}
+n0 = broadcasts()
+second_admin = client_as(ADMIN_ID)
+codes = [None, None]
+
+
+def press(i, client):
+    codes[i] = client.post(SEND, data=form).status_code
+
+
+threads = [threading.Thread(target=press, args=(0, admin)), threading.Thread(target=press, args=(1, second_admin))]
+for t in threads:
+    t.start()
+for t in threads:
+    t.join()
+row = q1("SELECT id, reference, status, recipient_count, sent_count FROM sms_broadcasts ORDER BY id DESC LIMIT 1")
+check("two requests at the same moment: no server error", codes == [302, 302], codes)
+check("... exactly one broadcast is recorded, under the form's reference",
+      broadcasts() == n0 + 1 and row["reference"] == ref, (broadcasts() - n0, row["reference"]))
+check("... its recipients were texted once (one recipient row each) and the row is complete",
+      q1("SELECT COUNT(*) FROM sms_broadcast_recipients WHERE broadcast_id = ?", (row["id"],))[0]
+      == row["recipient_count"] == row["sent_count"] and row["status"] == "Sent")
+r = admin.post(SEND, data=form)
+shown = body(admin.get("/account"))
+check("the same form sent again (back button, refresh): refused, nothing sent",
+      r.status_code == 302 and broadcasts() == n0 + 1)
+check("... with a plain message", f"This broadcast was already sent ({ref}). It was not sent again." in shown)
+stale = dict(form, send_reference=ref, message="QA stale form")
+admin.post(SEND, data=dict(form, send_reference=page_reference(admin), message="QA other sender"))
+r = admin.post(SEND, data=dict(stale, send_reference=f"SMS-{TODAY.year}-9999"))
+check("a form whose reference was taken by another broadcast: refused, dialog reopened with the typed message",
+      r.status_code == 200 and "QA stale form" in body(r) and "was not sent" in body(r)
+      and broadcasts() == n0 + 2)
+r = admin.post(SEND, data=dict(form, send_reference="not-a-reference", message="QA forged"))
+check("a malformed reference: refused, nothing sent", r.status_code == 200 and broadcasts() == n0 + 2)
+r = admin.post(SEND, data={"message": "QA no form", "audience": "all_patients", "category": ""})
+check("a post with no compose form (the demo seed's path) still sends once, under the next reference",
+      r.status_code == 302 and broadcasts() == n0 + 3)
+
 # ---------------------------------------------------------------------------
 failed = [name for name, ok in results if not ok]
 print("\n" + "=" * 78)

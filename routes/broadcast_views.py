@@ -13,10 +13,17 @@ from models.appointment_sms import (
 )
 from models.audit import ACTION_SMS_BROADCAST_SENT, MODULE_SMS, log_action
 from models.broadcasts import (
+    ALREADY_SENT,
     AUDIENCE_NOT_AVAILABLE,
     AUDIENCES,
     BROADCAST_CATEGORIES,
+    REFERENCE_TAKEN,
+    SEND_REFERENCE_FIELD,
+    SEND_REFERENCE_PATTERN,
+    BroadcastNotSent,
     audience_options,
+    generate_next_reference,
+    get_broadcast_by_id,
     get_broadcast_history,
     get_broadcast_recipient_counts,
     get_broadcast_recipients,
@@ -147,6 +154,10 @@ def sms_notifications_context(compose=None, errors=None):
         "audiences_unavailable": AUDIENCE_NOT_AVAILABLE,
         "categories": BROADCAST_CATEGORIES,
         "compose": compose or {},
+        # The reference the next broadcast will be stored under: the compose form's
+        # one-time token (audit B20). Read fresh on every render.
+        "send_reference": generate_next_reference(),
+        "send_reference_field": SEND_REFERENCE_FIELD,
         "errors": errors or {},
         "compose_open": bool(errors),
         # Handed to the template so the live counter in the dialog and the
@@ -246,9 +257,28 @@ def process_send_broadcast(form_data, user_id, ip_address=None):
     if errors:
         return None, sms_notifications_context(compose=values, errors=errors), None
 
-    broadcast = send_broadcast(
-        values["message"], values["audience"], values["category"], user_id
-    )
+    # The compose form's one-time token (audit B20). A post without one (a script, the
+    # demo seed) still claims the next reference safely; one with a malformed one is
+    # treated as an out-of-date form.
+    reference = (form_data.get(SEND_REFERENCE_FIELD) or "").strip() or None
+    if reference is not None and not SEND_REFERENCE_PATTERN.fullmatch(reference):
+        reference = "stale"
+    try:
+        if reference == "stale":
+            raise BroadcastNotSent(REFERENCE_TAKEN)
+        broadcast = send_broadcast(
+            values["message"], values["audience"], values["category"], user_id,
+            reference=reference,
+        )
+    except BroadcastNotSent as refused:
+        if refused.reason == ALREADY_SENT:
+            existing = get_broadcast_by_id(refused.existing)
+            return existing, None, (
+                f"This broadcast was already sent ({existing['reference']}). "
+                "It was not sent again.")
+        return None, sms_notifications_context(compose=values, errors={"message": (
+            "Another broadcast was sent while this one was open, so this one was not "
+            "sent. Check the history, then press Send again.")}), None
 
     metrics = message_metrics(values["message"])
     log_action(
