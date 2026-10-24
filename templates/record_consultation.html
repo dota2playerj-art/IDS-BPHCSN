@@ -288,7 +288,7 @@
     the explanation of why a stale entry survives; what stayed is that it can be
     stale, which is the part that changes what the clinician does with it. #}
         <span style="display:block; margin-top:3px; font-size:12px; opacity:0.85;">
-          From the patient's record, not from this visit{% if patient.updated_at %} &mdash; last updated {{ patient.updated_at | display_date }}{% endif %}.
+          From the patient's record, not from this visit{% if patient.updated_at %} &mdash; last updated {{ patient.updated_at | stamp_date }}{% endif %}.
           It may be out of date. Nothing here is removed on its own.
         </span>
 {%- endif %}
@@ -323,7 +323,7 @@
       <span class="material-symbols-outlined">history</span>
       <div>
         <strong>This record has been edited before</strong>
-        Last changed {{ consultation.updated_at | display_date }}. Every edit is kept in the audit log with the name of whoever made it.
+        Last changed {{ consultation.updated_at | stamp_date }}. Every edit is kept in the audit log with the name of whoever made it.
       </div>
     </div>
 {%- endif %}

@@ -499,8 +499,9 @@ check("time-format.js is served", app.test_client().get("/static/js/time-format.
 for name in ("community_reports", "patient_profile", "patient_profile_demographics",
              "patient_records", "reports_analytics"):
     source = (REPO / f"templates/{name}.html").read_text(encoding="utf-8")
-    check(f"{name}.html stamps its printout with IDSTime.formatDateTime()",
-          "IDSTime.formatDateTime(new Date())" in source and "toLocaleString" not in source)
+    # The clinic's clock, not the device's (audit B23, Task 24): IDSTime.clinicStamp().
+    check(f"{name}.html stamps its printout with IDSTime.clinicStamp()",
+          "IDSTime.clinicStamp()" in source and "new Date()" not in source and "toLocaleString" not in source)
 
 # ---------------------------------------------------------------------------
 failed = [name for name, ok in results if not ok]

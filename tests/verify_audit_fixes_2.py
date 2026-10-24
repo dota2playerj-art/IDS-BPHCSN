@@ -558,6 +558,87 @@ readme = (REPO / "README.md").read_text(encoding="utf-8")
 check("full run 'about 30 minutes', quick run 'about 9 minutes'",
       "every suite (about 30 minutes)" in readme and "(about 9 minutes)" in readme)
 
+
+# ===========================================================================
+section("B22. A STORED UTC TIMESTAMP IS SHOWN ON ITS MANILA DATE")
+from utils.dates import clinic_now_iso, now as clinic_now, stamp_date, stamp_long_date  # noqa: E402
+
+check("16:30 UTC on Oct 31 is 00:30 on Nov 1 in Manila: 'Nov 01, 2026' / 'November 1, 2026'",
+      stamp_date("2026-10-31 16:30:00") == "Nov 01, 2026" and stamp_long_date("2026-10-31 16:30:00")
+      == "November 1, 2026")
+check("the boundary: 15:59:59 UTC is still Oct 31; 16:00:00 UTC is Nov 1",
+      stamp_date("2026-10-31 15:59:59") == "Oct 31, 2026" and stamp_date("2026-10-31 16:00:00") == "Nov 01, 2026")
+check("SQLite's fractional seconds are read too", stamp_date("2026-10-31 16:30:00.123") == "Nov 01, 2026")
+check("a plain date is shown as it is (never moved across a timezone)", stamp_date("2026-10-31") == "Oct 31, 2026")
+check("nothing -> the fallback", stamp_date(None, "—") == "—" and stamp_long_date("", "—") == "—")
+
+late_pid = add_patient("1990-04-04", first="Zzqalate")
+run_sql("UPDATE patients SET created_at = '2026-10-31 16:30:00', updated_at = '2026-10-31 16:30:00' WHERE id = ?",
+        (late_pid,))
+late_ref = f"PAT-{late_pid:03d}"
+profile = flat(body(staff.get(f"/staff/patient_profile/{late_pid}")))
+check("Staff profile: 'Registered November 1, 2026' and 'Date Registered November 1, 2026'",
+      "Registered November 1, 2026" in profile and "Date Registered November 1, 2026" in profile
+      and "October 31, 2026" not in profile, profile[profile.find("Registered"):][:120])
+admin_profile = flat(body(admin.get(f"/admin/patient_profile/{late_pid}")))
+check("Administrator's profile: 'Registered November 1, 2026' and 'Nov 01, 2026'",
+      "Registered November 1, 2026" in admin_profile and "Nov 01, 2026" in admin_profile
+      and "Oct 31, 2026" not in admin_profile, admin_profile[admin_profile.find("Registered"):][:120])
+records = body(admin.get("/admin/patient_records"))
+row = records[records.find(late_ref):][:1500]
+check("Administrator's Patient Records: the Registered column says Nov 01, 2026",
+      "Nov 01, 2026" in row and "Oct 31, 2026" not in row, flat(row)[:200])
+book = load_workbook(io.BytesIO(admin.get("/admin/patient_records/export.xlsx").data))
+late_rows = [r for ws in book.worksheets for r in ws.iter_rows(values_only=True) if late_ref in r]
+check("... and its Excel file", late_rows and "Nov 01, 2026" in late_rows[0] and "Oct 31, 2026" not in late_rows[0],
+      late_rows[:1])
+
+cons = q1("SELECT c.id, c.patient_id FROM consultations c WHERE c.restricted_at IS NULL ORDER BY c.id LIMIT 1")
+run_sql("UPDATE consultations SET created_at = '2026-10-31 16:10:00', updated_at = '2026-10-31 16:45:00.250' "
+        "WHERE id = ?", (cons["id"],))
+profile = flat(body(doctor.get(f"/staff/patient_profile/{cons['patient_id']}?tab=history")))
+check("profile, consultation: 'Recorded by … on Nov 01, 2026'",
+      re.search(r"Recorded by [^.]+ on Nov 01, 2026\.", profile) is not None,
+      re.findall(r"Recorded by [^.]+ on [^.]+\.", profile)[:3])
+check("... 'Last edited Nov 01, 2026' (stored with fractional seconds, as an edit saves it)",
+      "Last edited Nov 01, 2026" in profile)
+edit = flat(body(doctor.get(f"/staff/consultation/edit/{cons['id']}")))
+check("Edit Consultation: 'Last changed Nov 01, 2026'", "Last changed Nov 01, 2026" in edit,
+      edit[edit.find("Last changed"):][:80] if "Last changed" in edit else edit[:200])
+
+batch = q1("SELECT id, inventory_item_id FROM inventory_batches ORDER BY id LIMIT 1")
+run_sql("INSERT INTO inventory_removals (batch_id, quantity, reason, note, removed_by, created_at) "
+        "VALUES (?, 1, 'Damaged', 'QA', ?, '2026-10-31 16:30:00')", (batch["id"], STAFF_ID))
+item_page = flat(body(staff.get(f"/staff/medicine_inventory/{batch['inventory_item_id']}")))
+check("item page, Recent removals: Nov 01, 2026", "Nov 01, 2026" in item_page and "Oct 31, 2026" not in item_page)
+
+unconverted = []
+for path in sorted((REPO / "templates").glob("*.html")):
+    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if re.search(r"\w+_at\s*\|\s*(display_date|long_date|full_date)\b", line):
+            unconverted.append(f"{path.name}:{number}")
+check("no template prints a *_at column through display_date / long_date / full_date",
+      not unconverted, "\n".join(unconverted))
+
+section("B23. THE PAGE CARRIES THE SERVER'S PHILIPPINE DATE AND TIME")
+page = body(staff.get("/staff/dashboard"))
+stamp = re.search(r'data-clinic-now="(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)"', page)
+check("<body data-clinic-now> holds the server's Manila time (within 2 minutes)",
+      stamp is not None and abs((clinic_now().replace(tzinfo=None)
+                                 - __import__("datetime").datetime.fromisoformat(stamp.group(1)))
+                                .total_seconds()) < 120, stamp and stamp.group(1))
+check("clinic_now_iso() is the clinic's now(), to the second, with no offset",
+      re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d", clinic_now_iso()) is not None
+      and clinic_now_iso()[:10] == clinic_now().date().isoformat())
+js = (REPO / "static" / "js" / "time-format.js").read_text(encoding="utf-8")
+check("the print stamps and the age preview no longer read the device clock",
+      not [p.name for p in (REPO / "templates").glob("*.html")
+           if "formatDateTime(new Date())" in p.read_text(encoding="utf-8")]
+      and "new Date();" not in (REPO / "templates" / "register_patient.html").read_text(encoding="utf-8")
+      and "clinicStamp" in js and "clinicToday" in js)
+# The browser half (a device in Los Angeles with its clock two days behind) is in
+# verify_audit_fixes_2_browser.py.
+
 # ---------------------------------------------------------------------------
 failed = [name for name, ok in results if not ok]
 print("\n" + "=" * 78)

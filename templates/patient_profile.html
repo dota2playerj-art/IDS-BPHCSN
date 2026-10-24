@@ -400,7 +400,7 @@
           <div class="profile-avatar">{{ patient.initials }}</div>
           <div>
             <div class="profile-name">{{ patient.full_name }} <span class="badge-status {{ patient.status_badge_class }}">{{ patient.status }}</span></div>
-            <div class="profile-id">Patient ID: {{ patient.patient_id }} &middot; Registered {{ patient.created_at | long_date }}</div>
+            <div class="profile-id">Patient ID: {{ patient.patient_id }} &middot; Registered {{ patient.created_at | stamp_long_date }}</div>
 
             <div class="profile-meta-grid">
               <div class="meta-item">
@@ -538,7 +538,7 @@
             <div class="info-item"><div class="info-label">Address</div><div class="info-value">{{ patient.display_address or 'Not recorded' }}</div></div>
             <div class="info-item"><div class="info-label">Emergency Contact</div><div class="info-value">{{ patient.emergency_contact_name or 'Not recorded' }}{% if patient.emergency_contact_relationship %} ({{ patient.emergency_contact_relationship }}){% endif %}</div></div>
             <div class="info-item"><div class="info-label">Emergency Contact No.</div><div class="info-value">{{ patient.emergency_contact_number or 'Not recorded' }}</div></div>
-            <div class="info-item"><div class="info-label">Date Registered</div><div class="info-value">{{ patient.created_at | long_date }}</div></div>
+            <div class="info-item"><div class="info-label">Date Registered</div><div class="info-value">{{ patient.created_at | stamp_long_date }}</div></div>
           </div>
         </div>
 
@@ -831,7 +831,7 @@
                             You are seeing it in full. Health Center Staff, BHWs and the Administrator see
                             &ldquo;{{ restricted_placeholder }}&rdquo; in place of the written text, but can see the vital signs and doses.
 {%- if consultation.restricted_by_name %}
-                            Marked by {{ consultation.restricted_by_name }}{% if consultation.restricted_at %} on {{ consultation.restricted_at | display_date }}{% endif %}.
+                            Marked by {{ consultation.restricted_by_name }}{% if consultation.restricted_at %} on {{ consultation.restricted_at | stamp_date }}{% endif %}.
 {%- endif %}
 {%- else %}
                             <strong>The written text of this visit is restricted</strong>
@@ -841,8 +841,8 @@
                         </div>
 {%- endif %}
                         <div style="font-size:12px; color:var(--text-muted); margin-top:14px; padding-top:12px; border-top:1px dashed var(--border-color);">
-                          Recorded by {{ consultation.recorded_by_name }} on {{ consultation.created_at | display_date }}.
-{%- if consultation.was_edited %} Last edited {{ consultation.updated_at | display_date }} — see the audit log for what changed.{% endif %}
+                          Recorded by {{ consultation.recorded_by_name }} on {{ consultation.created_at | stamp_date }}.
+{%- if consultation.was_edited %} Last edited {{ consultation.updated_at | stamp_date }} — see the audit log for what changed.{% endif %}
                         </div>
                       </div>
                     </div>
@@ -1788,7 +1788,7 @@
   (function(){
     function stamp(){
       // static/js/time-format.js: the 12-hour clock whatever the browser's language.
-      var when = IDSTime.formatDateTime(new Date());
+      var when = IDSTime.clinicStamp();
       document.querySelectorAll('.print-stamp').forEach(function(el){ el.textContent = when; });
     }
     // beforeprint covers the browser's own Ctrl+P as well as the button.

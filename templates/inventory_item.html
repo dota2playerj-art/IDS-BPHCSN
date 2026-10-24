@@ -265,7 +265,7 @@
           <tbody>
 {%- for removal in removals %}
             <tr>
-              <td>{{ removal.created_at | display_date }}</td>
+              <td>{{ removal.created_at | stamp_date }}</td>
               <td>{{ removal.lot_number }}</td>
               <td>{{ "{:,}".format(removal.quantity) }}</td>
               <td>{{ removal.reason }}</td>

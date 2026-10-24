@@ -645,8 +645,8 @@
     var born = new Date(value + 'T00:00:00');
     if(isNaN(born.getTime())){ ageDisplay.value = ''; return; }
 
-    var now = new Date();
-    var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    // Today at the health center, from the server's Philippine clock, not the device's (audit B23).
+    var today = IDSTime.clinicToday();
 
     var years = wholeYears(born, today);
 
@@ -708,8 +708,7 @@
     if(!value){ return null; }
     var born = new Date(value + 'T00:00:00');
     if(isNaN(born.getTime())){ return null; }
-    var now = new Date();
-    var years = wholeYears(born, new Date(now.getFullYear(), now.getMonth(), now.getDate()));
+    var years = wholeYears(born, IDSTime.clinicToday());
     return (years < 0 || years >= 150) ? null : years;
   }
 

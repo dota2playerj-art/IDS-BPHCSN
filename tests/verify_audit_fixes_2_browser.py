@@ -3,6 +3,8 @@
 B26  Patient Records, Sort by Age: babies are in age order (5 weeks, 5 months, 7 months).
 B27  The Official dashboard at 390 px: a broadcast with a long unbroken run does not push the
      page wider than the screen.
+B23  A device in Los Angeles with its clock two days behind: the age preview, the civil-status
+     list and the "Printed ..." stamp follow the server's Philippine date, not the device's.
 The sections for the later batches are added below as each batch is done.
 Every name, date and number below is made up.
 
@@ -14,7 +16,7 @@ import socket
 import sqlite3
 import sys
 import threading
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -171,6 +173,47 @@ def run_checks(browser, base_url):
     check("set-up: the long broadcast is on the dashboard", "QQQQQQQQQQ" in page.evaluate("document.body.innerText"))
     wide = page.evaluate("document.documentElement.scrollWidth")
     check("no sideways scroll", wide <= 390, f"the page is {wide}px wide on a 390px screen")
+    context.close()
+
+    section("B23. A DEVICE IN LOS ANGELES WITH ITS CLOCK TWO DAYS BEHIND")
+    from utils.dates import now as clinic_now, today as clinic_today
+
+    context = browser.new_context(base_url=base_url, storage_state=states["staff"],
+                                  timezone_id="America/Los_Angeles", viewport={"width": 1366, "height": 800})
+    page = context.new_page()
+    page.clock.set_system_time(datetime.now(timezone.utc) - timedelta(days=2))
+    errors = watch_errors(page)
+    page.goto("/staff/register-patient")
+    page.wait_for_load_state()
+    day = clinic_today()
+    device_day = page.evaluate("(() => { const d = new Date(); return [d.getFullYear(), d.getMonth() + 1, d.getDate()]; })()")
+    check("set-up: the device's own date is not the clinic's", device_day != [day.year, day.month, day.day],
+          (device_day, day))
+    try:
+        eighteen = day.replace(year=day.year - 18)
+    except ValueError:  # Feb 29
+        eighteen = day.replace(year=day.year - 18, day=28)
+    page.fill("#birthDate", eighteen.isoformat())
+    page.dispatch_event("#birthDate", "change")
+    age = page.input_value("#ageDisplay")
+    options = page.evaluate("Array.from(document.querySelectorAll('#civilStatus option')).map(o => o.value)")
+    check("born 18 years ago today (clinic date): the age preview says 18 years", age == "18 years", age)
+    check("... and the civil-status list is the adult one (Married offered)", "Married" in options, options)
+    page.fill("#birthDate", (eighteen + timedelta(days=1)).isoformat())
+    page.dispatch_event("#birthDate", "change")
+    check("one day short of 18: 17 years, only Single", page.input_value("#ageDisplay") == "17 years"
+          and page.evaluate("Array.from(document.querySelectorAll('#civilStatus option')).map(o => o.value)")
+          == ["Single"])
+    for path in ("/staff/patient_records", f"/staff/patient_profile/{q1('SELECT MIN(id) FROM patients')[0]}"):
+        page.goto(path)
+        page.wait_for_load_state()
+        # The clinic's date and hour now or two minutes ago (the page was built in between).
+        moments = (clinic_now(), clinic_now() - timedelta(minutes=2))
+        expected = {f"{m:%B} {m.day}, {m.year} at {(m.hour + 11) % 12 + 1}:" for m in moments}
+        stamps = page.evaluate("Array.from(document.querySelectorAll('.print-stamp')).map(e => e.textContent)")
+        check(f"{path}: the 'Printed' stamp carries the clinic's date and hour", stamps
+              and all(any(s.startswith(e) for e in expected) for s in stamps), (stamps, expected))
+    check("no page script failed", not errors, "\n".join(errors))
     context.close()
 
 

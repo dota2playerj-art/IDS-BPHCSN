@@ -64,7 +64,7 @@
           <div class="profile-avatar">{{ patient.initials }}</div>
           <div>
             <div class="profile-name">{{ patient.full_name }} <span class="badge-status {{ patient.status_badge_class }}">{{ patient.status }}</span></div>
-            <div class="profile-id">Patient ID: {{ patient.patient_id }} &middot; Registered {{ patient.created_at | long_date }}</div>
+            <div class="profile-id">Patient ID: {{ patient.patient_id }} &middot; Registered {{ patient.created_at | stamp_long_date }}</div>
             <div class="profile-meta-grid">
               <div class="meta-item">
                 <div class="meta-label">Age / Sex</div>
@@ -84,7 +84,7 @@
               </div>
               <div class="meta-item">
                 <div class="meta-label">Registered</div>
-                <div class="meta-value">{{ patient.created_at | display_date }}</div>
+                <div class="meta-value">{{ patient.created_at | stamp_date }}</div>
               </div>
             </div>
           </div>
@@ -110,7 +110,7 @@
   (function(){
     function stamp(){
       // static/js/time-format.js: the 12-hour clock whatever the browser's language.
-      var when = IDSTime.formatDateTime(new Date());
+      var when = IDSTime.clinicStamp();
       document.querySelectorAll('.print-stamp').forEach(function(el){ el.textContent = when; });
     }
     window.addEventListener('beforeprint', stamp);

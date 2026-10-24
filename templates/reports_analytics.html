@@ -1034,7 +1034,7 @@
   (function(){
     function stamp(){
       // static/js/time-format.js: the 12-hour clock whatever the browser's language.
-      var when = IDSTime.formatDateTime(new Date());
+      var when = IDSTime.clinicStamp();
       document.querySelectorAll('.print-stamp').forEach(function(el){ el.textContent = when; });
     }
     window.addEventListener('beforeprint', stamp);

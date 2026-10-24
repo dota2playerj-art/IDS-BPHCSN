@@ -234,15 +234,17 @@
 <link href="{{ url_for('static', filename='css/responsive.css') }}" rel="stylesheet">
 </head>
 {#- The session timings for static/js/session.js, from config.py. Only on a
-    signed-in page: the script does nothing without them. #}
+    signed-in page: the script does nothing without them. data-clinic-now is the
+    server's Philippine date and time when the page was built, for IDSTime (audit B23). #}
 {%- if current_role %}
 <body data-session-idle-ms="{{ (config.IDLE_TIMEOUT.total_seconds() * 1000) | int }}"
       data-session-warn-ms="{{ (config.IDLE_WARNING.total_seconds() * 1000) | int }}"
       data-session-ping-ms="{{ (config.KEEPALIVE_INTERVAL.total_seconds() * 1000) | int }}"
       data-session-keepalive-url="{{ url_for('auth.keep_alive') }}"
-      data-session-login-url="{{ url_for('auth.login') }}">
+      data-session-login-url="{{ url_for('auth.login') }}"
+      data-clinic-now="{{ clinic_now_iso() }}">
 {%- else %}
-<body>
+<body data-clinic-now="{{ clinic_now_iso() }}">
 {%- endif %}
 
 <!-- SIDEBAR

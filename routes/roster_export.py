@@ -10,7 +10,7 @@ from models.inventory import get_expiry_batches
 from models.settings import health_center_name
 from routes.report_export import _download  # noqa: F401  (re-exported below)
 from utils.dates import (
-    display_date, display_timestamp, format_datetime, long_date, now, today,
+    display_date, display_timestamp, format_datetime, long_date, now, stamp_date, today,
 )
 from utils.document import LANDSCAPE, render
 from utils.workbook import XLSX_MIMETYPE, build, figures, safe_filename, sheet, table
@@ -430,7 +430,7 @@ def _patient_table(context):
                 _value(patient.get("sex")),
                 _value(patient.get("display_address")),
                 _value(patient.get("status")),
-                display_date(patient.get("created_at"), "—"),
+                stamp_date(patient.get("created_at"), "—"),
             ]
             for patient in patients
         ]

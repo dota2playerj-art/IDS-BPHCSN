@@ -195,6 +195,10 @@ def _parse(value):
     if not value:
         return None
     text = str(value).strip()
+    # SQLite's fractional seconds ('2026-10-31 16:30:00.123', as consultations.updated_at
+    # and restricted_at are stored) are dropped first; otherwise the time of day was lost
+    # and a converted stamp landed on 08:00 of the UTC day (audit B22).
+    text = re.sub(r"(\d{2}:\d{2}:\d{2})\.\d+$", r"\1", text)
     for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
         try:
             return datetime.strptime(text, fmt)
@@ -242,6 +246,22 @@ def to_clinic_time(value):
     if len(str(value).strip()) <= 10:
         return parsed
     return parsed.replace(tzinfo=timezone.utc).astimezone(CLINIC_TIMEZONE)
+
+
+def stamp_date(value, fallback=MISSING):
+    """A stored UTC timestamp -> its date at the health center, 'Nov 01, 2026'.
+
+    display_date() of to_clinic_time(): for a CURRENT_TIMESTAMP column shown as a
+    date alone ("Registered", "Recorded on", "Last edited"). Printed as written,
+    a record saved between midnight and 8 AM Manila showed the day before
+    (audit B22). A plain date is shown as it is.
+    """
+    return display_date(to_clinic_time(value), fallback)
+
+
+def stamp_long_date(value, fallback=MISSING):
+    """A stored UTC timestamp -> 'November 1, 2026' at the health center. See stamp_date()."""
+    return long_date(to_clinic_time(value), fallback)
 
 
 def full_date(value, fallback=MISSING):
@@ -382,9 +402,22 @@ def clock_time(value=None, fallback=MISSING):
     return format_time(local) or fallback
 
 
+def clinic_now_iso():
+    """Now at the health center as '2026-10-24T05:16:00', for <body data-clinic-now>.
+
+    static/js/time-format.js reads it (IDSTime.clinicToday(), clinicStamp()) so the age
+    preview and the "Printed ..." stamp follow the server's Philippine clock, not the
+    device's clock or timezone (audit B23).
+    """
+    return now().replace(microsecond=0, tzinfo=None).isoformat()
+
+
 def register_date_filters(app):
+    app.jinja_env.globals["clinic_now_iso"] = clinic_now_iso
     app.jinja_env.filters["display_date"] = display_date
     app.jinja_env.filters["long_date"] = long_date
+    app.jinja_env.filters["stamp_date"] = stamp_date
+    app.jinja_env.filters["stamp_long_date"] = stamp_long_date
     app.jinja_env.filters["full_date"] = full_date
     app.jinja_env.filters["display_timestamp"] = display_timestamp
     app.jinja_env.filters["clock_time"] = clock_time

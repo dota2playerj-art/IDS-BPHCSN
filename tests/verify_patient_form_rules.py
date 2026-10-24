@@ -259,7 +259,7 @@ check("the page's script gets the adult list and Single from the server (one cop
 source = (REPO / "templates" / "register_patient.html").read_text(encoding="utf-8")
 check("the page's age box and civil status list read one whole-years function",
       source.count("function wholeYears(") == 1 and "var years = wholeYears(born, today);" in source
-      and "wholeYears(born, new Date(" in source)
+      and "wholeYears(born, IDSTime.clinicToday())" in source)  # the clinic's date (audit B23)
 check("the page asks again when the birth date makes the choice invalid",
       "Please choose the civil status again for this birth date." in fresh)
 

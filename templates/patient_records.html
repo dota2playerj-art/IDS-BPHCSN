@@ -498,7 +498,7 @@
               <td>{{ patient.sex or '—' }}</td>
               <td>{{ patient.display_address or '—' }}</td>
 {%- if demographics_only %}
-              <td>{{ patient.created_at | display_date }}</td>
+              <td>{{ patient.created_at | stamp_date }}</td>
 {%- else %}
               <td>{{ patient.contact_number or '—' }}</td>
               <td>{{ patient.last_visit | display_date('No visits yet') }}</td>
@@ -771,7 +771,7 @@
   (function(){
     function stamp(){
       // static/js/time-format.js: the 12-hour clock whatever the browser's language.
-      var when = IDSTime.formatDateTime(new Date());
+      var when = IDSTime.clinicStamp();
       document.querySelectorAll('.print-stamp').forEach(function(el){ el.textContent = when; });
     }
     window.addEventListener('beforeprint', function(){
