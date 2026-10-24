@@ -1099,12 +1099,11 @@ def _appointment_export(context, produced_by):
             ["Calendar", "The month's load, one row per day that had visits."],
             ["Summary", "The figures the screen's stat cards and headers show."],
         ],
-        intro=(
-            "The Patient Queue shows today's queue, the visits still open from earlier days, "
-            "and the calendar; all three are in this file on sheets of their own. "
-            "Taken off the system on "
-            f"{now().strftime('%B %d, %Y')}."
-        ),
+        intro=" ".join((
+            "Today's queue, the visits still open from earlier days and the calendar "
+            "are each on a sheet of their own.",
+            f"Taken off the system on {now().strftime('%B %d, %Y')}.",
+        )),
     )
 
     notes = _untracked_sheet(

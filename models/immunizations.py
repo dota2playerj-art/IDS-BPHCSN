@@ -535,11 +535,12 @@ def refuse_doses_past_schedule_age(raw_keys, age_context):
     """
     if age_context.get("is_pediatric") or not any(str(key).strip() for key in raw_keys or ()):
         return {}
-    return {DOSES_GIVEN_HERE_FIELD: (
-        f"The infant immunization schedule is for {SCHEDULE_AGE_LIMIT_TEXT}. This patient "
-        f"was {age_context.get('age_display') or 'older'} on the visit date, so no dose of it "
-        "can be recorded as given here. A dose from a vaccination card can be recorded on "
-        "the Immunization Record tab.")}
+    return {DOSES_GIVEN_HERE_FIELD: " ".join((
+        f"The infant immunization schedule is for {SCHEDULE_AGE_LIMIT_TEXT}.",
+        f"This patient was {age_context.get('age_display') or 'older'} on the visit date, so a dose "
+        "given here cannot be recorded.",
+        "A dose from a vaccination card can be recorded on the Immunization Record tab.",
+    ))}
 
 
 def check_given_today(patient, dose_keys, visit_date, reported_entries=()):

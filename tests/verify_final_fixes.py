@@ -559,7 +559,8 @@ else:
     _js = (_js.replace("function refreshAge(){", "function refreshAge(birthValue, nowValue){")
            .replace("if(!birthDate || !ageDisplay){ return; }", "var ageDisplay={value:''};")
            .replace("var value = birthDate.value;", "var value = birthValue;")
-           .replace("var now = new Date();", "var now = new Date(nowValue + 'T12:00:00');")
+           # The page takes today from the server's Philippine clock (audit B23, Task 24).
+           .replace("var today = IDSTime.clinicToday();", "var today = new Date(nowValue + 'T00:00:00');")
            .replace("return; }", "return ageDisplay.value; }").replace("      return;\n", "      return ageDisplay.value;\n")
            .replace("    ageDisplay.value = plural(years, 'year');\n  }",
                     "    ageDisplay.value = plural(years, 'year'); return ageDisplay.value;\n  }")
