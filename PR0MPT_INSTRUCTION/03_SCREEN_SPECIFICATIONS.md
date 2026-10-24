@@ -52,6 +52,33 @@ of the same names) and `static/js/time-format.js`. Stored values, form values an
 `<input type="time">` fields stay 24-hour, and lists are ordered by the stored value, never by the
 displayed text. `tests/verify_time_format.py` fails if a display path formats a time any other way.
 
+**Philippine time, and the limits every form checks (Task 24, 2026-10-24; audit B12–B28).**
+- *Dates of stored timestamps (B22).* A value saved by the database clock (UTC) is shown on its
+  Philippine date (Asia/Manila, UTC+8): Registered on the Patient Profile, Patient Records and its
+  Excel file, a consultation's "Recorded … on", "Last edited" and "marked", Edit Consultation's
+  "Last changed", "last updated" on the allergy note, and Recent removals. A record saved at
+  00:30 on November 1 in Manila reads November 1, not October 31 (`stamp_date` / `stamp_long_date`).
+- *The page's clock (B23).* Every page carries the server's Philippine date and time
+  (`<body data-clinic-now>`). The Register / Edit Patient age preview, its civil-status list and the
+  "Printed …" stamp read it (`IDSTime.clinicToday()`, `clinicStamp()`), never the device's clock or
+  timezone. The server still decides on save.
+- *Maximum lengths (B21, B14).* Names 100 characters, address lines 200, the condition and allergy
+  notes and the four written consultation fields 2,000, the check-in reason 200 (both check-in
+  paths), inventory text fields, lot and brand 200, the item note 2,000, the removal note 200. Each
+  is a server check with "Use N characters or fewer. This has M." beside the field, the typed value
+  kept, and the same number as the form's maxlength. A birth date over 120 years ago is refused.
+  Records saved before these limits still display and export in full; they are asked to be
+  shortened only when edited.
+- *Numbers (B13, B14).* Cost and quantity fields take plain digits only: "inf", "nan", "1e9", "+5"
+  and "1_000" are refused; the reorder level is at most 100,000.
+- *No server error page for an ordinary mistake (B12, B13, B24).* A second parent's report for one
+  dose is refused in words with the dialog reopened; every PDF table wraps or shortens a very long
+  cell ("…") instead of failing, and the Excel file keeps the full text.
+- *One broadcast per compose form (B20).* The SMS compose form carries a one-time token (the
+  broadcast reference). The server claims it in one locked transaction before any message is sent,
+  so a second press, a refreshed page or two requests at once send and record nothing more, with a
+  plain message. The Send button disables itself after the first click.
+
 Every screen must reuse the same design system.
 
 ---
@@ -499,6 +526,11 @@ Barangay purchase, Donation, Other), optional brand name. It adds one batch and 
 **Remove from stock (Task 12).** On the item page, per batch. An amount from 1 up to what the batch holds,
 a required reason (Expired, Damaged, Lost, Returned, Count correction) and an optional note. It takes the
 amount out of that one batch and writes one audit entry (item, lot, amount, reason; the note is not copied).
+A refused removal (more than the batch holds, no reason, a note over 200 characters) shows the item page
+again with the dialog open on the typed amount, reason and note and the message beside the field, as
+Receive stock does (Task 24, audit B16). When no batch holds usable stock the Nearest expiry card, the
+list column, the Administrator dashboard and the export say "No stock" (B17); "No expiry" is kept for
+stock on hand that carries no expiry date.
 
 ---
 
@@ -580,6 +612,8 @@ visit waiting for him, and Staff and the Doctor can mark a visit Left before bei
 the list read-only. Nothing closes a visit automatically. The line under Today's table starts "Today:" and
 gives the five status counts; a line under this section, "Earlier days:", gives the three open ones. The
 Doctor's dashboard count, the Staff count and the queue (today plus earlier days) are the same number.
+The Excel and PDF files hold this list too, on their own "Earlier Days" sheet, counted on the cover
+(Task 24, audit B18).
 
 **Start is for today (Task 11, 2026-10-03).** A visit from an earlier day with status Waiting offers only Left
 before being seen (and Change service); Start is not shown, and a Start POST on it is refused by the server
@@ -1031,6 +1065,11 @@ This screen carries no doughnut chart. Two overlapping cohorts are not slices of
 
 ## Vaccination Campaigns
 
+**One name for the follow-up figure (Task 24, audit B19).** The number of children with a dose due,
+with no record, or with only a parent's word is "Children Due for Immunization" here, on the Staff,
+Doctor and Administrator dashboards and in the report files, with one sub-line: "<N> with a dose with
+no record (28 days past due)".
+
 Purpose
 
 Report immunisation coverage against the Department of Health Expanded Program on Immunization (EPI) infant schedule.
@@ -1223,7 +1262,11 @@ Recording is refused if that queue entry has already been written up; the operat
 
 Immunizations Given Today
 
-Shown for patients under 5 only.
+Shown for patients under 5 only (the schedule's cohort: under 5 years, 0–59 months, judged on the
+visit's date). The server refuses, in words, a dose given here for a patient of 5 years or more on
+Record and on Edit Consultation, and keeps everything typed (Task 24, audit B15; before, the dose was
+dropped silently). A childhood dose seen on a vaccination card can still be recorded at any age from
+the Immunization Record tab, so a history can be written down.
 
 Every scheduled dose is offered, not only the outstanding ones, so a health worker catching a child up can see the whole schedule.
 
@@ -1683,7 +1726,7 @@ working control is the worst kind this project keeps.
 
 **Column sorting — built on Screens 03 and 06; deliberately absent on Screen 08.**
 
-Patient Records sorts by Name, Age, Last Visit and Status; Medicine Inventory sorts by Item
+Patient Records sorts by Name, Age (on the birth date, so babies are in age order; audit B26), Last Visit and Status; Medicine Inventory sorts by Item
 name, Usable stock, Nearest expiry and Status. Both run over the rows already rendered, the way
 their search boxes and Advanced Filter panels do, so sorting composes with a narrowed list instead
 of resetting it. One comparator serves both (`static/js/table-sort.js`); each screen supplies only

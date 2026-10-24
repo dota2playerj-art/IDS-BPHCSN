@@ -892,6 +892,49 @@ it had nowhere to go. `patients.barangay` (nullable TEXT) was added by
 changed automatically: a record saved before has no barangay, and Edit Patient shows its stored values
 and asks for the barangay (and for any other value the rules now refuse) before it can be saved.
 
+# Decision Record — Plain Refusals, Limits and Philippine Time (2026-10-24, Task 24)
+
+Fixes for the audit findings B12–B28 of 2026-10-23 (kept outside the repository, in
+`C:\IDS-BPHCSN-audit\FINDINGS.md`). No role, permission, screen or schema change.
+
+**D1 — A mistake is refused in words, never with the error page.** A second parent's report for one
+dose (B12), a huge reorder level (B13) and a non-number in a cost or quantity field ("inf", "nan",
+"1e9"; B14) are refused beside the field with what was typed kept. Every PDF table wraps or shortens a
+very long cell instead of failing (B24); the Excel file keeps the full text. A refused Remove from
+stock reopens its dialog on the typed amount, reason and note (B16).
+
+**D2 — One broadcast per compose form (B20).** The compose form carries a one-time token, the
+broadcast's reference. The server claims it in one locked database transaction before any message is
+sent, so a double click, a refreshed page or two requests at once cannot send or record a broadcast
+twice. The Send button also disables itself after the first click.
+
+**D3 — Maximum lengths (B21, B14).** Names 100 characters; address lines 200; condition and allergy
+notes and the four written consultation fields 2,000; the check-in reason 200 on both check-in paths;
+inventory text fields, lot and brand 200; the item note 2,000; the removal note 200. Server checks,
+with the same numbers as the forms' maxlength. A birth date over 120 years ago is refused. Older
+records over a limit still display and export; they are asked to be shortened only when edited. On
+2026-10-24 the live database had none (read-only count).
+
+**D4 — Philippine time everywhere (B22, B23).** Every date and time shown is Philippine time
+(Asia/Manila, UTC+8). A timestamp the database stores in UTC is converted before its date is printed,
+so a record saved between midnight and 8 AM shows the right day. The page's age preview, its
+civil-status list and the "Printed …" stamp use the server's Philippine date and time, written into
+every page, not the device's clock; the server still decides.
+
+**D5 — The infant schedule's age (B15).** A dose of the EPI infant schedule cannot be recorded as
+given here for a patient who was 5 years (60 months) or older on the visit date: the schedule's cohort
+is under 5 years, 0–59 months (`PEDIATRIC_AGE_YEARS`; the schedule data has no per-dose upper age).
+The form does not offer it and the server refuses it in words. A dose given elsewhere, recorded from a
+vaccination card, stays allowed at any age so that a history can be written down.
+
+**D6 — One name for one figure (B19), and the display fixes.** The children with a dose due, with no
+record, or with only a parent's word are "Children Due for Immunization" on every dashboard, on
+Vaccination Campaigns and in the report files, with one sub-line ("<N> with a dose with no record (28
+days past due)"); the chapter 4 number sources and the manuscript do not name this figure, so the
+dashboards' existing label was kept. The Patient Queue's files hold the open visits from earlier days
+(B18); Sort by Age uses the birth date (B26); a long unbroken broadcast preview wraps (B27); an item
+with no usable stock says "No stock", not "No expiry" (B17).
+
 # Sample Development Workflow
 
 Research
@@ -1115,3 +1158,10 @@ diagnosis is required only where the service needs it (B01); one open visit per 
 clinical action for a patient marked Deceased, and no death declared over an open visit (B04); SMS segments
 counted in 16-bit units (B05); the Service Schedule uses the Patient Queue's service list (B06). See the visit
 flow above and `03_SCREEN_SPECIFICATIONS.md`.
+
+Version 3.8 (2026-10-24)
+
+Task 24, fixes from the same audit (B12–B28): plain refusals instead of the error page, one SMS
+broadcast per compose form, maximum lengths, Philippine time for stored timestamps and the page's own
+clock, no infant-schedule dose given here from 5 years of age, and one name for the immunization
+follow-up figure. See the Task 24 decision record and `03_SCREEN_SPECIFICATIONS.md`.
