@@ -4,7 +4,9 @@ B12  A second parent's report for one dose is refused in words, not with a serve
 B13  A huge reorder level is refused; B14 "inf", "nan", "1e9" and other non-numbers too.
 B24  A PDF export never fails on long text; B25 the Patient Records search runs clean.
 B20  One compose form sends one SMS broadcast. B21, B14 maximum lengths.
-The sections for the later batches are added below as each batch is done.
+B19, B18, B26, B17, B27, B28 wording and display. B22, B23 dates in Philippine time.
+B15  No infant-schedule dose given here past the schedule's age. B16 a refused removal keeps
+     what was typed.
 Every name, date and number below is made up.
 """
 import io
@@ -638,6 +640,114 @@ check("the print stamps and the age preview no longer read the device clock",
       and "clinicStamp" in js and "clinicToday" in js)
 # The browser half (a device in Los Angeles with its clock two days behind) is in
 # verify_audit_fixes_2_browser.py.
+
+
+# ===========================================================================
+section("B15. NO INFANT-SCHEDULE DOSE GIVEN HERE PAST THE SCHEDULE'S AGE")
+from models.immunizations import DATE_FIELD, DOSE_FIELD, PROOF_FIELD, SCHEDULE_AGE_LIMIT_TEXT  # noqa: E402
+
+CHECK_IN = "/staff/appointment_scheduling/check-in"
+START_URL = "/staff/appointment_scheduling/start-consultation"
+
+
+def open_visit(pid):
+    run_sql("UPDATE appointments SET status = 'Completed' WHERE status IN ('Waiting', 'In Consultation', "
+            "'Waiting for the Doctor')")
+    staff.post(CHECK_IN, data={"patient_id": str(pid), "reason": "QA visit", "service": "Immunization"})
+    visit = q1("SELECT id FROM appointments WHERE patient_id = ? ORDER BY id DESC LIMIT 1", (pid,))[0]
+    staff.post(START_URL, data={"appointment_id": str(visit)})
+    return visit
+
+
+def years_before(day, years):
+    try:
+        return day.replace(year=day.year - years)
+    except ValueError:  # Feb 29
+        return day.replace(year=day.year - years, day=28)
+
+
+check("the limit used is the schedule's own cohort: children under 5 years (0–59 months)",
+      SCHEDULE_AGE_LIMIT_TEXT == "children under 5 years (0–59 months)", SCHEDULE_AGE_LIMIT_TEXT)
+INTAKE = {"chief_complaint": "QA typed complaint", "temperature": "36.9"}
+cases = (("an adult of 36", years_before(TODAY, 36), True),
+         ("a child of exactly 5 years (60 months)", years_before(TODAY, 5), True),
+         ("a child one day short of 5 years (59 months)", years_before(TODAY, 5) + timedelta(days=1), False))
+for label, born, refused in cases:
+    pid = add_patient(born.isoformat(), first="Zzqaepi")
+    visit = open_visit(pid)
+    form_page = body(staff.get(f"/staff/consultation/record/{visit}"))
+    check(f"{label}: the form {'does not offer' if refused else 'offers'} 'Immunizations Given Today'",
+          ('name="immunizations"' in form_page) is not refused)
+    r = staff.post(f"/staff/consultation/record/{visit}", data={**INTAKE, "immunizations": ["MMR:1"]})
+    shown = body(r)
+    said = "The infant immunization schedule is for children under 5 years (0–59 months)" in shown
+    if refused:
+        check(f"{label}: a dose given here is refused in words (200, no server error)",
+              r.status_code == 200 and said, r.status_code)
+        check(f"{label}: ... nothing saved, the typed complaint kept",
+              q1("SELECT COUNT(*) FROM consultations WHERE appointment_id = ?", (visit,))[0] == 0
+              and q1("SELECT COUNT(*) FROM immunizations WHERE patient_id = ?", (pid,))[0] == 0
+              and "QA typed complaint" in shown)
+        r = staff.post(f"/staff/consultation/record/{visit}", data=INTAKE)
+        check(f"{label}: the same consultation without the dose saves",
+              q1("SELECT COUNT(*) FROM consultations WHERE appointment_id = ?", (visit,))[0] == 1)
+        saved = q1("SELECT id FROM consultations WHERE appointment_id = ?", (visit,))
+        if saved:
+            r = staff.post(f"/staff/consultation/edit/{saved[0]}",
+                           data={**INTAKE, "chief_complaint": "QA edited", "immunizations": ["MMR:1"]})
+            check(f"{label}: an edit with a dose given here is refused in words too, nothing saved",
+                  r.status_code == 200 and "The infant immunization schedule is for" in body(r)
+                  and q1("SELECT COUNT(*) FROM immunizations WHERE patient_id = ?", (pid,))[0] == 0,
+                  r.status_code)
+    else:
+        check(f"{label}: no age refusal (the schedule still applies)", not said)
+
+adult = add_patient(years_before(TODAY, 40).isoformat(), first="Zzqacard")
+r = staff.post(f"/staff/patient_profile/{adult}/dose-elsewhere",
+               data={DOSE_FIELD: "BCG:1", PROOF_FIELD: "card", DATE_FIELD: years_before(TODAY, 39).isoformat()})
+check("an adult's childhood dose from a vaccination card can still be recorded (history)",
+      r.status_code == 302 and q1("SELECT COUNT(*) FROM immunizations WHERE patient_id = ? AND evidence = 'card'",
+                                  (adult,))[0] == 1, (r.status_code, body(r)[:200]))
+
+
+# ===========================================================================
+section("B16. A REFUSED 'REMOVE STOCK' KEEPS WHAT WAS TYPED")
+stock_item = q1("SELECT id FROM inventory_items WHERE status = 'Active' ORDER BY id DESC LIMIT 1")[0]
+run_sql("INSERT INTO inventory_batches (inventory_item_id, lot_number, expiry_date, quantity_received, "
+        "quantity_remaining, date_received, source) VALUES (?, 'QA-B16', ?, 40, 40, ?, 'DOH')",
+        (stock_item, (TODAY + timedelta(days=300)).isoformat(), TODAY.isoformat()))
+b16 = q1("SELECT id FROM inventory_batches WHERE lot_number = 'QA-B16'")[0]
+
+
+def left16():
+    return q1("SELECT quantity_remaining FROM inventory_batches WHERE id = ?", (b16,))[0]
+
+
+for who, client, prefix in (("Health Center Staff", staff, "/staff"), ("Administrator", admin, "/admin")):
+    url = f"{prefix}/medicine_inventory/{stock_item}/remove"
+    held = left16()
+    r = client.post(url, data={"batch_id": str(b16), "quantity": str(held + 1), "reason": "Lost", "note": "QA typed note"})
+    page = body(r)
+    check(f"{who}: more than the batch holds -> the item page again (200), not a redirect",
+          r.status_code == 200, r.status_code)
+    check(f"{who}: ... the dialog reopens on its batch, with the amount, reason and note typed",
+          "new bootstrap.Modal(removeModal).show()" in page and f'id="removeBatchId" value="{b16}"' in page
+          and f'value="{held + 1}"' in page and '<option value="Lost" selected>' in page and 'value="QA typed note"' in page)
+    check(f"{who}: ... and the message beside the amount", f"This batch holds only {held}." in page
+          and f'id="removeQuantity" required max="{held}"' in page)
+    r = client.post(url, data={"batch_id": str(b16), "quantity": "3", "reason": "", "note": "QA second"})
+    page = body(r)
+    check(f"{who}: no reason -> reopened with the amount kept and 'Choose a reason.'",
+          r.status_code == 200 and 'value="3"' in page and "Choose a reason." in page and 'value="QA second"' in page)
+    r = client.post(url, data={"batch_id": str(b16), "quantity": "2", "reason": "Damaged", "note": "N" * 201})
+    check(f"{who}: a note over 200 characters -> reopened with the message", r.status_code == 200
+          and "200 characters or fewer" in body(r) and "new bootstrap.Modal(removeModal).show()" in body(r),
+          re.findall(r"invalid-feedback d-block\">([^<]+)", body(r))[:3])
+    check(f"{who}: nothing was removed by the refused attempts", left16() == held)
+    r = client.post(url, data={"batch_id": str(b16), "quantity": "1", "reason": "Damaged", "note": ""})
+    check(f"{who}: a valid removal still saves and redirects", r.status_code == 302)
+check("a normal item page does not open the dialog by itself",
+      "new bootstrap.Modal(removeModal).show()" not in body(staff.get(f"/staff/medicine_inventory/{stock_item}")))
 
 # ---------------------------------------------------------------------------
 failed = [name for name, ok in results if not ok]

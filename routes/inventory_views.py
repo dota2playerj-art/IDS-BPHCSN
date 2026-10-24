@@ -19,6 +19,7 @@ from models.inventory import (
     ITEM_CATEGORIES,
     ITEM_STATUSES,
     NO_LOT_NUMBER,
+    REMOVAL_NOTE_MAX_LENGTH,
     REMOVAL_REASONS,
     STOCK_SOURCES,
     UNITS,
@@ -207,8 +208,13 @@ def process_add_edit_medicine(form_data, item=None, user_id=None, ip_address=Non
     return new_id, None, f"{created['name']} added. Now receive its first stock."
 
 
-def item_page_context(item_id, receive_form=None, receive_errors=None):
-    """Everything the item page renders, or None if there is no such item."""
+def item_page_context(item_id, receive_form=None, receive_errors=None,
+                      remove_form=None, remove_errors=None, remove_batch=None):
+    """Everything the item page renders, or None if there is no such item.
+
+    remove_* reopen the Remove from stock dialog on a refused removal, with what was typed
+    and the message beside the field (audit B16), as receive_* do for Receive stock.
+    """
     item = get_inventory_item_by_id(item_id)
     if item is None:
         return None
@@ -218,6 +224,10 @@ def item_page_context(item_id, receive_form=None, receive_errors=None):
         "options": FORM_OPTIONS,
         "receive_form": receive_form or {"date_received": today().isoformat()},
         "receive_errors": receive_errors or {},
+        "remove_form": remove_form or {},
+        "remove_errors": remove_errors or {},
+        "remove_batch": remove_batch,
+        "removal_note_max": REMOVAL_NOTE_MAX_LENGTH,
         "expiring_soon_days": EXPIRING_SOON_DAYS,
         "batch_text_max": TEXT_MAX_LENGTH,
     }
@@ -242,24 +252,29 @@ def process_receive_stock(item_id, form_data, user_id=None, ip_address=None):
 
 
 def process_remove_stock(item_id, form_data, user_id=None, ip_address=None):
-    """Take an amount out of one batch. Returns the message to flash."""
+    """Take an amount out of one batch. Returns (context, message): a context means re-render
+    the item page with the dialog reopened on what was typed and the field errors (audit
+    B16); otherwise redirect to the item page and flash `message`."""
     item = get_inventory_item_by_id(item_id)
     if item is None:
-        return "That inventory item could not be found."
+        return None, "That inventory item could not be found."
 
     values = _extract_form(form_data, REMOVE_FIELDS)
     if not values["batch_id"].isdigit():
-        return "Choose the batch to take stock out of."
+        return None, "Choose the batch to take stock out of."
     batch = next((b for b in item["batches"] if b["id"] == int(values["batch_id"])), None)
     if batch is None:
-        return "That batch could not be found."
+        return None, "That batch could not be found."
 
     removed, errors = remove_from_batch(
         item_id, batch["id"], values, removed_by=user_id,
         audit=stock_removed(user_id, ip_address))
     if errors:
-        return " ".join(errors.values())
-    return f"Removed {removed:,} from lot {batch['lot_number']} ({values['reason']})."
+        if set(errors) <= {"quantity", "reason", "note"}:
+            return item_page_context(item_id, remove_form=values, remove_errors=errors,
+                                     remove_batch=batch), None
+        return None, " ".join(errors.values())
+    return None, f"Removed {removed:,} from lot {batch['lot_number']} ({values['reason']})."
 
 
 def process_archive_medicine(form_data, user_id=None, ip_address=None):

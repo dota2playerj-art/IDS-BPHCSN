@@ -514,6 +514,34 @@ def dose_today_field(key):
     return "dose_today_" + str(key or "").replace(":", "_")
 
 
+# The infant schedule's upper age (audit B15, Task 24). EPI_SCHEDULE has no per-dose upper
+# age; the schedule as a whole applies while get_immunization_status() says `applicable`,
+# under PEDIATRIC_AGE_YEARS (5 years, 0-59 months), the cohort the consultation form uses.
+SCHEDULE_AGE_LIMIT_TEXT = (f"children under {PEDIATRIC_AGE_YEARS} years "
+                           f"(0–{PEDIATRIC_AGE_YEARS * 12 - 1} months)")
+DOSES_GIVEN_HERE_FIELD = "immunizations"
+REPORTED_DATE_LABELS_EXTRA = {DOSES_GIVEN_HERE_FIELD: "Immunizations Given Today"}
+
+
+def refuse_doses_past_schedule_age(raw_keys, age_context):
+    """Refuse infant-schedule doses GIVEN HERE for a patient past the schedule's age.
+
+    Returns {field: message}, empty when nothing was ticked or the patient is in the
+    cohort. The form does not offer the section past that age; this is the server's own
+    refusal, in words, for a stale or forged form (before, the doses were silently
+    dropped and the consultation saved). Judged on the visit's date, as age_context is.
+    A dose given elsewhere, recorded from a vaccination card on the Immunization Record
+    tab, stays allowed at any age so that a history can be written down.
+    """
+    if age_context.get("is_pediatric") or not any(str(key).strip() for key in raw_keys or ()):
+        return {}
+    return {DOSES_GIVEN_HERE_FIELD: (
+        f"The infant immunization schedule is for {SCHEDULE_AGE_LIMIT_TEXT}. This patient "
+        f"was {age_context.get('age_display') or 'older'} on the visit date, so no dose of it "
+        "can be recorded as given here. A dose from a vaccination card can be recorded on "
+        "the Immunization Record tab.")}
+
+
 def check_given_today(patient, dose_keys, visit_date, reported_entries=()):
     """Refuse every ticked "given today" dose that is not eligible (Task 13, D3).
 

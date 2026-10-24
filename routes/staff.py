@@ -433,8 +433,11 @@ def staff_receive_stock(item_id):
 @login_required
 @role_required(*CLINICAL_FLOOR_ROLES)
 def staff_remove_stock(item_id):
-    flash(process_remove_stock(
-        item_id, request.form, session.get("user_id"), request.remote_addr))
+    context, message = process_remove_stock(
+        item_id, request.form, session.get("user_id"), request.remote_addr)
+    if context is not None:
+        return render_template('inventory_item.html', **context)
+    flash(message)
     return redirect(url_for("staff.staff_medicine_item", item_id=item_id))
 
 

@@ -91,6 +91,8 @@ from models.immunizations import (
     parse_dose_keys,
     parse_reported_doses,
     record_immunizations,
+    REPORTED_DATE_LABELS_EXTRA,
+    refuse_doses_past_schedule_age,
     record_reported_immunizations,
     reported_date_field,
     reported_proof_field,
@@ -770,7 +772,8 @@ def consultation_form_context(patient, appointment=None, consultation=None,
         # consultation's own label map is left exactly as it was, so the audit
         # trail still describes only the fields it describes.
         "field_labels": dict(FIELD_LABELS, **GENERAL_VACCINE_LABELS,
-                             **DISPENSING_LABELS, **REPORTED_DATE_LABELS),
+                             **DISPENSING_LABELS, **REPORTED_DATE_LABELS,
+                             **REPORTED_DATE_LABELS_EXTRA),
         # (field, label, unit, low, high, whole) -- the form prints the unit in
         # each field's hint and the range in its out-of-range message, from the
         # same tuples the validator checks against.
@@ -954,6 +957,8 @@ def process_record_consultation(appointment_id, form_data, user_id,
     errors.update(general_errors)
     errors.update(reported_errors)
     errors.update(dispense_errors)
+    # Past the schedule's age a dose given here is refused in words, not dropped (audit B15).
+    errors.update(refuse_doses_past_schedule_age(form_data.getlist(IMMUNIZATION_FIELD), age_context))
     # A dose that is not due is refused whatever the form showed (Task 13).
     if age_context["is_pediatric"]:
         errors.update(check_given_today(patient, dose_keys, context["visit_date"],
@@ -1484,6 +1489,8 @@ def process_edit_consultation(consultation_id, form_data, user_id, ip_address=No
     errors.update(general_errors)
     errors.update(reported_errors)
     errors.update(dispense_errors)
+    # Past the schedule's age a dose given here is refused in words, not dropped (audit B15).
+    errors.update(refuse_doses_past_schedule_age(form_data.getlist(IMMUNIZATION_FIELD), age_context))
     # A dose that is not due is refused on an edit too (Task 13). Doses this visit already
     # recorded are locked on the form and skipped here, as the save skips them.
     if age_context["is_pediatric"]:

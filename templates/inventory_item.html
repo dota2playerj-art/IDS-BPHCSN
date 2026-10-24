@@ -283,29 +283,40 @@
       <div class="modal-dialog modal-fullscreen-sm-down modal-dialog-centered">
         <form class="modal-content" method="post" action="{{ url_for(remove_stock_endpoint, item_id=item.id) }}" style="border-radius:16px;">
           {{ csrf_field() }}
-          <input type="hidden" name="batch_id" id="removeBatchId" value="">
+          {#- Reopened by the server on a refused removal, with what was typed (audit B16). #}
+{%- set rb = remove_batch if remove_errors else none %}
+          <input type="hidden" name="batch_id" id="removeBatchId" value="{{ rb.id if rb else '' }}">
           <div class="modal-header">
             <h5 class="modal-title" id="removeStockModalLabel">Remove from stock</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
-            <p style="margin-bottom:14px;">Lot <strong id="removeLot"></strong> holds <strong id="removeLeft"></strong>. This takes stock out of this one batch.</p>
+{%- if remove_errors %}
+            <div class="notice notice-danger" style="margin-bottom:12px;">
+              <span class="material-symbols-outlined">error</span>
+              <div>Nothing was removed. Please correct the highlighted field{{ "s" if remove_errors|length != 1 }} below.</div>
+            </div>
+{%- endif %}
+            <p style="margin-bottom:14px;">Lot <strong id="removeLot">{{ rb.lot_number if rb else '' }}</strong> holds <strong id="removeLeft">{{ rb.quantity_remaining if rb else '' }}</strong>. This takes stock out of this one batch.</p>
             <div class="mb-3">
               <label class="field-label" for="removeQuantity">Amount to remove<span class="req">*</span></label>
-              <input type="number" min="1" step="1" class="form-control" name="quantity" id="removeQuantity" required>
+              <input type="number" min="1" step="1" class="form-control{% if remove_errors.quantity %} is-invalid{% endif %}" name="quantity" id="removeQuantity" required{% if rb %} max="{{ rb.quantity_remaining }}" value="{{ remove_form.quantity or '' }}"{% endif %}>
+              {%- if remove_errors.quantity %}<div class="invalid-feedback d-block">{{ remove_errors.quantity }}</div>{% endif %}
             </div>
             <div class="mb-3">
               <label class="field-label" for="removeReason">Reason<span class="req">*</span></label>
-              <select class="form-select" name="reason" id="removeReason" required>
+              <select class="form-select{% if remove_errors.reason %} is-invalid{% endif %}" name="reason" id="removeReason" required>
                 <option value="">Select reason</option>
 {%- for option in options.reasons %}
-                <option value="{{ option }}">{{ option }}</option>
+                <option value="{{ option }}"{% if rb and remove_form.reason == option %} selected{% endif %}>{{ option }}</option>
 {%- endfor %}
               </select>
+              {%- if remove_errors.reason %}<div class="invalid-feedback d-block">{{ remove_errors.reason }}</div>{% endif %}
             </div>
             <div>
               <label class="field-label" for="removeNote">Note</label>
-              <input type="text" class="form-control" name="note" id="removeNote" maxlength="200" placeholder="Optional. Do not write a patient name.">
+              <input type="text" class="form-control{% if remove_errors.note %} is-invalid{% endif %}" name="note" id="removeNote" maxlength="{{ removal_note_max }}" placeholder="Optional. Do not write a patient name."{% if rb %} value="{{ remove_form.note or '' }}"{% endif %}>
+              {%- if remove_errors.note %}<div class="invalid-feedback d-block">{{ remove_errors.note }}</div>{% endif %}
             </div>
           </div>
           <div class="modal-footer">
@@ -324,6 +335,9 @@
     removeModal.addEventListener('show.bs.modal', function(event){
       var trigger = event.relatedTarget;
       if(!trigger){ return; }
+      // A new batch chosen after a refusal: the old messages go with the old values.
+      removeModal.querySelectorAll('.is-invalid').forEach(function(el){ el.classList.remove('is-invalid'); });
+      removeModal.querySelectorAll('.invalid-feedback, .notice-danger').forEach(function(el){ el.remove(); });
       var left = trigger.dataset.left || '';
       document.getElementById('removeBatchId').value = trigger.dataset.batchId || '';
       document.getElementById('removeLot').textContent = trigger.dataset.lot || '';
@@ -335,6 +349,13 @@
       document.getElementById('removeNote').value = '';
     });
   }
+{%- if remove_errors %}
+  // A refused removal: the dialog opens again on what was typed (audit B16). Opened from
+  // here there is no relatedTarget, so the handler above leaves the values alone.
+  document.addEventListener('DOMContentLoaded', function(){
+    if (window.bootstrap && removeModal) { new bootstrap.Modal(removeModal).show(); }
+  });
+{%- endif %}
   // A ticked "No lot number" replaces the lot box.
   (function(){
     var box = document.getElementById('rNoLot');

@@ -5,7 +5,7 @@ B27  The Official dashboard at 390 px: a broadcast with a long unbroken run does
      page wider than the screen.
 B23  A device in Los Angeles with its clock two days behind: the age preview, the civil-status
      list and the "Printed ..." stamp follow the server's Philippine date, not the device's.
-The sections for the later batches are added below as each batch is done.
+B16  A refused Remove from stock: the dialog opens again with the typed amount, reason and note.
 Every name, date and number below is made up.
 
 Needs the DEV-only package: pip install -r requirements-dev.txt, then
@@ -96,6 +96,13 @@ run_sql("INSERT INTO sms_broadcasts (reference, message, category, audience, aud
         "sent_count, failed_count, segments, encoding, status, delivery_mode, sent_by) VALUES "
         "('BC-ZZB27', ?, 'General Reminder', 'all_patients', 'All patients', 1, 1, 0, 1, 'GSM-7', 'Sent', "
         "'simulated', ?)", ("Q" * 1600, ADMIN_ID))
+
+
+# The batch of B16, on the newest active item.
+B16_ITEM = q1("SELECT id FROM inventory_items WHERE status = 'Active' ORDER BY id DESC LIMIT 1")[0]
+B16_BATCH = run_sql("INSERT INTO inventory_batches (inventory_item_id, lot_number, expiry_date, quantity_received, "
+                    "quantity_remaining, date_received, source) VALUES (?, 'QA-B16B', ?, 30, 30, ?, 'DOH')",
+                    (B16_ITEM, (TODAY + timedelta(days=300)).isoformat(), TODAY.isoformat()))
 
 
 def start_server():
@@ -213,6 +220,37 @@ def run_checks(browser, base_url):
         stamps = page.evaluate("Array.from(document.querySelectorAll('.print-stamp')).map(e => e.textContent)")
         check(f"{path}: the 'Printed' stamp carries the clinic's date and hour", stamps
               and all(any(s.startswith(e) for e in expected) for s in stamps), (stamps, expected))
+    check("no page script failed", not errors, "\n".join(errors))
+    context.close()
+
+    section("B16. A REFUSED REMOVE FROM STOCK REOPENS THE DIALOG WITH WHAT WAS TYPED")
+    context = browser.new_context(base_url=base_url, storage_state=states["staff"],
+                                  viewport={"width": 1366, "height": 800})
+    page = context.new_page()
+    errors = watch_errors(page)
+    page.goto(f"/staff/medicine_inventory/{B16_ITEM}")
+    page.wait_for_load_state()
+    page.click(f"button[data-batch-id='{B16_BATCH}']")
+    page.wait_for_selector("#removeStockModal.show")
+    page.evaluate("document.getElementById('removeQuantity').removeAttribute('max')")  # as a stale page would
+    page.fill("#removeQuantity", "31")
+    page.select_option("#removeReason", "Lost")
+    page.fill("#removeNote", "QA browser note")
+    page.click("#removeStockModal button[type=submit]")
+    page.wait_for_load_state()
+    page.wait_for_selector("#removeStockModal.show", timeout=5000)
+    state = page.evaluate("""() => ({
+        quantity: document.getElementById('removeQuantity').value,
+        reason: document.getElementById('removeReason').value,
+        note: document.getElementById('removeNote').value,
+        lot: document.getElementById('removeLot').textContent,
+        message: (document.querySelector('#removeStockModal .invalid-feedback') || {}).textContent || ''})""")
+    check("the dialog is open again with 31, Lost and the note, on lot QA-B16B",
+          state["quantity"] == "31" and state["reason"] == "Lost" and state["note"] == "QA browser note"
+          and state["lot"] == "QA-B16B", state)
+    check("... with the message beside the amount", "holds only 30" in state["message"], state)
+    check("nothing was removed", q1("SELECT quantity_remaining FROM inventory_batches WHERE id = ?",
+                                    (B16_BATCH,))[0] == 30)
     check("no page script failed", not errors, "\n".join(errors))
     context.close()
 
