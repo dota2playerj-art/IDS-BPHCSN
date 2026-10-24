@@ -749,7 +749,7 @@ def _inventory_export(context, produced_by):
             _value(item.get("stock_quantity")),
             _value(item.get("unit")),
             _value(item.get("low_stock_threshold")),
-            display_date(item.get("nearest_expiry"), "No expiry"),
+            display_date(item.get("nearest_expiry"), "No expiry" if item.get("stock_quantity") else "No stock"),
             _value(item.get("expiring_soon_batches")),
             _value(item.get("expired_batches")),
             _value(item.get("supplier")),
@@ -974,6 +974,38 @@ def _appointment_export(context, produced_by):
         ),
     )
 
+    # The screen's second list (audit B18): every visit from an earlier day that is still
+    # open. It was missing from the file, so a printout hid visits still waiting.
+    earlier = context.get("earlier_open") or []
+    earlier_columns = ["Visit", "Patient", "Patient ID", "Checked in", "Waiting",
+                       *(["Service"] if show_reason else []), "Status"]
+    earlier_rows = [
+        [
+            _value(entry.get("reference")),
+            _value(_patient_name(entry)),
+            _value(entry.get("patient_reference")),
+            _value(display_date(entry.get("checked_in_date"))
+                   + (f" · {entry['arrival_time']}" if entry.get("arrival_time") else "")),
+            _value(entry.get("waiting_text")),
+            *([_value(entry.get("appointment_type") or "Consultation")] if show_reason else []),
+            _value(entry.get("display_status")),
+        ]
+        for entry in earlier
+    ]
+    earlier_sheet = sheet(
+        "Earlier Days",
+        [table(
+            f"Still open from earlier days — {_count_label(len(earlier), 'visit')}",
+            earlier_columns,
+            earlier_rows,
+            note="Oldest first. Nothing closes these automatically.",
+            empty="No visit from an earlier day is still open.",
+        )],
+        heading="Open Visits from Earlier Days",
+        intro=("Every visit from a day that has gone and is still Waiting, In Consultation "
+               "or Waiting for the Doctor, as listed under today's queue on the screen."),
+    )
+
     calendar_rows = [
         [
             display_date(cell["date"]),
@@ -1047,6 +1079,7 @@ def _appointment_export(context, produced_by):
         detail=[
             ("Queue date", long_date(queue_date)),
             ("In today's queue", len(queue)),
+            ("Still open from earlier days", len(earlier)),
             ("Calendar month", calendar["label"]),
         ],
         controls=[
@@ -1062,12 +1095,14 @@ def _appointment_export(context, produced_by):
         ],
         index=[
             ["Today's Queue", "Everyone checked in today, in queue order."],
+            ["Earlier Days", "Visits from earlier days that are still open."],
             ["Calendar", "The month's load, one row per day that had visits."],
             ["Summary", "The figures the screen's stat cards and headers show."],
         ],
         intro=(
-            "The Patient Queue shows two lists, and both are in this file on "
-            "sheets of their own. Taken off the system on "
+            "The Patient Queue shows today's queue, the visits still open from earlier days, "
+            "and the calendar; all three are in this file on sheets of their own. "
+            "Taken off the system on "
             f"{now().strftime('%B %d, %Y')}."
         ),
     )
@@ -1082,7 +1117,7 @@ def _appointment_export(context, produced_by):
         f"{display_date(queue_date)} queue · {calendar['label']}",
         _stem("Patient Queue", "Queue and calendar"),
         cover,
-        [queue_sheet, calendar_sheet, summary],
+        [queue_sheet, earlier_sheet, calendar_sheet, summary],
         notes,
     )
 

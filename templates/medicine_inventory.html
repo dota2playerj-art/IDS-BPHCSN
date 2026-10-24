@@ -336,7 +336,7 @@
                 <div class="stock-bar-track"><div class="stock-bar-fill {{ item.stock_fill_class }}" style="width:{{ item.stock_percent }}%;"></div></div>
               </td>
               <td>{{ "{:,}".format(item.low_stock_threshold) }} {{ item.unit or '' }}</td>
-              <td>{{ item.nearest_expiry | display_date('No expiry') }}</td>
+              <td>{{ item.nearest_expiry | display_date('No expiry' if item.stock_quantity else 'No stock') }}</td>
               <td>{% if item.expiring_soon_batches %}<span class="badge-status badge-nearexpiry">{{ item.expiring_soon_batches }}</span>{% else %}0{% endif %}</td>
               <td>{% if item.expired_batches %}<span class="badge-status badge-expired">{{ item.expired_batches }}</span>{% else %}0{% endif %}</td>
               <td><span class="badge-status {{ item.status_badge_class }}">{{ item.display_status }}</span>{% if item.is_retired %}<div class="med-generic">{{ item.stock_status }} when retired</div>{% endif %}</td>

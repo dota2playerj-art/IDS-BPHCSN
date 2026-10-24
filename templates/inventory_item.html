@@ -109,7 +109,7 @@
       </div>
       <div class="col-md-3 col-sm-6">
         <div class="stat-card">
-          <div class="stat-value" style="font-size:20px;">{{ item.nearest_expiry | display_date('No expiry') }}</div>
+          <div class="stat-value" style="font-size:20px;">{{ item.nearest_expiry | display_date('No expiry' if item.stock_quantity else 'No stock') }}</div>
           <div class="stat-label">Nearest expiry</div>
         </div>
       </div>

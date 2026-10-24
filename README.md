@@ -100,8 +100,8 @@ Settings shows which mode is on.
 ## Running the tests
 
 ```
-python tests/run_all.py            # every suite (about 5 minutes)
-python tests/run_all.py --quick    # skips the slow suites: demo data, phone layout (about 4 minutes)
+python tests/run_all.py            # every suite (about 30 minutes)
+python tests/run_all.py --quick    # skips the slow suites: demo data, phone layout (about 9 minutes)
 ```
 
 Use `--quick` while you work, and run the full suite before you push.

@@ -1625,9 +1625,9 @@ follow = follow[:follow.find("panel-card")] if "panel-card" in follow else follo
 check("the Staff dashboard's immunization card and list use amber, not red",
       "#FEE2E2" not in card and "var(--danger)" not in card and "#FEE2E2" not in follow
       and "var(--danger)" not in follow, card[-300:])
-check("the dashboard card says it in plain words: '<N> children have doses with no record', and has no "
-      "'doses to follow up' figure",
-      re.search(r"\d+ child(?:ren)? ha(?:s|ve) doses with no record", flat(dash)) is not None
+check("the dashboard card says it in plain words, in the one sub-line every screen uses (audit B19): "
+      "'<N> with a dose with no record (28 days past due)', and has no 'doses to follow up' figure",
+      re.search(r"\d+ with a dose with no record \(28 days past due\)", flat(dash)) is not None
       and "to follow up" not in flat(dash).split("Children Due for Immunization")[1][:200])
 check("the Administrator's dashboard says 'with no record' in amber, not red",
       "with no record" in body(admin.get("/admin/dashboard"))

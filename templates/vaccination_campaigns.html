@@ -150,9 +150,9 @@
         <div class="stat-card">
           <div class="stat-icon" style="background:#FEF3C7;"><span class="material-symbols-outlined" style="color:var(--warning);">notification_important</span></div>
           <div class="stat-value">{{ immunization_coverage.needing_attention }}</div>
-          <div class="stat-label">Children Behind Schedule</div>
+          <div class="stat-label">Children Due for Immunization</div>
           <div class="stat-trend" style="color:var(--text-muted);">
-            {{ immunization_coverage.no_record_children }} with a dose with no record, {{ grace_period_days }} days after it was due
+            {{ immunization_coverage.no_record_children }} with a dose with no record ({{ grace_period_days }} days past due)
           </div>
         </div>
       </div>

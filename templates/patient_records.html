@@ -487,6 +487,7 @@
                     which would put Deceased second. #}
                 data-sort-name="{{ ((patient.last_name or '') ~ ' ' ~ (patient.first_name or '')) | lower }}"
                 data-age-years="{{ patient.age_years if patient.age_years is not none else '' }}"
+                data-age-order="{{ (99999999 - (patient.birth_date[:10] | replace('-', '') | int)) if patient.birth_date else '' }}"
                 data-visit="{{ patient.last_visit or '' }}"
                 data-status-rank="{{ patient.status_rank if patient.status_rank is not none else '' }}"
                 data-visited="{{ 'visited' if patient.last_visit else 'never' }}">
@@ -1033,7 +1034,9 @@
       columns: [
         { key: 'name',   label: 'name',       attr: 'data-sort-name',   type: 'text',
           asc: 'A–Z',        desc: 'Z–A' },
-        { key: 'age',    label: 'age',        attr: 'data-age-years',   type: 'number',
+        // Sorted on the full birth date, so babies are in order too (audit B26): whole
+        // years made every child under one a tie at 0. The number grows with age.
+        { key: 'age',    label: 'age',        attr: 'data-age-order',   type: 'number',
           asc: 'youngest first',  desc: 'oldest first' },
         // Opens newest-first: "who have I seen recently" is the question a Last
         // Visit sort gets asked, and it is also the direction that puts the

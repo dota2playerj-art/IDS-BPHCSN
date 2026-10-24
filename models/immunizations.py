@@ -1047,6 +1047,9 @@ def get_immunization_alert(limit=None, on_date=None):
         "children": children if limit is None else children[:limit],
         "child_count": len(children),
         "no_record_child_count": sum(1 for child in children if child["no_record_count"]),
+        # How late a dose is before it reads "No record", for the one sub-line every screen
+        # prints under "Children Due for Immunization" (audit B19).
+        "grace_period_days": GRACE_PERIOD_DAYS,
         # Doses to follow up across those children: no record, due now, or only a parent's word.
         "due_dose_count": sum(child["attention_count"] for child in children),
         "no_record_dose_count": sum(child["no_record_count"] for child in children),

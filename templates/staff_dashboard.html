@@ -167,7 +167,7 @@
           <div class="stat-value">{{ immunization_alert.child_count }}</div>
           <div class="stat-label">Children Due for Immunization</div>
           {%- if immunization_alert.no_record_child_count %}
-          <div class="stat-trend" style="color:var(--warning);">{{ immunization_alert.no_record_child_count }} child{{ ' has' if immunization_alert.no_record_child_count == 1 else 'ren have' }} doses with no record</div>
+          <div class="stat-trend" style="color:var(--warning);">{{ immunization_alert.no_record_child_count }} with a dose with no record ({{ immunization_alert.grace_period_days }} days past due)</div>
           {%- elif immunization_alert.child_count %}
           <div class="stat-trend" style="color:var(--warning);">{{ immunization_alert.child_count }} child{{ ' has' if immunization_alert.child_count == 1 else 'ren have' }} doses to check</div>
           {%- else %}
@@ -419,7 +419,7 @@
             <a href="{{ url_for(patient_records_endpoint) }}" class="panel-link">All patients<span class="material-symbols-outlined" style="font-size:15px;">chevron_right</span></a>
 {%- endif %}
           </div>
-          <div class="panel-sub mb-2">{{ immunization_alert.child_count }} child{{ "ren" if immunization_alert.child_count != 1 else "" }} with a dose outstanding</div>
+          <div class="panel-sub mb-2">{{ immunization_alert.child_count }} child{{ "ren" if immunization_alert.child_count != 1 else "" }} due for immunization</div>
           <div>
 {%- for child in immunization_alert.children %}
 {%- set no_record = child.no_record_count > 0 %}

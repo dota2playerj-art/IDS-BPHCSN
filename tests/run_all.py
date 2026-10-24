@@ -63,6 +63,7 @@ SUITES = [
     ("verify_patient_form_browser.py", "(new in Task 22)"),
     ("verify_audit_fixes.py", "(new in Task 23: audit fixes B01-B11)"),
     ("verify_audit_fixes_2.py", "(new in Task 24: audit fixes B12-B28)"),
+    ("verify_audit_fixes_2_browser.py", "(new in Task 24: audit fixes B12-B28, browser)"),
     ("verify_mobile_layout.py", "(new in Task 17)"),
 ]
 

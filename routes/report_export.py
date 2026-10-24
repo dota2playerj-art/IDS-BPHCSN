@@ -749,12 +749,12 @@ def _vaccination(context):
              coverage["up_to_date_children"], f"As of {closing}"),
             ("Children up to date (%)", coverage["up_to_date_pct"],
              "Against registered children, not against the barangay"),
-            ("Children needing attention", coverage["needing_attention"],
+            ("Children due for immunization", coverage["needing_attention"],
              f"A dose due, with no record, or with only a parent's word, as of {closing}"),
             ("Children with a dose with no record", coverage["no_record_children"],
              f"As of {closing}. The dose may have been given elsewhere"),
             ("Children awaiting a first dose", coverage["awaiting_first_dose"],
-             "Needing attention and with no dose on record yet"),
+             "Due for immunization and with no dose on record yet"),
         ], note=(f"Coverage is judged on one day: {closing}, the range's last day, or "
                  "today if the range ends later. A child is not up to date \"during\" a period.")),
         figures("Doses", [

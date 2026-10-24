@@ -446,6 +446,118 @@ for length, expected in ((201, 0), (200, 1)):
           q1("SELECT COUNT(*) FROM appointments WHERE patient_id = 12")[0] - n0 == expected)
 run_sql("UPDATE appointments SET status = 'Completed' WHERE patient_id = 12 AND status = 'Waiting'")
 
+
+# ===========================================================================
+def add_patient(birth_date, first="Zzqabatch"):
+    pid = q1("SELECT MAX(id) FROM patients")[0] + 1
+    run_sql("INSERT INTO patients (id, patient_id, first_name, last_name, birth_date, sex, civil_status, "
+            "address, municipality, province, contact_number, status) VALUES (?, ?, ?, 'Qafour', ?, "
+            "'Female', 'Single', 'Purok 1', 'San Francisco', 'Surigao del Norte', ?, 'Active')",
+            (pid, f"PAT-{pid:03d}", first, birth_date, f"0900000{pid:04d}"))
+    return pid
+
+
+def flat(text):
+    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", text))
+
+
+section("B19. ONE NAME FOR THE IMMUNIZATION FIGURE EVERYWHERE")
+from openpyxl import load_workbook  # noqa: E402
+
+screens = {
+    "Staff dashboard": flat(body(staff.get("/staff/dashboard"))),
+    "Doctor dashboard": flat(body(doctor.get("/staff/dashboard"))),
+    "Administrator dashboard": flat(body(admin.get("/admin/dashboard"))),
+    "Vaccination Campaigns": flat(body(official.get("/official/vaccination-campaigns"))),
+}
+xl = official.get("/official/community-reports/export.xlsx?type=all").data
+report_cells = " ".join(str(c) for ws in load_workbook(io.BytesIO(xl)).worksheets
+                        for row in ws.iter_rows(values_only=True) for c in row if c is not None)
+screens["Community Report (Excel)"] = report_cells
+screens["Community Report (PDF)"] = re.sub(r"\s+", " ", pdf_text(
+    official.get("/official/community-reports/export.pdf?type=all").data))
+for where, text in screens.items():
+    check(f"{where}: the figure is called 'due for immunization'",
+          "due for immunization" in text.lower(), text[:300])
+    check(f"{where}: the old names 'Behind Schedule' and 'needing attention' are gone",
+          "behind schedule" not in text.lower() and "needing attention" not in text.lower())
+for where in ("Staff dashboard", "Vaccination Campaigns"):
+    check(f"{where}: the no-record sub-line is the shared one: '<N> with a dose with no record (28 days past due)'",
+          re.search(r"\d+ with a dose with no record \(28 days past due\)", screens[where]) is not None,
+          screens[where][:300])
+
+section("B18. THE QUEUE EXPORT HOLDS THE OPEN VISITS FROM EARLIER DAYS")
+earlier_pid = add_patient("1986-02-02")
+earlier_day = (TODAY - timedelta(days=3)).isoformat()
+earlier_visit = run_sql(
+    "INSERT INTO appointments (patient_id, scheduled_by, appointment_type, appointment_date, appointment_time, "
+    "status, is_walkin, checked_in_at) VALUES (?, ?, 'Consultation', ?, '09:10', 'Waiting', 1, ?)",
+    (earlier_pid, STAFF_ID, earlier_day, f"{earlier_day} 09:10:00"))
+earlier_ref = f"APT-{earlier_visit:05d}"
+check("set-up: the screen lists the earlier-day visit", earlier_ref in body(staff.get("/staff/appointment_scheduling")))
+xl = staff.get("/staff/appointment_scheduling/export.xlsx").data
+book = load_workbook(io.BytesIO(xl))
+check("the Excel file has an 'Earlier Days' sheet", "Earlier Days" in book.sheetnames, book.sheetnames)
+earlier_cells = [str(c) for row in book["Earlier Days"].iter_rows(values_only=True) for c in row
+                 if c is not None] if "Earlier Days" in book.sheetnames else []
+check("... listing the visit still open from an earlier day", earlier_ref in earlier_cells, earlier_cells[:20])
+cover_cells = " ".join(str(c) for row in book.worksheets[0].iter_rows(values_only=True) for c in row if c)
+check("the cover counts it ('Still open from earlier days')", "Still open from earlier days" in cover_cells)
+check("the PDF lists it too", earlier_ref in pdf_text(staff.get("/staff/appointment_scheduling/export.pdf").data))
+run_sql("UPDATE appointments SET status = 'Completed' WHERE id = ?", (earlier_visit,))
+book = load_workbook(io.BytesIO(staff.get("/staff/appointment_scheduling/export.xlsx").data))
+check("with no earlier open visit the sheet says so in words",
+      any("No visit from an earlier day is still open." == str(c)
+          for row in book["Earlier Days"].iter_rows(values_only=True) for c in row))
+
+section("B26. SORT BY AGE ORDERS BABIES BY BIRTH DATE")
+babies = {label: add_patient((TODAY - timedelta(days=days)).isoformat(), first=f"Zzqababy{label}")
+          for label, days in (("w5", 38), ("m5", 160), ("m7", 220), ("y30", 30 * 365 + 10))}
+page = body(staff.get("/staff/patient_records"))
+order = {int(pid): (int(years) if years else None, int(key) if key else None)  # (whole years, sort key)
+         for years, key, pid in re.findall(r'data-age-years="([^"]*)"\s+data-age-order="([^"]*)"'
+                                           r'[\s\S]*?name="patient_ids" value="(\d+)"', page)}
+keys = [order.get(babies[label], (None, None)) for label in ("w5", "m5", "m7", "y30")]
+check("set-up: the three babies are all 0 whole years (the old key tied them)",
+      [k[0] for k in keys[:3]] == [0, 0, 0], keys)
+check("the sort key grows with age: 5 weeks < 5 months < 7 months < 30 years",
+      all(a[1] is not None for a in keys) and keys[0][1] < keys[1][1] < keys[2][1] < keys[3][1], keys)
+check("the Age column sorts on that key", "attr: 'data-age-order'" in page)
+check("a patient with no birth date gets an empty key (sorted last, as before)",
+      'data-age-order=""' in page or q1("SELECT COUNT(*) FROM patients WHERE birth_date IS NULL OR "
+                                        "birth_date = ''")[0] == 0)
+
+section("B17. 'NO STOCK' INSTEAD OF 'NO EXPIRY' WHEN EVERY BATCH IS EMPTY")
+item_id = q1("SELECT i.id FROM inventory_items i WHERE i.status = 'Active' AND EXISTS "
+             "(SELECT 1 FROM inventory_batches b WHERE b.inventory_item_id = i.id) ORDER BY i.id LIMIT 1")[0]
+run_sql("UPDATE inventory_batches SET quantity_remaining = 0 WHERE inventory_item_id = ?", (item_id,))
+item_page = flat(body(staff.get(f"/staff/medicine_inventory/{item_id}")))
+check("item page: the Nearest expiry card reads 'No stock'", "No stock Nearest expiry" in item_page,
+      item_page[item_page.find("Nearest expiry") - 80:][:120])
+check("... and not 'No expiry'", "No expiry Nearest expiry" not in item_page)
+book = load_workbook(io.BytesIO(staff.get("/staff/medicine_inventory/export.xlsx").data))
+name = q1("SELECT name FROM inventory_items WHERE id = ?", (item_id,))[0]
+rows = [row for ws in book.worksheets for row in ws.iter_rows(values_only=True) if name in row]
+check("the inventory export says 'No stock' for that item", any("No stock" in row for row in rows), rows[:2])
+check("the medicine list says 'No stock' on that item's row",
+      "No stock" in body(staff.get("/staff/medicine_inventory")))
+run_sql("UPDATE inventory_batches SET quantity_remaining = 5, expiry_date = NULL WHERE inventory_item_id = ?",
+        (item_id,))
+item_page = flat(body(staff.get(f"/staff/medicine_inventory/{item_id}")))
+check("stock on hand with no expiry date still reads 'No expiry'", "No expiry Nearest expiry" in item_page,
+      item_page[item_page.find("Nearest expiry") - 80:][:120])
+
+section("B27. A LONG UNBROKEN BROADCAST PREVIEW WRAPS ON THE OFFICIAL DASHBOARD")
+dash = body(official.get("/official/dashboard"))
+check("the preview line breaks long words (overflow-wrap:anywhere)",
+      re.search(r"\.list-sub\{[^}]*overflow-wrap:anywhere", dash) is not None)
+# The browser half (no sideways scroll at 390 px) is in verify_audit_fixes_2_browser.py.
+
+section("B28. THE README GIVES THE MEASURED TEST TIMES")
+readme = (REPO / "README.md").read_text(encoding="utf-8")
+check("full run 'about 30 minutes', quick run 'about 9 minutes'",
+      "every suite (about 30 minutes)" in readme and "(about 9 minutes)" in readme)
+
 # ---------------------------------------------------------------------------
 failed = [name for name, ok in results if not ok]
 print("\n" + "=" * 78)

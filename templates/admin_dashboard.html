@@ -298,7 +298,7 @@
             <div class="inv-item-head"><span class="inv-name">{{ item.name }}</span>{% if item.threshold_pct is not none %}<span class="inv-pct" style="color:{{ 'var(--danger)' if critical else 'var(--warning)' }};">{{ item.threshold_pct }}%</span>{% endif %}</div>
             <div class="inv-qty">{{ item.stock_quantity }} / {{ item.low_stock_threshold }} {{ item.unit or 'units' }}</div>
             <div class="inv-bar-track"><div class="inv-bar-fill {{ item.stock_fill_class }}" style="width:{{ item.stock_percent }}%;"></div></div>
-            <div class="inv-exp">Exp: {{ item.nearest_expiry | display_date('No expiry') }}</div>
+            <div class="inv-exp">Exp: {{ item.nearest_expiry | display_date('No expiry' if item.stock_quantity else 'No stock') }}</div>
           </div>
 {%- endfor %}
 {%- if not low_stock.low_stock_items %}
@@ -317,8 +317,8 @@
           <div style="margin-top:18px; padding-top:16px; border-top:1px solid var(--border-color);">
             <div class="panel-title" style="font-size:15px;">Immunization Follow-up</div>
             <div class="panel-sub mb-2">
-              {{ immunization_alert.child_count }} child{{ "ren" if immunization_alert.child_count != 1 else "" }} due
-{%- if immunization_alert.no_record_child_count %} &middot; <span style="color:var(--warning); font-weight:600;">{{ immunization_alert.no_record_child_count }} with no record</span>{% endif %}
+              {{ immunization_alert.child_count }} child{{ "ren" if immunization_alert.child_count != 1 else "" }} due for immunization
+{%- if immunization_alert.no_record_child_count %} &middot; <span style="color:var(--warning); font-weight:600;">{{ immunization_alert.no_record_child_count }} with a dose with no record ({{ immunization_alert.grace_period_days }} days past due)</span>{% endif %}
             </div>
 {%- if not immunization_alert.child_count %}
             <div class="panel-sub">Every child under {{ pediatric_age_years }} is up to date with the DOH schedule.</div>
